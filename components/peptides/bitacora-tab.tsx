@@ -219,15 +219,46 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
   const [editToma, setEditToma] = useState<TomaLog | null>(null);
 
   const activos = compuestos.filter((c) => c.estado === 'activo');
-  const log = useMemo<TomaLog[]>(
+
+  // Filtros de la bitácora (por péptido / rango de fechas).
+  const [filtroCompuesto, setFiltroCompuesto] = useState('');
+  const [filtroDesde, setFiltroDesde] = useState('');
+  const [filtroHasta, setFiltroHasta] = useState('');
+  const hayFiltro = !!(filtroCompuesto || filtroDesde || filtroHasta);
+
+  // Todas las tomas aplanadas + ordenadas (sin recortar) — base de los filtros.
+  const allTomas = useMemo<TomaLog[]>(
     () =>
       compuestos
         .flatMap((c) =>
           c.tomas.map((t) => ({ ...t, nombre: c.nombre, componentes: c.componentes }))
         )
-        .sort((a, b) => b.fecha.localeCompare(a.fecha))
-        .slice(0, 60),
+        .sort((a, b) => b.fecha.localeCompare(a.fecha)),
     [compuestos]
+  );
+
+  // Compuestos con al menos una toma — opciones del filtro por péptido.
+  const compuestosEnLog = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const t of allTomas) if (!seen.has(t.compuesto_id)) seen.set(t.compuesto_id, t.nombre);
+    return [...seen]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [allTomas]);
+
+  // Lista visible: aplica filtros (péptido + rango de fechas locales) y recorta a 60.
+  const log = useMemo<TomaLog[]>(
+    () =>
+      allTomas
+        .filter((t) => {
+          if (filtroCompuesto && t.compuesto_id !== filtroCompuesto) return false;
+          const d = dateInput(t.fecha);
+          if (filtroDesde && d < filtroDesde) return false;
+          if (filtroHasta && d > filtroHasta) return false;
+          return true;
+        })
+        .slice(0, 60),
+    [allTomas, filtroCompuesto, filtroDesde, filtroHasta]
   );
 
   const selected = compuestos.find((c) => c.id === compuestoId) ?? null;
@@ -631,46 +662,136 @@ export function BitacoraTab({ compuestos }: { compuestos: ProtocoloCompuestoConT
 
       {/* Bitácora */}
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Últimas tomas
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Últimas tomas
+            {hayFiltro ? (
+              <span className="ml-1.5 normal-case tracking-normal text-muted-foreground/70">
+                · {log.length}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <div className={labelCls}>Péptido</div>
+              <select
+                className={selCls}
+                value={filtroCompuesto}
+                onChange={(e) => setFiltroCompuesto(e.target.value)}
+                aria-label="Filtrar por péptido"
+              >
+                <option value="">Todos</option>
+                {compuestosEnLog.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className={labelCls}>Desde</div>
+              <input
+                className={selCls}
+                type="date"
+                value={filtroDesde}
+                max={filtroHasta || undefined}
+                onChange={(e) => setFiltroDesde(e.target.value)}
+                aria-label="Desde"
+              />
+            </div>
+            <div>
+              <div className={labelCls}>Hasta</div>
+              <input
+                className={selCls}
+                type="date"
+                value={filtroHasta}
+                min={filtroDesde || undefined}
+                onChange={(e) => setFiltroHasta(e.target.value)}
+                aria-label="Hasta"
+              />
+            </div>
+            {hayFiltro ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroCompuesto('');
+                  setFiltroDesde('');
+                  setFiltroHasta('');
+                }}
+                className="h-9 rounded-md px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Limpiar
+              </button>
+            ) : null}
+          </div>
         </div>
         {log.length ? (
           <div className="divide-y rounded-xl border bg-card">
-            {log.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setEditToma(t)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent"
-              >
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                  <span className="font-medium">{t.nombre}</span>
-                  {t.componentes?.length ? (
-                    <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                      blend · {t.componentes.length}
-                    </span>
-                  ) : null}
-                  <span className="tabular-nums text-muted-foreground">
-                    {t.dosis}
-                    {t.unidad ? ` ${t.unidad}` : ''}
+            {log.map((t) => {
+              // mg/mcg/concentración derivados de lo que se guardó en la toma.
+              const c = computeConversions(
+                t.vial_mg ?? 0,
+                t.bac_ml ?? 0,
+                t.dosis,
+                normalizeUnit(t.unidad)
+              );
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setEditToma(t)}
+                  className="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <span className="font-medium">{t.nombre}</span>
+                      {t.componentes?.length ? (
+                        <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                          blend · {t.componentes.length}
+                        </span>
+                      ) : null}
+                      <span className="tabular-nums text-muted-foreground">
+                        {t.dosis}
+                        {t.unidad ? ` ${t.unidad}` : ''}
+                      </span>
+                      {t.unidades != null && normalizeUnit(t.unidad) !== 'u' ? (
+                        <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {t.unidades} u
+                        </span>
+                      ) : null}
+                      {t.nota ? <span className="text-muted-foreground">· {t.nota}</span> : null}
+                    </div>
+                    {/* Equivalencias de la toma: mg / mcg / concentración */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span className="tabular-nums">
+                        mg{' '}
+                        <span className="font-medium text-foreground">{round(c.mg, 4) ?? '—'}</span>
+                      </span>
+                      <span className="tabular-nums">
+                        mcg{' '}
+                        <span className="font-medium text-foreground">
+                          {round(c.mcg, 1) ?? '—'}
+                        </span>
+                      </span>
+                      <span className="tabular-nums">
+                        conc{' '}
+                        <span className="font-medium text-foreground">
+                          {c.concentracion != null ? `${round(c.concentracion, 3)} mg/mL` : '—'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+                    {fmtFecha(t.fecha)}
+                    <Pencil className="h-3.5 w-3.5 opacity-40" />
                   </span>
-                  {t.unidades != null && normalizeUnit(t.unidad) !== 'u' ? (
-                    <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
-                      {t.unidades} u
-                    </span>
-                  ) : null}
-                  {t.nota ? <span className="text-muted-foreground">· {t.nota}</span> : null}
-                </div>
-                <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
-                  {fmtFecha(t.fecha)}
-                  <Pencil className="h-3.5 w-3.5 opacity-40" />
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Aún no hay tomas registradas.
+            {hayFiltro ? 'Ninguna toma coincide con el filtro.' : 'Aún no hay tomas registradas.'}
           </div>
         )}
       </div>
