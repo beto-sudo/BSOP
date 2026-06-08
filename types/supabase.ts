@@ -1,3 +1,14 @@
+// ==============================================================================
+// Auto-generated Supabase database types.
+// Last regenerated: 2026-06-08T11:49:35Z
+// Project ref: ybklderteyhuugzfmxbi
+// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
+//
+// DO NOT EDIT BY HAND. Regenerate via:
+//   - GitHub Actions: trigger 'DB Types' workflow manually
+//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
+// ==============================================================================
+
 export type Json =
   | string
   | number
@@ -4494,6 +4505,13 @@ export type Database = {
         Row: {
           anticipo_comision: number | null
           casa_valuadora: string | null
+          cd_aval_domicilio: string | null
+          cd_aval_nombre: string | null
+          cd_fecha_suscripcion: string | null
+          cd_interes_ordinario_pct: number | null
+          cd_plan_pagos: Json
+          cd_spread_moratorio_pct: number | null
+          cd_tiie28_pct: number | null
           coda_row_id: string | null
           comision_gerencia: number | null
           comision_vendedor: number | null
@@ -4528,6 +4546,7 @@ export type Database = {
           ine_numero: string | null
           monto_avaluo: number | null
           monto_credito_cotitular: number | null
+          monto_credito_directo: number | null
           monto_credito_titular: number | null
           motivo_desasignacion: string | null
           notario: string | null
@@ -4557,6 +4576,13 @@ export type Database = {
         Insert: {
           anticipo_comision?: number | null
           casa_valuadora?: string | null
+          cd_aval_domicilio?: string | null
+          cd_aval_nombre?: string | null
+          cd_fecha_suscripcion?: string | null
+          cd_interes_ordinario_pct?: number | null
+          cd_plan_pagos?: Json
+          cd_spread_moratorio_pct?: number | null
+          cd_tiie28_pct?: number | null
           coda_row_id?: string | null
           comision_gerencia?: number | null
           comision_vendedor?: number | null
@@ -4591,6 +4617,7 @@ export type Database = {
           ine_numero?: string | null
           monto_avaluo?: number | null
           monto_credito_cotitular?: number | null
+          monto_credito_directo?: number | null
           monto_credito_titular?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
@@ -4620,6 +4647,13 @@ export type Database = {
         Update: {
           anticipo_comision?: number | null
           casa_valuadora?: string | null
+          cd_aval_domicilio?: string | null
+          cd_aval_nombre?: string | null
+          cd_fecha_suscripcion?: string | null
+          cd_interes_ordinario_pct?: number | null
+          cd_plan_pagos?: Json
+          cd_spread_moratorio_pct?: number | null
+          cd_tiie28_pct?: number | null
           coda_row_id?: string | null
           comision_gerencia?: number | null
           comision_vendedor?: number | null
@@ -4654,6 +4688,7 @@ export type Database = {
           ine_numero?: string | null
           monto_avaluo?: number | null
           monto_credito_cotitular?: number | null
+          monto_credito_directo?: number | null
           monto_credito_titular?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
