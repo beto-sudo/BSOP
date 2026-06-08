@@ -4,6 +4,7 @@
 **Empresas:** RDB (V1) — patrón replicable a DILESA/COAGAN/ANSA cuando tengan masa crítica
 **Schemas afectados:** `erp` (3 tablas satélite nuevas: `personas_contactos`, `personas_cuentas_bancarias`, `personas_direcciones`)
 **Estado:** in_progress
+**Próximo hito:** Sprint 3 (operativo, **lo hace Beto + ops**) — captura manual desde `PROVEEDORES RDB.csv` para los 12 RDB activos: cuentas bancarias, contacto, direcciones. Saneamiento de 3 RFCs inválidos. Resolver duplicado #4 (Jorge Amin / Abastecedora Industrial). Cierra al terminar
 **Dueño:** Beto
 **Creada:** 2026-04-30
 **Última actualización:** 2026-04-30 (Sprints 1 + 2 técnicos cerrados; Sprint 3 operativo en mano de Beto + ops)

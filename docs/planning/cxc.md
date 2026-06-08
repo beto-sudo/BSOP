@@ -4,6 +4,7 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
+**Próximo hito:** **Sprint 1 completo en prod** (PRs #609/#610/#612/#613: foundation + originación + RPCs + backfill). Pendiente: limpieza de datos del backfill (saldos a favor por desajuste Coda↔modelo) + Sprint 2 UI (estado de cuenta, módulo cobranza, captura de abono, recibo)
 **Dueño:** Beto
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-01 (Sprints 1-3 en prod + impresión: estado de cuenta imprimible **por venta** + recibo de caja por abono (ADR-021). Pendiente: recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)

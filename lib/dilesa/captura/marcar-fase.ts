@@ -112,12 +112,36 @@ export async function marcarFase(
     adjuntosCreados += 1;
   }
 
-  // 3) UPDATE de los campos de la venta (si hay)
-  if (Object.keys(camposVenta).length > 0) {
+  // 3) UPDATE de los campos de la venta — siempre sincronizamos
+  //    `fase_actual` y `fase_posicion` con la fase que se está cerrando
+  //    (no dependemos de que cada page los pase). El listado de ventas y
+  //    el header del detalle leen estos campos como caché de la posición
+  //    real, así que si no los actualizamos quedan stale y la UI muestra
+  //    fases anteriores aunque el pipeline (venta_fases) tenga más
+  //    cerradas. Bug detectado tras agregar Fases 3/4/5 que no los
+  //    seteaban.
+  //
+  //    Defensa: solo avanza, nunca retrocede. Si por alguna razón se
+  //    está re-capturando una fase anterior, no pisamos un estado más
+  //    avanzado. Para retroceder se usa la server action
+  //    `regresarAFase` (que limpia pipeline + sincroniza).
+  const camposParaUpdate: Record<string, unknown> = { ...camposVenta };
+  const { data: ventaActual } = await sb
+    .schema('dilesa')
+    .from('ventas')
+    .select('fase_posicion')
+    .eq('id', ventaId)
+    .maybeSingle();
+  const posActual = (ventaActual?.fase_posicion as number | null) ?? 0;
+  if (faseposicion > posActual) {
+    camposParaUpdate.fase_actual = faseNombre;
+    camposParaUpdate.fase_posicion = faseposicion;
+  }
+  if (Object.keys(camposParaUpdate).length > 0) {
     const { error: vErr } = await sb
       .schema('dilesa')
       .from('ventas')
-      .update(camposVenta)
+      .update(camposParaUpdate)
       .eq('id', ventaId);
     if (vErr) {
       return {

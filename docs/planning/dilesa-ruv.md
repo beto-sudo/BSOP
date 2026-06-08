@@ -5,6 +5,7 @@
 **Schemas afectados:** `dilesa` (3+ tablas nuevas), `core.modulos`
 (slug nuevo + backfill de permisos)
 **Estado:** proposed
+**Próximo hito:** Sprint 0 (bloqueante) — deep-dive de las 3 tablas en Coda (1,557 rows: 1132 CUV + 169 docs + 256 urgencias) + confirmar D1 (schema preciso, tablas auxiliares, plan de adjuntos). D2 cerrada (RBAC: operadora + Gerente de Proyectos + Dirección + Beto admin)
 **Dueño:** Beto
 **Creada:** 2026-05-26
 **Última actualización:** 2026-05-26 (D2 scope RBAC cerrado: operadora actual + gerente de proyectos + dirección + Beto admin; D1 sigue bloqueante con Sprint 0 deep-dive de Coda; estado se mantiene `proposed`)

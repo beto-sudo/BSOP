@@ -5,6 +5,7 @@
 **Schemas afectados:** `dilesa` (8 tablas nuevas + extender `productos`),
 `erp` (extender `personas.tipo` con `'contratista'`)
 **Estado:** in_progress
+**Próximo hito:** 5 sprints previos + Sprint 6 (reabre 2026-06-01): PDF del contrato de obra + ANEXO 3 de precios unitarios derivados. Trigger 20% → disponible en prod. Próximo: validar Anexo 3 en preview; posible Sprint 7 (Anexos 1/2 + persistir PDF)
 **Dueño:** Beto
 **Creada:** 2026-05-24
 **Última actualización:** 2026-06-01 (Sprint 6 — PDF del contrato de obra

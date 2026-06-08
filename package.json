@@ -28,6 +28,8 @@
     "db:new": "npx tsx scripts/new-migration.ts",
     "schema:ref": "npx tsx scripts/gen-schema-ref.ts",
     "schema:check": "npm run schema:ref && git diff --exit-code -I '^  Last regenerated: ' supabase/SCHEMA_REF.md",
+    "initiatives:gen": "npx tsx scripts/gen-initiatives.ts",
+    "initiatives:check": "npm run initiatives:gen && git diff --exit-code docs/strategy/INITIATIVES.md",
     "prepare": "husky"
   },
   "dependencies": {

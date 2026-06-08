@@ -3,7 +3,8 @@
 **Slug:** `manual-usuario`
 **Empresas:** DILESA (golden; piloto = módulo Ventas). Sistema cross-empresa, pensado para rollout a las 5 empresas.
 **Schemas afectados:** `core.modulos` (slug nuevo `dilesa.manual` + backfill defensivo de permisos). El **contenido vive en el repo** (markdown versionado con git), **no** en la DB.
-**Estado:** planned
+**Estado:** in_progress
+**Próximo hito:** Sprint 0 (fundación + ADR-043) mergeado (#720, preview). Próximo: Beto aplica la migración `20260607170000_modulo_dilesa_manual.sql` + valida en preview → Sprint 1 (resto del contenido de Ventas: ~8 docs)
 **Dueño:** Beto
 **Creada:** 2026-06-07
 **Última actualización:** 2026-06-07 (promoción — enfoque cerrado con Beto: in-app + PDF, markdown en repo, piloto end-to-end con Ventas)

@@ -3,7 +3,7 @@
 **Slug:** `module-page-submodules`
 **Empresas:** RDB (primero), todas (el patrón es cross-empresa)
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-25
 **Última actualización:** 2026-04-26

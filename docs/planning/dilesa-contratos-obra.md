@@ -6,6 +6,7 @@
 nuevas de presupuesto de obra y estimaciones de monto), `erp` (`personas` como
 proveedores/contratistas; futura emisión a CxP)
 **Estado:** in_progress
+**Próximo hito:** Sprint 1 schema en prod: `contratos_construccion` + tipo/anticipo/retención/IVA + `obra_presupuesto`/`obra_estimaciones` (266 contratos backfill a vivienda; ADR-038). IVA 8% frontera / 16% excepción. Próximo: parser de traspaso LDLE+LDS (RESUMEN + contratos + estimaciones). Fase 2 = emisión a CxP
 **Dueño:** Beto
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-07 (Ciclo de obra end-to-end: Capa A (#617) +
