@@ -3,11 +3,11 @@
 **Slug:** `cross-session-coordination`
 **Empresas:** todas (infraestructura del repo / proceso)
 **Schemas afectados:** ninguno (tooling + convenciones + CI). Toca `package.json`, `scripts/`, `.github/workflows/`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`.
-**Estado:** in_progress
-**Próximo hito:** Sprint 2 (auto-gen de la tabla Activas desde headers) en este PR. Próximo: Sprint 3 — afinar convenciones de coordinación en `CLAUDE.md` (branch=slug, 1 iniciativa/sesión, `gh pr list` previo) y cerrar
+**Estado:** done
+**Próximo hito:** Cerrada 2026-06-07 — 3 piezas entregadas (#732 `db:new` · #744 auto-gen de INITIATIVES.md · Sprint 3 convenciones en este PR)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (Sprint 2 — auto-gen de la tabla Activas de INITIATIVES.md desde los headers de los planning docs + `initiatives:gen`/`initiatives:check` + step de CI + Regla 1 reescrita en CLAUDE.md)
+**Última actualización:** 2026-06-07 (Sprint 3 — convenciones de sesión afinadas en CLAUDE.md (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, rebase antes de push) + closeout; **iniciativa cerrada**, las 3 piezas en prod)
 
 ## Problema
 
@@ -95,7 +95,8 @@ serializar, lo que mata el paralelismo).
   `## Activas` desde los headers + `initiatives:gen` / `initiatives:check` + step en
   CI + Regla 1 reescrita en `CLAUDE.md`. **(Este PR.)**
 - **Sprint 3 — Convenciones + closeout.** Afinar la sección de coordinación en
-  `CLAUDE.md` (branch=slug, 1 iniciativa/sesión, `gh pr list` previo) y cerrar.
+  `CLAUDE.md` (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, rebase antes
+  de push) y cerrar la iniciativa. **(Este PR — cerrada.)**
 
 ## Bitácora
 
@@ -120,3 +121,15 @@ serializar, lo que mata el paralelismo).
   `done` colados, todo fuera de los marcadores byte-idéntico, generador idempotente.
   Estado `planned → in_progress`. Pendiente: Beto decide si `dilesa-prelaunch-audit`
   (ventana pre-cutover ya pasó) se marca `done`.
+- **2026-06-07** — **Sprint 3 (convenciones + closeout) — iniciativa CERRADA** (este
+  PR). Afinada la sección "Trabajando con múltiples PRs en paralelo" de `CLAUDE.md`:
+  intro reescrito (los 2 hotspots históricos —migraciones e INITIATIVES.md— ahora
+  resueltos por Regla 0 y Regla 1) + nueva subsección "Convenciones de sesión"
+  (branch=slug, 1 iniciativa/sesión, `gh pr list` previo, editar solo tu planning
+  doc, rebase antes de push, abre tu PR pronto). Estado `in_progress → done`: header
+  a `done`, removida de la tabla `## Activas` por el generador (22 → 21) y agregada a
+  mano a `## Done`. Las 3 piezas del Outcome quedan entregadas (#732, #744, este PR).
+  Barrido de Reminders `Claude 🧭`: sin entradas del slug (las sub-tareas vivían en
+  TodoWrite por la regla global). Métricas: instrumentadas (db:new + initiatives:check
+  en CI); "cero colisiones / cero conflictos" se observa en operación. Follow-up vivo
+  (no de esta iniciativa): Beto decide si `dilesa-prelaunch-audit` se marca `done`.
