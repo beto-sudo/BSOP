@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 construido (migración `20260608214309_dilesa_ruv_modulo.sql` + RBAC los-4-lugares de ADR-014 + page skeleton). Falta: **Beto aplica la migración** (crea el rol nuevo "Asistente de Proyectos" + permisos D2) → regenero `types/supabase.ts` + `SCHEMA_REF.md` → **Sprint 2** (import de 93 frentes + 27 docs del catálogo + backfill de `construccion.frente_id`). D2 cerrada (RBAC)
+**Próximo hito:** Sprints 1-2 en prod (schema + RBAC aplicados, PR #760; import de 78 frentes + 27 docs + 1036 viviendas ligadas vía `construccion.frente_id`). **Sprint 3** (UI): listado de ofertas/frentes + checklist de documentos + KPIs de avance (lee `v_ruv_frente_avance`) — para que Beto defina el proceso de alta de frentes nuevos. D2 cerrada (RBAC)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-08 (Sprint 1 construido: migración con las 3 tablas + `construccion.frente_id` + vista `v_ruv_frente_avance` + módulo `dilesa.ruv` + rol nuevo "Asistente de Proyectos" + permisos D2; código RBAC (`nav-config` / `ROUTE_TO_MODULE` / `EXPECTED_DB_MODULE_SLUGS`) + page skeleton con gate. CI local verde (typecheck/test/lint/format). La migración crea rol+permisos → la aplica Beto; tras aplicar, regenero types/SCHEMA_REF y arranco Sprint 2)
+**Última actualización:** 2026-06-08 (Sprint 2 import aplicado a prod: 78 frentes —77 con proyecto resuelto—, 27 docs del catálogo, backfill de `construccion.frente_id` (1036 viviendas, 100% match). Vista `v_ruv_frente_avance` ya da avance real por frente. Script idempotente `scripts/import_dilesa_ruv.ts`. Arrancando Sprint 3 (UI))
 
 ## Problema
 
@@ -426,6 +426,19 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   aplicar: regenerar types/SCHEMA_REF + arrancar Sprint 2 (import). PR
   [#760](https://github.com/beto-sudo/BSOP/pull/760) (CI verde; incluye un regen
   de `SCHEMA_REF.md` por drift heredado de #754/#755).
+- **2026-06-08 (Sprint 1 aplicado + mergeado)** — Beto autorizó aplicar. Migración
+  aplicada a prod vía MCP `apply_migration` (verificado: 3 tablas, 12 RLS, rol +
+  3 permisos). types/SCHEMA_REF regenerados. PR #760 mergeado a main (`63497b9`);
+  de paso se resolvió el merge con #759 (Fase 10) regenerando los auto-generados
+  contra prod.
+- **2026-06-08 (Sprint 2 import)** — `scripts/import_dilesa_ruv.ts` (idempotente,
+  dry-run + apply) corrido contra prod: **78 frentes** (de 93 filas de Coda; 15
+  vacías omitidas; 77 con `proyecto_id` resuelto por Fraccionamiento, 1 sin
+  match), **27 docs** del catálogo, y **backfill de `construccion.frente_id`** por
+  nombre normalizado (trim+collapse+upper): **1036 viviendas matcheadas, 0 sin
+  match**. La vista `v_ruv_frente_avance` ya da avance real (ej. LOMA VERDE 11:
+  86 viviendas, 86 CUVs, 100% paquete RUV). CUV + hitos NO se importaron (ya
+  estaban en `dilesa.construccion`). Urgencias sigue fuera de v1 (reporte canvas).
 
 ## Decisiones registradas
 
