@@ -169,3 +169,15 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   (revertido `<ModuleHeader helpSlug>`). ADR-043 M2/M4 actualizados. La portada
   `/dilesa/manual` queda accesible por URL pero sin enlace en sidebar (pendiente
   confirmar con Beto si se conserva). PR a preview sin auto-merge.
+- **2026-06-07** — **Bug "manual vacío" + contenido completo de DILESA.** Bug
+  cazado: `actualizado: 2026-06-07` sin comillas lo parsea YAML como `Date`, no
+  string; el loader exigía `typeof string` → descartaba TODOS los docs →
+  "no hay ayuda" en todo. Fix: `coerceStr()` normaliza Date/número → string +
+  `lib/manual/load.test.ts` dinámico (valida que cada `.md` cargue). Verificado
+  además que `outputFileTracingIncludes` empaca los `.md` en el deploy.
+  **Contenido: 32 docs cubriendo TODAS las superficies navegables de DILESA**
+  (RH, Administración, Ventas ×5, Construcción ×6, Compras ×5, CxP ×5, CxC ×2,
+  Portafolio, Anteproyectos, Proyectos). Redactados leyendo el código real de
+  cada módulo (un explorador por grupo) en lenguaje de usuario. Pendiente:
+  revisión de Beto del detalle de negocio, sub-forms de captura (fases), y
+  rollout a las otras 4 empresas.
