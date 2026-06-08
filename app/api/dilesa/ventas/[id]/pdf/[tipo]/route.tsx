@@ -31,6 +31,7 @@ import {
 } from '@/lib/dilesa/pdf/solicitud-dictamen';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
+import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 
 const TIPOS = [
   'solicitud-asignacion',
@@ -86,7 +87,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -233,6 +234,16 @@ export async function GET(
     year: 'numeric',
   });
 
+  // Para las solicitudes (avalúo/dictamen) el contacto es el Gerente de
+  // Ventas (Edgar en DILESA), no el asesor que capturó la venta. Mismo
+  // criterio que los emails. Solo se resuelve para esos 2 tipos.
+  const gerente =
+    tipo === 'solicitud-avaluo' || tipo === 'solicitud-dictamen'
+      ? await loadGerenteVentas(sb, venta.empresa_id)
+      : null;
+  const contactoNombre = gerente?.nombre ?? (vendedorNombre || null);
+  const contactoEmail = gerente?.email ?? vendedorEmail;
+
   if (tipo === 'solicitud-avaluo') {
     let valuadorNombre = '(casa valuadora)';
     if (venta.valuador_id) {
@@ -263,8 +274,8 @@ export async function GET(
       clienteNombre,
       clienteCurp: persona?.curp ?? null,
       clienteTelefono: persona?.telefono ?? null,
-      vendedorNombre: vendedorNombre || null,
-      vendedorEmail,
+      vendedorNombre: contactoNombre,
+      vendedorEmail: contactoEmail,
     };
     const buf = await renderToBuffer(<SolicitudAvaluoPDF data={data} />);
     return pdfResponse(buf, `solicitud-avaluo-${identificacionInventario || id}.pdf`);
@@ -303,8 +314,8 @@ export async function GET(
       precioVenta: moneyPdf(venta.precio_asignacion),
       montoCreditoTitular: moneyPdf(venta.monto_credito_titular),
       montoCreditoCotitular: moneyPdf(venta.monto_credito_cotitular),
-      vendedorNombre: vendedorNombre || null,
-      vendedorEmail,
+      vendedorNombre: contactoNombre,
+      vendedorEmail: contactoEmail,
     };
     const buf = await renderToBuffer(<SolicitudDictamenPDF data={data} />);
     return pdfResponse(buf, `solicitud-dictamen-${identificacionInventario || id}.pdf`);
