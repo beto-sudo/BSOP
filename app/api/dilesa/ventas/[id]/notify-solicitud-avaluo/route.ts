@@ -23,6 +23,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendAvaluoSolicitudEmail, type AvaluoSolicitudContext } from '@/lib/dilesa/avaluo-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
+import { signAvaluoToken } from '@/lib/dilesa/avaluo-token';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -174,10 +175,30 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const branding = await loadEmpresaBranding(admin, venta.empresa_id);
 
+  // Genera el magic link para que el valuador suba el dictamen sin login.
+  // Hardcodeamos `https://bsop.io` como en lib/dilesa/email-branding.ts: los
+  // emails se envían desde prod siempre, usar `NEXT_PUBLIC_SITE_URL` haría
+  // que previews mandaran URLs efímeras de Vercel.
+  let uploadUrl = '';
+  try {
+    const token = await signAvaluoToken({
+      ventaId: venta.id,
+      valuadorId: venta.valuador_id,
+    });
+    uploadUrl = `https://bsop.io/dilesa/valuador/avaluo/${token}`;
+  } catch (e) {
+    console.warn('[notify-solicitud-avaluo] no se pudo firmar token:', (e as Error).message);
+    return NextResponse.json(
+      { ok: false, error: 'No se pudo generar el enlace de subida del avalúo.' },
+      { status: 500 }
+    );
+  }
+
   const emailCtx: AvaluoSolicitudContext = {
     branding,
     ventaId: venta.id,
     empresaId: venta.empresa_id,
+    uploadUrl,
     valuadorEmail: valuador.email as string,
     valuadorNombre: valuadorNombreCompleto,
     valuadorContacto,
