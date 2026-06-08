@@ -47,6 +47,8 @@ type VentaCtx = {
   tipo_credito: string | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
+  credito_titular_ref: string | null;
+  credito_cotitular_ref: string | null;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -86,6 +88,9 @@ function CapturarFase6Body() {
   // Editables — defaults de los actuales de la venta (acarreo Fase 1).
   const [montoTitular, setMontoTitular] = useState<string>('');
   const [montoCotitular, setMontoCotitular] = useState<string>('');
+  // Número de crédito + institución (lo trae la constancia del banco).
+  const [creditoTitularRef, setCreditoTitularRef] = useState<string>('');
+  const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
   const [fechaInscripcion, setFechaInscripcion] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
@@ -109,7 +114,7 @@ function CapturarFase6Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, tipo_credito, monto_credito_titular, monto_credito_cotitular'
+          'id, persona_id, unidad_id, tipo_credito, monto_credito_titular, monto_credito_cotitular, credito_titular_ref, credito_cotitular_ref'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -133,6 +138,8 @@ function CapturarFase6Body() {
       if (v.monto_credito_cotitular != null) {
         setMontoCotitular(String(v.monto_credito_cotitular));
       }
+      if (v.credito_titular_ref) setCreditoTitularRef(v.credito_titular_ref);
+      if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
 
       const [pRes, uRes, fRes] = await Promise.all([
         sb
@@ -258,6 +265,8 @@ function CapturarFase6Body() {
         camposVenta: {
           monto_credito_titular: montoTitNum,
           monto_credito_cotitular: montoCoNum,
+          credito_titular_ref: creditoTitularRef.trim() || null,
+          credito_cotitular_ref: creditoCotitularRef.trim() || null,
         },
         notas:
           fechaInscripcion !== new Date().toISOString().slice(0, 10)
@@ -288,6 +297,8 @@ function CapturarFase6Body() {
       fechaInscripcion,
       montoTitNum,
       montoCoNum,
+      creditoTitularRef,
+      creditoCotitularRef,
       requiereTitular,
       requiereCotitular,
       sinCredito,
@@ -417,6 +428,24 @@ function CapturarFase6Body() {
                   disabled={sinCredito}
                 />
                 <Hint>{money(montoCoNum)} — 0 si no hay co-titular</Hint>
+              </Field>
+              <Field label="Número de Crédito Titular e Institución">
+                <Input
+                  value={creditoTitularRef}
+                  onChange={(e) => setCreditoTitularRef(e.target.value)}
+                  placeholder="Ej. Infonavit 1234567890"
+                  disabled={sinCredito}
+                />
+                <Hint>Número del crédito + institución (lo trae la constancia del banco)</Hint>
+              </Field>
+              <Field label="Número de Crédito Co-Titular e Institución">
+                <Input
+                  value={creditoCotitularRef}
+                  onChange={(e) => setCreditoCotitularRef(e.target.value)}
+                  placeholder="Si no hay co-titular, déjalo en blanco"
+                  disabled={sinCredito}
+                />
+                <Hint>Solo si hay co-acreditado</Hint>
               </Field>
               <Field label="Fecha de inscripción *">
                 <Input
