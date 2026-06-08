@@ -229,6 +229,15 @@ Semax + 13 tomas) vía las server actions de `app/health/actions.ts`.
   para crear otros blends. KLOW ya existía como compuesto en prod → el seed le
   adjuntó la receta vía UPDATE idempotente.
 
+- **2026-06-08** — _Post-cierre · filtros + equivalencias en la bitácora._ La
+  lista "Últimas tomas" gana **filtros por péptido y por rango de fecha**
+  (desde/hasta, fechas locales `America/Matamoros`; el recorte a 60 se aplica
+  **después** de filtrar) y cada fila muestra ahora la **concentración + mg +
+  mcg** de la toma, derivados al vuelo con `computeConversions` de lo que se
+  guardó (`vial_mg`/`bac_ml`/`dosis`/`unidad`) — misma math que el panel de
+  equivalencias del registro, sin columnas nuevas en `health.protocolo_tomas`.
+  Cambio UI-only en `components/peptides/bitacora-tab.tsx`.
+
 ## Decisiones registradas
 
 - **2026-06-03** — Schema **`peptides` propio** (no tablas dentro de `health`).
