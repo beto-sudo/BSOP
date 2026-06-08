@@ -5,21 +5,11 @@
 **Schemas afectados:** `dilesa` (generalizar `contratos_construccion` + tablas
 nuevas de presupuesto de obra y estimaciones de monto), `erp` (`personas` como
 proveedores/contratistas; futura emisión a CxP)
-**Estado:** in_progress
-**Próximo hito:** Sprint 1 schema en prod: `contratos_construccion` + tipo/anticipo/retención/IVA + `obra_presupuesto`/`obra_estimaciones` (266 contratos backfill a vivienda; ADR-038). IVA 8% frontera / 16% excepción. Próximo: parser de traspaso LDLE+LDS (RESUMEN + contratos + estimaciones). Fase 2 = emisión a CxP
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-07 (Ciclo de obra end-to-end: Capa A (#617) +
-Capa B (#631) + Sprint 3 Costeo (#639) + Sprint 4 captura (#644) + **puente CxP**
-backend (#651, en prod) + UI "Emitir a CxP" (#654) + **Sprint 5 captura de
-presupuesto**. **Sprint promovido 2026-06-06: Contratos → partidas + PDF de obra**
-(ejecuta ADR-042 Fases 2-3 + PDF) — el monto de contrato no se ve por partida
-(302/303 sin `partida_id`) + falta el PDF de obra de monto global; plan de 4 fases
-documentado en Bitácora. **Fases 1-4 done** (#709 DB · #710 UI partida · #711 Costeo 3 capas +
-backfill · #712 PDF de obra). **Sprint UI: edición de datos del contrato** desde el detalle
-(sección "Editar datos del contrato", solo obra) para no depender de SQL. Aparte: reasignar los 8
-contratos placeholder + 3 contratos de obra sin partida; capturar `objeto`/plazo de los contratos
-de obra existentes.)
+**Última actualización:** 2026-06-08 (**cerrada** — schema + traspaso + costeo por partida + PDF de obra entregados en prod (Fases 1-4))
 
 ## Problema
 
@@ -180,6 +170,8 @@ esperar a CxP. Razón: hay dolor real (todo en Excel) y el registro del contrato
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+- **2026-06-08 (cierre de la iniciativa)** — Fases 1-4 en prod — schema (`contratos_construccion` + tipo/anticipo/retención/IVA + `obra_presupuesto`/`obra_estimaciones`, ADR-038), parser de traspaso LDLE+LDS, costeo por partida 3 capas + backfill (#711), y PDF del contrato de obra de monto global (#712) + UI de edición de datos del contrato (#714). Residual = solo datos, resoluble desde la UI ya construida: 3 contratos de obra sin partida ligada + capturar objeto/plazo de contratos históricos para PDF completo + dedup de ELECTROGAZA en `erp.personas`. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 ### 2026-06-01 — Sprint 1 (schema) aplicado a prod
 

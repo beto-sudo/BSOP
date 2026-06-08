@@ -3,11 +3,11 @@
 **Slug:** `dilesa-resumen-consejo`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (vistas nuevas `v_margen_prototipo`, `v_inventario_prototipo`; lectura de `v_proyecto_avances`, `ventas`, `venta_fase_catalogo`, `v_estimaciones_resumen`, `unidades`, `productos`, `proyectos`), `erp` (`cuentas_bancarias` — captura manual de saldos), `core` (`notification_log` + registry)
-**Estado:** in_progress
-**Próximo hito:** **CUTOVER hecho** — Sprints 0-2 en prod, `RESUMEN_CONSEJO_LIVE=1` activado, cron enviando a `consejo@dilesa.mx` (L–S 20:00 CST); Coda apagado. Próximo: Beto captura los saldos bancarios reales en la UI de `tesoreria` (los cargados son demo del 3-jun); Fase 2 (CxC/CxP, resumen ejecutivo, alertas) en backlog
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (**CUTOVER** — Sprints 0-2 en prod: vistas margen/inventario + fix RUV/Seguro (#725), plantilla del correo (#733), cron+envío con fail-safe (#734), rediseño de Contratistas a obra-en-construcción con vista `v_contratista_obra` (#736), layout al original full-width (#738), y UI de captura de saldos `tesoreria` S3 (#739). Correo validado end-to-end con Beto: 7/7 secciones (incl. Bancos con saldos demo de Coda). `RESUMEN_CONSEJO_LIVE=1` activado en Vercel prod → el cron empieza a enviar a `consejo@dilesa.mx` (L–S 20:00 CST, domingo no); Coda apagado por Beto. Pendiente: Beto captura los saldos reales en la UI (los cargados son demo del 3-jun). Mejoras Fase 2 (CxC/CxP, resumen ejecutivo, alertas) en backlog. | promovida a `planned`; mismo día se refinó: RUV/Seguro resuelto (Coda correcto, BSOP tiene el % ÷10 → fix en Sprint 0) y el bloque de bancos pasa a depender del módulo Saldos Bancos de la nueva iniciativa hermana `tesoreria` — el correo espera ese módulo para lanzar los 7 bloques. Paridad 1:1 primero + mejoras en Fase 2; envío a `consejo@dilesa.mx` ~20:00 CST L–S, domingo no.)
+**Última actualización:** 2026-06-08 (**cerrada** — cutover hecho, correo diario al Consejo live, Beto ya capturó los saldos reales)
 
 ## Problema
 
@@ -252,6 +252,8 @@ hora de envío se acepta en v1.
 - 100% de envíos trazables en `core.notification_log`.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Cutover completo y operando — correo diario "Resumen Diario Operación Dilesa" enviándose a consejo@dilesa.mx (L–S 20:00 CST, domingo no), Coda apagado, `RESUMEN_CONSEJO_LIVE=1` en prod (#740) + fix correctivo post-cutover del avance de construcción (#747). Beto ya capturó los saldos bancarios reales en la UI de Tesorería (verificado en prod). Fase 2 (CxC/CxP, resumen ejecutivo, alertas) queda como backlog explícito fuera de v1. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-06-07 (promoción)** — Beto pidió recrear el correo diario del
   Consejo desde BSOP de cara al cutover de Coda-DILESA. Diagnóstico

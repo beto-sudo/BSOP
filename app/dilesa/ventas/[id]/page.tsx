@@ -228,13 +228,12 @@ const FASE_ROLES: Record<string, string[]> = {
   Formalizada: ['contrato_promesa'],
   'Solicitud de Avalúo': [],
   'Avalúo Cerrado': ['avaluo_comercial'],
-  Inscrita: [],
+  // Beto: las Constancias de Crédito (titular + co-titular) van en Inscrita
+  // (el banco las entrega al inscribir el crédito). La Carta de instrucción
+  // notarial queda en Dictaminada (sale después con el dictamen jurídico).
+  Inscrita: ['constancia_credito_titular', 'constancia_credito_cotitular'],
   'Solicitud de Dictaminación': ['aprobacion_credito'],
-  Dictaminada: [
-    'carta_instruccion_notarial',
-    'constancia_credito_titular',
-    'constancia_credito_cotitular',
-  ],
+  Dictaminada: ['carta_instruccion_notarial'],
   'Validación Patronal': ['validacion_patronal'],
   'Firmas Programadas': [],
   Escriturada: ['pagare'],
@@ -257,7 +256,10 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   3: '3-formalizada',
   4: '4-solicitud-avaluo',
   5: '5-avaluo-cerrado',
-  // 6–17 → próximos PRs del Sprint 7c
+  6: '6-inscrita',
+  7: '7-solicitud-dictamen',
+  8: '8-dictaminada',
+  // 9–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */

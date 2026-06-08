@@ -3,11 +3,11 @@
 **Slug:** `salud-protocolo`
 **Empresas:** SANREN (salud personal — gateada `RequireAccess empresa="sanren"`)
 **Schemas afectados:** `health` (3 tablas nuevas: `protocolo_compuestos`, `protocolo_tomas`, `protocolo_efectos`); lectura de `health.health_metrics` para el overlay
-**Estado:** in_progress
-**Próximo hito:** **Sprint 1 (schema) en prod** (3 tablas `health` + RLS deny-all). Próximo: Sprint 2 — lectura (`lib/protocolo` + `ProtocoloSection` en `/health`) + seed Retatrutide tras confirmar fecha
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-02
-**Última actualización:** 2026-06-02 (Sprint 2 **cerrado** — sección de protocolo en `/health` (lectura) + fix de exposición de `health` a PostgREST; mergeado en #648. Próximo: Sprint 3 — captura por drawer)
+**Última actualización:** 2026-06-08 (**cerrada** — Beto confirmó terminada; schema en prod y la captura/lectura se materializó vía la iniciativa hermana)
 
 ## Problema
 
@@ -169,6 +169,8 @@ Los biomarcadores (peso, RHR, HRV, BP) **no se duplican**: viven en
 - **Unidades mixtas** (mg para péptidos, UI/mcg para suplementos). `unidad_dosis` por compuesto lo resuelve; el overlay agrupa por compuesto, no mezcla unidades.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Beto confirmó la iniciativa como terminada. El Sprint 1 (schema: 3 tablas en `health` — `protocolo_compuestos`/`protocolo_tomas`/`protocolo_efectos` + RLS deny-all) está en prod, y la captura/lectura del protocolo (bitácora + calculadora de reconstitución + overlay) se materializó reusando `health.protocolo_*` a través de la iniciativa hermana `sanren-peptides` (ya cerrada). El objetivo de la bitácora de protocolo quedó cubierto. Cerrada por confirmación explícita de Beto.
 
 - **2026-06-02** — Promovida a `planned`. Beto pidió una bitácora de péptidos en SANREN → Salud (arranque: Retatrutide 2.5 mg SC semanal; planea agregar otros "para medir interacciones con su cuerpo"). Exploración: `/health` es dashboard read-only de Apple Health; `health.health_medications` existe pero no se renderiza; los biomarcadores viven en `health.health_metrics`. Alcance v1 cerrado con 4 decisiones (protocolo completo / escalas 0–5 + nota / drawer web / promover). Modelo de 3 tablas en `health` propuesto. Pendiente: OK verbal de Beto para aplicar el schema (Sprint 1).
 - **2026-06-02** — Sprint 1 aplicado a prod (proyecto `ybklderteyhuugzfmxbi`, migración `20260602145253_health_protocolo_peptidos`). Tras OK explícito de Beto. `db push` descartado por drift (migraciones `20260602020000`/`20260602180000` de otras sesiones en remoto sin archivo local — no se tocaron); aplicado quirúrgicamente vía connector `apply_migration`. RLS deny-all verificada (cero grants a authenticated/anon). `SCHEMA_REF.md` + `types/supabase.ts` regenerados (diff limpio, solo las 3 tablas). **Pendiente para cerrar Sprint 1: seed del Retatrutide** — falta fecha de la 1ª inyección + historial de tomas (PERSONAL.md solo tiene compuesto + dosis 2.5 mg, no fechas).

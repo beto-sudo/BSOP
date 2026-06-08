@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; piloto = módulo Ventas). Sistema cross-empresa, pensado para rollout a las 5 empresas.
 **Schemas afectados:** `core.modulos` (slug nuevo `dilesa.manual` + backfill defensivo de permisos). El **contenido vive en el repo** (markdown versionado con git), **no** en la DB.
 **Estado:** in_progress
-**Próximo hito:** Sprint 0 (fundación + ADR-043) mergeado (#720, preview). Próximo: Beto aplica la migración `20260607170000_modulo_dilesa_manual.sql` + valida en preview → Sprint 1 (resto del contenido de Ventas: ~8 docs)
+**Próximo hito:** Módulo `dilesa.manual` + 28 docs de contenido en prod (migración aplicada, verificado). Próximo: Sprint 2 (export PDF on-demand + buscador en la portada /dilesa/manual) + Sprint 3 (closeout + plantilla replicable a las otras empresas)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (promoción — enfoque cerrado con Beto: in-app + PDF, markdown en repo, piloto end-to-end con Ventas)
+**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprint 0 + contenido (#720/#742/#748) y migración en prod; pendiente real = Sprint 2 PDF+buscador y Sprint 3 closeout)
 
 ## Problema
 

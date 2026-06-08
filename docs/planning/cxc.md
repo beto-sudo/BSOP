@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** **Sprint 1 completo en prod** (PRs #609/#610/#612/#613: foundation + originación + RPCs + backfill). Pendiente: limpieza de datos del backfill (saldos a favor por desajuste Coda↔modelo) + Sprint 2 UI (estado de cuenta, módulo cobranza, captura de abono, recibo)
+**Próximo hito:** Limpieza de datos: ~$2.0M en saldos a favor (185 ventas DILESA, depósitos Infonavit/Fovissste capturados ≥ precio) — requiere regla + OK de Beto. Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Sprints 1-3 + impresión ya en prod
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-01 (Sprints 1-3 en prod + impresión: estado de cuenta imprimible **por venta** + recibo de caja por abono (ADR-021). Pendiente: recordatorios, limpieza de los $2.0M de saldos a favor, retiro de Coda. Ver Bitácora.)
+**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprints 1-3 confirmados en prod; pendiente real = limpieza de saldos a favor + Sprints 4-5)
 
 ## Problema
 

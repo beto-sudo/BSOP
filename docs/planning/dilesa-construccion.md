@@ -4,14 +4,11 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (8 tablas nuevas + extender `productos`),
 `erp` (extender `personas.tipo` con `'contratista'`)
-**Estado:** in_progress
-**Próximo hito:** 5 sprints previos + Sprint 6 (reabre 2026-06-01): PDF del contrato de obra + ANEXO 3 de precios unitarios derivados. Trigger 20% → disponible en prod. Próximo: validar Anexo 3 en preview; posible Sprint 7 (Anexos 1/2 + persistir PDF)
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-05-24
-**Última actualización:** 2026-06-01 (Sprint 6 — PDF del contrato de obra
-generable/imprimible desde el detalle del contrato. Reabre la iniciativa
-con un add-on: el documento legal "Contrato de Servicios a Precios
-Unitarios" replicado de Coda + ANEXO 3 de precios unitarios derivados.)
+**Última actualización:** 2026-06-08 (**cerrada** — 5 sprints + Sprint 6 (PDF del contrato de obra + Anexo 3 derivado) en prod)
 
 ## Problema
 
@@ -331,6 +328,8 @@ decisión legal de Beto.
 ## Bitácora
 
 (append-only, escrito por Claude Code al ejecutar)
+
+- **2026-06-08 (cierre de la iniciativa)** — 5 sprints + Sprint 6 reabierto y cerrado en prod — PDF del contrato de obra generable + ANEXO 3 de precios unitarios derivado por % de costo (#608), sobre el backfill de obras (#594). Residuales no-código: que Beto valide el Anexo 3 derivado contra uno real en preview, y la decisión legal de cuál representante/escritura DILESA es la vigente. Sprint 7 (Anexos 1/2 + persistir PDF) queda como opcional no comprometido. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 ### 2026-05-25 — Sprint 3 (UI lectura)
 
