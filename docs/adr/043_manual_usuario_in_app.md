@@ -29,20 +29,24 @@ git**, con export a PDF on-demand (Sprint 2). Reglas canónicas:
   `content/manual/<empresa>/<...>.md` con frontmatter (`titulo`, `version`,
   `actualizado`). Nada de contenido en la DB. El PDF se genera del mismo
   markdown.
-- **M2 — Ayuda contextual por pantalla.** Un botón "?" (`<HelpButton slug>`,
-  reusable en cualquier header — `<ModuleHeader helpSlug>` o headers custom)
-  abre un drawer (`<HelpDrawer>` sobre `<DetailDrawer>`) con la ayuda de **esa**
-  pantalla. El botón solo aparece en pantallas ya gateadas → la ayuda hereda el
-  gate RBAC sin lógica extra.
+- **M2 — Ayuda contextual, un solo botón "?" global.** El header global (entre
+  la campanita y el menú de usuario) monta un `<HeaderHelpButton>` que abre la
+  ayuda de la **pantalla actual**: deriva el doc con `usePathname()` vía
+  `resolveHelpSlug` (reusa `ROUTE_TO_MODULE` — el slug del módulo ↔ la ruta del
+  `.md`). En pantallas sin doc, el drawer (`<HelpDrawer>` sobre `<DetailDrawer>`)
+  muestra "todavía no hay ayuda". _(El primer diseño puso el "?" en cada
+  `<ModuleHeader helpSlug>`; se centralizó en el header global por simplicidad —
+  un solo punto, siempre visible, sin cablear cada módulo.)_
 - **M3 — Carga server-side, traza explícita en Vercel.** Los `.md` se leen con
   `fs` (`lib/manual/load.ts`) desde un route handler (`/api/manual/[...slug]`,
   auth-gated) y desde la portada (server component). Viajan al deploy vía
   `outputFileTracingIncludes` en `next.config.ts` (mismo mecanismo que
   ghostscript-wasm). El loader valida los segmentos contra path traversal.
-- **M4 — Portada por empresa.** Un módulo "Manual" en el sidebar
-  (`/dilesa/manual`) lista las pantallas documentadas con su versión y fecha.
-  Es un módulo RBAC top-level read-only, visible para todo miembro de la
-  empresa (backfill `lectura=true, escritura=false` a todos los roles).
+- **M4 — Sin entrada de sidebar para la ayuda.** El botón "?" global (M2) es el
+  único punto de acceso — no hay sección "Ayuda" en el sidebar. La portada
+  `/dilesa/manual` (índice de docs por versión; módulo RBAC `dilesa.manual`
+  read-only, `lectura=true/escritura=false` a todos los roles) sigue existiendo
+  como página accesible por URL, pero ya no se enlaza desde el sidebar.
 - **M5 — Versionado por módulo y global.** Cada `.md` lleva su `version`
   semántica, la fecha `actualizado` y un changelog `## Cambios` al pie. El
   usuario ve "v1.2 · actualizado 07-jun" en el drawer.
