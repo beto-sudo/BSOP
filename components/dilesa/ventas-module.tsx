@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
-import { HelpButton } from '@/components/manual/help-drawer';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -411,9 +410,6 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           <p className="text-sm text-[var(--text)]/60">
             Ventas de unidades DILESA: comprador, pipeline de 17 fases, pagos y expediente digital.
           </p>
-        </div>
-        <div className="ml-auto">
-          <HelpButton slug="dilesa/ventas/lista" />
         </div>
       </header>
 

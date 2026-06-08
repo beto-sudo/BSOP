@@ -192,16 +192,22 @@ CI normal tarda ~1-2 min en este repo. Si después de 5 min sigue
 
 ### Trabajando con múltiples PRs en paralelo
 
-Cuando hay 2+ PRs abiertos al mismo tiempo, los archivos compartidos
-(`docs/strategy/INITIATIVES.md`, y `docs/strategy/ROADMAP.md` cuando
-exista) son hotspots de conflicto: ambos PRs editan la misma tabla, el
-primero que mergea le gana la línea al segundo, y el segundo termina
-con `This branch has conflicts that must be resolved`.
+Cuando hay 2+ PRs abiertos al mismo tiempo, dos archivos eran **hotspots de
+conflicto** entre sesiones. Ambos ya están **resueltos por tooling** (iniciativa
+`cross-session-coordination`), pero entendé el porqué:
 
-El hotspot más peligroso son las **migraciones**: dos sesiones que eligen el
-mismo `YYYYMMDDHHMMSS` colisionan el PK de `schema_migrations` y **rompen
-Supabase Preview / prod** (pasó el 2026-06-07 con `20260607190000`, usado por
-dos PRs a la vez). Reglas para mantener la fricción baja:
+- **Migraciones** (`supabase/migrations/`): dos sesiones que elegían el mismo
+  `YYYYMMDDHHMMSS` colisionaban el PK de `schema_migrations` y **rompían Supabase
+  Preview / prod** (pasó el 2026-06-07 con `20260607190000`, usado por dos PRs a
+  la vez). → **Regla 0** (`npm run db:new`) lo elimina por construcción.
+- **`docs/strategy/INITIATIVES.md`**: toda promoción / cambio de estado editaba la
+  misma tabla `## Activas` → conflictos de merge recurrentes. → **Regla 1**
+  (auto-generación desde los headers) lo elimina: cada sesión solo toca su propio
+  planning doc.
+
+Con esos dos tooled, la coordinación restante son un puñado de **convenciones de
+sesión** (abajo): no hay candado global, así que dependen de que toda sesión lea
+este `CLAUDE.md` al arrancar. Reglas para mantener la fricción baja:
 
 #### Regla 0: timestamps de migración sin colisión — `npm run db:new`
 
@@ -219,13 +225,24 @@ en el mismo segundo antes de abrir su PR — por eso **abre tu PR pronto**.
 (Lógica en `scripts/lib/migration-version.ts` + `scripts/new-migration.ts`;
 iniciativa `cross-session-coordination`.)
 
-Convenciones de coordinación complementarias (la memoria compartida entre
-sesiones es este `CLAUDE.md` — todas lo leen al arrancar):
+#### Convenciones de sesión (el "registro" de quién hace qué)
 
-- **Branch = slug de iniciativa** (`claude/<slug>-…`) → `gh pr list` revela quién
-  trabaja en qué (es el "registro" de sesiones, sin archivo nuevo que mantener).
-- **Una iniciativa = una sesión.** Antes de arrancar, corre `gh pr list` para no
+La memoria compartida entre sesiones es este `CLAUDE.md` (todas lo leen al
+arrancar) + el estado en GitHub. No hay candado global; estas convenciones
+mantienen la fricción baja:
+
+- **Branch = slug de iniciativa** (`claude/<slug>-…`; sufijo `-s2`/`-s3` por
+  sprint). Así `gh pr list` revela quién trabaja en qué — es el registro de
+  sesiones, sin archivo nuevo que mantener.
+- **Una iniciativa = una sesión.** Antes de arrancar, corré `gh pr list` para no
   pisar una iniciativa que otra sesión ya tiene abierta.
+- **Editá solo tu planning doc**, nunca la tabla `## Activas` a mano (Regla 1).
+  Un archivo por iniciativa → las sesiones casi nunca tocan el mismo archivo.
+- **Rebase antes de push** sobre `origin/main` cuando toques un hotspot
+  (`docs/strategy/*`, migraciones) — ver Regla 2.
+- **Abre tu PR pronto.** Es lo que hace que las otras sesiones (y `db:new`, vía
+  `gh`) vean tu trabajo en curso. El residual de colisión vive en la ventana
+  "trabajo local sin PR todavía".
 
 #### Regla 1: la tabla `## Activas` se auto-genera — no la edites a mano
 
