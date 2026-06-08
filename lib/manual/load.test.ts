@@ -1,5 +1,23 @@
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { loadManualDoc, listManualDocs } from './load';
+
+/** Descubre TODOS los `.md` bajo content/manual como arrays de segmentos. */
+function allManualSlugs(): string[][] {
+  const root = path.join(process.cwd(), 'content', 'manual');
+  const out: string[][] = [];
+  const walk = (dir: string, base: string[]) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) walk(path.join(dir, entry.name), [...base, entry.name]);
+      else if (entry.name.endsWith('.md') && !entry.name.startsWith('_')) {
+        out.push([...base, entry.name.replace(/\.md$/, '')]);
+      }
+    }
+  };
+  walk(root, []);
+  return out;
+}
 
 /**
  * Tests de integración del loader del manual: leen los `.md` reales del repo.
@@ -10,15 +28,12 @@ import { loadManualDoc, listManualDocs } from './load';
  * sin que ningún check falle.
  */
 describe('loadManualDoc', () => {
-  it('carga los docs publicados de DILESA con frontmatter normalizado a string', async () => {
-    const slugs = [
-      ['dilesa', 'ventas', 'lista'],
-      ['dilesa', 'proyectos', 'activos'],
-      ['dilesa', 'construccion', 'obras'],
-      ['dilesa', 'cxp', 'facturas'],
-    ];
+  it('TODOS los .md del manual cargan con frontmatter normalizado a string', async () => {
+    const slugs = allManualSlugs();
+    expect(slugs.length).toBeGreaterThan(0);
     for (const slug of slugs) {
       const doc = await loadManualDoc(slug);
+      // Si esto falla, ese doc renderizaría "no hay ayuda" en producción.
       expect(doc, slug.join('/')).not.toBeNull();
       expect(typeof doc!.frontmatter.titulo).toBe('string');
       expect(typeof doc!.frontmatter.version).toBe('string');
