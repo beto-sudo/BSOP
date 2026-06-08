@@ -257,7 +257,9 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   4: '4-solicitud-avaluo',
   5: '5-avaluo-cerrado',
   6: '6-inscrita',
-  // 7–17 → próximos PRs del Sprint 7c
+  7: '7-solicitud-dictamen',
+  8: '8-dictaminada',
+  // 9–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */

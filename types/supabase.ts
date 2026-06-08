@@ -4326,8 +4326,10 @@ export type Database = {
           fase_actual: string | null
           fase_posicion: number | null
           fecha_avaluo_cerrado: string | null
+          fecha_dictaminada: string | null
           fecha_escritura: string | null
           fecha_solicitud_avaluo: string | null
+          fecha_solicitud_dictamen: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
           id: string
@@ -4337,12 +4339,14 @@ export type Database = {
           monto_credito_titular: number | null
           motivo_desasignacion: string | null
           notario: string | null
+          notario_id: string | null
           notas: string | null
           notif_hold_4h_at: string | null
           notif_hold_creado_at: string | null
           notif_hold_expirada_at: string | null
           notif_hold_promovido_at: string | null
           notif_solicitud_avaluo_at: string | null
+          notif_solicitud_dictamen_at: string | null
           numero_escritura: string | null
           ocupacion: string | null
           persona_id: string
@@ -4382,8 +4386,10 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_dictaminada?: string | null
           fecha_escritura?: string | null
           fecha_solicitud_avaluo?: string | null
+          fecha_solicitud_dictamen?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
@@ -4393,12 +4399,14 @@ export type Database = {
           monto_credito_titular?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
+          notario_id?: string | null
           notas?: string | null
           notif_hold_4h_at?: string | null
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null
           notif_hold_promovido_at?: string | null
           notif_solicitud_avaluo_at?: string | null
+          notif_solicitud_dictamen_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id: string
@@ -4438,8 +4446,10 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_dictaminada?: string | null
           fecha_escritura?: string | null
           fecha_solicitud_avaluo?: string | null
+          fecha_solicitud_dictamen?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
@@ -4449,12 +4459,14 @@ export type Database = {
           monto_credito_titular?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
+          notario_id?: string | null
           notas?: string | null
           notif_hold_4h_at?: string | null
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null
           notif_hold_promovido_at?: string | null
           notif_solicitud_avaluo_at?: string | null
+          notif_solicitud_dictamen_at?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id?: string
