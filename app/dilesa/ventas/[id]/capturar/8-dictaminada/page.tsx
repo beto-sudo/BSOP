@@ -39,7 +39,20 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   notario_id: string | null;
+  credito_titular_ref: string | null;
+  credito_cotitular_ref: string | null;
+  monto_credito_titular: number | null;
+  monto_credito_cotitular: number | null;
+  gastos_escrituracion: number | null;
 };
+
+const moneyFmt = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 0,
+});
+const money = (n: number | null | undefined): string =>
+  n == null ? '—' : moneyFmt.format(Number(n));
 
 export default function CapturarFase8Page() {
   return (
@@ -65,6 +78,12 @@ function CapturarFase8Body() {
 
   const [fechaDictamen, setFechaDictamen] = useState<string>(new Date().toISOString().slice(0, 10));
   const [archivo, setArchivo] = useState<File | null>(null);
+  // Confirmar/editar (acarrean de Fase 6) + capturar gastos de escrituración.
+  const [montoTitular, setMontoTitular] = useState<string>('');
+  const [montoCotitular, setMontoCotitular] = useState<string>('');
+  const [creditoTitularRef, setCreditoTitularRef] = useState<string>('');
+  const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
+  const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +100,9 @@ function CapturarFase8Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, persona_id, unidad_id, notario_id')
+        .select(
+          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion'
+        )
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -98,6 +119,11 @@ function CapturarFase8Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
+      if (v.monto_credito_titular != null) setMontoTitular(String(v.monto_credito_titular));
+      if (v.monto_credito_cotitular != null) setMontoCotitular(String(v.monto_credito_cotitular));
+      if (v.credito_titular_ref) setCreditoTitularRef(v.credito_titular_ref);
+      if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
+      if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
 
       const [pRes, uRes, fRes, notRes] = await Promise.all([
         sb
@@ -192,6 +218,7 @@ function CapturarFase8Body() {
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
 
+      const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
       const result = await marcarFase(sb, {
         ventaId: venta.id,
         faseNombre: 'Dictaminada',
@@ -199,6 +226,11 @@ function CapturarFase8Body() {
         docs: [{ rol: 'carta_instruccion_notarial', archivo }],
         camposVenta: {
           fecha_dictaminada: fechaDictamen,
+          monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
+          monto_credito_cotitular: montoCotitular.trim() ? Number(montoCotitular) : null,
+          credito_titular_ref: creditoTitularRef.trim() || null,
+          credito_cotitular_ref: creditoCotitularRef.trim() || null,
+          gastos_escrituracion: gastosNum,
         },
         notas: null,
         registradoPor: userId,
@@ -220,7 +252,69 @@ function CapturarFase8Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [archivo, fechaDictamen, router, sb, toast, venta]
+    [
+      archivo,
+      fechaDictamen,
+      montoTitular,
+      montoCotitular,
+      creditoTitularRef,
+      creditoCotitularRef,
+      gastosEscrituracion,
+      router,
+      sb,
+      toast,
+      venta,
+    ]
+  );
+
+  // Caso magic link: el notario ya cerró F8 subiendo la carta, pero los
+  // datos administrativos (número de crédito + gastos de escrituración)
+  // los captura Gerencia Ventas. Este path hace UPDATE directo de la venta
+  // SIN insertar otra fila en venta_fases (la fase ya está cerrada).
+  const onActualizarDatos = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!venta) return;
+      setSubmitting(true);
+      const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
+          monto_credito_cotitular: montoCotitular.trim() ? Number(montoCotitular) : null,
+          credito_titular_ref: creditoTitularRef.trim() || null,
+          credito_cotitular_ref: creditoCotitularRef.trim() || null,
+          gastos_escrituracion: gastosNum,
+        })
+        .eq('id', venta.id);
+      setSubmitting(false);
+      if (upErr) {
+        toast.add({
+          title: 'Error al actualizar datos',
+          description: getSupabaseErrorMessage(upErr, 'No se pudieron guardar los datos.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({
+        title: 'Datos actualizados',
+        description: 'Números de crédito y gastos de escrituración guardados.',
+        type: 'success',
+      });
+      router.push(`/dilesa/ventas/${venta.id}`);
+    },
+    [
+      montoTitular,
+      montoCotitular,
+      creditoTitularRef,
+      creditoCotitularRef,
+      gastosEscrituracion,
+      router,
+      sb,
+      toast,
+      venta,
+    ]
   );
 
   if (loading) {
@@ -262,11 +356,85 @@ function CapturarFase8Body() {
       />
 
       {yaCerrada ? (
-        <Banner
-          tone="success"
-          title="Fase 8 ya está cerrada"
-          body="Esta venta ya pasó por Dictaminada. La siguiente fase es Validación Patronal."
-        />
+        <>
+          <Banner
+            tone="success"
+            title="Fase 8 ya está cerrada"
+            body="La Carta de Instrucción ya está capturada. Aquí puedes confirmar/actualizar los números de crédito y los gastos de escrituración (útil si el notario cerró la fase desde el enlace del correo)."
+          />
+          <form onSubmit={onActualizarDatos} className="mt-4 space-y-6">
+            <Section title="Datos del crédito y escrituración">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Monto Crédito Titular">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={montoTitular}
+                    onChange={(e) => setMontoTitular(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(montoTitular) || 0)}</Hint>
+                </Field>
+                <Field label="Monto Crédito Co-Titular">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={montoCotitular}
+                    onChange={(e) => setMontoCotitular(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(montoCotitular) || 0)}</Hint>
+                </Field>
+                <Field label="Número de Crédito Titular e Institución">
+                  <Input
+                    value={creditoTitularRef}
+                    onChange={(e) => setCreditoTitularRef(e.target.value)}
+                    placeholder="Ej. Infonavit 1234567890"
+                  />
+                </Field>
+                <Field label="Número de Crédito Co-Titular e Institución">
+                  <Input
+                    value={creditoCotitularRef}
+                    onChange={(e) => setCreditoCotitularRef(e.target.value)}
+                    placeholder="Si no hay co-titular, déjalo en blanco"
+                  />
+                </Field>
+                <Field label="Gastos de Escrituración">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={gastosEscrituracion}
+                    onChange={(e) => setGastosEscrituracion(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(gastosEscrituracion) || 0)}</Hint>
+                </Field>
+              </div>
+            </Section>
+            <div className="flex items-center justify-end gap-3">
+              <Link
+                href={`/dilesa/ventas/${venta.id}`}
+                className="text-sm text-muted-foreground hover:text-[var(--text)]"
+              >
+                Volver al detalle
+              </Link>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 size-4" /> Actualizar datos
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </>
       ) : !fase7Cerrada ? (
         <Banner
           tone="warning"
@@ -310,6 +478,61 @@ function CapturarFase8Body() {
                   value={fechaDictamen}
                   onChange={(e) => setFechaDictamen(e.target.value)}
                   required
+                />
+              </Field>
+              <Field label="Gastos de Escrituración">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={gastosEscrituracion}
+                  onChange={(e) => setGastosEscrituracion(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(gastosEscrituracion) || 0)} — los calcula el notario</Hint>
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Confirmar datos del crédito">
+            <p className="mb-3 text-xs text-[var(--text)]/50">
+              Acarreados de Inscrita (Fase 6). Confirma o corrige si el banco cambió algo.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Monto Crédito Titular">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={montoTitular}
+                  onChange={(e) => setMontoTitular(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(montoTitular) || 0)}</Hint>
+              </Field>
+              <Field label="Monto Crédito Co-Titular">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={montoCotitular}
+                  onChange={(e) => setMontoCotitular(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(montoCotitular) || 0)}</Hint>
+              </Field>
+              <Field label="Número de Crédito Titular e Institución">
+                <Input
+                  value={creditoTitularRef}
+                  onChange={(e) => setCreditoTitularRef(e.target.value)}
+                  placeholder="Ej. Infonavit 1234567890"
+                />
+              </Field>
+              <Field label="Número de Crédito Co-Titular e Institución">
+                <Input
+                  value={creditoCotitularRef}
+                  onChange={(e) => setCreditoCotitularRef(e.target.value)}
+                  placeholder="Si no hay co-titular, déjalo en blanco"
                 />
               </Field>
             </div>
@@ -360,6 +583,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] text-[var(--text)]/50">{children}</p>;
 }
 
 function FileSlot({
