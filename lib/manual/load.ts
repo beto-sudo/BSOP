@@ -55,12 +55,19 @@ function safeSegments(segments: string[]): string[] | null {
   return segments;
 }
 
-function hasRequiredFrontmatter(data: Record<string, unknown>): data is ManualFrontmatter {
-  return (
-    typeof data.titulo === 'string' &&
-    typeof data.version === 'string' &&
-    typeof data.actualizado === 'string'
-  );
+/**
+ * Normaliza un valor de frontmatter a string. YAML parsea sin comillas:
+ * `version: 1.0` como número y `actualizado: 2026-06-07` como `Date` — por eso
+ * NO basta con exigir `typeof === 'string'` (era el bug que dejaba todo el
+ * manual "vacío"). Devuelve `null` si no se puede normalizar.
+ */
+function coerceStr(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() || null;
+  if (typeof value === 'number') return String(value);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+  return null;
 }
 
 /**
@@ -87,15 +94,20 @@ export async function loadManualDoc(segments: string[]): Promise<ManualDoc | nul
 
   const parsed = matter(raw);
   const data = parsed.data as Record<string, unknown>;
-  if (!hasRequiredFrontmatter(data)) return null;
+
+  const titulo = coerceStr(data.titulo);
+  const version = coerceStr(data.version);
+  const actualizado = coerceStr(data.actualizado);
+  // Un doc sin título/versión/fecha no se sirve (D7).
+  if (!titulo || !version || !actualizado) return null;
 
   return {
     slug: safe,
     frontmatter: {
-      titulo: data.titulo,
+      titulo,
       modulo: typeof data.modulo === 'string' ? data.modulo : undefined,
-      version: data.version,
-      actualizado: data.actualizado,
+      version,
+      actualizado,
     },
     body: parsed.content.trim(),
   };
