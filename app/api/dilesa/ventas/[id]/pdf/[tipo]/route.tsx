@@ -29,6 +29,7 @@ import {
   SolicitudDictamenPDF,
   type SolicitudDictamenData,
 } from '@/lib/dilesa/pdf/solicitud-dictamen';
+import { PolizaGarantiaPDF, type PolizaGarantiaData } from '@/lib/dilesa/pdf/poliza-garantia';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
@@ -40,6 +41,7 @@ const TIPOS = [
   'promesa-compraventa',
   'solicitud-avaluo',
   'solicitud-dictamen',
+  'poliza-garantia',
 ] as const;
 type TipoPdf = (typeof TIPOS)[number];
 
@@ -319,6 +321,54 @@ export async function GET(
     };
     const buf = await renderToBuffer(<SolicitudDictamenPDF data={data} />);
     return pdfResponse(buf, `solicitud-dictamen-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'poliza-garantia') {
+    // Datos del desarrollador (core.empresas). registro_infonavit/telefono/
+    // email_contacto son columnas nuevas (Sprint 7h) — casteamos el row para
+    // no depender de la regen de types antes del typecheck local.
+    const { data: empRow } = await sb
+      .schema('core')
+      .from('empresas')
+      .select(
+        'razon_social, nombre, representante_legal, registro_infonavit, telefono, email_contacto'
+      )
+      .eq('id', venta.empresa_id)
+      .maybeSingle();
+    const empresa = (empRow ?? null) as {
+      razon_social: string | null;
+      nombre: string | null;
+      representante_legal: string | null;
+      registro_infonavit: string | null;
+      telefono: string | null;
+      email_contacto: string | null;
+    } | null;
+    const razonSocial = (empresa?.razon_social || empresa?.nombre || 'DILESA').toUpperCase();
+    // Fecha de expedición = hoy (la póliza se expide al imprimirla para el notario).
+    const fechaExpedicion = new Date().toLocaleDateString('es-MX', {
+      timeZone: 'America/Matamoros',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const data: PolizaGarantiaData = {
+      fechaTexto: fechaExpedicion,
+      desarrolladorRazonSocial: razonSocial,
+      registroInfonavit: empresa?.registro_infonavit ?? null,
+      representanteLegal: empresa?.representante_legal ?? null,
+      telefono: empresa?.telefono ?? null,
+      email: empresa?.email_contacto ?? null,
+      clienteNombre,
+      identificacionInventario,
+      fraccionamiento: pdfFraccionamiento ? pdfFraccionamiento.toUpperCase() : null,
+      manzana: pdfManzana,
+      lote: pdfLote,
+      prototipo: pdfPrototipo,
+      domicilioOficial: pdfDomicilioOficial ? pdfDomicilioOficial.toUpperCase() : null,
+      watermark: watermarkText,
+    };
+    const buf = await renderToBuffer(<PolizaGarantiaPDF data={data} />);
+    return pdfResponse(buf, `poliza-garantia-${identificacionInventario || id}.pdf`);
   }
 
   if (tipo === 'aviso-privacidad') {
