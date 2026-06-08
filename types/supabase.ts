@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-06-08T11:49:35Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -250,12 +239,14 @@ export type Database = {
           domicilio_municipio: string | null
           domicilio_numero_ext: string | null
           domicilio_numero_int: string | null
+          email_contacto: string | null
           email_fiscal: string | null
           escritura_constitutiva: Json | null
           escritura_poder: Json | null
           estatus_sat: string | null
           favicon_url: string | null
           fecha_inicio_operaciones: string | null
+          firmante_poliza: string | null
           footer_doc_url: string | null
           header_email_url: string | null
           header_url: string | null
@@ -273,12 +264,14 @@ export type Database = {
           razon_social: string | null
           regimen_capital: string | null
           regimen_fiscal: string | null
+          registro_infonavit: string | null
           registro_patronal_imss: string | null
           representante_legal: string | null
           rfc: string | null
           rpi_imss: string | null
           slug: string
           solo_fiscal: boolean
+          telefono: string | null
           tipo_contribuyente: string
           uso_cfdi_default: string | null
           watermark_url: string | null
@@ -306,12 +299,14 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_contacto?: string | null
           email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
           favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          firmante_poliza?: string | null
           footer_doc_url?: string | null
           header_email_url?: string | null
           header_url?: string | null
@@ -329,12 +324,14 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_infonavit?: string | null
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
           rpi_imss?: string | null
           slug: string
           solo_fiscal?: boolean
+          telefono?: string | null
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
           watermark_url?: string | null
@@ -362,12 +359,14 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_contacto?: string | null
           email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
           estatus_sat?: string | null
           favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          firmante_poliza?: string | null
           footer_doc_url?: string | null
           header_email_url?: string | null
           header_url?: string | null
@@ -385,12 +384,14 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_infonavit?: string | null
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
           rpi_imss?: string | null
           slug?: string
           solo_fiscal?: boolean
+          telefono?: string | null
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
           watermark_url?: string | null
@@ -2027,6 +2028,7 @@ export type Database = {
           fecha_paquete_ruv: string | null
           fecha_seguro_calidad: string | null
           fecha_terminada: string | null
+          frente_id: string | null
           frente_ruv: string | null
           id: string
           m2_construccion: number | null
@@ -2057,6 +2059,7 @@ export type Database = {
           fecha_paquete_ruv?: string | null
           fecha_seguro_calidad?: string | null
           fecha_terminada?: string | null
+          frente_id?: string | null
           frente_ruv?: string | null
           id?: string
           m2_construccion?: number | null
@@ -2087,6 +2090,7 @@ export type Database = {
           fecha_paquete_ruv?: string | null
           fecha_seguro_calidad?: string | null
           fecha_terminada?: string | null
+          frente_id?: string | null
           frente_ruv?: string | null
           id?: string
           m2_construccion?: number | null
@@ -2100,6 +2104,20 @@ export type Database = {
           valor_contrato_mo?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "construccion_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "ruv_frentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_frente_avance"
+            referencedColumns: ["frente_id"]
+          },
           {
             foreignKeyName: "construccion_producto_id_fkey"
             columns: ["producto_id"]
@@ -3982,6 +4000,166 @@ export type Database = {
         }
         Relationships: []
       }
+      ruv_documentos_catalogo: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ruv_frente_documentos: {
+        Row: {
+          archivo_url: string | null
+          created_at: string
+          deleted_at: string | null
+          documento_catalogo_id: string
+          empresa_id: string
+          estado: string
+          fecha_carga: string | null
+          frente_id: string
+          id: string
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          archivo_url?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          documento_catalogo_id: string
+          empresa_id: string
+          estado?: string
+          fecha_carga?: string | null
+          frente_id: string
+          id?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archivo_url?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          documento_catalogo_id?: string
+          empresa_id?: string
+          estado?: string
+          fecha_carga?: string | null
+          frente_id?: string
+          id?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ruv_frente_documentos_documento_catalogo_id_fkey"
+            columns: ["documento_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "ruv_documentos_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ruv_frente_documentos_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "ruv_frentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ruv_frente_documentos_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_frente_avance"
+            referencedColumns: ["frente_id"]
+          },
+        ]
+      }
+      ruv_frentes: {
+        Row: {
+          coda_id: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          id_oferta: number | null
+          id_orden: number | null
+          nombre: string
+          proyecto_id: string | null
+          updated_at: string
+          viviendas_oferta: number | null
+        }
+        Insert: {
+          coda_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          id_oferta?: number | null
+          id_orden?: number | null
+          nombre: string
+          proyecto_id?: string | null
+          updated_at?: string
+          viviendas_oferta?: number | null
+        }
+        Update: {
+          coda_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          id_oferta?: number | null
+          id_orden?: number | null
+          nombre?: string
+          proyecto_id?: string | null
+          updated_at?: string
+          viviendas_oferta?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
+      }
       tareas_construccion: {
         Row: {
           coda_row_id: string | null
@@ -4339,11 +4517,13 @@ export type Database = {
           fecha_avaluo_cerrado: string | null
           fecha_dictaminada: string | null
           fecha_escritura: string | null
+          fecha_firma_programada: string | null
           fecha_solicitud_avaluo: string | null
           fecha_solicitud_dictamen: string | null
           fecha_validacion_patronal: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
+          hora_firma_programada: string | null
           id: string
           ine_numero: string | null
           monto_avaluo: number | null
@@ -4400,11 +4580,13 @@ export type Database = {
           fecha_avaluo_cerrado?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
+          fecha_firma_programada?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          hora_firma_programada?: string | null
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
@@ -4461,11 +4643,13 @@ export type Database = {
           fecha_avaluo_cerrado?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
+          fecha_firma_programada?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          hora_firma_programada?: string | null
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
@@ -4696,6 +4880,38 @@ export type Database = {
           ventas_totales: number | null
         }
         Relationships: []
+      }
+      v_ruv_frente_avance: {
+        Row: {
+          con_dtu: number | null
+          con_paquete_ruv: number | null
+          con_seguro_calidad: number | null
+          cuvs_emitidos: number | null
+          documentos_pendientes: number | null
+          empresa_id: string | null
+          frente_id: string | null
+          nombre: string | null
+          pct_paquete_ruv: number | null
+          proyecto_id: string | null
+          viviendas: number | null
+          viviendas_oferta: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+        ]
       }
       v_tareas_pendientes_de_pago: {
         Row: {
