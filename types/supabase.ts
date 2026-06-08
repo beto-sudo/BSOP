@@ -250,6 +250,7 @@ export type Database = {
           domicilio_municipio: string | null
           domicilio_numero_ext: string | null
           domicilio_numero_int: string | null
+          email_contacto: string | null
           email_fiscal: string | null
           escritura_constitutiva: Json | null
           escritura_poder: Json | null
@@ -273,12 +274,14 @@ export type Database = {
           razon_social: string | null
           regimen_capital: string | null
           regimen_fiscal: string | null
+          registro_infonavit: string | null
           registro_patronal_imss: string | null
           representante_legal: string | null
           rfc: string | null
           rpi_imss: string | null
           slug: string
           solo_fiscal: boolean
+          telefono: string | null
           tipo_contribuyente: string
           uso_cfdi_default: string | null
           watermark_url: string | null
@@ -306,6 +309,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_contacto?: string | null
           email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
@@ -329,12 +333,14 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_infonavit?: string | null
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
           rpi_imss?: string | null
           slug: string
           solo_fiscal?: boolean
+          telefono?: string | null
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
           watermark_url?: string | null
@@ -362,6 +368,7 @@ export type Database = {
           domicilio_municipio?: string | null
           domicilio_numero_ext?: string | null
           domicilio_numero_int?: string | null
+          email_contacto?: string | null
           email_fiscal?: string | null
           escritura_constitutiva?: Json | null
           escritura_poder?: Json | null
@@ -385,12 +392,14 @@ export type Database = {
           razon_social?: string | null
           regimen_capital?: string | null
           regimen_fiscal?: string | null
+          registro_infonavit?: string | null
           registro_patronal_imss?: string | null
           representante_legal?: string | null
           rfc?: string | null
           rpi_imss?: string | null
           slug?: string
           solo_fiscal?: boolean
+          telefono?: string | null
           tipo_contribuyente?: string
           uso_cfdi_default?: string | null
           watermark_url?: string | null
@@ -4339,11 +4348,13 @@ export type Database = {
           fecha_avaluo_cerrado: string | null
           fecha_dictaminada: string | null
           fecha_escritura: string | null
+          fecha_firma_programada: string | null
           fecha_solicitud_avaluo: string | null
           fecha_solicitud_dictamen: string | null
           fecha_validacion_patronal: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
+          hora_firma_programada: string | null
           id: string
           ine_numero: string | null
           monto_avaluo: number | null
@@ -4400,11 +4411,13 @@ export type Database = {
           fecha_avaluo_cerrado?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
+          fecha_firma_programada?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          hora_firma_programada?: string | null
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
@@ -4461,11 +4474,13 @@ export type Database = {
           fecha_avaluo_cerrado?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
+          fecha_firma_programada?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          hora_firma_programada?: string | null
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
