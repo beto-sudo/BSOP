@@ -4341,6 +4341,7 @@ export type Database = {
           fecha_escritura: string | null
           fecha_solicitud_avaluo: string | null
           fecha_solicitud_dictamen: string | null
+          fecha_validacion_patronal: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
           id: string
@@ -4401,6 +4402,7 @@ export type Database = {
           fecha_escritura?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
+          fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
@@ -4461,6 +4463,7 @@ export type Database = {
           fecha_escritura?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
+          fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
           id?: string
