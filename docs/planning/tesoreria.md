@@ -3,11 +3,11 @@
 **Slug:** `tesoreria`
 **Empresas:** todas (golden DILESA)
 **Schemas afectados:** `erp` (nueva `cuenta_saldos` + vista `v_cuenta_saldo_actual`; carga `cuentas_bancarias`), `core.modulos` (sección `tesoreria` nueva + reubicar CxC/CxP + slug módulo Saldos Bancos + backfill de permisos)
-**Estado:** planned
-**Próximo hito:** Sprint 1 — `erp.cuenta_saldos` (historial) + vista último saldo + carga de las 4 cuentas DILESA. Dependencia previa del lanzamiento de `dilesa-resumen-consejo`
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-07 (promovida a `planned` — alcance v1 cerrado con Beto: golden DILESA; solo crear la sección + el módulo Saldos Bancos nuevo (CxC/CxP solo se reubican bajo la sección, sin tocar sus UIs); el módulo es dependencia previa del lanzamiento del correo al Consejo (`dilesa-resumen-consejo`).)
+**Última actualización:** 2026-06-08 (**cerrada** — Sprints 1-3 en prod; sección Tesorería + módulo Saldos Bancos con 4 cuentas DILESA y saldos reales capturados)
 
 ## Problema
 
@@ -182,6 +182,8 @@ secciones derivables) avanzan en paralelo sin bloqueo.
   desbloqueado para lanzar los 7 bloques.
 
 ## Bitácora
+
+- **2026-06-08 (cierre de la iniciativa)** — Sprints 1-3 entregados y en prod — #726 (`erp.cuenta_saldos` + vista `v_cuenta_saldo_actual` + carga de las 4 cuentas DILESA), #730 (sección Tesorería + reubicar CxC/CxP + módulo `dilesa.saldos-bancos` + backfill RBAC), #739 (UI de captura de saldos). Verificado en prod 2026-06-08: las 4 cuentas (Monex $128.6M, BBVA Bancomer $664k, BBVA USD $0, Finamex $0) con saldo real capturado hoy (no demo). La dependencia (`dilesa-resumen-consejo`) ya hizo cutover. Sprint 4 (doc para operadores) queda como housekeeping opcional, no bloquea. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-06-07 (promoción)** — Surgió al planear `dilesa-resumen-consejo`:
   el bloque de bancos era un gap duro (`cuentas_bancarias` vacía). Beto

@@ -3,11 +3,11 @@
 **Slug:** `rdb-proveedores-data-completion`
 **Empresas:** RDB (V1) — patrón replicable a DILESA/COAGAN/ANSA cuando tengan masa crítica
 **Schemas afectados:** `erp` (3 tablas satélite nuevas: `personas_contactos`, `personas_cuentas_bancarias`, `personas_direcciones`)
-**Estado:** in_progress
-**Próximo hito:** Sprint 3 (operativo, **lo hace Beto + ops**) — captura manual desde `PROVEEDORES RDB.csv` para los 12 RDB activos: cuentas bancarias, contacto, direcciones. Saneamiento de 3 RFCs inválidos. Resolver duplicado #4 (Jorge Amin / Abastecedora Industrial). Cierra al terminar
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-04-30
-**Última actualización:** 2026-04-30 (Sprints 1 + 2 técnicos cerrados; Sprint 3 operativo en mano de Beto + ops)
+**Última actualización:** 2026-06-08 (**cerrada** — Beto confirmó terminada; la captura operativa la completaron Beto + ops)
 
 ## Problema
 
@@ -95,6 +95,8 @@ Decisiones de schema en [ADR-028](../adr/028_personas_satellites.md) (reglas PS1
 ## Bitácora
 
 _(append-only)_
+
+- **2026-06-08 (cierre de la iniciativa)** — Beto confirmó la iniciativa como terminada. El Sprint 3 operativo (captura manual desde el CSV de proveedores RDB: cuentas bancarias, contacto y direcciones de los proveedores activos, saneamiento de RFCs inválidos, resolución de duplicados) lo completaron Beto + ops. Las 3 tablas satélite (`personas_contactos`/`personas_cuentas_bancarias`/`personas_direcciones`) quedan como patrón replicable a DILESA/COAGAN/ANSA cuando tengan masa crítica. Cerrada por confirmación explícita de Beto.
 
 - **2026-04-30** — Iniciativa creada. Disparada por la depuración del catálogo de proveedores RDB usando `PROVEEDORES RDB.csv`: el CSV trae info que el schema actual no soporta (cuentas bancarias del proveedor, contacto principal, cuentas contables) más datos legacy con inconsistencias que requieren saneamiento. SQL de activación/desactivación + actualización de campos básicos (RFC, CURP, email, teléfono, domicilio libre, condiciones de pago, tipo_persona deducido por longitud de RFC) en `/tmp/proveedores_rdb_update.sql`.
 - **2026-04-30** — SQL aplicado vía Supabase MCP (`execute_sql` en una sola transacción `BEGIN/COMMIT`). Verificación: 12 activos, 18 inactivos. Los 12 activos quedaron con: 7 morales (Aranda Chocolate, Arca Continental, Moctezuma, H-E-B, Walmart, El Mirador, Super Gutiérrez) + 5 físicas (Arnulfo Sandoval, Dinorah, Fernando Dario, Franziella, Jorge Amin). Datos pendientes de saneamiento (ver alcance v1): RFC real de Moctezuma + Abastecedora + Franziella, materno de Arnulfo Sandoval (perdido en el split — el CSV solo traía "Arnulfo Sandoval" sin segundo apellido y el `paterno` previo "Sandoval Morales" se reemplazó por "Sandoval" para alinear al CSV).

@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 6)
 **Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`; extiende `movimientos_bancarios` con referencia polimórfica, ADR-037)
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 (schema DB-puro) en prod 2026-06-01: `erp.facturas` extendida + `cxp_pagos`/`cxp_pago_aplicaciones` + 6 RPCs + `es_comite_ejecutivo` + trigger de saldo. Próximo: Sprint 2 — ingesta XML CFDI (parser determinista en endpoint app) + match con OC
+**Próximo hito:** Sprint 5 (pago en efectivo + conciliación contra cortes, engancha cortes-conciliacion) + Sprint 6 (migrar erp.gastos → CxP + rollout COAGAN/ANSA). Sprints 1-4 (schema + ingesta XML CFDI + match OC + UI programación/aprobación de pagos) ya en prod
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-02 (**Sprint 4** — UI de programación + aprobación de pagos para RDB + DILESA: 2 sub-páginas nuevas (`programacion`, `pagos`) vía 2 componentes compartidos `components/cxp/` + 4 sub-slugs RBAC nuevos (`{rdb,dilesa}.cxp.{programacion,pagos}`) en los 4 lugares + migración `20260602020000`. Cablea las RPCs `cxp_pago_programar`/`aprobar`/`marcar_pagado`/`cancelar` (gate Dirección server-side). Email de notificación al aprobador **diferido a follow-up**. UI visible — sin auto-merge, preview para revisión de Beto. Modo autónomo. Próximo: Sprint 5 (pago efectivo + conciliación). Ver Bitácora.)
+**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprints 1-4 confirmados en prod, #640/#699; pendiente real = Sprints 5-6)
 
 ## Problema
 
