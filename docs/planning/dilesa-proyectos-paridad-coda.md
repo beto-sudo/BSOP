@@ -3,11 +3,11 @@
 **Slug:** `dilesa-proyectos-paridad-coda`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.proyectos` (4 columnas en Sprint A + ~6 más pendientes en Sprint C), `dilesa.v_proyecto_avances` (vista derivando avances de `unidades`; Sprint C amplía agregados)
-**Estado:** in_progress
-**Próximo hito:** **Reabierta 2026-05-27**. Sprint B extiende `<ProyectosModule>` con 5 columnas leyendo `v_proyecto_avances`. Sprint C en spike: ~15 columnas Coda faltantes (derivable / ALTER simple / aclaración con Beto) — esperando OK de alcance v2 antes de tocar schema
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-07; paridad sustancial en prod, categoría (c) del spike diferida por decisión de Beto)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-07 (Sprint D.1 — avance de construcción = casas terminadas, no lotes. Migración `20260608011252`: el NUMERADOR `viv_construidas` de `v_proyecto_avances` ya solo cuenta casas terminadas (producto final formalizado o casa terminada con `producto_id`), excluyendo lotes urbanizados en estado `terminada` sin casa y unidades `asignada` (preventa). Corrige el 92.48% imposible de LDLE → 67.52%; LDS 89.13 → 80.43; los 4 completados intactos en 100%.)
+**Última actualización:** 2026-06-07 (**cerrada** — paridad con Coda sustancialmente en prod tras Sprints A–D.1; las 6 definiciones de la categoría (c) del spike — Bitácora de Obra, ZCU, Control de Documentos, Pendiente Pago Seguro, DTU, "En Proceso Por Detonar" — se difieren por decisión de Beto, se verán individualmente. Verificado en prod hoy vía MCP: LV/LV2/LDV/PDV 100/100 `completado`; LDLE 67.52/52.62; LDS 80.43/66.30.)
 
 ## Problema
 
@@ -282,6 +282,24 @@ proyecto. Todos columna escalar; idempotente con
 
 ## Bitácora
 
+- **2026-06-07 (cierre de la iniciativa)** — Beto decidió cerrarla. La
+  paridad con Coda quedó sustancialmente cubierta en prod a lo largo de
+  los Sprints A–D.1: 10 columnas raw nuevas en `dilesa.proyectos` + flag
+  `es_muestra` en `dilesa.unidades` + vista `v_proyecto_avances` con ~16
+  derivaciones reemplazando las 46 fórmulas de Coda + 2 refinamientos del
+  cálculo de avance (sobre vivienda activa, y construcción = casas
+  terminadas no lotes). Lo único pendiente eran las 6 definiciones de
+  negocio de la **categoría (c)** del spike (Bitácora de Obra, Archivos
+  ZCU, Control de Documentos, Pendiente Pago Seguro, DTU, "En Proceso Por
+  Detonar"): requieren aclaración operativa y/o tablas relacionadas, y
+  Beto las verá individualmente más adelante — fuera del alcance de esta
+  iniciativa. Verificación final en prod (vía Supabase MCP): migraciones
+  `20260527190000` / `20260605183000` / `20260608011252` aplicadas;
+  `v_proyecto_avances` computa LV/LV2/LDV/PDV 100/100
+  (`estado_sugerido='completado'`), LDLE 67.52/52.62, LDS 80.43/66.30,
+  ALDE/LDLD 0/0 — coherente, sin el 92.48% imposible que motivó el fix
+  D.1. Barrido de Reminders `Claude 🧭`: sin pendientes vivos del slug.
+
 - **2026-06-07 (Sprint D.1 — avance de construcción = casas terminadas)** —
   Beto reportó que el correo al Consejo mostraba el avance de construcción de
   LDLE en **92.48%**, número imposible. Diagnóstico: el Sprint D corrigió el
@@ -401,6 +419,16 @@ proyecto. Todos columna escalar; idempotente con
   la pide se abre iniciativa nueva. Iniciativa cierra en `done`.
 
 ## Decisiones registradas
+
+- **2026-06-07 — Cierre con la categoría (c) del spike diferida**. Beto
+  cerró la iniciativa con la paridad sustancial ya en prod (campos raw +
+  vista de avances derivados + reglas de estado/avance sobre vivienda)
+  como outcome v1. Los 6 conceptos no modelados de la categoría (c)
+  — Bitácora de Obra, Archivos ZCU, Control de Documentos, Pendiente Pago
+  Seguro, DTU (Terminadas sin/Con DTU), "En Proceso Por Detonar ($)" —
+  requieren aclaración de negocio y/o tablas relacionadas. Cuando alguno
+  pese, se retoma como tarea suelta o iniciativa nueva, **no** reabriendo
+  ésta.
 
 - **2026-06-07 — El avance de construcción cuenta CASAS terminadas, no
   lotes; `asignada` no cuenta**. El estado `terminada` se usa en
