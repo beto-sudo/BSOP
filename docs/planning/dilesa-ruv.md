@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
 **Estado:** in_progress
-**Próximo hito:** Sprints 1-2 en prod (schema + RBAC aplicados, PR #760; import de 78 frentes + 27 docs + 1036 viviendas ligadas vía `construccion.frente_id`). **Sprint 3** (UI): listado de ofertas/frentes + checklist de documentos + KPIs de avance (lee `v_ruv_frente_avance`) — para que Beto defina el proceso de alta de frentes nuevos. D2 cerrada (RBAC)
+**Próximo hito:** Sprints 1-3 en preview (schema + RBAC + import en prod; UI read-only en PR — listado de frentes + KPIs + detail drawer con checklist). **Pendiente: Beto revisa el preview y define el proceso de alta de frentes** → Sprint 4 (form de alta/edición de frente + marcado cargado/pendiente de documentos). D2 cerrada (RBAC)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-08 (Sprint 2 import aplicado a prod: 78 frentes —77 con proyecto resuelto—, 27 docs del catálogo, backfill de `construccion.frente_id` (1036 viviendas, 100% match). Vista `v_ruv_frente_avance` ya da avance real por frente. Script idempotente `scripts/import_dilesa_ruv.ts`. Arrancando Sprint 3 (UI))
+**Última actualización:** 2026-06-08 (Sprint 3 UI construido: `RuvModule` (listado de frentes + 5 KPIs + filtros) + `RuvFrenteDetailDrawer` (datos de oferta + avance + checklist de documentos) + page real. Read-only en v1. PR sin auto-merge para que Beto vea el preview y definamos el proceso de alta de frentes nuevos)
 
 ## Problema
 
@@ -439,6 +439,16 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   match**. La vista `v_ruv_frente_avance` ya da avance real (ej. LOMA VERDE 11:
   86 viviendas, 86 CUVs, 100% paquete RUV). CUV + hitos NO se importaron (ya
   estaban en `dilesa.construccion`). Urgencias sigue fuera de v1 (reporte canvas).
+- **2026-06-08 (Sprint 3 UI)** — Componentes nuevos: `components/dilesa/ruv-module.tsx`
+  (listado de frentes + 5 KPIs reactivos —frentes, viviendas en oferta, CUVs,
+  avance paquete RUV %, frentes sin viviendas— + filtros búsqueda/proyecto),
+  `ruv-frente-detail-drawer.tsx` (datos de la oferta + avance del trámite +
+  checklist de los 27 documentos del paquete con estado cargado/pendiente) y
+  `ruv-utils.ts`. Page `app/dilesa/ruv/page.tsx` reemplaza el skeleton por
+  `<RuvModule>`. **Read-only en v1** (sin alta/edición ni marcado de documentos).
+  Lee `v_ruv_frente_avance` + `ruv_frentes` + `ruv_documentos_catalogo` +
+  `ruv_frente_documentos`. CI local verde. PR **sin auto-merge**: Beto revisa el
+  preview y define el proceso de alta de frentes → Sprint 4.
 
 ## Decisiones registradas
 
