@@ -5,6 +5,7 @@
 **Schemas afectados:** `dilesa` (rediseño completo del schema, deprecación de
 las tablas viejas), `core.empresas` (lectura)
 **Estado:** in_progress
+**Próximo hito:** Sprints 1-4 + Fase 4.5 (expediente) en prod. Import de Coda completo: 1,425 ventas, 1,300 clientes, 11,878 adjuntos. Sprint 7c-2 (Fase 1 KYC) mergeado. Próximo: Sprint 7c-3 (Fase 2+)
 **Dueño:** Beto
 **Creada:** 2026-05-08
 **Última actualización:** 2026-06-05 (PR #700: fichas de detalle de unidad

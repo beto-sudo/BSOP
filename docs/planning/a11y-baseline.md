@@ -3,7 +3,7 @@
 **Slug:** `a11y-baseline`
 **Empresas:** todas
 **Schemas afectados:** n/a (UI)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-04-26
 **Última actualización:** 2026-04-29

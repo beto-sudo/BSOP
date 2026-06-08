@@ -4,6 +4,7 @@
 **Empresas:** todas
 **Schemas afectados:** `erp` (`movimientos_bancarios`, `conciliaciones`, `cuentas_bancarias`)
 **Estado:** proposed
+**Próximo hito:** Cerrar alcance v1 — bloqueada hasta que CxC+CxP emitan movimientos; definir formato de import (CSV/layout/API), reglas de auto-match, manejo de no-identificados, generalizar `conciliaciones` a polimórfica
 **Dueño:** Beto
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-01 (esbozada como hermana de `cxc`/`cxp`; bloqueada hasta que ambas emitan movimientos bancarios)

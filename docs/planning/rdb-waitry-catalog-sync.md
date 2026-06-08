@@ -4,6 +4,7 @@
 **Empresas:** RDB
 **Schemas afectados:** rdb (productos_waitry_map), erp (productos, productos_precios, categorias_producto)
 **Estado:** proposed
+**Próximo hito:** Sprint 0 (bloqueo externo) — esperar NDA firmado + recibir `client_id`/`client_secret`/`user`/`password`/`placeId` + respuestas a las 10 preguntas técnicas
 **Dueño:** Beto
 **Creada:** 2026-04-29
 **Última actualización:** 2026-04-29

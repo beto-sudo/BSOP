@@ -44,6 +44,14 @@ jobs:
       - name: Prettier — check
         run: npm run format:check
 
+      # Verifica que docs/strategy/INITIATIVES.md (tabla Activas) sigue en sync
+      # con los headers de docs/planning/*.md. Si alguien editó la tabla a mano,
+      # o promovió/cambió el estado de una iniciativa sin correr el generador,
+      # este step falla y pide correr `npm run initiatives:gen`. No necesita
+      # secrets — solo lee archivos del repo. Iniciativa cross-session-coordination.
+      - name: Initiatives index — drift check
+        run: npm run initiatives:check
+
       # Verifica que supabase/SCHEMA_REF.md coincide con el schema real de la
       # DB. Si alguien aplicó una migración sin regenerar el MD (o lo editó a
       # mano), este step falla y pide correr `npm run schema:ref`.
