@@ -331,7 +331,7 @@ export async function GET(
       .schema('core')
       .from('empresas')
       .select(
-        'razon_social, nombre, representante_legal, registro_infonavit, telefono, email_contacto'
+        'razon_social, nombre, representante_legal, firmante_poliza, registro_infonavit, telefono, email_contacto'
       )
       .eq('id', venta.empresa_id)
       .maybeSingle();
@@ -339,6 +339,7 @@ export async function GET(
       razon_social: string | null;
       nombre: string | null;
       representante_legal: string | null;
+      firmante_poliza: string | null;
       registro_infonavit: string | null;
       telefono: string | null;
       email_contacto: string | null;
@@ -355,7 +356,9 @@ export async function GET(
       fechaTexto: fechaExpedicion,
       desarrolladorRazonSocial: razonSocial,
       registroInfonavit: empresa?.registro_infonavit ?? null,
-      representanteLegal: empresa?.representante_legal ?? null,
+      // La póliza la firma `firmante_poliza` (Adalberto en DILESA); cae a
+      // representante_legal (administrativo/fiscal) si no hay firmante propio.
+      representanteLegal: empresa?.firmante_poliza ?? empresa?.representante_legal ?? null,
       telefono: empresa?.telefono ?? null,
       email: empresa?.email_contacto ?? null,
       clienteNombre,

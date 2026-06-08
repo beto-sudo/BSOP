@@ -257,6 +257,7 @@ export type Database = {
           estatus_sat: string | null
           favicon_url: string | null
           fecha_inicio_operaciones: string | null
+          firmante_poliza: string | null
           footer_doc_url: string | null
           header_email_url: string | null
           header_url: string | null
@@ -316,6 +317,7 @@ export type Database = {
           estatus_sat?: string | null
           favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          firmante_poliza?: string | null
           footer_doc_url?: string | null
           header_email_url?: string | null
           header_url?: string | null
@@ -375,6 +377,7 @@ export type Database = {
           estatus_sat?: string | null
           favicon_url?: string | null
           fecha_inicio_operaciones?: string | null
+          firmante_poliza?: string | null
           footer_doc_url?: string | null
           header_email_url?: string | null
           header_url?: string | null
