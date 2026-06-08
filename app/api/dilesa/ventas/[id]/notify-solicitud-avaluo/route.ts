@@ -24,6 +24,7 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendAvaluoSolicitudEmail, type AvaluoSolicitudContext } from '@/lib/dilesa/avaluo-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 import { signAvaluoToken } from '@/lib/dilesa/avaluo-token';
+import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -175,6 +176,14 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const branding = await loadEmpresaBranding(admin, venta.empresa_id);
 
+  // Contacto para el valuador = Gerente de Ventas de la empresa (Edgar en
+  // DILESA), NO el asesor que capturó la venta. Decisión Beto: el valuador
+  // coordina con la gerencia comercial. Fallback al asesor si no hay
+  // gerente activo (defensa para no dejar el email sin contacto).
+  const gerente = await loadGerenteVentas(admin, venta.empresa_id);
+  const contactoNombre = gerente?.nombre ?? vendedorNombre;
+  const contactoEmail = gerente?.email ?? (usuario?.email as string | null) ?? null;
+
   // Genera el magic link para que el valuador suba el dictamen sin login.
   // Hardcodeamos `https://bsop.io` como en lib/dilesa/email-branding.ts: los
   // emails se envían desde prod siempre, usar `NEXT_PUBLIC_SITE_URL` haría
@@ -215,11 +224,12 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     m2Construccion: unidad?.m2_construccion != null ? Number(unidad.m2_construccion) : null,
     esquina: unidad?.es_esquina ?? null,
     tieneFrenteVerde: unidad?.tiene_frente_verde ?? null,
-    vendedorNombre,
-    vendedorEmail: (usuario?.email as string | null) ?? null,
-    // `core.usuarios` no tiene columna teléfono — si lo necesitamos en
-    // el futuro habrá que agregarlo al perfil o leer de erp.personas.
-    vendedorTelefono: null,
+    // El campo "vendedor*" del contexto se etiqueta como "Gerencia de
+    // Ventas" en el email — usamos al Gerente de Ventas (Edgar), no al
+    // asesor que capturó la venta.
+    vendedorNombre: contactoNombre,
+    vendedorEmail: contactoEmail,
+    vendedorTelefono: gerente?.telefono ?? null,
   };
 
   const res = await sendAvaluoSolicitudEmail(emailCtx);

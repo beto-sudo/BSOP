@@ -24,11 +24,32 @@ import { SolicitudAsignacionPDF, type SolicitudData } from '@/lib/dilesa/pdf/sol
 import { AvisoPrivacidadPDF, type AvisoPrivacidadData } from '@/lib/dilesa/pdf/aviso-privacidad';
 import { FicuPDF, type FicuData } from '@/lib/dilesa/pdf/ficu';
 import { PromesaCompraventaPDF, type PromesaData } from '@/lib/dilesa/pdf/promesa-compraventa';
+import { SolicitudAvaluoPDF, type SolicitudAvaluoData } from '@/lib/dilesa/pdf/solicitud-avaluo';
+import {
+  SolicitudDictamenPDF,
+  type SolicitudDictamenData,
+} from '@/lib/dilesa/pdf/solicitud-dictamen';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
+import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 
-const TIPOS = ['solicitud-asignacion', 'aviso-privacidad', 'ficu', 'promesa-compraventa'] as const;
+const TIPOS = [
+  'solicitud-asignacion',
+  'aviso-privacidad',
+  'ficu',
+  'promesa-compraventa',
+  'solicitud-avaluo',
+  'solicitud-dictamen',
+] as const;
 type TipoPdf = (typeof TIPOS)[number];
+
+const moneyFmtPdf = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 0,
+});
+const moneyPdf = (n: number | null | undefined): string | null =>
+  n == null || Number(n) <= 0 ? null : moneyFmtPdf.format(Number(n));
 
 const MESES_ES = [
   'Enero',
@@ -66,7 +87,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -108,6 +129,7 @@ export async function GET(
   // solo el first_name; si falta first_name, fallback a email; si nada,
   // al campo text legacy de la venta.
   let vendedorNombre = (venta.vendedor ?? '').toString();
+  let vendedorEmail: string | null = null;
   if (venta.vendedor_usuario_id) {
     const { data: u } = await sb
       .schema('core')
@@ -121,11 +143,22 @@ export async function GET(
     } else if (u?.email && !vendedorNombre) {
       vendedorNombre = u.email;
     }
+    vendedorEmail = (u?.email as string | null) ?? null;
   }
 
   // Unidad + proyecto + producto (todos en dilesa)
   let identificacionInventario = '';
   let pdfDataExtra: Partial<SolicitudData> = {};
+  // Datos del inmueble en scope superior para las solicitudes imprimibles
+  // (avalúo, dictamen) que los muestran tal cual sin desglose de precio.
+  let pdfFraccionamiento: string | null = null;
+  let pdfManzana: string | null = null;
+  let pdfLote: string | null = null;
+  let pdfPrototipo: string | null = null;
+  let pdfDomicilioOficial: string | null = null;
+  let pdfAreaTerreno: string | null = null;
+  let pdfAreaConstruida: string | null = null;
+  let pdfCaracteristicas: string | null = null;
   if (venta.unidad_id) {
     const { data: unidad } = await sb
       .schema('dilesa')
@@ -175,6 +208,21 @@ export async function GET(
         esquina: unidad.es_esquina ?? false,
         precioM2Excedente: Number(proyecto?.precio_m2_excedente ?? 0),
       };
+
+      // Datos para las solicitudes imprimibles (avalúo, dictamen).
+      pdfFraccionamiento = proyecto?.nombre ?? null;
+      pdfManzana = unidad.manzana ?? null;
+      pdfLote = unidad.numero_lote ?? null;
+      pdfPrototipo = protoSufijo || null;
+      pdfDomicilioOficial =
+        [unidad.calle, unidad.numero_oficial].filter(Boolean).join(' #') || null;
+      pdfAreaTerreno = unidad.area_m2 != null ? `${Number(unidad.area_m2).toFixed(2)} m²` : null;
+      pdfAreaConstruida =
+        unidad.m2_construccion != null ? `${Number(unidad.m2_construccion).toFixed(2)} m²` : null;
+      const carac: string[] = [];
+      if (unidad.es_esquina) carac.push('Esquina');
+      if (unidad.tiene_frente_verde) carac.push('Frente verde');
+      pdfCaracteristicas = carac.length > 0 ? carac.join(' · ') : null;
     }
   }
 
@@ -185,6 +233,93 @@ export async function GET(
     month: 'long',
     year: 'numeric',
   });
+
+  // Para las solicitudes (avalúo/dictamen) el contacto es el Gerente de
+  // Ventas (Edgar en DILESA), no el asesor que capturó la venta. Mismo
+  // criterio que los emails. Solo se resuelve para esos 2 tipos.
+  const gerente =
+    tipo === 'solicitud-avaluo' || tipo === 'solicitud-dictamen'
+      ? await loadGerenteVentas(sb, venta.empresa_id)
+      : null;
+  const contactoNombre = gerente?.nombre ?? (vendedorNombre || null);
+  const contactoEmail = gerente?.email ?? vendedorEmail;
+
+  if (tipo === 'solicitud-avaluo') {
+    let valuadorNombre = '(casa valuadora)';
+    if (venta.valuador_id) {
+      const { data: val } = await sb
+        .schema('erp')
+        .from('personas')
+        .select('nombre, apellido_paterno, apellido_materno')
+        .eq('id', venta.valuador_id)
+        .maybeSingle();
+      valuadorNombre =
+        [val?.nombre, val?.apellido_paterno, val?.apellido_materno]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || valuadorNombre;
+    }
+    const data: SolicitudAvaluoData = {
+      fechaTexto,
+      valuadorNombre,
+      fraccionamiento: pdfFraccionamiento,
+      manzana: pdfManzana,
+      lote: pdfLote,
+      prototipo: pdfPrototipo,
+      identificacionInventario,
+      domicilioOficial: pdfDomicilioOficial,
+      areaTerreno: pdfAreaTerreno,
+      areaConstruida: pdfAreaConstruida,
+      caracteristicas: pdfCaracteristicas,
+      clienteNombre,
+      clienteCurp: persona?.curp ?? null,
+      clienteTelefono: persona?.telefono ?? null,
+      vendedorNombre: contactoNombre,
+      vendedorEmail: contactoEmail,
+    };
+    const buf = await renderToBuffer(<SolicitudAvaluoPDF data={data} />);
+    return pdfResponse(buf, `solicitud-avaluo-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'solicitud-dictamen') {
+    let notarioNombre = '(notaría)';
+    if (venta.notario_id) {
+      const { data: not } = await sb
+        .schema('erp')
+        .from('personas')
+        .select('nombre, apellido_paterno, apellido_materno')
+        .eq('id', venta.notario_id)
+        .maybeSingle();
+      notarioNombre =
+        [not?.nombre, not?.apellido_paterno, not?.apellido_materno]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || notarioNombre;
+    }
+    const data: SolicitudDictamenData = {
+      fechaTexto,
+      notarioNombre,
+      fraccionamiento: pdfFraccionamiento,
+      manzana: pdfManzana,
+      lote: pdfLote,
+      prototipo: pdfPrototipo,
+      identificacionInventario,
+      domicilioOficial: pdfDomicilioOficial,
+      areaTerreno: pdfAreaTerreno,
+      areaConstruida: pdfAreaConstruida,
+      clienteNombre,
+      clienteCurp: persona?.curp ?? null,
+      clienteTelefono: persona?.telefono ?? null,
+      tipoCredito: venta.tipo_credito ?? null,
+      precioVenta: moneyPdf(venta.precio_asignacion),
+      montoCreditoTitular: moneyPdf(venta.monto_credito_titular),
+      montoCreditoCotitular: moneyPdf(venta.monto_credito_cotitular),
+      vendedorNombre: contactoNombre,
+      vendedorEmail: contactoEmail,
+    };
+    const buf = await renderToBuffer(<SolicitudDictamenPDF data={data} />);
+    return pdfResponse(buf, `solicitud-dictamen-${identificacionInventario || id}.pdf`);
+  }
 
   if (tipo === 'aviso-privacidad') {
     const data: AvisoPrivacidadData = {

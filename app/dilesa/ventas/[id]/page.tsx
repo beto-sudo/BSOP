@@ -97,6 +97,8 @@ type Venta = {
   vendedor: string | null;
   notario: string | null;
   casa_valuadora: string | null;
+  valuador_id: string | null;
+  notario_id: string | null;
   es_pep: boolean | null;
   ocupacion: string | null;
   ine_numero: string | null;
@@ -815,6 +817,16 @@ function DetailInner() {
           tipo="promesa-compraventa"
           label="Promesa de Compraventa"
         />
+        {venta.valuador_id ? (
+          <PdfDownloadLink ventaId={venta.id} tipo="solicitud-avaluo" label="Solicitud de Avalúo" />
+        ) : null}
+        {venta.notario_id ? (
+          <PdfDownloadLink
+            ventaId={venta.id}
+            tipo="solicitud-dictamen"
+            label="Solicitud de Dictaminación"
+          />
+        ) : null}
       </div>
 
       <MovimientosAdministrativos
@@ -1471,7 +1483,13 @@ function PdfDownloadLink({
   label,
 }: {
   ventaId: string;
-  tipo: 'solicitud-asignacion' | 'aviso-privacidad' | 'ficu' | 'promesa-compraventa';
+  tipo:
+    | 'solicitud-asignacion'
+    | 'aviso-privacidad'
+    | 'ficu'
+    | 'promesa-compraventa'
+    | 'solicitud-avaluo'
+    | 'solicitud-dictamen';
   label: string;
 }) {
   return (

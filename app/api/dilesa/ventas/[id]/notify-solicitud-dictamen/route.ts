@@ -23,6 +23,7 @@ import {
 } from '@/lib/dilesa/dictamen-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 import { signDictamenToken } from '@/lib/dilesa/dictamen-token';
+import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -169,6 +170,12 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const branding = await loadEmpresaBranding(admin, venta.empresa_id);
 
+  // Contacto para el notario = Gerente de Ventas (Edgar en DILESA), NO el
+  // asesor que capturó la venta. Mismo criterio que el email de avalúo.
+  const gerente = await loadGerenteVentas(admin, venta.empresa_id);
+  const contactoNombre = gerente?.nombre ?? vendedorNombre;
+  const contactoEmail = gerente?.email ?? (usuario?.email as string | null) ?? null;
+
   // Genera el magic link para que el notario suba la Carta de Instrucción.
   let uploadUrl = '';
   try {
@@ -209,8 +216,10 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       venta.monto_credito_titular != null ? Number(venta.monto_credito_titular) : null,
     montoCreditoCotitular:
       venta.monto_credito_cotitular != null ? Number(venta.monto_credito_cotitular) : null,
-    vendedorNombre,
-    vendedorEmail: (usuario?.email as string | null) ?? null,
+    // Etiquetado como "Gerencia de Ventas" en el email — usamos al
+    // Gerente de Ventas (Edgar), no al asesor que capturó la venta.
+    vendedorNombre: contactoNombre,
+    vendedorEmail: contactoEmail,
   };
 
   const res = await sendDictamenSolicitudEmail(emailCtx);
