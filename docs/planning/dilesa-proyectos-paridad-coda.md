@@ -7,7 +7,7 @@
 **Próximo hito:** **Reabierta 2026-05-27**. Sprint B extiende `<ProyectosModule>` con 5 columnas leyendo `v_proyecto_avances`. Sprint C en spike: ~15 columnas Coda faltantes (derivable / ALTER simple / aclaración con Beto) — esperando OK de alcance v2 antes de tocar schema
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-05 (Sprint D — avance sobre vivienda. Migración `20260605183000` en prod: `v_proyecto_avances` mide construcción/ventas y `estado_sugerido` solo sobre VIVIENDA ACTIVA (excluye comercial/donación municipal/equipamiento + unidades liberadas al portafolio). PDV escriturado a socios. LV/LV2/PDV → completado; LDV → completado tras liberar sus 2 casas al portafolio en la iniciativa hermana `dilesa-portafolio-activos`.)
+**Última actualización:** 2026-06-07 (Sprint D.1 — avance de construcción = casas terminadas, no lotes. Migración `20260608011252`: el NUMERADOR `viv_construidas` de `v_proyecto_avances` ya solo cuenta casas terminadas (producto final formalizado o casa terminada con `producto_id`), excluyendo lotes urbanizados en estado `terminada` sin casa y unidades `asignada` (preventa). Corrige el 92.48% imposible de LDLE → 67.52%; LDS 89.13 → 80.43; los 4 completados intactos en 100%.)
 
 ## Problema
 
@@ -282,6 +282,27 @@ proyecto. Todos columna escalar; idempotente con
 
 ## Bitácora
 
+- **2026-06-07 (Sprint D.1 — avance de construcción = casas terminadas)** —
+  Beto reportó que el correo al Consejo mostraba el avance de construcción de
+  LDLE en **92.48%**, número imposible. Diagnóstico: el Sprint D corrigió el
+  denominador (vivienda activa) pero el numerador `viv_construidas` contaba como
+  "construida" toda unidad en estado terminada/asignada/vendida/escriturada/
+  entregada **sin verificar que tuviera casa**. En LDLE eso metía **117 lotes
+  urbanizados** en estado `terminada` SIN `producto_id` (lotes listos, no casas)
+  - **59 casas `asignada`** (preventa sobre plano, aún sin construir). 652/705 =
+    92.48%. Fix (migración `20260608011252`): `viv_construidas` ahora cuenta una
+    unidad como construida solo si (a) su producto final ya se formalizó
+    (`vendida`/`escriturada`/`entregada` — sea casa o lote vendido como lote, p.ej.
+    los 15 lotes escriturados de PDV) **o** (b) es casa terminada en inventario
+    (`terminada` AND `producto_id IS NOT NULL`). Además `casas_terminadas` exige
+    `producto_id` (LDLE 281 → 164 casas reales, no lotes). Verificado en prod sin
+    regresiones: LDLE 92.48 → **67.52**, LDS 89.13 → **80.43**; LV/LV2/LDV/PDV se
+    mantienen **100.00** y `estado_sugerido='completado'`; LDLD/ALDE en 0.00.
+    Decisión de Beto sobre `asignada`: NO cuenta como casa terminada (puede ser
+    preventa sin construir). UI sin cambios (mismas columnas, distinto cálculo);
+    beneficia también la barra "Construcción" del detalle y la tabla del
+    portafolio. **Pendiente: aplicar a prod** (migración en archivo).
+
 - **2026-06-05 (Sprint D — avance sobre vivienda)** — Beto reportó que
   los fraccionamientos terminados (LV, LV2, LDV, PDV) seguían
   apareciendo "en construcción/ejecución" al ~98%. Diagnóstico: la regla
@@ -380,6 +401,23 @@ proyecto. Todos columna escalar; idempotente con
   la pide se abre iniciativa nueva. Iniciativa cierra en `done`.
 
 ## Decisiones registradas
+
+- **2026-06-07 — El avance de construcción cuenta CASAS terminadas, no
+  lotes; `asignada` no cuenta**. El estado `terminada` se usa en
+  `dilesa.unidades` para dos cosas distintas: lote urbanizado terminado (sin
+  `producto_id`) y casa terminada (con `producto_id`). Para el avance de
+  construcción solo cuentan las casas: una unidad de vivienda activa es
+  "construida" si su producto final ya se formalizó
+  (`vendida`/`escriturada`/`entregada`) o es casa terminada en inventario
+  (`terminada` + `producto_id`). Los lotes urbanizados en inventario (`terminada`
+  sin casa) y las unidades `asignada` quedan fuera del numerador. Razón de Beto
+  sobre `asignada`: en DILESA la asignación puede ser preventa sobre plano, antes
+  de construir, así que no representa una casa terminada. Excepción intencional:
+  un lote vendido como lote (sin casa) sí cuenta cuando está
+  `vendida`/`escriturada`/`entregada` — su "construcción" es la urbanización, ya
+  terminada (caso Paseo del Valle, 100%). No contradice la decisión del
+  2026-06-05 (denominador = vivienda activa); la precisa por el lado del
+  numerador.
 
 - **2026-06-05 — El avance y el "completado" se miden solo sobre
   VIVIENDA**. La regla estricta del 2026-05-26 era correcta para
