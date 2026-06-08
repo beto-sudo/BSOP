@@ -4,6 +4,7 @@
 **Empresas:** todas (golden DILESA)
 **Schemas afectados:** `erp` (nueva `cuenta_saldos` + vista `v_cuenta_saldo_actual`; carga `cuentas_bancarias`), `core.modulos` (sección `tesoreria` nueva + reubicar CxC/CxP + slug módulo Saldos Bancos + backfill de permisos)
 **Estado:** planned
+**Próximo hito:** Sprint 1 — `erp.cuenta_saldos` (historial) + vista último saldo + carga de las 4 cuentas DILESA. Dependencia previa del lanzamiento de `dilesa-resumen-consejo`
 **Dueño:** Beto
 **Creada:** 2026-06-07
 **Última actualización:** 2026-06-07 (promovida a `planned` — alcance v1 cerrado con Beto: golden DILESA; solo crear la sección + el módulo Saldos Bancos nuevo (CxC/CxP solo se reubican bajo la sección, sin tocar sus UIs); el módulo es dependencia previa del lanzamiento del correo al Consejo (`dilesa-resumen-consejo`).)

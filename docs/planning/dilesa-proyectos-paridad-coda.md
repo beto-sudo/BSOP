@@ -4,6 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.proyectos` (4 columnas en Sprint A + ~6 más pendientes en Sprint C), `dilesa.v_proyecto_avances` (vista derivando avances de `unidades`; Sprint C amplía agregados)
 **Estado:** in_progress
+**Próximo hito:** **Reabierta 2026-05-27**. Sprint B extiende `<ProyectosModule>` con 5 columnas leyendo `v_proyecto_avances`. Sprint C en spike: ~15 columnas Coda faltantes (derivable / ALTER simple / aclaración con Beto) — esperando OK de alcance v2 antes de tocar schema
 **Dueño:** Beto
 **Creada:** 2026-05-26
 **Última actualización:** 2026-06-05 (Sprint D — avance sobre vivienda. Migración `20260605183000` en prod: `v_proyecto_avances` mide construcción/ventas y `estado_sugerido` solo sobre VIVIENDA ACTIVA (excluye comercial/donación municipal/equipamiento + unidades liberadas al portafolio). PDV escriturado a socios. LV/LV2/PDV → completado; LDV → completado tras liberar sus 2 casas al portafolio en la iniciativa hermana `dilesa-portafolio-activos`.)

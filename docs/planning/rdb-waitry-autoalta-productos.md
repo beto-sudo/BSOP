@@ -4,6 +4,7 @@
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (ingesta `waitry_productos` — webhook o trigger), `erp` (`productos`)
 **Estado:** in_progress
+**Próximo hito:** Sprint 1+2 en prod: trigger `trg_waitry_zzz_autoalta_producto` (auto-crea el producto faltante sin categoría, idempotente + fail-open) + filtro/contador Sin categoría en `/rdb/productos`. D1-D4 cerradas. Próximo: observar volumen de auto-altas; Sprint 3 (aviso) opcional
 **Dueño:** Beto
 **Creada:** 2026-06-05
 **Última actualización:** 2026-06-05

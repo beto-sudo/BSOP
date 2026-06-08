@@ -4,6 +4,7 @@
 **Empresas:** SANREN (salud personal — gateada `RequireAccess empresa="sanren"`)
 **Schemas afectados:** `health` (3 tablas nuevas: `protocolo_compuestos`, `protocolo_tomas`, `protocolo_efectos`); lectura de `health.health_metrics` para el overlay
 **Estado:** in_progress
+**Próximo hito:** **Sprint 1 (schema) en prod** (3 tablas `health` + RLS deny-all). Próximo: Sprint 2 — lectura (`lib/protocolo` + `ProtocoloSection` en `/health`) + seed Retatrutide tras confirmar fecha
 **Dueño:** Beto
 **Creada:** 2026-06-02
 **Última actualización:** 2026-06-02 (Sprint 2 **cerrado** — sección de protocolo en `/health` (lectura) + fix de exposición de `health` a PostgREST; mergeado en #648. Próximo: Sprint 3 — captura por drawer)

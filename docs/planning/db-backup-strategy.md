@@ -4,6 +4,7 @@
 **Empresas:** todas (BSOP es la DB compartida del portafolio)
 **Schemas afectados:** todos (es protección DB-wide; los respaldos cubren `public`, `core`, `erp`, `rdb`, `health`, `playtomic`, `dilesa`, `maquinaria` y los que se agreguen)
 **Estado:** proposed
+**Próximo hito:** Cerrar alcance v1 — decidir D1-D7 (destino, cron host, cifrado, alerta, PITR sí/no, scope auth/vault, storage en/fuera)
 **Dueño:** Beto
 **Creada:** 2026-04-30
 **Última actualización:** 2026-04-30
