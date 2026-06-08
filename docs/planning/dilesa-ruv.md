@@ -423,7 +423,9 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   Inmobiliario), `ROUTE_TO_MODULE`, `EXPECTED_DB_MODULE_SLUGS`, page skeleton
   `app/dilesa/ruv/page.tsx` con `<RequireAccess modulo="dilesa.ruv">`. CI local
   verde. La migración crea rol+permisos → **la aplica Beto** (no autónomo). Tras
-  aplicar: regenerar types/SCHEMA_REF + arrancar Sprint 2 (import). PR pendiente.
+  aplicar: regenerar types/SCHEMA_REF + arrancar Sprint 2 (import). PR
+  [#760](https://github.com/beto-sudo/BSOP/pull/760) (CI verde; incluye un regen
+  de `SCHEMA_REF.md` por drift heredado de #754/#755).
 
 ## Decisiones registradas
 
