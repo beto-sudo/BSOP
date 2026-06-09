@@ -208,3 +208,102 @@ export async function marcarDocumento(input: MarcarDocumentoInput): Promise<Acti
   revalidatePath('/dilesa/ruv');
   return { ok: true };
 }
+
+const HITO_COLUMNA = {
+  dtu: 'fecha_dtu',
+  extraccion: 'fecha_extraccion',
+  seguro_calidad: 'fecha_seguro_calidad',
+  paquete_ruv: 'fecha_paquete_ruv',
+} as const;
+
+export type RuvHito = keyof typeof HITO_COLUMNA;
+
+/**
+ * Marca/edita la fecha de un hito del trámite RUV (DTU / extracción / seguro de
+ * calidad / paquete) de un lote (unidad). `fecha` null o vacío limpia el hito.
+ */
+export async function marcarHito(input: {
+  unidadId: string;
+  hito: RuvHito;
+  fecha: string | null;
+}): Promise<ActionResult> {
+  await assertNotInPreview();
+  if (!input.unidadId) return { ok: false, error: 'Falta el lote.' };
+  const columna = HITO_COLUMNA[input.hito];
+  if (!columna) return { ok: false, error: 'Hito inválido.' };
+
+  const supabase = await createSupabaseServerClient();
+  const patch: {
+    fecha_dtu?: string | null;
+    fecha_extraccion?: string | null;
+    fecha_seguro_calidad?: string | null;
+    fecha_paquete_ruv?: string | null;
+  } = {};
+  patch[columna] = dateOrNull(input.fecha);
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('unidades')
+    .update(patch)
+    .eq('id', input.unidadId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo actualizar el hito.') };
+  }
+  revalidatePath('/dilesa/ruv');
+  return { ok: true };
+}
+
+/**
+ * Captura/edita el CUV (Clave Única de Vivienda) de un lote. INFONAVIT lo emite
+ * tras registrar el paquete, así que se carga después. `cuv` vacío lo limpia.
+ * Valida 16 dígitos y unicidad (un CUV identifica una sola vivienda).
+ */
+export async function marcarCuv(input: {
+  unidadId: string;
+  cuv: string | null;
+}): Promise<ActionResult> {
+  await assertNotInPreview();
+  if (!input.unidadId) return { ok: false, error: 'Falta el lote.' };
+
+  const cuv = input.cuv?.trim() || null;
+  if (cuv && !/^\d{16}$/.test(cuv)) {
+    return { ok: false, error: 'El CUV debe ser de 16 dígitos.' };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // Unicidad: el CUV no puede estar ya asignado a otro lote.
+  if (cuv) {
+    const { data: existe } = await supabase
+      .schema('dilesa')
+      .from('unidades')
+      .select('id, identificador')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .eq('cuv', cuv)
+      .neq('id', input.unidadId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (existe) {
+      return {
+        ok: false,
+        error: `Ese CUV ya está asignado al lote ${(existe.identificador as string) ?? existe.id}.`,
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('unidades')
+    .update({ cuv })
+    .eq('id', input.unidadId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo guardar el CUV.') };
+  }
+  revalidatePath('/dilesa/ruv');
+  return { ok: true };
+}

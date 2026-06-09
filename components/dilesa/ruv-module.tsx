@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileStack, Plus, RefreshCw, Search } from 'lucide-react';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -23,7 +24,6 @@ import { formatDate } from '@/lib/format';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { RuvFrenteDetailDrawer } from '@/components/dilesa/ruv-frente-detail-drawer';
 import { RuvFrenteCrearDrawer } from '@/components/dilesa/ruv-frente-crear-drawer';
 import {
   avanceLabel,
@@ -44,8 +44,8 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
   const [error, setError] = useState<Error | string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const [detalle, setDetalle] = useState<RuvFrenteRow | null>(null);
   const [crearOpen, setCrearOpen] = useState(false);
+  const router = useRouter();
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -339,22 +339,12 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
-        onRowClick={(r) => setDetalle(r)}
+        onRowClick={(r) => router.push(`/dilesa/ruv/${r.id}`)}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin frentes RUV"
         emptyDescription="No hay frentes (ofertas) registrados para DILESA."
         emptyIcon={<FileStack className="h-6 w-6" />}
         maxHeight="calc(100vh - 340px)"
-      />
-
-      <RuvFrenteDetailDrawer
-        frente={detalle}
-        empresaId={empresaId}
-        open={detalle != null}
-        onOpenChange={(o) => {
-          if (!o) setDetalle(null);
-        }}
-        onChanged={() => void cargar()}
       />
 
       <RuvFrenteCrearDrawer
