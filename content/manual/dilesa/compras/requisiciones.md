@@ -55,3 +55,5 @@ Sí: al generar la OC, la requisición queda autorizada automáticamente.
 
 Si no puedes generar la orden, revisa que la requisición esté **autorizada** y que
 no tenga ya una orden ligada.
+
+> **Ver también:** **El viaje de una compra (flujo del gasto)** — en [el manual](/dilesa/manual) — el mapa completo Solicitar → Cotizar → Ordenar → Recibir → Facturar → Pagar, con glosario.

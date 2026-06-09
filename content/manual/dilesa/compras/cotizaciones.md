@@ -59,3 +59,5 @@ la pestaña Órdenes) para que comprometa el presupuesto.
 
 Si no puedes comparar, asegúrate de haber **capturado las respuestas** de al menos
 un proveedor.
+
+> **Ver también:** **El viaje de una compra (flujo del gasto)** — en [el manual](/dilesa/manual) — el mapa completo Solicitar → Cotizar → Ordenar → Recibir → Facturar → Pagar, con glosario.
