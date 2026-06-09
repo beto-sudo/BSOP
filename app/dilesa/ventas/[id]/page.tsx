@@ -295,6 +295,18 @@ const FASES_ORDEN: Array<{ pos: number; nombre: string }> = [
   { pos: 17, nombre: 'Operación Terminada' },
 ];
 
+/**
+ * Las 17 fases agrupadas en 5 macro-etapas (Zona B del Expediente de
+ * Operación) — para que el pipeline se lea como 5 pasos, no como 17.
+ */
+const MACRO_ETAPAS: Array<{ nombre: string; desde: number; hasta: number }> = [
+  { nombre: 'Comercial', desde: 1, hasta: 3 },
+  { nombre: 'Crédito', desde: 4, hasta: 9 },
+  { nombre: 'Cierre legal', desde: 10, hasta: 12 },
+  { nombre: 'Administrativo', desde: 13, hasta: 13 },
+  { nombre: 'Entrega', desde: 14, hasta: 17 },
+];
+
 function fmtMoney(n: number | null): string | null {
   return n == null ? null : moneyFmt.format(n);
 }
@@ -987,80 +999,100 @@ function DetailInner() {
       </Section>
 
       <Section title="Pipeline" description={`${pipelineAlcanzadas} de 17 fases alcanzadas`}>
-        <ol className="space-y-1">
-          {pipelineRows.map((r) => (
-            <li
-              key={r.pos}
-              className={
-                'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
-                (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
-              }
-            >
-              {/* Status circle + posición */}
-              <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
-                {r.alcanzada ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
-                )}
-                <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
-                  {r.pos}
-                </span>
-              </div>
-
-              {/* Nombre + fecha */}
-              <div className="min-w-[200px] shrink-0">
-                <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
-                <div className="text-[11px] text-[var(--text)]/50">
-                  {r.fecha ? fmtFecha(r.fecha) : '—'}
-                </div>
-              </div>
-
-              {/* Docs cargados + faltantes */}
-              <div className="flex flex-1 flex-wrap items-center gap-1">
-                {r.cargados.map((a) => (
-                  <AdjuntoLink key={a.id} a={a} compact />
-                ))}
-                {r.faltantes.map((rol) => (
+        <div className="space-y-4">
+          {MACRO_ETAPAS.map((etapa) => {
+            const filas = pipelineRows.filter((r) => r.pos >= etapa.desde && r.pos <= etapa.hasta);
+            const cerradas = filas.filter((r) => r.alcanzada).length;
+            return (
+              <div key={etapa.nombre}>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
+                    {etapa.nombre}
+                  </h3>
                   <span
-                    key={rol}
-                    className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
-                    title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
+                    className={`text-[10px] ${cerradas === filas.length ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text)]/40'}`}
                   >
-                    <FileText className="h-2.5 w-2.5" />
-                    {ROL_LABEL[rol] ?? rol}
+                    {cerradas}/{filas.length}
                   </span>
-                ))}
-                {r.cargados.length === 0 && r.faltantes.length === 0 ? (
-                  <span className="text-[10px] text-[var(--text)]/30">—</span>
-                ) : null}
-              </div>
-
-              {/* Capturar fase — solo si la página está implementada y aplica */}
-              {r.slugCaptura ? (
-                <div className="shrink-0">
-                  {r.puedeCapturar ? (
-                    <Link
-                      href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                    >
-                      <Pencil className="h-2.5 w-2.5" />
-                      Capturar fase
-                    </Link>
-                  ) : r.alcanzada ? null : (
-                    <span
-                      className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
-                      title={`Falta cerrar la fase ${r.pos - 1} primero.`}
-                    >
-                      <Pencil className="h-2.5 w-2.5" />
-                      Capturar
-                    </span>
-                  )}
                 </div>
-              ) : null}
-            </li>
-          ))}
-        </ol>
+                <ol className="space-y-1 border-l-2 border-[var(--border)] pl-2">
+                  {filas.map((r) => (
+                    <li
+                      key={r.pos}
+                      className={
+                        'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
+                        (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
+                      }
+                    >
+                      {/* Status circle + posición */}
+                      <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
+                        {r.alcanzada ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
+                        )}
+                        <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
+                          {r.pos}
+                        </span>
+                      </div>
+
+                      {/* Nombre + fecha */}
+                      <div className="min-w-[200px] shrink-0">
+                        <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
+                        <div className="text-[11px] text-[var(--text)]/50">
+                          {r.fecha ? fmtFecha(r.fecha) : '—'}
+                        </div>
+                      </div>
+
+                      {/* Docs cargados + faltantes */}
+                      <div className="flex flex-1 flex-wrap items-center gap-1">
+                        {r.cargados.map((a) => (
+                          <AdjuntoLink key={a.id} a={a} compact />
+                        ))}
+                        {r.faltantes.map((rol) => (
+                          <span
+                            key={rol}
+                            className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
+                            title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
+                          >
+                            <FileText className="h-2.5 w-2.5" />
+                            {ROL_LABEL[rol] ?? rol}
+                          </span>
+                        ))}
+                        {r.cargados.length === 0 && r.faltantes.length === 0 ? (
+                          <span className="text-[10px] text-[var(--text)]/30">—</span>
+                        ) : null}
+                      </div>
+
+                      {/* Capturar fase — solo si la página está implementada y aplica */}
+                      {r.slugCaptura ? (
+                        <div className="shrink-0">
+                          {r.puedeCapturar ? (
+                            <Link
+                              href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                              Capturar fase
+                            </Link>
+                          ) : r.alcanzada ? null : (
+                            <span
+                              className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
+                              title={`Falta cerrar la fase ${r.pos - 1} primero.`}
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                              Capturar
+                            </span>
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
       </Section>
 
       <Section
