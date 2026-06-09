@@ -16,7 +16,7 @@
  * a permanent exception.
  */
 
-import { Fragment, type ReactNode, useState, useTransition } from 'react';
+import { Fragment, type ReactNode, useEffect, useState, useTransition } from 'react';
 import { usePermissions } from '@/components/providers';
 import {
   Building2,
@@ -244,19 +244,28 @@ export function AccesoClient({
   const [usuarioFirstName, setUsuarioFirstName] = useState('');
   const [usuarioLastName, setUsuarioLastName] = useState('');
 
-  // ── Error state ──
-  const [dialogError, setDialogError] = useState<string | null>(null);
+  // ── Toast (feedback de acciones; visible dentro y fuera de diálogos) ──
+  // El estado de error vivía solo dentro de los diálogos, así que las acciones
+  // de la lista (borrar rol/usuario, toggles) fallaban en silencio. El toast es
+  // global y fixed, por lo que se ve siempre.
+  const [toast, setToast] = useState<{ kind: 'error' | 'success'; msg: string } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), toast.kind === 'error' ? 6000 : 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // ── Action helper ──
 
   function run(action: () => Promise<void>, onSuccess?: () => void) {
-    setDialogError(null);
+    setToast(null);
     startTransition(async () => {
       try {
         await action();
         onSuccess?.();
       } catch (err) {
-        setDialogError(err instanceof Error ? err.message : 'Error desconocido');
+        setToast({ kind: 'error', msg: err instanceof Error ? err.message : 'Error desconocido' });
       }
     });
   }
@@ -298,20 +307,20 @@ export function AccesoClient({
     setEmpresaNombre(editing?.nombre ?? '');
     setEmpresaSlug(editing?.slug ?? '');
     setEmpresaSlugManual(!!editing);
-    setDialogError(null);
+    setToast(null);
   }
 
   function openRolDialog(editing: RolRecord | null) {
     setRolDialog({ open: true, editing });
     setRolNombre(editing?.nombre ?? '');
-    setDialogError(null);
+    setToast(null);
   }
 
   function openUsuarioDialog() {
     setUsuarioEmail('');
     setUsuarioFirstName('');
     setUsuarioLastName('');
-    setDialogError(null);
+    setToast(null);
     setUsuarioDialogOpen(true);
   }
 
@@ -326,6 +335,27 @@ export function AccesoClient({
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={`fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+            toast.kind === 'error'
+              ? 'border-red-500/30 bg-red-50 text-red-700 dark:bg-red-950/90 dark:text-red-200'
+              : 'border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/90 dark:text-emerald-200'
+          }`}
+        >
+          <span className="flex-1">{toast.msg}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Cerrar"
+            className="shrink-0 opacity-60 transition hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold dark:text-white text-[var(--text)]">
@@ -1168,11 +1198,6 @@ export function AccesoClient({
                 Identificador único, solo letras minúsculas, números y guiones.
               </p>
             </div>
-            {dialogError && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
-                {dialogError}
-              </p>
-            )}
           </div>
           <DialogFooter>
             <Button
@@ -1234,11 +1259,6 @@ export function AccesoClient({
                 autoFocus
               />
             </div>
-            {dialogError && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
-                {dialogError}
-              </p>
-            )}
           </div>
           <DialogFooter>
             <Button
@@ -1305,11 +1325,6 @@ export function AccesoClient({
                 placeholder="Ej. Pérez García"
               />
             </div>
-            {dialogError && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
-                {dialogError}
-              </p>
-            )}
           </div>
           <DialogFooter>
             <Button
