@@ -323,7 +323,7 @@ async function main() {
     entidad_tipo: string;
     entidad_id: string;
     rol: string;
-    metadata: { coda_source_url?: string } | null;
+    metadata: { coda_source_url?: string; recableado_de_venta_pago?: string } | null;
   };
   const PAGE = 1000;
   const existing: ExistingRow[] = [];
@@ -333,7 +333,11 @@ async function main() {
       .from('adjuntos')
       .select('entidad_tipo, entidad_id, rol, metadata')
       .eq('empresa_id', empresaId)
-      .in('entidad_tipo', ['venta', 'venta_pago'])
+      // 'cxc_pago' DEBE estar en el set: el recableo (migración 20260602180000
+      // + paso nocturno sync_dilesa_cxc_incremental) re-apunta los adjuntos de
+      // depósito venta_pago → cxc_pago. Sin verlos, el dedup re-descarga todo
+      // el set recableado (bug que generó 1,450 duplicados el 2026-06-03).
+      .in('entidad_tipo', ['venta', 'venta_pago', 'cxc_pago'])
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Error leyendo adjuntos existentes: ${error.message}`);
     const rows = (data ?? []) as ExistingRow[];
@@ -345,11 +349,21 @@ async function main() {
   for (const a of existing) {
     const src = a.metadata?.coda_source_url;
     if (!src) continue;
+    // Un adjunto recableado a cxc_pago dedupea con la key del venta_pago de
+    // origen (preservado en metadata) — es la misma key que generaría el
+    // target si se re-importara.
+    const ventaPagoOrigen =
+      a.entidad_tipo === 'cxc_pago' ? a.metadata?.recableado_de_venta_pago : null;
     const inScope =
       (a.entidad_tipo === 'venta' && ventaSet.has(a.entidad_id)) ||
-      (a.entidad_tipo === 'venta_pago' && pagoSet.has(a.entidad_id));
+      (a.entidad_tipo === 'venta_pago' && pagoSet.has(a.entidad_id)) ||
+      (!!ventaPagoOrigen && pagoSet.has(ventaPagoOrigen));
     if (!inScope) continue;
-    existingKey.add(`${a.entidad_tipo}|${a.entidad_id}|${a.rol}|${src}`);
+    if (ventaPagoOrigen) {
+      existingKey.add(`venta_pago|${ventaPagoOrigen}|${a.rol}|${src}`);
+    } else {
+      existingKey.add(`${a.entidad_tipo}|${a.entidad_id}|${a.rol}|${src}`);
+    }
   }
   console.log(`Adjuntos ya migrados en alcance: ${existingKey.size}`);
 

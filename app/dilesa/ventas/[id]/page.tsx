@@ -163,7 +163,13 @@ type DesgloseCalculo = {
   isai_2pct: number;
   gastos_notariales_6pct: number;
 };
-type Fase = { id: string; fase: string; posicion: number | null; fecha: string | null };
+type Fase = {
+  id: string;
+  fase: string;
+  posicion: number | null;
+  fecha: string | null;
+  registrado_por: string | null;
+};
 type Cargo = {
   id: string;
   tipo_cargo: string;
@@ -378,6 +384,8 @@ function DetailInner() {
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
+  // Nombre por usuario que registró cada fase (bitácora: "quién cerró qué").
+  const [registradoresPorId, setRegistradoresPorId] = useState<Map<string, string>>(new Map());
   const [holdSnapshot, setHoldSnapshot] = useState<HoldSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -461,7 +469,7 @@ function DetailInner() {
         sb
           .schema('dilesa')
           .from('venta_fases')
-          .select('id, fase, posicion, fecha')
+          .select('id, fase, posicion, fecha, registrado_por')
           .eq('venta_id', ventaRow.id)
           .is('deleted_at', null)
           .order('posicion', { ascending: true }),
@@ -503,7 +511,33 @@ function DetailInner() {
       }
 
       setPersona((pRes.data as unknown as Persona) ?? null);
-      setFases((fRes.data ?? []) as Fase[]);
+      const fasesData = (fRes.data ?? []) as Fase[];
+      setFases(fasesData);
+
+      // Resolver nombres de quién registró cada fase (bitácora).
+      const registradorIds = [
+        ...new Set(fasesData.map((f) => f.registrado_por).filter((x): x is string => !!x)),
+      ];
+      if (registradorIds.length > 0) {
+        const { data: regUsers } = await sb
+          .schema('core')
+          .from('usuarios')
+          .select('id, first_name, last_name, email')
+          .in('id', registradorIds);
+        if (activo) {
+          const rm = new Map<string, string>();
+          for (const u of (regUsers ?? []) as {
+            id: string;
+            first_name: string | null;
+            last_name: string | null;
+            email: string | null;
+          }[]) {
+            const completo = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+            rm.set(u.id, completo || u.email || '');
+          }
+          setRegistradoresPorId(rm);
+        }
+      }
       const cargosData = (cargosRes.data ?? []) as Cargo[];
       const abonosData = (abonosRes.data ?? []) as Abono[];
       setCargos(cargosData);
@@ -723,6 +757,7 @@ function DetailInner() {
         pos,
         nombre,
         fecha: f?.fecha ?? null,
+        registradoPor: f?.registrado_por ?? null,
         alcanzada,
         cargados,
         faltantes,
@@ -773,10 +808,15 @@ function DetailInner() {
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
           directoCliente: a.fuente === 'cliente',
+          // Con recibo de caja emitido ⇒ suma al Valor Facturado (paridad
+          // Coda). El recibo vive como adjunto rol='recibo_caja' del abono.
+          tieneRecibo: (comprobantesPorAbono.get(a.id) ?? []).some(
+            (adj) => adj.rol === 'recibo_caja'
+          ),
         })),
         proyectoNombre,
       }),
-    [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit]
+    [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit, comprobantesPorAbono]
   );
 
   if (loading) {
@@ -987,12 +1027,34 @@ function DetailInner() {
           {pipelineRows.flatMap((r) => r.cargados).length === 0 ? (
             <p className="text-sm text-[var(--text)]/50">Sin documentos cargados aún.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {pipelineRows
-                .flatMap((r) => r.cargados)
-                .map((a) => (
-                  <AdjuntoLink key={a.id} a={a} />
-                ))}
+            <div className="space-y-4">
+              {MACRO_ETAPAS.map((me) => {
+                const rowsConDocs = pipelineRows.filter(
+                  (r) => r.pos >= me.desde && r.pos <= me.hasta && r.cargados.length > 0
+                );
+                if (rowsConDocs.length === 0) return null;
+                const total = rowsConDocs.reduce((s, r) => s + r.cargados.length, 0);
+                return (
+                  <div key={me.nombre}>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
+                      {me.nombre}{' '}
+                      <span className="font-normal text-[var(--text)]/40">· {total}</span>
+                    </h4>
+                    <div className="space-y-2">
+                      {rowsConDocs.map((r) => (
+                        <div key={r.pos} className="flex flex-wrap items-baseline gap-2">
+                          <span className="w-44 shrink-0 text-[11px] text-[var(--text)]/50">
+                            {r.pos}. {r.nombre}
+                          </span>
+                          {r.cargados.map((a) => (
+                            <AdjuntoLink key={a.id} a={a} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </Section>
@@ -1006,19 +1068,23 @@ function DetailInner() {
             <ol className="space-y-1.5">
               {pipelineRows
                 .filter((r) => r.alcanzada)
-                .map((r) => (
-                  <li key={r.pos} className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text)]/80">
-                      <span className="mr-2 font-mono text-[11px] text-[var(--text)]/40">
-                        {r.pos}
+                .map((r) => {
+                  const quien = r.registradoPor ? registradoresPorId.get(r.registradoPor) : null;
+                  return (
+                    <li key={r.pos} className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--text)]/80">
+                        <span className="mr-2 font-mono text-[11px] text-[var(--text)]/40">
+                          {r.pos}
+                        </span>
+                        {r.nombre}
                       </span>
-                      {r.nombre}
-                    </span>
-                    <span className="text-[11px] text-[var(--text)]/55">
-                      {r.fecha ? fmtFecha(r.fecha) : '—'}
-                    </span>
-                  </li>
-                ))}
+                      <span className="text-[11px] text-[var(--text)]/55">
+                        {quien ? <span className="mr-2 text-[var(--text)]/45">{quien}</span> : null}
+                        {r.fecha ? fmtFecha(r.fecha) : '—'}
+                      </span>
+                    </li>
+                  );
+                })}
             </ol>
           )}
         </Section>
