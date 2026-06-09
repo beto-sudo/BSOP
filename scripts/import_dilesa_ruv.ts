@@ -177,6 +177,14 @@ async function main() {
   // Inventario de Coda, ligada por "ID Lote" (= dilesa.unidades.identificador).
   const frenteIdPorNombre = new Map<string, string>();
   const unidadIdPorIdent = new Map<string, string>();
+  const unidadCuvPorIdent = new Map<string, string | null>();
+  type FechasHito = {
+    dtu: string | null;
+    extraccion: string | null;
+    seguro: string | null;
+    paquete: string | null;
+  };
+  const unidadFechasPorIdent = new Map<string, FechasHito>();
   if (!DRY_RUN) {
     const [frentesDb, unidadesDb] = await Promise.all([
       sb
@@ -188,7 +196,9 @@ async function main() {
       sb
         .schema('dilesa')
         .from('unidades')
-        .select('id, identificador')
+        .select(
+          'id, identificador, cuv, fecha_dtu, fecha_extraccion, fecha_seguro_calidad, fecha_paquete_ruv'
+        )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
     ]);
@@ -200,7 +210,17 @@ async function main() {
     }
     for (const u of unidadesDb.data ?? []) {
       const ident = str(u.identificador);
-      if (ident) unidadIdPorIdent.set(ident.trim().toUpperCase(), u.id as string);
+      if (ident) {
+        const key = ident.trim().toUpperCase();
+        unidadIdPorIdent.set(key, u.id as string);
+        unidadCuvPorIdent.set(key, str(u.cuv));
+        unidadFechasPorIdent.set(key, {
+          dtu: (u.fecha_dtu as string | null) ?? null,
+          extraccion: (u.fecha_extraccion as string | null) ?? null,
+          seguro: (u.fecha_seguro_calidad as string | null) ?? null,
+          paquete: (u.fecha_paquete_ruv as string | null) ?? null,
+        });
+      }
     }
   } else {
     for (const f of frentesParaCargar) {
@@ -213,12 +233,56 @@ async function main() {
   const invMap = buildColumnMap(invCols);
   const invRows = await coda.listRowsAll(CODA_DOC, CODA_INVENTARIO, { limit: 500 });
 
-  // Agrupar ids de unidad por frente resuelto.
+  // Agrupar ids de unidad por frente resuelto + recolectar CUVs a escribir.
+  // Column IDs de las fechas de hito en Coda Inventario (nombres llevan emoji).
+  const COL_FECHA_DTU = 'c-NFHHfauqMX';
+  const COL_FECHA_EXTRACCION = 'c-8J3K9nJTnz';
+  const COL_FECHA_SEGURO = 'c-EQVKSVU4gf';
+  const COL_FECHA_PAQUETE = 'c-TZ_W1Qp2Lp';
+
   const idsPorFrente = new Map<string, string[]>();
+  const cuvUpdates: Array<{ id: string; cuv: string }> = [];
+  const fechaUpdates: Array<{ id: string; patch: Record<string, string> }> = [];
   let sinFrenteTexto = 0; // filas de inventario sin "Frente RUV"
   let sinFrenteMatch = 0; // "Frente RUV" que no resuelve a un frente cargado
   let sinUnidad = 0; // "ID Lote" que no resuelve a una unidad en BSOP
+  let cuvNuevos = 0; // CUVs a escribir en unidades.cuv (faltaban o diferían)
+  let fechasNuevas = 0; // fechas de hito a escribir (faltaban o diferían)
   for (const row of invRows) {
+    const idLote = str(pick(row.values, invMap, 'ID Lote'));
+    const key = idLote ? idLote.trim().toUpperCase() : null;
+    const uid = DRY_RUN ? 'dry-run' : key ? unidadIdPorIdent.get(key) : undefined;
+
+    // (a) CUV del lote → unidades.cuv (solo si válido y falta o difiere).
+    const cuvLote = str(pick(row.values, invMap, 'CUV'));
+    if (cuvLote && /^\d{16}$/.test(cuvLote) && key) {
+      if (DRY_RUN) {
+        cuvNuevos++;
+      } else if (uid && unidadCuvPorIdent.get(key) !== cuvLote) {
+        cuvUpdates.push({ id: uid, cuv: cuvLote });
+        cuvNuevos++;
+      }
+    }
+
+    // (a2) Fechas de hito (DTU/extracción/seguro/paquete) → unidades.
+    if (!DRY_RUN && uid && key) {
+      const actual = unidadFechasPorIdent.get(key);
+      const cd = dateStr(row.values[COL_FECHA_DTU]);
+      const ce = dateStr(row.values[COL_FECHA_EXTRACCION]);
+      const cs = dateStr(row.values[COL_FECHA_SEGURO]);
+      const cp = dateStr(row.values[COL_FECHA_PAQUETE]);
+      const patch: Record<string, string> = {};
+      if (cd && actual?.dtu !== cd) patch.fecha_dtu = cd;
+      if (ce && actual?.extraccion !== ce) patch.fecha_extraccion = ce;
+      if (cs && actual?.seguro !== cs) patch.fecha_seguro_calidad = cs;
+      if (cp && actual?.paquete !== cp) patch.fecha_paquete_ruv = cp;
+      if (Object.keys(patch).length > 0) {
+        fechaUpdates.push({ id: uid, patch });
+        fechasNuevas += Object.keys(patch).length;
+      }
+    }
+
+    // (b) Frente del lote → unidades.frente_id.
     const frenteTexto = str(pick(row.values, invMap, 'Frente RUV'));
     if (!frenteTexto) {
       sinFrenteTexto++;
@@ -229,12 +293,6 @@ async function main() {
       sinFrenteMatch++;
       continue;
     }
-    const idLote = str(pick(row.values, invMap, 'ID Lote'));
-    const uid = DRY_RUN
-      ? 'dry-run'
-      : idLote
-        ? unidadIdPorIdent.get(idLote.trim().toUpperCase())
-        : undefined;
     if (!uid) {
       sinUnidad++;
       continue;
@@ -247,6 +305,14 @@ async function main() {
     `Backfill unidades.frente_id: ${totalLigar} lotes ligados ` +
       `(${sinFrenteTexto} sin Frente RUV en Coda, ${sinFrenteMatch} Frente sin match, ${sinUnidad} lote sin unidad en BSOP)`
   );
+  log(
+    `Backfill unidades.cuv: ${cuvNuevos} CUVs ${DRY_RUN ? 'válidos en Coda (estimado)' : 'a escribir (faltaban o diferían)'}`
+  );
+  if (!DRY_RUN) {
+    log(
+      `Backfill unidades.fecha_* (DTU/extracción/seguro/paquete): ${fechasNuevas} fechas a escribir`
+    );
+  }
 
   if (!DRY_RUN) {
     for (const [fid, ids] of idsPorFrente) {
@@ -260,6 +326,20 @@ async function main() {
           .in('id', chunk);
         if (error) throw error;
       }
+    }
+    // CUV: uno por unidad (cada lote tiene su clave única; no agrupable).
+    for (const u of cuvUpdates) {
+      const { error } = await sb
+        .schema('dilesa')
+        .from('unidades')
+        .update({ cuv: u.cuv })
+        .eq('id', u.id);
+      if (error) throw error;
+    }
+    // Fechas de hito: patch por unidad (solo las que faltaban/diferían).
+    for (const f of fechaUpdates) {
+      const { error } = await sb.schema('dilesa').from('unidades').update(f.patch).eq('id', f.id);
+      if (error) throw error;
     }
   }
 

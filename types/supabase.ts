@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-06-08T11:49:35Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -2039,7 +2028,6 @@ export type Database = {
           fecha_paquete_ruv: string | null
           fecha_seguro_calidad: string | null
           fecha_terminada: string | null
-          frente_id: string | null
           frente_ruv: string | null
           id: string
           m2_construccion: number | null
@@ -2070,7 +2058,6 @@ export type Database = {
           fecha_paquete_ruv?: string | null
           fecha_seguro_calidad?: string | null
           fecha_terminada?: string | null
-          frente_id?: string | null
           frente_ruv?: string | null
           id?: string
           m2_construccion?: number | null
@@ -2101,7 +2088,6 @@ export type Database = {
           fecha_paquete_ruv?: string | null
           fecha_seguro_calidad?: string | null
           fecha_terminada?: string | null
-          frente_id?: string | null
           frente_ruv?: string | null
           id?: string
           m2_construccion?: number | null
@@ -2115,20 +2101,6 @@ export type Database = {
           valor_contrato_mo?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "construccion_frente_id_fkey"
-            columns: ["frente_id"]
-            isOneToOne: false
-            referencedRelation: "ruv_frentes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "construccion_frente_id_fkey"
-            columns: ["frente_id"]
-            isOneToOne: false
-            referencedRelation: "v_ruv_frente_avance"
-            referencedColumns: ["frente_id"]
-          },
           {
             foreignKeyName: "construccion_producto_id_fkey"
             columns: ["producto_id"]
@@ -4348,11 +4320,16 @@ export type Database = {
           area_m2: number | null
           calle: string | null
           created_at: string
+          cuv: string | null
           deleted_at: string | null
           empresa_id: string
           es_esquina: boolean | null
           es_muestra: boolean
           estado: string
+          fecha_dtu: string | null
+          fecha_extraccion: string | null
+          fecha_paquete_ruv: string | null
+          fecha_seguro_calidad: string | null
           frente_id: string | null
           id: string
           identificador: string
@@ -4374,11 +4351,16 @@ export type Database = {
           area_m2?: number | null
           calle?: string | null
           created_at?: string
+          cuv?: string | null
           deleted_at?: string | null
           empresa_id: string
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
           frente_id?: string | null
           id?: string
           identificador: string
@@ -4400,11 +4382,16 @@ export type Database = {
           area_m2?: number | null
           calle?: string | null
           created_at?: string
+          cuv?: string | null
           deleted_at?: string | null
           empresa_id?: string
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
           frente_id?: string | null
           id?: string
           identificador?: string

@@ -3,11 +3,11 @@
 **Slug:** `dilesa-ruv`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
-**Estado:** in_progress
-**Próximo hito:** Sprint 4 construido (alta de frentes con selección de lotes + carga documental a Storage). **Pendiente: Beto prueba el alta en preview y mergea.** Luego cierre v1 (queda fuera: Urgencias —reporte canvas— y el drop de `construccion.frente_id` vestigial, que requiere su OK). D2 cerrada (RBAC)
+**Estado:** done
+**Próximo hito:** — (v1.1 entregada: detalle como página completa con lotes + marcado de hitos. El cutoff operativo —cerrar acceso a Coda + avisar al equipo— lo ejecuta Beto). Follow-up suelto: Urgencias RUV (reporte en canvas)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-08 (Sprint 4: la liga lote→frente se movió a `dilesa.unidades.frente_id` —porque el alta selecciona lotes sin construcción— con backfill desde Coda Inventario (1381 lotes); vista `v_ruv_frente_avance` reescrita (deriva de unidades⋈construccion, agrega `lotes`). Form de alta (`RuvFrenteCrearDrawer`: nombre + selección de lotes disponibles → crea frente, liga lotes, inicializa 27 docs pendiente) + checklist editable con subida de archivos a Storage (`ruv_frente_documentos.archivo_url`). Server actions `crearFrente`/`marcarDocumento`. PR sin auto-merge para que Beto pruebe el alta)
+**Última actualización:** 2026-06-09 (v1.1: el detalle del frente pasó de drawer a **página completa** `/dilesa/ruv/[id]` con la lista de **lotes del frente** y el **marcado de hitos** (DTU/extracción/seguro de calidad/paquete RUV) editable por lote. Los 4 hitos se movieron a `dilesa.unidades.fecha_*` con backfill completo desde Coda (cerró 518 fechas faltantes: 193 extracción + 325 paquete). Reconciliación de fechas Coda↔BSOP **100%** (DTU 1219, extracción 797, seguro 280, paquete 1347, 0 difieren))
 
 ## Problema
 
@@ -474,6 +474,32 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   de lotes disponibles, mostrado en cada opción. Hoy: 4 proyectos (Ampliación
   Lomas de los Encinos 358, Lomas de las Delicias 165, Lomas de los Encinos 93,
   Lomas del Sol 24).
+- **2026-06-09 (CIERRE — cutoff de Coda)** — Comparativo de reconciliación
+  Coda↔BSOP con `scripts/reconcile_dilesa_ruv_coda.ts`: **100% en las 4
+  dimensiones** (frentes 78=78 sin diffs, catálogo 27=27, CUVs 1140=1140,
+  lotes→frente 1381 sin discrepancias). El primer corrida reveló 166 CUVs de Coda
+  ausentes en BSOP (el CUV solo vivía en `construccion.cuv`, que no cubre lotes
+  sin obra) → fix: migración `20260609150032` agrega `dilesa.unidades.cuv` +
+  backfill desde Coda Inventario (167 escritos) + vista actualizada para contar
+  `unidades.cuv`. Dropeada `construccion.frente_id` vestigial (migración
+  `20260609151439`, autorizado por Beto). Beto dio de alta a **Nala** como
+  Asistente de Proyectos. Iniciativa `done`; el cierre de acceso a Coda + aviso
+  al equipo lo ejecuta Beto. Urgencias RUV queda como follow-up v1.1.
+- **2026-06-09 (v1.1 — página + hitos por lote)** — Por feedback de Beto: el
+  detalle del frente pasó de side-drawer a **página completa** `/dilesa/ruv/[id]`
+  (`RuvFrenteDetalle`) con la lista de **lotes del frente** y el **marcado de los
+  4 hitos** (DTU / extracción / seguro de calidad / paquete RUV) editable por lote
+  (inputs date inline → server action `marcarHito`). El drawer
+  `ruv-frente-detail-drawer` se eliminó; el listado ahora navega a la página. Los
+  4 hitos se movieron a `dilesa.unidades.fecha_*` (migración `20260609153715`) con
+  backfill desde construccion + completado desde Coda Inventario (import paso 3):
+  **518 fechas** que faltaban (193 extracción + 325 paquete) ahora en BSOP.
+  Reconciliación de fechas Coda↔BSOP **100%** (`reconcile` comparativo #5). Las
+  columnas `construccion.fecha_*` quedan vestigiales (sin lectores; no se usaban
+  fuera de RUV — verificado). **El CUV es capturable** por lote en la página
+  (input editable, valida 16 dígitos + unicidad; server action `marcarCuv`):
+  INFONAVIT lo emite tras armar el paquete, así que la operadora lo carga cuando
+  llega.
 
 ## Decisiones registradas
 
@@ -487,3 +513,11 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   por defecto: comercial, ventas, contraloría, RH. El backfill
   defensivo del Sprint 1 debe ser explícito por rol, no clonar
   a ciegas.
+- **2026-06-09 — La liga lote→frente y el CUV viven en `dilesa.unidades`,
+  no en `dilesa.construccion`.** Un frente se arma con lotes que aún no tienen
+  obra, y el CUV se emite por vivienda con o sin construcción. `construccion`
+  solo existe cuando hay obra, así que `unidades` (el lote, siempre presente) es
+  el hogar canónico de `frente_id` y `cuv`. La vista `v_ruv_frente_avance` deriva
+  el avance uniendo `unidades` ⋈ `construccion`. `construccion.frente_id` se
+  dropeó; `construccion.cuv` queda (lo gestiona el módulo Construcción) pero ya
+  no es la fuente del CUV para RUV.
