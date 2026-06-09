@@ -465,10 +465,8 @@ Decisiones que no han sido tomadas o que son aspiracionales. No documentar prema
 - **Workflow DevKit (Vercel Workflows)** — para crons largos, orquestación multi-paso con retries. No usado aún; los crons hoy son simples Vercel Cron Jobs.
 - **Backups externos** — iniciativa `db-backup-strategy` en `proposed`. Hoy solo daily backup automático de Supabase Pro (7 días retención).
 - **BI externo (Metabase)** — iniciativa `analytics` en `blocked` esperando bootstrap del Cowork.
-- **Cuentas por Pagar (CxP)** — iniciativa `cxp` en `planned`. Schema delta + RPCs por arrancar.
 - **Ramp-up de schemas tenant** — `coagan` y `ansa` aún sin masa crítica de módulos UI; entran cuando esas empresas operen activamente.
 - **Realtime cross-tab/cross-page** — Supabase Realtime + Broadcast Channel. Ad-hoc por ahora; documentado como follow-up en varios planning docs.
-- **Auto-generación de `INITIATIVES.md`** — escalar a `npm run initiatives:gen` desde headers de planning docs si los conflicts de hotspot persisten (ver `CLAUDE.md` repo "CI / PRs").
 - **Conflicto de numeración ADR** — ADR-005-008 existen tanto en `docs/adr/` como en `supabase/adr/`. Cleanup pendiente (ver `docs/planning/architecture-master.md`).
 
 ---

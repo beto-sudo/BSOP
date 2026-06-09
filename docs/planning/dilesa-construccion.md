@@ -329,6 +329,10 @@ decisión legal de Beto.
 
 (append-only, escrito por Claude Code al ejecutar)
 
+- **2026-06-09 (post-cierre — cutover de obra)** — Construcción salió del sync
+  diario Coda→BSOP (#782: ajusta `dilesa-coda-sync.yml` + `run-dilesa-sync.ts`).
+  BSOP deja de leer obra desde Coda; la captura de avances de obra vive en BSOP
+  desde esta fecha. Registrado en revisión de docs del mismo día.
 - **2026-06-08 (cierre de la iniciativa)** — 5 sprints + Sprint 6 reabierto y cerrado en prod — PDF del contrato de obra generable + ANEXO 3 de precios unitarios derivado por % de costo (#608), sobre el backfill de obras (#594). Residuales no-código: que Beto valide el Anexo 3 derivado contra uno real en preview, y la decisión legal de cuál representante/escritura DILESA es la vigente. Sprint 7 (Anexos 1/2 + persistir PDF) queda como opcional no comprometido. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 ### 2026-05-25 — Sprint 3 (UI lectura)

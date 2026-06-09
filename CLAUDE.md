@@ -75,15 +75,21 @@ una iniciativa, vive en su `## Decisiones registradas`.
 
 > Un PR no está "listo" hasta que CI pase verde. No reportar entregado antes.
 
-### Antes de `git push` — correr los 4 checks de CI
+### Antes de `git push` — correr los 6 checks de CI
 
-**Sobre todo el repo, no solo los archivos tocados**, en este orden:
+**Sobre todo el repo, no solo los archivos tocados**, en este orden (espejo de
+`.github/workflows/ci.yml`; si CI cambia, actualizar esta lista):
 
 ```bash
-npm run typecheck       # tsc --noEmit
-npm run test:run        # vitest run
-npm run lint            # eslint .
-npm run format:check    # prettier --check . (¡todo el repo!)
+npm run typecheck         # tsc --noEmit
+npm run test:coverage     # vitest + coverage thresholds — `test:run` NO basta:
+                          # puede pasar local y CI fallar por coverage
+npm run lint              # eslint .
+npm run format:check      # prettier --check . (¡todo el repo!)
+npm run initiatives:check # tabla Activas de INITIATIVES.md en sync con docs/planning/
+npm run schema:check      # SCHEMA_REF.md vs DB prod — requiere SUPABASE_DB_URL
+                          # (op read "op://Infrastructure/SUPABASE_DB_URL/credential");
+                          # si no tocaste DB puede saltarse: CI lo corre igual
 ```
 
 Si `format:check` reporta archivos que no toqué, **igual los formateo en este

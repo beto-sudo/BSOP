@@ -5,7 +5,7 @@
 > ADR-012 para el contexto histórico de la deprecación del split
 > Cowork/CC).
 >
-> **Última actualización:** 2026-06-08 — auditoría de estado real: cerradas 11 iniciativas ya terminadas, afinados 4 hitos pendientes y depurado este índice. El historial detallado de cada iniciativa vive en su `docs/planning/<slug>.md` (sección `## Bitácora`).
+> **Última actualización:** 2026-06-09 — revisión de docs: checks de CI re-sincronizados en `CLAUDE.md` (6 reales, no 4), bitácora post-cierre del cutover de obra en `dilesa-construccion` (#782) y retiro de 2 topics vencidos de `ARCHITECTURE.md` §8. (2026-06-08: auditoría de estado real — 11 iniciativas cerradas, índice depurado.) El historial detallado de cada iniciativa vive en su `docs/planning/<slug>.md` (sección `## Bitácora`).
 
 ## Convenciones
 
