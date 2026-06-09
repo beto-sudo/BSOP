@@ -2,9 +2,13 @@
 
 /**
  * Editor de las entradas de cuadratura (pestaña Cuadratura del Expediente de
- * Operación). Captura/ajusta los 4 buckets de descuento, el apoyo Infonavit y
- * el tope de descuento autorizado — el saldo y los derivados recomputan en
- * vivo (el padre re-calcula con `lib/dilesa/cuadratura.ts`).
+ * Operación). Captura/ajusta los 4 buckets de descuento y el tope de descuento
+ * autorizado — el saldo y los derivados recomputan en vivo (el padre re-calcula
+ * con `lib/dilesa/cuadratura.ts`).
+ *
+ * El apoyo Infonavit NO se captura: se deriva automáticamente del catálogo
+ * `dilesa.tipos_credito` según el tipo de crédito de la venta (misma fuente que
+ * usa el RPC `fn_calcular_precio_venta`). Aquí solo se muestra read-only.
  *
  * Iniciativa `dilesa-ventas-expediente` (Sprint 2b).
  */
@@ -22,7 +26,6 @@ export type CuadraturaInputsStr = {
   descuentoEquipamiento: string;
   descuentoGastosEscr: string;
   descuentoNotaCredito: string;
-  apoyoInfonavit: string;
   descuentoMaximo: string;
 };
 
@@ -38,11 +41,17 @@ export function CuadraturaAjustes({
   values,
   onPatch,
   canWrite,
+  apoyoInfonavit,
+  tipoCredito,
 }: {
   ventaId: string;
   values: CuadraturaInputsStr;
   onPatch: (patch: Partial<CuadraturaInputsStr>) => void;
   canWrite: boolean;
+  /** Apoyo Infonavit derivado del catálogo (auto, read-only). */
+  apoyoInfonavit: number;
+  /** Nombre del tipo de crédito, para etiquetar de dónde sale el apoyo. */
+  tipoCredito: string | null;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
@@ -64,7 +73,6 @@ export function CuadraturaAjustes({
         descuento_equipamiento: numOrNull(values.descuentoEquipamiento),
         descuento_gastos_escrituracion: numOrNull(values.descuentoGastosEscr),
         descuento_nota_credito: numOrNull(values.descuentoNotaCredito),
-        apoyo_infonavit: numOrNull(values.apoyoInfonavit),
         descuento_maximo_autorizado: numOrNull(values.descuentoMaximo),
         // El total se mantiene en sync con la suma de los buckets.
         descuento_total: descTotal,
@@ -136,13 +144,6 @@ export function CuadraturaAjustes({
             disabled={!canWrite}
           />
         </Campo>
-        <Campo label="Apoyo Infonavit (gastos escr.)">
-          <NumInput
-            value={values.apoyoInfonavit}
-            onChange={(v) => onPatch({ apoyoInfonavit: v })}
-            disabled={!canWrite}
-          />
-        </Campo>
         <Campo label="Descuento máximo autorizado">
           <NumInput
             value={values.descuentoMaximo}
@@ -152,9 +153,22 @@ export function CuadraturaAjustes({
         </Campo>
       </div>
 
-      <p className="mt-3 text-[11px] text-[var(--text)]/55">
+      <div className="mt-3 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+          Apoyo Infonavit · auto
+        </span>
+        <span className="text-xs font-semibold tabular-nums text-[var(--text)]/85">
+          {moneyFmt.format(apoyoInfonavit)}
+          {tipoCredito ? (
+            <span className="ml-1.5 font-normal text-[var(--text)]/50">· {tipoCredito}</span>
+          ) : null}
+        </span>
+      </div>
+
+      <p className="mt-2 text-[11px] text-[var(--text)]/55">
         Descuento otorgado total:{' '}
         <span className="font-semibold">{moneyFmt.format(descTotal)}</span> (suma de los 4 buckets).
+        El apoyo Infonavit se toma del catálogo de tipos de crédito, no se captura.
       </p>
     </section>
   );

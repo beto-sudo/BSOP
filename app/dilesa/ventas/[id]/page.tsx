@@ -358,9 +358,11 @@ function DetailInner() {
     descuentoEquipamiento: '',
     descuentoGastosEscr: '',
     descuentoNotaCredito: '',
-    apoyoInfonavit: '',
     descuentoMaximo: '',
   });
+  // Apoyo Infonavit derivado del catálogo `dilesa.tipos_credito` según el tipo
+  // de crédito de la venta (auto, no se captura). Misma fuente que el RPC.
+  const [apoyoInfonavit, setApoyoInfonavit] = useState(0);
   const [venta, setVenta] = useState<Venta | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -420,9 +422,32 @@ function DetailInner() {
         descuentoEquipamiento: numStr(ventaRow.descuento_equipamiento),
         descuentoGastosEscr: numStr(ventaRow.descuento_gastos_escrituracion),
         descuentoNotaCredito: numStr(ventaRow.descuento_nota_credito),
-        apoyoInfonavit: numStr(ventaRow.apoyo_infonavit),
         descuentoMaximo: numStr(ventaRow.descuento_maximo_autorizado),
       });
+
+      // Resolver el tipo de crédito → id + apoyo Infonavit del catálogo
+      // `dilesa.tipos_credito`. El apoyo se deriva (no se captura) y el id se
+      // pasa al RPC para que el desglose calcule apoyo + costo adicional (ej.
+      // Fovissste +6%) de la misma fuente. Match por empresa + nombre.
+      let tipoCreditoId: string | null = null;
+      let apoyoDerivado = 0;
+      if (ventaRow.tipo_credito) {
+        const { data: tcRow } = await sb
+          .schema('dilesa')
+          .from('tipos_credito')
+          .select('id, apoyo_infonavit_monto')
+          .eq('empresa_id', ventaRow.empresa_id)
+          .eq('nombre', ventaRow.tipo_credito)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (tcRow) {
+          tipoCreditoId = (tcRow as { id: string }).id;
+          apoyoDerivado = Number(
+            (tcRow as { apoyo_infonavit_monto: number | null }).apoyo_infonavit_monto ?? 0
+          );
+        }
+      }
+      if (activo) setApoyoInfonavit(apoyoDerivado);
 
       const [pRes, fRes, cargosRes, abonosRes, uRes] = await Promise.all([
         sb
@@ -605,6 +630,7 @@ function DetailInner() {
       if (ventaRow.unidad_id) {
         const { data: calcRow } = await sb.schema('dilesa').rpc('fn_calcular_precio_venta', {
           p_unidad_id: ventaRow.unidad_id,
+          p_tipo_credito_id: tipoCreditoId ?? undefined,
           p_monto_credito_titular: Number(ventaRow.monto_credito_titular ?? 0),
           p_monto_credito_cotitular: Number(ventaRow.monto_credito_cotitular ?? 0),
           p_productos_adicionales: Number(ventaRow.productos_adicionales ?? 0),
@@ -736,7 +762,8 @@ function DetailInner() {
         montoCreditoDirecto: venta?.monto_credito_directo ?? null,
         montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
-        apoyoInfonavit: cuadInputs.apoyoInfonavit === '' ? null : Number(cuadInputs.apoyoInfonavit),
+        // Derivado del catálogo de tipos de crédito (auto, no capturado).
+        apoyoInfonavit,
         descuentoOtorgadoTotal:
           (Number(cuadInputs.descuentoPrecio) || 0) +
           (Number(cuadInputs.descuentoEquipamiento) || 0) +
@@ -749,7 +776,7 @@ function DetailInner() {
         })),
         proyectoNombre,
       }),
-    [venta, abonos, proyectoNombre, cuadInputs]
+    [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit]
   );
 
   if (loading) {
@@ -940,6 +967,8 @@ function DetailInner() {
             ventaId={venta.id}
             values={cuadInputs}
             onPatch={(patch) => setCuadInputs((prev) => ({ ...prev, ...patch }))}
+            apoyoInfonavit={apoyoInfonavit}
+            tipoCredito={venta.tipo_credito}
             canWrite={
               permissions.isAdmin ||
               permissions.modulos.get('dilesa.ventas.fase13_facturada')?.write === true
