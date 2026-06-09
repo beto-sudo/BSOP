@@ -46,6 +46,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
 import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
+import { CuadraturaPanel } from '@/components/dilesa/cuadratura-panel';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
@@ -338,6 +339,9 @@ function DetailInner() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
+  const [tab, setTab] = useState<'operacion' | 'cuadratura' | 'documentos' | 'bitacora'>(
+    'operacion'
+  );
   const [venta, setVenta] = useState<Venta | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -871,430 +875,525 @@ function DetailInner() {
         cuadratura={cuadratura}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <PdfDownloadLink
-          ventaId={venta.id}
-          tipo="solicitud-asignacion"
-          label="Solicitud de Asignación"
-        />
-        <PdfDownloadLink ventaId={venta.id} tipo="aviso-privacidad" label="Aviso de Privacidad" />
-        <PdfDownloadLink ventaId={venta.id} tipo="ficu" label="FICU" />
-        <PdfDownloadLink
-          ventaId={venta.id}
-          tipo="promesa-compraventa"
-          label="Promesa de Compraventa"
-        />
-        {venta.valuador_id ? (
-          <PdfDownloadLink ventaId={venta.id} tipo="solicitud-avaluo" label="Solicitud de Avalúo" />
-        ) : null}
-        {venta.notario_id ? (
-          <PdfDownloadLink
-            ventaId={venta.id}
-            tipo="solicitud-dictamen"
-            label="Solicitud de Dictaminación"
-          />
-        ) : null}
-        {venta.unidad_id ? (
-          <PdfDownloadLink ventaId={venta.id} tipo="poliza-garantia" label="Póliza de Garantía" />
-        ) : null}
-        {venta.monto_credito_directo != null && Number(venta.monto_credito_directo) > 0 ? (
-          <PdfDownloadLink
-            ventaId={venta.id}
-            tipo="pagare-credito-directo"
-            label="Pagaré (crédito directo)"
-          />
-        ) : null}
+      {/* Zona C — pestañas del panel de trabajo (Expediente de Operación). */}
+      <div className="flex gap-1 border-b border-[var(--border)]">
+        {(
+          [
+            ['operacion', 'Operación'],
+            ['cuadratura', 'Cuadratura'],
+            ['documentos', 'Documentos'],
+            ['bitacora', 'Bitácora'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === key
+                ? 'border-[var(--accent)] text-[var(--text)]'
+                : 'border-transparent text-[var(--text)]/55 hover:text-[var(--text)]/80'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <MovimientosAdministrativos
-        ventaId={venta.id}
-        estado={venta.estado}
-        fasePosicion={venta.fase_posicion}
-        personaId={venta.persona_id}
-      />
+      {tab === 'cuadratura' ? (
+        <CuadraturaPanel
+          cuadratura={cuadratura}
+          valorEscrituracion={venta.valor_escrituracion}
+          chequeCapturado={venta.monto_cheque_notaria != null}
+        />
+      ) : null}
 
-      <Section title="Datos del cliente">
-        {fichaPersona.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">Sin datos del cliente.</p>
-        ) : (
-          <FichaGrid rows={fichaPersona} cols={3} />
-        )}
-      </Section>
+      {tab === 'documentos' ? (
+        <Section title="Documentos del expediente">
+          {pipelineRows.flatMap((r) => r.cargados).length === 0 ? (
+            <p className="text-sm text-[var(--text)]/50">Sin documentos cargados aún.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {pipelineRows
+                .flatMap((r) => r.cargados)
+                .map((a) => (
+                  <AdjuntoLink key={a.id} a={a} />
+                ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
 
-      <Section title="Datos de la venta">
-        {fichaVenta.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">—</p>
-        ) : (
-          <FichaGrid rows={fichaVenta} cols={3} />
-        )}
-        {calculo ? (
-          <div className="mt-5 border-t border-[var(--border)] pt-5">
-            <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-              Desglose del cálculo
-            </h3>
-            <FichaGrid
-              rows={[
-                { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
-                {
-                  label: `Excedente terreno (${calculo.metros_excedentes.toFixed(1)} m²)`,
-                  value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
-                },
-                { label: 'Frente verde', value: fmtMoney(calculo.valor_frente_verde) ?? '—' },
-                {
-                  label: `Esquina (${(calculo.pct_esquina_aplicado * 100).toFixed(1)}%)`,
-                  value: fmtMoney(calculo.valor_esquina) ?? '—',
-                },
-                { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
-                {
-                  label: 'Costo crédito adicional',
-                  value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
-                },
-                {
-                  label: 'Productos adicionales',
-                  value: fmtMoney(calculo.productos_adicionales) ?? '—',
-                },
-                {
-                  label: 'Precio de venta total',
-                  value: fmtMoney(calculo.precio_venta_total) ?? '—',
-                },
-                { label: 'Apoyo Infonavit', value: fmtMoney(calculo.apoyo_infonavit) ?? '—' },
-                { label: 'Pago directo cliente', value: fmtMoney(calculo.pago_directo) ?? '—' },
-                { label: 'Enganche 1%', value: fmtMoney(calculo.enganche_1pct) ?? '—' },
-                { label: 'ISAI 2%', value: fmtMoney(calculo.isai_2pct) ?? '—' },
-                {
-                  label: 'Gastos notariales 6%',
-                  value: fmtMoney(calculo.gastos_notariales_6pct) ?? '—',
-                },
-              ]}
-              cols={3}
+      {tab === 'bitacora' ? (
+        <Section title="Bitácora de fases">
+          {pipelineRows.filter((r) => r.alcanzada).length === 0 ? (
+            <p className="text-sm text-[var(--text)]/50">Sin fases cerradas aún.</p>
+          ) : (
+            <ol className="space-y-1.5">
+              {pipelineRows
+                .filter((r) => r.alcanzada)
+                .map((r) => (
+                  <li key={r.pos} className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--text)]/80">
+                      <span className="mr-2 font-mono text-[11px] text-[var(--text)]/40">
+                        {r.pos}
+                      </span>
+                      {r.nombre}
+                    </span>
+                    <span className="text-[11px] text-[var(--text)]/55">
+                      {r.fecha ? fmtFecha(r.fecha) : '—'}
+                    </span>
+                  </li>
+                ))}
+            </ol>
+          )}
+        </Section>
+      ) : null}
+
+      {tab === 'operacion' ? (
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            <PdfDownloadLink
+              ventaId={venta.id}
+              tipo="solicitud-asignacion"
+              label="Solicitud de Asignación"
             />
+            <PdfDownloadLink
+              ventaId={venta.id}
+              tipo="aviso-privacidad"
+              label="Aviso de Privacidad"
+            />
+            <PdfDownloadLink ventaId={venta.id} tipo="ficu" label="FICU" />
+            <PdfDownloadLink
+              ventaId={venta.id}
+              tipo="promesa-compraventa"
+              label="Promesa de Compraventa"
+            />
+            {venta.valuador_id ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="solicitud-avaluo"
+                label="Solicitud de Avalúo"
+              />
+            ) : null}
+            {venta.notario_id ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="solicitud-dictamen"
+                label="Solicitud de Dictaminación"
+              />
+            ) : null}
+            {venta.unidad_id ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="poliza-garantia"
+                label="Póliza de Garantía"
+              />
+            ) : null}
+            {venta.monto_credito_directo != null && Number(venta.monto_credito_directo) > 0 ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="pagare-credito-directo"
+                label="Pagaré (crédito directo)"
+              />
+            ) : null}
           </div>
-        ) : null}
-        {venta.motivo_desasignacion ? (
-          <div className="mt-4 border-t border-[var(--border)] pt-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-              Motivo de desasignación
-            </div>
-            <p className="mt-0.5 text-sm text-[var(--text)]/80">{venta.motivo_desasignacion}</p>
-          </div>
-        ) : null}
-        {kyc.length > 0 ? (
-          <div className="mt-6 border-t border-[var(--border)] pt-4">
-            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-              KYC / PLD
-            </div>
-            <FichaGrid rows={kyc} cols={3} />
-          </div>
-        ) : null}
-        {venta.notas ? (
-          <div className="mt-4 border-t border-[var(--border)] pt-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-              Notas
-            </div>
-            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text)]/80">
-              {venta.notas}
-            </p>
-          </div>
-        ) : null}
-      </Section>
 
-      <Section title="Pipeline" description={`${pipelineAlcanzadas} de 17 fases alcanzadas`}>
-        <div className="space-y-4">
-          {MACRO_ETAPAS.map((etapa) => {
-            const filas = pipelineRows.filter((r) => r.pos >= etapa.desde && r.pos <= etapa.hasta);
-            const cerradas = filas.filter((r) => r.alcanzada).length;
-            return (
-              <div key={etapa.nombre}>
-                <div className="mb-1.5 flex items-center gap-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
-                    {etapa.nombre}
-                  </h3>
-                  <span
-                    className={`text-[10px] ${cerradas === filas.length ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text)]/40'}`}
-                  >
-                    {cerradas}/{filas.length}
-                  </span>
-                </div>
-                <ol className="space-y-1 border-l-2 border-[var(--border)] pl-2">
-                  {filas.map((r) => (
-                    <li
-                      key={r.pos}
-                      className={
-                        'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
-                        (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
-                      }
-                    >
-                      {/* Status circle + posición */}
-                      <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
-                        {r.alcanzada ? (
-                          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
-                        )}
-                        <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
-                          {r.pos}
-                        </span>
-                      </div>
+          <MovimientosAdministrativos
+            ventaId={venta.id}
+            estado={venta.estado}
+            fasePosicion={venta.fase_posicion}
+            personaId={venta.persona_id}
+          />
 
-                      {/* Nombre + fecha */}
-                      <div className="min-w-[200px] shrink-0">
-                        <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
-                        <div className="text-[11px] text-[var(--text)]/50">
-                          {r.fecha ? fmtFecha(r.fecha) : '—'}
-                        </div>
-                      </div>
+          <Section title="Datos del cliente">
+            {fichaPersona.length === 0 ? (
+              <p className="text-sm text-[var(--text)]/60">Sin datos del cliente.</p>
+            ) : (
+              <FichaGrid rows={fichaPersona} cols={3} />
+            )}
+          </Section>
 
-                      {/* Docs cargados + faltantes */}
-                      <div className="flex flex-1 flex-wrap items-center gap-1">
-                        {r.cargados.map((a) => (
-                          <AdjuntoLink key={a.id} a={a} compact />
-                        ))}
-                        {r.faltantes.map((rol) => (
-                          <span
-                            key={rol}
-                            className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
-                            title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
-                          >
-                            <FileText className="h-2.5 w-2.5" />
-                            {ROL_LABEL[rol] ?? rol}
-                          </span>
-                        ))}
-                        {r.cargados.length === 0 && r.faltantes.length === 0 ? (
-                          <span className="text-[10px] text-[var(--text)]/30">—</span>
-                        ) : null}
-                      </div>
-
-                      {/* Capturar fase — solo si la página está implementada y aplica */}
-                      {r.slugCaptura ? (
-                        <div className="shrink-0">
-                          {r.puedeCapturar ? (
-                            <Link
-                              href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                            >
-                              <Pencil className="h-2.5 w-2.5" />
-                              Capturar fase
-                            </Link>
-                          ) : r.alcanzada ? null : (
-                            <span
-                              className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
-                              title={`Falta cerrar la fase ${r.pos - 1} primero.`}
-                            >
-                              <Pencil className="h-2.5 w-2.5" />
-                              Capturar
-                            </span>
-                          )}
-                        </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section
-        title="Estado de cuenta"
-        description={
-          cargos.length === 0
-            ? 'sin plan de pagos'
-            : `saldo ${moneyFmt.format(saldoPendiente)} de ${moneyFmt.format(totalACobrar)}`
-        }
-      >
-        <div className="mb-4 flex flex-wrap justify-end gap-2">
-          {cargos.length === 0 ? (
-            <button
-              type="button"
-              onClick={handleGenerarPlan}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
-            >
-              Generar plan
-            </button>
-          ) : null}
-          {cargos.length > 0 || abonos.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setEstadoCuentaOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
-            >
-              <Printer className="h-4 w-4" /> Imprimir estado de cuenta
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setAbonoOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" /> Registrar abono
-          </button>
-        </div>
-        {cargos.length === 0 && abonos.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">
-            Sin plan de pagos generado para esta venta.
-          </p>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-              <ResumenItem label="A cobrar" value={moneyFmt.format(totalACobrar)} />
-              <ResumenItem label="Cobrado" value={moneyFmt.format(totalCobrado)} />
-              <ResumenItem label="Saldo" value={moneyFmt.format(saldoPendiente)} />
-              {saldoFavor > 0 ? (
-                <ResumenItem label="Saldo a favor" value={moneyFmt.format(saldoFavor)} warn />
-              ) : null}
-            </div>
-
-            {cargos.length > 0 ? (
-              <div>
-                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  Cargos
-                </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
-                      <th className="py-1 pr-2 font-medium">Concepto</th>
-                      <th className="py-1 pr-2 font-medium">Vence</th>
-                      <th className="py-1 pr-2 font-medium">Fuente</th>
-                      <th className="py-1 pr-2 text-right font-medium">Monto</th>
-                      <th className="py-1 pr-2 text-right font-medium">Pagado</th>
-                      <th className="py-1 pr-2 text-right font-medium">Saldo</th>
-                      <th className="py-1 pl-2 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cargos.map((c) => (
-                      <tr key={c.id} className="border-b border-[var(--border)]/40">
-                        <td className="py-1.5 pr-2">{c.concepto ?? capitalizar(c.tipo_cargo)}</td>
-                        <td className="py-1.5 pr-2 text-[var(--text)]/70">
-                          {fmtFecha(c.fecha_vencimiento) ?? '—'}
-                        </td>
-                        <td className="py-1.5 pr-2">
-                          <Badge tone={fuenteTone(c.fuente_esperada)}>
-                            {fuenteLabel(c.fuente_esperada)}
-                          </Badge>
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">
-                          {moneyFmt.format(c.monto)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
-                          {moneyFmt.format(c.monto_pagado)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">
-                          {moneyFmt.format(c.saldo)}
-                        </td>
-                        <td className="py-1.5 pl-2">
-                          <Badge tone={estadoTone(c.estado)}>{capitalizar(c.estado)}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <Section title="Datos de la venta">
+            {fichaVenta.length === 0 ? (
+              <p className="text-sm text-[var(--text)]/60">—</p>
+            ) : (
+              <FichaGrid rows={fichaVenta} cols={3} />
+            )}
+            {calculo ? (
+              <div className="mt-5 border-t border-[var(--border)] pt-5">
+                <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  Desglose del cálculo
+                </h3>
+                <FichaGrid
+                  rows={[
+                    { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
+                    {
+                      label: `Excedente terreno (${calculo.metros_excedentes.toFixed(1)} m²)`,
+                      value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
+                    },
+                    { label: 'Frente verde', value: fmtMoney(calculo.valor_frente_verde) ?? '—' },
+                    {
+                      label: `Esquina (${(calculo.pct_esquina_aplicado * 100).toFixed(1)}%)`,
+                      value: fmtMoney(calculo.valor_esquina) ?? '—',
+                    },
+                    { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
+                    {
+                      label: 'Costo crédito adicional',
+                      value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
+                    },
+                    {
+                      label: 'Productos adicionales',
+                      value: fmtMoney(calculo.productos_adicionales) ?? '—',
+                    },
+                    {
+                      label: 'Precio de venta total',
+                      value: fmtMoney(calculo.precio_venta_total) ?? '—',
+                    },
+                    { label: 'Apoyo Infonavit', value: fmtMoney(calculo.apoyo_infonavit) ?? '—' },
+                    { label: 'Pago directo cliente', value: fmtMoney(calculo.pago_directo) ?? '—' },
+                    { label: 'Enganche 1%', value: fmtMoney(calculo.enganche_1pct) ?? '—' },
+                    { label: 'ISAI 2%', value: fmtMoney(calculo.isai_2pct) ?? '—' },
+                    {
+                      label: 'Gastos notariales 6%',
+                      value: fmtMoney(calculo.gastos_notariales_6pct) ?? '—',
+                    },
+                  ]}
+                  cols={3}
+                />
               </div>
             ) : null}
-
-            {abonos.length > 0 ? (
-              <div>
-                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  Abonos
+            {venta.motivo_desasignacion ? (
+              <div className="mt-4 border-t border-[var(--border)] pt-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  Motivo de desasignación
                 </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
-                      <th className="py-1 pr-2 font-medium">Fecha</th>
-                      <th className="py-1 pr-2 font-medium">Fuente</th>
-                      <th className="py-1 pr-2 text-right font-medium">Monto</th>
-                      <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
-                      <th className="py-1 pr-2 text-right font-medium">Saldo a favor</th>
-                      <th className="py-1 pr-2 font-medium">Comprobante</th>
-                      <th className="py-1 pl-2 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {abonos.map((a) => {
-                      const aplicado = aplicadoPorAbono.get(a.id) ?? 0;
-                      const favor = a.monto_total - aplicado;
-                      return (
-                        <tr key={a.id} className="border-b border-[var(--border)]/40">
-                          <td className="py-1.5 pr-2">{fmtFecha(a.fecha) ?? '—'}</td>
-                          <td className="py-1.5 pr-2">
-                            <Badge tone={fuenteTone(a.fuente)}>{fuenteLabel(a.fuente)}</Badge>
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums">
-                            {moneyFmt.format(a.monto_total)}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
-                            {moneyFmt.format(aplicado)}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums">
-                            {favor > 0 ? (
-                              <span className="font-medium text-amber-600">
-                                {moneyFmt.format(favor)}
-                              </span>
+                <p className="mt-0.5 text-sm text-[var(--text)]/80">{venta.motivo_desasignacion}</p>
+              </div>
+            ) : null}
+            {kyc.length > 0 ? (
+              <div className="mt-6 border-t border-[var(--border)] pt-4">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  KYC / PLD
+                </div>
+                <FichaGrid rows={kyc} cols={3} />
+              </div>
+            ) : null}
+            {venta.notas ? (
+              <div className="mt-4 border-t border-[var(--border)] pt-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                  Notas
+                </div>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text)]/80">
+                  {venta.notas}
+                </p>
+              </div>
+            ) : null}
+          </Section>
+
+          <Section title="Pipeline" description={`${pipelineAlcanzadas} de 17 fases alcanzadas`}>
+            <div className="space-y-4">
+              {MACRO_ETAPAS.map((etapa) => {
+                const filas = pipelineRows.filter(
+                  (r) => r.pos >= etapa.desde && r.pos <= etapa.hasta
+                );
+                const cerradas = filas.filter((r) => r.alcanzada).length;
+                return (
+                  <div key={etapa.nombre}>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
+                        {etapa.nombre}
+                      </h3>
+                      <span
+                        className={`text-[10px] ${cerradas === filas.length ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text)]/40'}`}
+                      >
+                        {cerradas}/{filas.length}
+                      </span>
+                    </div>
+                    <ol className="space-y-1 border-l-2 border-[var(--border)] pl-2">
+                      {filas.map((r) => (
+                        <li
+                          key={r.pos}
+                          className={
+                            'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
+                            (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
+                          }
+                        >
+                          {/* Status circle + posición */}
+                          <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
+                            {r.alcanzada ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                             ) : (
-                              <span className="text-[var(--text)]/30">—</span>
+                              <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
                             )}
-                          </td>
-                          <td className="py-1.5 pr-2">
-                            <div className="flex flex-wrap gap-1">
-                              {(comprobantesPorAbono.get(a.id) ?? []).map((adj) => (
-                                <AdjuntoLink key={adj.id} a={adj} compact />
-                              ))}
-                              {(comprobantesPorAbono.get(a.id) ?? []).length === 0 ? (
-                                <span className="text-[var(--text)]/30">—</span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="py-1.5 pl-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setReciboAbono(a)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
-                              title="Imprimir recibo de caja"
-                            >
-                              <Printer className="h-3 w-3" /> Recibo
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </Section>
+                            <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
+                              {r.pos}
+                            </span>
+                          </div>
 
-      <Section
-        title="Expediente digital"
-        description={
-          adjuntosVenta.length === 0 ? 'sin documentos' : `${adjuntosVenta.length} documentos`
-        }
-      >
-        {adjuntosPorRol.length === 0 ? (
-          <p className="text-sm text-[var(--text)]/60">
-            Sin documentos en el expediente para esta venta.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {adjuntosPorRol.map(([rol, ads]) => (
-              <div key={rol}>
-                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  {ROL_LABEL[rol] ?? rol}
+                          {/* Nombre + fecha */}
+                          <div className="min-w-[200px] shrink-0">
+                            <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
+                            <div className="text-[11px] text-[var(--text)]/50">
+                              {r.fecha ? fmtFecha(r.fecha) : '—'}
+                            </div>
+                          </div>
+
+                          {/* Docs cargados + faltantes */}
+                          <div className="flex flex-1 flex-wrap items-center gap-1">
+                            {r.cargados.map((a) => (
+                              <AdjuntoLink key={a.id} a={a} compact />
+                            ))}
+                            {r.faltantes.map((rol) => (
+                              <span
+                                key={rol}
+                                className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
+                                title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
+                              >
+                                <FileText className="h-2.5 w-2.5" />
+                                {ROL_LABEL[rol] ?? rol}
+                              </span>
+                            ))}
+                            {r.cargados.length === 0 && r.faltantes.length === 0 ? (
+                              <span className="text-[10px] text-[var(--text)]/30">—</span>
+                            ) : null}
+                          </div>
+
+                          {/* Capturar fase — solo si la página está implementada y aplica */}
+                          {r.slugCaptura ? (
+                            <div className="shrink-0">
+                              {r.puedeCapturar ? (
+                                <Link
+                                  href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
+                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                                >
+                                  <Pencil className="h-2.5 w-2.5" />
+                                  Capturar fase
+                                </Link>
+                              ) : r.alcanzada ? null : (
+                                <span
+                                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
+                                  title={`Falta cerrar la fase ${r.pos - 1} primero.`}
+                                >
+                                  <Pencil className="h-2.5 w-2.5" />
+                                  Capturar
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+
+          <Section
+            title="Estado de cuenta"
+            description={
+              cargos.length === 0
+                ? 'sin plan de pagos'
+                : `saldo ${moneyFmt.format(saldoPendiente)} de ${moneyFmt.format(totalACobrar)}`
+            }
+          >
+            <div className="mb-4 flex flex-wrap justify-end gap-2">
+              {cargos.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={handleGenerarPlan}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
+                >
+                  Generar plan
+                </button>
+              ) : null}
+              {cargos.length > 0 || abonos.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setEstadoCuentaOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-[var(--panel)]"
+                >
+                  <Printer className="h-4 w-4" /> Imprimir estado de cuenta
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setAbonoOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--card)] hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" /> Registrar abono
+              </button>
+            </div>
+            {cargos.length === 0 && abonos.length === 0 ? (
+              <p className="text-sm text-[var(--text)]/60">
+                Sin plan de pagos generado para esta venta.
+              </p>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex flex-wrap gap-x-8 gap-y-3">
+                  <ResumenItem label="A cobrar" value={moneyFmt.format(totalACobrar)} />
+                  <ResumenItem label="Cobrado" value={moneyFmt.format(totalCobrado)} />
+                  <ResumenItem label="Saldo" value={moneyFmt.format(saldoPendiente)} />
+                  {saldoFavor > 0 ? (
+                    <ResumenItem label="Saldo a favor" value={moneyFmt.format(saldoFavor)} warn />
+                  ) : null}
                 </div>
-                <ul className="flex flex-wrap gap-2">
-                  {ads.map((a) => (
-                    <li key={a.id}>
-                      <AdjuntoLink a={a} />
-                    </li>
-                  ))}
-                </ul>
+
+                {cargos.length > 0 ? (
+                  <div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                      Cargos
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
+                          <th className="py-1 pr-2 font-medium">Concepto</th>
+                          <th className="py-1 pr-2 font-medium">Vence</th>
+                          <th className="py-1 pr-2 font-medium">Fuente</th>
+                          <th className="py-1 pr-2 text-right font-medium">Monto</th>
+                          <th className="py-1 pr-2 text-right font-medium">Pagado</th>
+                          <th className="py-1 pr-2 text-right font-medium">Saldo</th>
+                          <th className="py-1 pl-2 font-medium">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cargos.map((c) => (
+                          <tr key={c.id} className="border-b border-[var(--border)]/40">
+                            <td className="py-1.5 pr-2">
+                              {c.concepto ?? capitalizar(c.tipo_cargo)}
+                            </td>
+                            <td className="py-1.5 pr-2 text-[var(--text)]/70">
+                              {fmtFecha(c.fecha_vencimiento) ?? '—'}
+                            </td>
+                            <td className="py-1.5 pr-2">
+                              <Badge tone={fuenteTone(c.fuente_esperada)}>
+                                {fuenteLabel(c.fuente_esperada)}
+                              </Badge>
+                            </td>
+                            <td className="py-1.5 pr-2 text-right tabular-nums">
+                              {moneyFmt.format(c.monto)}
+                            </td>
+                            <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
+                              {moneyFmt.format(c.monto_pagado)}
+                            </td>
+                            <td className="py-1.5 pr-2 text-right tabular-nums">
+                              {moneyFmt.format(c.saldo)}
+                            </td>
+                            <td className="py-1.5 pl-2">
+                              <Badge tone={estadoTone(c.estado)}>{capitalizar(c.estado)}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+
+                {abonos.length > 0 ? (
+                  <div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                      Abonos
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
+                          <th className="py-1 pr-2 font-medium">Fecha</th>
+                          <th className="py-1 pr-2 font-medium">Fuente</th>
+                          <th className="py-1 pr-2 text-right font-medium">Monto</th>
+                          <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
+                          <th className="py-1 pr-2 text-right font-medium">Saldo a favor</th>
+                          <th className="py-1 pr-2 font-medium">Comprobante</th>
+                          <th className="py-1 pl-2 font-medium"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {abonos.map((a) => {
+                          const aplicado = aplicadoPorAbono.get(a.id) ?? 0;
+                          const favor = a.monto_total - aplicado;
+                          return (
+                            <tr key={a.id} className="border-b border-[var(--border)]/40">
+                              <td className="py-1.5 pr-2">{fmtFecha(a.fecha) ?? '—'}</td>
+                              <td className="py-1.5 pr-2">
+                                <Badge tone={fuenteTone(a.fuente)}>{fuenteLabel(a.fuente)}</Badge>
+                              </td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums">
+                                {moneyFmt.format(a.monto_total)}
+                              </td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums text-[var(--text)]/70">
+                                {moneyFmt.format(aplicado)}
+                              </td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums">
+                                {favor > 0 ? (
+                                  <span className="font-medium text-amber-600">
+                                    {moneyFmt.format(favor)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[var(--text)]/30">—</span>
+                                )}
+                              </td>
+                              <td className="py-1.5 pr-2">
+                                <div className="flex flex-wrap gap-1">
+                                  {(comprobantesPorAbono.get(a.id) ?? []).map((adj) => (
+                                    <AdjuntoLink key={adj.id} a={adj} compact />
+                                  ))}
+                                  {(comprobantesPorAbono.get(a.id) ?? []).length === 0 ? (
+                                    <span className="text-[var(--text)]/30">—</span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="py-1.5 pl-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => setReciboAbono(a)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
+                                  title="Imprimir recibo de caja"
+                                >
+                                  <Printer className="h-3 w-3" /> Recibo
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </div>
-        )}
-      </Section>
+            )}
+          </Section>
+
+          <Section
+            title="Expediente digital"
+            description={
+              adjuntosVenta.length === 0 ? 'sin documentos' : `${adjuntosVenta.length} documentos`
+            }
+          >
+            {adjuntosPorRol.length === 0 ? (
+              <p className="text-sm text-[var(--text)]/60">
+                Sin documentos en el expediente para esta venta.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {adjuntosPorRol.map(([rol, ads]) => (
+                  <div key={rol}>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                      {ROL_LABEL[rol] ?? rol}
+                    </div>
+                    <ul className="flex flex-wrap gap-2">
+                      {ads.map((a) => (
+                        <li key={a.id}>
+                          <AdjuntoLink a={a} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
+      ) : null}
 
       <AbonoCaptureDrawer
         open={abonoOpen}
