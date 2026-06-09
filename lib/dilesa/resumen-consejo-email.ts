@@ -358,6 +358,30 @@ export function fechaTituloCST(now: Date): string {
   return `${cst.getUTCDate()} de ${MONTH_NAMES[cst.getUTCMonth()]} de ${cst.getUTCFullYear()}`;
 }
 
+/** Hora objetivo de envío en horario local de Matamoros (8pm). */
+export const HORA_ENVIO_LOCAL = 20;
+
+/**
+ * Hora (0-23) y si es domingo en horario local de Matamoros, con DST real.
+ * Matamoros es zona fronteriza y SÍ observa horario de verano (CDT, UTC-5) e
+ * invierno (CST, UTC-6) siguiendo a EE.UU.; por eso no usamos un offset fijo —
+ * Intl resuelve el offset correcto según la fecha. El cron dispara en las dos
+ * horas UTC candidatas (01:00 y 02:00) y este reloj deja pasar solo la corrida
+ * que cae a las 20:00 locales, auto-ajustándose al cambio de horario sin tener
+ * que editar el cron dos veces al año.
+ */
+export function relojMatamoros(now: Date): { hora: number; esDomingo: boolean } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Matamoros',
+    hour: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  }).formatToParts(now);
+  const hora = Number(parts.find((p) => p.type === 'hour')?.value ?? '0') % 24;
+  const esDomingo = parts.find((p) => p.type === 'weekday')?.value === 'Sun';
+  return { hora, esDomingo };
+}
+
 /**
  * Arma la data del correo desde las vistas DILESA. `supabase` debe ser un cliente
  * con acceso de lectura a los schemas `dilesa` y `erp` (service-role en el cron).

@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada 2026-06-08)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-08 (**cerrada** — cutover hecho, correo diario al Consejo live, Beto ya capturó los saldos reales)
+**Última actualización:** 2026-06-08 (fix post-cierre — horario a 8pm DST-proof + quitado el candado `LIVE` que causaba skip silencioso; ver Bitácora)
 
 ## Problema
 
@@ -253,6 +253,23 @@ hora de envío se acepta en v1.
 
 ## Bitácora
 
+- **2026-06-08 (fix post-cierre — el correo no llegaba)** — Beto reportó que el
+  correo no llegó a las 20:00. Diagnóstico: el correo **nunca había salido** por
+  dos causas. (1) **Horario:** el cron estaba en `0 2 * * *` (02:00 UTC),
+  calibrado para CST/invierno; en verano Matamoros es CDT (UTC-5) y eso son las
+  **21:00**, no las 20:00 — y Vercel no ajusta DST. (2) **Candado `LIVE`:**
+  `RESUMEN_CONSEJO_LIVE` no estaba efectivamente en `1` en prod (pese a que el
+  cierre lo daba por puesto en #740), así que el cron **hacía skip silencioso**
+  sin enviar. La tubería de envío (RESEND_API_KEY de prod, remitente
+  `noreply@bsop.io`, CRON_SECRET) estaba sana — idéntica a la del cron de tareas
+  que sí llega. **Fix:** cron a `0 1,2 * * *` + guard `relojMatamoros` (hora
+  local con TZ real) que envía solo a las 20:00 de Matamoros, auto-ajustándose
+  verano/invierno sin doble envío; **quitado el candado `LIVE`** (el correo
+  siempre sale; `RESUMEN_CONSEJO_TEST_TO` queda como única palanca de prueba,
+  igual que `daily-task-summary`); `console.log` para trazabilidad en runtime
+  logs; tests DST en `resumen-consejo-email.test.ts`. Pendiente operativo de
+  Beto: quitar la env huérfana `RESUMEN_CONSEJO_LIVE` de Vercel (ya sin uso).
+
 - **2026-06-08 (cierre de la iniciativa)** — Cutover completo y operando — correo diario "Resumen Diario Operación Dilesa" enviándose a consejo@dilesa.mx (L–S 20:00 CST, domingo no), Coda apagado, `RESUMEN_CONSEJO_LIVE=1` en prod (#740) + fix correctivo post-cutover del avance de construcción (#747). Beto ya capturó los saldos bancarios reales en la UI de Tesorería (verificado en prod). Fase 2 (CxC/CxP, resumen ejecutivo, alertas) queda como backlog explícito fuera de v1. Cerrada por instrucción de Beto tras auditoría de estado real (el header estaba stale respecto al trabajo ya en prod).
 
 - **2026-06-07 (promoción)** — Beto pidió recrear el correo diario del
@@ -265,6 +282,15 @@ hora de envío se acepta en v1.
   (D1–D3). Iniciativa promovida a `planned`.
 
 ## Decisiones registradas
+
+- **2026-06-08 — Quitar el candado `LIVE` y manejar el horario con TZ real (no
+  offset fijo).** Razón: el candado `RESUMEN_CONSEJO_LIVE` produjo un fallo
+  silencioso (cron skip) difícil de diagnosticar y que Beto no recordaba; ya
+  cumplió su función de proteger durante el desarrollo. El correo ahora siempre
+  se envía al Consejo —como `daily-task-summary`— con `RESUMEN_CONSEJO_TEST_TO`
+  como única palanca de prueba. El horario se calcula con `Intl` sobre
+  `America/Matamoros` (DST real) porque Vercel corre los crons en UTC fijo y un
+  offset CST hardcodeado se desfasa 1h en verano (8pm → 9pm).
 
 - **2026-06-07 — D1 Bancos manual / D2 Paridad-primero / D3
   consejo@dilesa.mx ~20:00 CST L–S (domingo no).** Ver "Decisiones
