@@ -110,6 +110,10 @@ const CONSTRUCCION_SCRIPTS: Array<{ name: string; path: string }> = [
 const DAILY_SCRIPTS: Array<{ name: string; path: string }> = [
   { name: 'Ventas', path: 'scripts/import_dilesa_ventas.ts' },
   { name: 'Expediente', path: 'scripts/import_dilesa_expediente.ts' },
+  // Puente venta_pagos → CxC (la UI de cuadratura/estado de cuenta lee
+  // erp.cxc_pagos). Va después de Expediente: recablea adjuntos recién
+  // importados. Muere con el daily al cutoff de ventas.
+  { name: 'CxC puente (incr)', path: 'scripts/sync_dilesa_cxc_incremental.ts' },
 ];
 const FULL_SCRIPTS: Array<{ name: string; path: string }> = [
   { name: 'Terrenos', path: 'scripts/import_dilesa_terrenos.ts' },
