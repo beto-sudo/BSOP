@@ -241,7 +241,7 @@ const FASE_ROLES: Record<string, string[]> = {
   'Firmas Programadas': [],
   Escriturada: ['pagare'],
   Detonada: ['imagen_detonacion'],
-  Facturada: ['factura', 'nota_credito'],
+  Facturada: ['factura', 'nota_credito', 'aviso_pld'],
   'Preparada para Entrega': ['checklist_pre_entrega'],
   Entregada: ['checklist_entrega'],
   'Comisión Pagada': [],
@@ -266,7 +266,8 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   10: '10-firmas-programadas',
   11: '11-escriturada',
   12: '12-detonada',
-  // 13–17 → próximos PRs del Sprint 7c
+  13: '13-facturada',
+  // 14–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
