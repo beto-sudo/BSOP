@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-06-08T11:49:35Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -2452,6 +2441,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "contratos_construccion_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       estimacion_tareas: {
@@ -2822,6 +2818,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       plantilla_proyecto_tareas: {
@@ -3073,6 +3076,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       promociones: {
@@ -3167,6 +3177,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "proyecto_activos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proyecto_documentos: {
@@ -3220,6 +3237,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_documentos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3281,6 +3305,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "proyecto_hitos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proyecto_planos: {
@@ -3337,6 +3368,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_planos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3423,6 +3461,13 @@ export type Database = {
             referencedColumns: ["proyecto_id"]
           },
           {
+            foreignKeyName: "proyecto_presupuesto_partidas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proyecto_presupuesto_partidas_tarea_origen_id_fkey"
             columns: ["tarea_origen_id"]
             isOneToOne: false
@@ -3478,6 +3523,13 @@ export type Database = {
             referencedColumns: ["proyecto_id"]
           },
           {
+            foreignKeyName: "proyecto_prorrateo_proyecto_madre_id_fkey"
+            columns: ["proyecto_madre_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proyecto_prorrateo_sub_proyecto_id_fkey"
             columns: ["sub_proyecto_id"]
             isOneToOne: false
@@ -3490,6 +3542,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_prorrateo_sub_proyecto_id_fkey"
+            columns: ["sub_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3538,6 +3597,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_responsables_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3712,6 +3778,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3957,6 +4030,13 @@ export type Database = {
             referencedColumns: ["proyecto_id"]
           },
           {
+            foreignKeyName: "proyectos_proyecto_padre_id_fkey"
+            columns: ["proyecto_padre_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proyectos_proyecto_predecesor_id_fkey"
             columns: ["proyecto_predecesor_id"]
             isOneToOne: false
@@ -3969,6 +4049,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyectos_proyecto_predecesor_id_fkey"
+            columns: ["proyecto_predecesor_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4169,6 +4256,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       tareas_construccion: {
@@ -4365,6 +4459,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4886,6 +4987,13 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       v_proyecto_avance: {
@@ -4910,6 +5018,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4976,7 +5091,23 @@ export type Database = {
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      v_ruv_proyectos_disponibles: {
+        Row: {
+          empresa_id: string | null
+          id: string | null
+          lotes_disponibles: number | null
+          nombre: string | null
+        }
+        Relationships: []
       }
       v_tareas_pendientes_de_pago: {
         Row: {

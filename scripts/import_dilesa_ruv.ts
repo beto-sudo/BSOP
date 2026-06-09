@@ -1,7 +1,7 @@
 /**
  * import_dilesa_ruv.ts
  *
- * Iniciativa `dilesa-ruv` · Sprint 2 — import desde Coda (doc ZNxWl_DI2D).
+ * Iniciativa `dilesa-ruv` · Sprints 2 y 4 — import desde Coda (doc ZNxWl_DI2D).
  *
  * Carga el módulo RUV con el alcance mínimo del Sprint 0: solo la OFERTA y el
  * CATÁLOGO de documentos (el detalle por vivienda —CUV + hitos— ya vive en
@@ -12,8 +12,10 @@
  *      - idempotente por coda_id (upsert por PK resolviendo el id existente)
  *   2. Catálogo (Coda "Documentos Necesarios" grid-QmS5nK8G4f →
  *      dilesa.ruv_documentos_catalogo) — upsert por (empresa_id, nombre)
- *   3. Backfill dilesa.construccion.frente_id: match del texto legacy
- *      construccion.frente_ruv contra ruv_frentes.nombre (normalizado).
+ *   3. Backfill dilesa.unidades.frente_id desde la columna "Frente RUV" de la
+ *      tabla Inventario de Coda (grid--AHYMPQI7Z), ligando por "ID Lote" =
+ *      dilesa.unidades.identificador. Cubre TODOS los lotes (con y sin
+ *      construcción) — Sprint 4 movió la liga lote→frente a unidades.
  *
  * Urgencias RUV NO se importa (es un reporte en canvas, va después).
  *
@@ -37,6 +39,7 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 const CODA_DOC = 'ZNxWl_DI2D';
 const CODA_FRENTE_RUV = 'grid-blmDCCczmb';
 const CODA_DOCUMENTOS = 'grid-QmS5nK8G4f';
+const CODA_INVENTARIO = 'grid--AHYMPQI7Z';
 
 if (!CODA_API_KEY) throw new Error('Falta CODA_API_KEY');
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Faltan credenciales de Supabase');
@@ -167,23 +170,37 @@ async function main() {
   log(`Catálogo documentos: ${docsUpsert.length} tipos upsert`);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PASO 3 — Backfill construccion.frente_id (match por nombre normalizado)
+  // PASO 3 — Backfill unidades.frente_id desde Coda Inventario (todos los lotes)
   // ─────────────────────────────────────────────────────────────────────────
-  // Mapa nombre→id de frentes. En apply se relee de la DB (ids reales tras el
-  // upsert); en dry-run los frentes aún no existen, así que el reporte de match
-  // usa los nombres en memoria (los que van a existir).
+  // La liga lote→frente vive en dilesa.unidades.frente_id. La fuente completa
+  // (lotes con y sin construcción) es la columna "Frente RUV" de la tabla
+  // Inventario de Coda, ligada por "ID Lote" (= dilesa.unidades.identificador).
   const frenteIdPorNombre = new Map<string, string>();
+  const unidadIdPorIdent = new Map<string, string>();
   if (!DRY_RUN) {
-    const { data: frentesDb, error: fdbErr } = await sb
-      .schema('dilesa')
-      .from('ruv_frentes')
-      .select('id, nombre')
-      .eq('empresa_id', empresaId)
-      .is('deleted_at', null);
-    if (fdbErr) throw fdbErr;
-    for (const f of frentesDb ?? []) {
+    const [frentesDb, unidadesDb] = await Promise.all([
+      sb
+        .schema('dilesa')
+        .from('ruv_frentes')
+        .select('id, nombre')
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null),
+      sb
+        .schema('dilesa')
+        .from('unidades')
+        .select('id, identificador')
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null),
+    ]);
+    if (frentesDb.error) throw frentesDb.error;
+    if (unidadesDb.error) throw unidadesDb.error;
+    for (const f of frentesDb.data ?? []) {
       const key = normNombre(f.nombre as string);
       if (!frenteIdPorNombre.has(key)) frenteIdPorNombre.set(key, f.id as string);
+    }
+    for (const u of unidadesDb.data ?? []) {
+      const ident = str(u.identificador);
+      if (ident) unidadIdPorIdent.set(ident.trim().toUpperCase(), u.id as string);
     }
   } else {
     for (const f of frentesParaCargar) {
@@ -192,39 +209,44 @@ async function main() {
     }
   }
 
-  const { data: construcciones, error: cErr } = await sb
-    .schema('dilesa')
-    .from('construccion')
-    .select('id, frente_ruv')
-    .eq('empresa_id', empresaId)
-    .not('frente_ruv', 'is', null)
-    .is('deleted_at', null);
-  if (cErr) throw cErr;
+  const invCols = await coda.listColumns(CODA_DOC, CODA_INVENTARIO);
+  const invMap = buildColumnMap(invCols);
+  const invRows = await coda.listRowsAll(CODA_DOC, CODA_INVENTARIO, { limit: 500 });
 
-  // Agrupar ids de construccion por frente_id resuelto.
+  // Agrupar ids de unidad por frente resuelto.
   const idsPorFrente = new Map<string, string[]>();
-  let sinMatch = 0;
-  const sinMatchNombres = new Set<string>();
-  for (const c of construcciones ?? []) {
-    const texto = str(c.frente_ruv);
-    if (!texto) continue;
-    const fid = frenteIdPorNombre.get(normNombre(texto));
+  let sinFrenteTexto = 0; // filas de inventario sin "Frente RUV"
+  let sinFrenteMatch = 0; // "Frente RUV" que no resuelve a un frente cargado
+  let sinUnidad = 0; // "ID Lote" que no resuelve a una unidad en BSOP
+  for (const row of invRows) {
+    const frenteTexto = str(pick(row.values, invMap, 'Frente RUV'));
+    if (!frenteTexto) {
+      sinFrenteTexto++;
+      continue;
+    }
+    const fid = frenteIdPorNombre.get(normNombre(frenteTexto));
     if (!fid) {
-      sinMatch++;
-      sinMatchNombres.add(texto);
+      sinFrenteMatch++;
+      continue;
+    }
+    const idLote = str(pick(row.values, invMap, 'ID Lote'));
+    const uid = DRY_RUN
+      ? 'dry-run'
+      : idLote
+        ? unidadIdPorIdent.get(idLote.trim().toUpperCase())
+        : undefined;
+    if (!uid) {
+      sinUnidad++;
       continue;
     }
     if (!idsPorFrente.has(fid)) idsPorFrente.set(fid, []);
-    idsPorFrente.get(fid)!.push(c.id as string);
+    idsPorFrente.get(fid)!.push(uid);
   }
-  const matched = (construcciones?.length ?? 0) - sinMatch;
+  const totalLigar = [...idsPorFrente.values()].reduce((acc, ids) => acc + ids.length, 0);
   log(
-    `Backfill construccion.frente_id: ${matched} viviendas matcheadas, ${sinMatch} sin match ` +
-      `(${sinMatchNombres.size} nombres de frente no resueltos)`
+    `Backfill unidades.frente_id: ${totalLigar} lotes ligados ` +
+      `(${sinFrenteTexto} sin Frente RUV en Coda, ${sinFrenteMatch} Frente sin match, ${sinUnidad} lote sin unidad en BSOP)`
   );
-  if (sinMatchNombres.size > 0) {
-    log('  Nombres sin match:', [...sinMatchNombres].slice(0, 25).join(' | '));
-  }
 
   if (!DRY_RUN) {
     for (const [fid, ids] of idsPorFrente) {
@@ -233,7 +255,7 @@ async function main() {
         const chunk = ids.slice(i, i + 150);
         const { error } = await sb
           .schema('dilesa')
-          .from('construccion')
+          .from('unidades')
           .update({ frente_id: fid })
           .in('id', chunk);
         if (error) throw error;
