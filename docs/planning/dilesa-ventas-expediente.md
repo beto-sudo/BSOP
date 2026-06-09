@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón de "workspace de operación" es replicable a las otras empresas)
 **Schemas afectados:** principalmente UI (Next.js App Router); `dilesa` (posible vista `v_venta_cuadratura` + columnas/slugs de fases 14-17), `core.modulos` (sub-slugs RBAC de 14-17). Reusa lo existente: `dilesa.ventas`, `dilesa.venta_fases`, `erp.adjuntos`, `erp.cxc_pagos`/`cxc_cargos`
 **Estado:** in_progress
-**Próximo hito:** Sprint 0 — cerrar decisiones de diseño (D1-D4 abajo) + correr auditoría de paridad Coda (readiness del cutoff). Luego Sprint 1 (esqueleto del workspace reusando los 13 formularios de fase ya construidos)
+**Próximo hito:** Sprint 2c (recibo de caja → Valor Facturado exacto) + S5 (definir y construir Fases 14-17, Beto define campos/docs). Luego S4 (copiloto de cierre) y S6 (cutover Coda de ventas)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (promovida — rediseño del flujo de captura de venta: de 17 formularios aislados a 1 expediente)
+**Última actualización:** 2026-06-09 (S0-S2b entregados; corte de construcción del sync nocturno)
 
 ## Problema
 
@@ -156,9 +156,37 @@ expediente, copiloto), no reescritura.
 - **2026-06-09:** Promovida. Beto eligió el rediseño completo (opción B) sobre
   el parche incremental, tras notar que la captura por fase pierde el contexto
   de la operación.
+- **2026-06-09 (S0):** Decisiones D1-D4 cerradas con Beto (D4: fórmulas de
+  cuadratura reverse-engineered de las 66 fórmulas Coda de `grid-mMIXWCSfyr`,
+  validadas con ejemplo real). Motor puro `lib/dilesa/cuadratura.ts` + tests.
+  Auditoría de paridad Coda: ~7 gaps reales de 109 columnas (PR #776).
+- **2026-06-09 (S1):** Workspace en prod — Zona A cabecera persistente +
+  mini-cuadratura (#776), Zona B timeline de macro-etapas (#777), Zona C
+  pestañas Operación/Cuadratura/Documentos/Bitácora (#778).
+- **2026-06-09 (S2a):** 6 columnas de entrada de cuadratura + mappings del
+  import (cutoff data) + wiring del motor (#779).
+- **2026-06-09 (S2b):** Editor de ajustes de cuadratura (4 buckets de
+  descuento + tope autorizado) con recálculo en vivo (#780). Apoyo Infonavit
+  pasó de captura manual a derivado del catálogo `dilesa.tipos_credito`
+  (paridad 100% con Coda `grid-gBvr7_9fgV`); de paso se corrigió que el
+  desglose RPC nunca recibía `p_tipo_credito_id` (apoyo y costo adicional
+  Fovissste/IMSS +6% salían en 0).
+- **2026-06-09 (sync):** Construcción cortada del sync nocturno Coda→BSOP
+  (#782) tras verificar diff 13,942/13,943 tareas y cero palomeos en Coda
+  post corte de accesos (2026-06-03). Daily queda solo ventas + expediente
+  hasta el cutoff de ventas (S6).
 
 ## Decisiones registradas
 
 - **2026-06-09:** Ir por rediseño completo (workspace "Expediente de
   Operación"), reusando los datos y formularios de las 13 fases ya
   construidas; definir Fases 14-17 dentro del nuevo modelo, no antes.
+- **2026-06-09:** El "saldo cero" de la cuadratura se mide contra **Valor de
+  Escrituración** (no precio de asignación); cubierta ⇔ saldo ≤ 0. Confirmado
+  por Beto con ejemplo real.
+- **2026-06-09:** Apoyo Infonavit NO se captura ni se importa: se deriva en
+  runtime de `dilesa.tipos_credito.apoyo_infonavit_monto` por nombre del tipo
+  de crédito (misma fuente que el RPC de desglose).
+- **2026-06-09:** Pre-cutoff, los descuentos se capturan en Coda (el sync
+  nocturno pisa los campos mapeados); el editor de BSOP queda listo para
+  cuando BSOP sea master (S6).
