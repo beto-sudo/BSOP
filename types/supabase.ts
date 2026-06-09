@@ -4631,6 +4631,7 @@ export type Database = {
       ventas: {
         Row: {
           anticipo_comision: number | null
+          apoyo_infonavit: number | null
           casa_valuadora: string | null
           cd_aval_domicilio: string | null
           cd_aval_nombre: string | null
@@ -4647,6 +4648,11 @@ export type Database = {
           credito_cotitular_ref: string | null
           credito_titular_ref: string | null
           deleted_at: string | null
+          descuento_equipamiento: number | null
+          descuento_gastos_escrituracion: number | null
+          descuento_maximo_autorizado: number | null
+          descuento_nota_credito: number | null
+          descuento_precio: number | null
           descuento_total: number | null
           empresa_id: string
           enganche_fecha_primer_pago: string | null
@@ -4709,6 +4715,7 @@ export type Database = {
         }
         Insert: {
           anticipo_comision?: number | null
+          apoyo_infonavit?: number | null
           casa_valuadora?: string | null
           cd_aval_domicilio?: string | null
           cd_aval_nombre?: string | null
@@ -4725,6 +4732,11 @@ export type Database = {
           credito_cotitular_ref?: string | null
           credito_titular_ref?: string | null
           deleted_at?: string | null
+          descuento_equipamiento?: number | null
+          descuento_gastos_escrituracion?: number | null
+          descuento_maximo_autorizado?: number | null
+          descuento_nota_credito?: number | null
+          descuento_precio?: number | null
           descuento_total?: number | null
           empresa_id: string
           enganche_fecha_primer_pago?: string | null
@@ -4787,6 +4799,7 @@ export type Database = {
         }
         Update: {
           anticipo_comision?: number | null
+          apoyo_infonavit?: number | null
           casa_valuadora?: string | null
           cd_aval_domicilio?: string | null
           cd_aval_nombre?: string | null
@@ -4803,6 +4816,11 @@ export type Database = {
           credito_cotitular_ref?: string | null
           credito_titular_ref?: string | null
           deleted_at?: string | null
+          descuento_equipamiento?: number | null
+          descuento_gastos_escrituracion?: number | null
+          descuento_maximo_autorizado?: number | null
+          descuento_nota_credito?: number | null
+          descuento_precio?: number | null
           descuento_total?: number | null
           empresa_id?: string
           enganche_fecha_primer_pago?: string | null

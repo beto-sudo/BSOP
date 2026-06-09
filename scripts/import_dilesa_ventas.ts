@@ -243,6 +243,16 @@ async function main() {
         // de Coda — verificar contra `coda.listColumns` antes del backfill.
         numero_cheque_notaria: str(pick(v, cm, 'Numero de Cheque Notaria')),
         monto_cheque_notaria: num(pick(v, cm, 'Monto Cheque Notaria')),
+        // Cutoff / cuadratura (Sprint 2 dilesa-ventas-expediente).
+        productos_adicionales: num(pick(v, cm, 'Productos Adicionales')) ?? 0,
+        monto_credito_directo: num(pick(v, cm, 'Monto Pagaré Autorizado')),
+        descuento_precio: num(pick(v, cm, 'Descuento Otorgado Precio')),
+        descuento_equipamiento: num(pick(v, cm, 'Descuento Otorgado Equipamiento')),
+        descuento_gastos_escrituracion: num(pick(v, cm, 'Descuento Otorgado Gastos Escrituración')),
+        descuento_nota_credito: num(pick(v, cm, 'Descuento Otorgado Nota de Credito')),
+        apoyo_infonavit: num(pick(v, cm, 'Apoyo Escrituración Infonavit')),
+        descuento_maximo_autorizado: num(pick(v, cm, 'Descuento máximo Autorizado')),
+        fecha_firma_programada: dateStr(pick(v, cm, 'Fecha y Hora de Firma Programada')),
         es_pep: boolOpt(pick(v, cm, 'Persona Políticamente Expuesta')),
         ocupacion: str(pick(v, cm, 'Actividad Ocupacion o Profesion')),
         ine_numero: str(pick(v, cm, 'Numero de Credencial INE')),
