@@ -4248,6 +4248,7 @@ export type Database = {
           es_esquina: boolean | null
           es_muestra: boolean
           estado: string
+          frente_id: string | null
           id: string
           identificador: string
           m2_construccion: number | null
@@ -4273,6 +4274,7 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          frente_id?: string | null
           id?: string
           identificador: string
           m2_construccion?: number | null
@@ -4298,6 +4300,7 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          frente_id?: string | null
           id?: string
           identificador?: string
           m2_construccion?: number | null
@@ -4320,6 +4323,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "activos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "ruv_frentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_frente_avance"
+            referencedColumns: ["frente_id"]
           },
           {
             foreignKeyName: "unidades_producto_id_fkey"
@@ -4533,6 +4550,7 @@ export type Database = {
           fase_actual: string | null
           fase_posicion: number | null
           fecha_avaluo_cerrado: string | null
+          fecha_detonacion: string | null
           fecha_dictaminada: string | null
           fecha_escritura: string | null
           fecha_firma_programada: string | null
@@ -4549,6 +4567,7 @@ export type Database = {
           monto_credito_cotitular: number | null
           monto_credito_directo: number | null
           monto_credito_titular: number | null
+          monto_detonado: number | null
           motivo_desasignacion: string | null
           notario: string | null
           notario_id: string | null
@@ -4606,6 +4625,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
           fecha_firma_programada?: string | null
@@ -4622,6 +4642,7 @@ export type Database = {
           monto_credito_cotitular?: number | null
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
+          monto_detonado?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
           notario_id?: string | null
@@ -4679,6 +4700,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
           fecha_firma_programada?: string | null
@@ -4695,6 +4717,7 @@ export type Database = {
           monto_credito_cotitular?: number | null
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
+          monto_detonado?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
           notario_id?: string | null
@@ -4931,6 +4954,7 @@ export type Database = {
           documentos_pendientes: number | null
           empresa_id: string | null
           frente_id: string | null
+          lotes: number | null
           nombre: string | null
           pct_paquete_ruv: number | null
           proyecto_id: string | null
