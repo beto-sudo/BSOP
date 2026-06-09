@@ -40,6 +40,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // default mapea al sub-slug del primer tab (`.activos`).
   '/dilesa/proyectos': 'dilesa.proyectos.activos',
   '/dilesa/proyectos/anteproyectos': 'dilesa.proyectos.anteproyectos',
+  // Tab Gasto del detalle de proyecto (iniciativa `dilesa-flujo-gasto` S2):
+  // el Costeo mudado de Construcción, gobernado por su propio sub-slug.
+  '/dilesa/proyectos/[id]/gasto': 'dilesa.proyectos.gasto',
   // Ventas es un hub con 5 tabs (sprint tabs-hub). El padre
   // `dilesa.ventas` queda como umbrella; cada tab tiene su sub-slug
   // (ADR-030 SS2). La URL default mapea al sub-slug del primer tab

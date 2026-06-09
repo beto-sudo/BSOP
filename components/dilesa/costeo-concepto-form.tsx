@@ -55,12 +55,15 @@ export function CosteoConceptoForm({
   proveedores,
   rows,
   editRow,
+  defaultProyectoId,
   onClose,
   onSaved,
   onDelete,
 }: {
   empresaId: string;
   proyectos: readonly ProyectoOption[];
+  /** Pre-selección del proyecto en alta (tab Gasto: el proyecto es fijo). */
+  defaultProyectoId?: string;
   /** Optgroups del catálogo (etapa›capítulo) para el selector de clasificación. */
   optgroups: readonly CatalogoOptgroup[];
   /** Proveedores activos (persona_id + nombre) para el dropdown. */
@@ -81,7 +84,7 @@ export function CosteoConceptoForm({
   const isEdit = editRow != null;
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const [proyectoId, setProyectoId] = useState(editRow?.proyecto_id ?? '');
+  const [proyectoId, setProyectoId] = useState(editRow?.proyecto_id ?? defaultProyectoId ?? '');
   const [concepto, setConcepto] = useState(editRow?.concepto ?? '');
   const [conceptoId, setConceptoId] = useState(editRow?.conceptoId ?? '');
   const [etapa, setEtapa] = useState(editRow?.etapa ?? '');

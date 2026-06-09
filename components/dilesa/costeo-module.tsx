@@ -307,11 +307,22 @@ type FetchResult = {
   error?: string;
 };
 
-export function CosteoModule({ empresaId }: { empresaId: string }) {
+export function CosteoModule({
+  empresaId,
+  proyectoIdFijo,
+}: {
+  empresaId: string;
+  /**
+   * Modo "home del gasto" (iniciativa dilesa-flujo-gasto · S2): el módulo
+   * vive dentro del detalle de un proyecto — proyecto fijo (sin selector ni
+   * header propio) y gate de escritura por el sub-slug del tab Gasto.
+   */
+  proyectoIdFijo?: string;
+}) {
   const { permissions } = usePermissions();
   const toast = useToast();
-  const puedeEscribir =
-    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.costeo')?.write === true;
+  const writeSlug = proyectoIdFijo ? 'dilesa.proyectos.gasto' : 'dilesa.construccion.costeo';
+  const puedeEscribir = permissions.isAdmin || permissions.modulos.get(writeSlug)?.write === true;
 
   const [rows, setRows] = useState<CosteoRow[]>([]);
   /** contratado/pagado por proyecto_id (Capa B). */
@@ -333,8 +344,9 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   /** '' = todos · '__sin__' = sin proyecto · else proyecto_id (un proyecto a la vez). */
-  const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const autoSelectDone = useRef(false);
+  const [proyectoFiltro, setProyectoFiltro] = useState(proyectoIdFijo ?? '');
+  // Con proyecto fijo el auto-select del primer proyecto no debe correr.
+  const autoSelectDone = useRef(Boolean(proyectoIdFijo));
   /** Captura de presupuesto. null editRow + open = alta. */
   const [formOpen, setFormOpen] = useState(false);
   const [editRow, setEditRow] = useState<CosteoRow | null>(null);
@@ -707,36 +719,40 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
 
   return (
     <div className="space-y-6 p-6">
-      <header className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
-          <Coins className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Costeo</h1>
-          <p className="text-sm text-[var(--text)]/60">
-            Presupuesto vs gasto real por concepto y etapa (urbanización + cabecera), con el
-            contratado y saldo por pagar de los contratos de obra. CapEx del desarrollo.
-          </p>
-        </div>
-      </header>
+      {proyectoIdFijo ? null : (
+        <header className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+            <Coins className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Costeo</h1>
+            <p className="text-sm text-[var(--text)]/60">
+              Presupuesto vs gasto real por concepto y etapa (urbanización + cabecera), con el
+              contratado y saldo por pagar de los contratos de obra. CapEx del desarrollo.
+            </p>
+          </div>
+        </header>
+      )}
 
       <ModuleKpiStrip stats={kpis} cols={5} />
 
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={proyectoFiltro}
-          onChange={(e) => setProyectoFiltro(e.target.value)}
-          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
-          aria-label="Proyecto"
-        >
-          <option value="">Todos los proyectos</option>
-          {proyectosPresentes.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-          {haySinProyecto ? <option value={SIN}>Sin proyecto asignado</option> : null}
-        </select>
+        {proyectoIdFijo ? null : (
+          <select
+            value={proyectoFiltro}
+            onChange={(e) => setProyectoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
+            aria-label="Proyecto"
+          >
+            <option value="">Todos los proyectos</option>
+            {proyectosPresentes.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+            {haySinProyecto ? <option value={SIN}>Sin proyecto asignado</option> : null}
+          </select>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
           <Input
@@ -780,6 +796,7 @@ export function CosteoModule({ empresaId }: { empresaId: string }) {
           proveedores={proveedores}
           rows={rows}
           editRow={editRow}
+          defaultProyectoId={proyectoIdFijo}
           onClose={cerrarForm}
           onSaved={() => {
             cerrarForm();

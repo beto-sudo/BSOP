@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -65,15 +63,7 @@ function Body() {
 
   return (
     <div>
-      <div className="px-4 pt-4 sm:px-6 sm:pt-6">
-        <Link
-          href="/dilesa/proyectos"
-          className="inline-flex items-center gap-1 text-sm text-[var(--text)]/60 hover:text-[var(--text)]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Volver a proyectos
-        </Link>
-      </div>
+      {/* El "Volver a proyectos" + tabs viven en el layout del detalle (S2 dilesa-flujo-gasto). */}
       {loading && <p className="p-6 text-sm text-[var(--text)]/60">Cargando proyecto…</p>}
       {notFound && (
         <p className="p-6 text-sm text-red-600/80">
