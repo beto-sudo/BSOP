@@ -4326,6 +4326,10 @@ export type Database = {
           es_esquina: boolean | null
           es_muestra: boolean
           estado: string
+          fecha_dtu: string | null
+          fecha_extraccion: string | null
+          fecha_paquete_ruv: string | null
+          fecha_seguro_calidad: string | null
           frente_id: string | null
           id: string
           identificador: string
@@ -4353,6 +4357,10 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
           frente_id?: string | null
           id?: string
           identificador: string
@@ -4380,6 +4388,10 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          fecha_dtu?: string | null
+          fecha_extraccion?: string | null
+          fecha_paquete_ruv?: string | null
+          fecha_seguro_calidad?: string | null
           frente_id?: string | null
           id?: string
           identificador?: string
