@@ -77,20 +77,26 @@ type CodaCounts = Partial<Record<keyof typeof CODA_TABLES, number>>;
  * Sync orquestador — 3 modos según volumen y costo:
  *
  * DAILY (default, todos los días):
- *   - Ventas, Expediente, y los 5 scripts de Construcción + Estimaciones
- *     incrementales. Todos usan UPSERT por coda_row_id (idempotentes).
- *   - Sprint 6 (cutover): se promovieron a daily porque del 2026-05-26
- *     al sábado 2026-05-31 el equipo sigue capturando en Coda — sin esto,
- *     las nuevas tareas/contratos/contratistas no llegarían a BSOP.
- *   - Orden importa por FK: contratistas → catálogos → contratos →
- *     construcción → tareas_terminadas → estimaciones (backfill incr).
+ *   - Solo Ventas + Expediente. Construcción se cortó del daily el
+ *     2026-06-09 (cutover de obra a BSOP): los supervisores ya no tienen
+ *     acceso a palomear tareas en Coda, así que seguir sincronizando solo
+ *     re-traería captura vieja o colisionaría con la captura nativa.
+ *     Ventas/Expediente siguen hasta su propio cutoff.
+ *
+ * CONSTRUCCION (CONSTRUCCION=1, manual):
+ *   - Los 6 scripts de construcción + ventas/expediente. Para traer un
+ *     rezago puntual de Coda post-cutover. Orden importa por FK:
+ *     contratistas → catálogos → contratos → construcción →
+ *     tareas_terminadas → estimaciones (backfill incr). Todos idempotentes
+ *     por coda_row_id.
  *
  * FULL (FULL=1, manual):
- *   - DAILY + terrenos + proyectos + inventario. Los 3 últimos cambian
- *     mensual y sus scripts antes truenaban (resuelto en F2 con UPSERT
- *     puro, ver iniciativa dilesa-portafolio).
+ *   - Todo: terrenos + proyectos + inventario + construcción + ventas +
+ *     expediente. Los 3 de portafolio cambian mensual y sus scripts antes
+ *     truenaban (resuelto en F2 con UPSERT puro, ver dilesa-portafolio).
  */
 const FULL = process.env.FULL === '1';
+const CONSTRUCCION = process.env.CONSTRUCCION === '1';
 
 const CONSTRUCCION_SCRIPTS: Array<{ name: string; path: string }> = [
   { name: 'Contratistas', path: 'scripts/import_dilesa_contratistas.ts' },
@@ -102,7 +108,6 @@ const CONSTRUCCION_SCRIPTS: Array<{ name: string; path: string }> = [
 ];
 
 const DAILY_SCRIPTS: Array<{ name: string; path: string }> = [
-  ...CONSTRUCCION_SCRIPTS,
   { name: 'Ventas', path: 'scripts/import_dilesa_ventas.ts' },
   { name: 'Expediente', path: 'scripts/import_dilesa_expediente.ts' },
 ];
@@ -110,9 +115,14 @@ const FULL_SCRIPTS: Array<{ name: string; path: string }> = [
   { name: 'Terrenos', path: 'scripts/import_dilesa_terrenos.ts' },
   { name: 'Proyectos', path: 'scripts/import_dilesa_proyectos.ts' },
   { name: 'Inventario', path: 'scripts/import_dilesa_inventario.ts' },
+  ...CONSTRUCCION_SCRIPTS,
   ...DAILY_SCRIPTS,
 ];
-const SCRIPTS = FULL ? FULL_SCRIPTS : DAILY_SCRIPTS;
+const SCRIPTS = FULL
+  ? FULL_SCRIPTS
+  : CONSTRUCCION
+    ? [...CONSTRUCCION_SCRIPTS, ...DAILY_SCRIPTS]
+    : DAILY_SCRIPTS;
 
 type StepResult = {
   name: string;
