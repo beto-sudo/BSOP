@@ -19,6 +19,7 @@ export type RuvFrenteRow = {
   proyectoId: string | null;
   proyectoNombre: string;
   // Métricas derivadas (vista dilesa.v_ruv_frente_avance).
+  lotes: number; // lotes ligados al frente (con y sin construcción)
   viviendas: number; // viviendas en construcción ligadas al frente
   cuvsEmitidos: number;
   conDtu: number;

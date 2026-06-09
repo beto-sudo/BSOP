@@ -4,6 +4,7 @@ import {
   fmtPct,
   fmtInt,
   fechaTituloCST,
+  relojMatamoros,
   renderResumenConsejoHtml,
   type ResumenConsejoData,
 } from './resumen-consejo-email';
@@ -35,6 +36,34 @@ describe('formato', () => {
     expect(fmtInt(5)).toBe('5');
     expect(fmtInt(null)).toBe('0');
     expect(fmtInt(0)).toBe('0');
+  });
+});
+
+describe('relojMatamoros — envío 8pm local con DST real', () => {
+  // El cron dispara a las 01:00 y 02:00 UTC; solo la corrida que cae a las 20:00
+  // de Matamoros envía. Verano = CDT (UTC-5) → 01:00 UTC. Invierno = CST (UTC-6)
+  // → 02:00 UTC. Matamoros es frontera y sí observa horario de verano.
+  it('verano (CDT): 01:00 UTC = 20:00 local → envía; 02:00 UTC = 21:00 → se salta', () => {
+    // Lunes 8-jun-2026 20:00 CDT = 9-jun 01:00 UTC
+    expect(relojMatamoros(new Date('2026-06-09T01:00:00Z'))).toEqual({
+      hora: 20,
+      esDomingo: false,
+    });
+    expect(relojMatamoros(new Date('2026-06-09T02:00:00Z')).hora).toBe(21);
+  });
+
+  it('invierno (CST): 02:00 UTC = 20:00 local → envía; 01:00 UTC = 19:00 → se salta', () => {
+    // 15-ene-2026 20:00 CST = 16-ene 02:00 UTC
+    expect(relojMatamoros(new Date('2026-01-16T02:00:00Z')).hora).toBe(20);
+    expect(relojMatamoros(new Date('2026-01-16T01:00:00Z')).hora).toBe(19);
+  });
+
+  it('domingo a las 20:00 locales → esDomingo true (no se envía)', () => {
+    // Domingo 7-jun-2026 20:00 CDT = 8-jun 01:00 UTC
+    expect(relojMatamoros(new Date('2026-06-08T01:00:00Z'))).toEqual({
+      hora: 20,
+      esDomingo: true,
+    });
   });
 });
 

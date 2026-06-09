@@ -1,13 +1,19 @@
 /**
  * Resumen Diario Operación DILESA — cron del correo al Consejo.
  *
- * Schedule: `0 2 * * *` (02:00 UTC ≈ 20:00 CST). Ver vercel.json.
+ * Schedule: `0 1,2 * * *` (01:00 y 02:00 UTC). Ver vercel.json. Vercel corre los
+ * crons en UTC y NO ajusta DST, pero Matamoros sí observa horario de verano
+ * (CDT, UTC-5) e invierno (CST, UTC-6). Por eso disparamos en las dos horas UTC
+ * candidatas y el guard de hora local (TZ real) deja pasar solo la que cae a las
+ * 20:00 de Matamoros → el correo llega a las 8pm todo el año sin editar el cron.
  * Iniciativa dilesa-resumen-consejo.
  *
  * Reglas:
- *   - Lunes a sábado. **Domingo NO se envía** (guard sobre el día en CST).
+ *   - Envío a las 20:00 hora de Matamoros, de lunes a sábado.
+ *   - **Domingo NO se envía** (guard sobre el día, TZ real).
  *   - Destino: RESUMEN_CONSEJO_TEST_TO si está definida (modo prueba, subject con
- *     [PRUEBA]); en su defecto, consejo@dilesa.mx (producción).
+ *     [PRUEBA]); en su defecto, consejo@dilesa.mx (producción). Sin candado extra
+ *     — igual que el cron de tareas, siempre envía (TEST_TO es la única palanca).
  *   - El bloque de Saldos Bancos solo aparece cuando hay saldos capturados
  *     (iniciativa tesoreria → erp.v_cuenta_saldo_actual).
  *
@@ -21,6 +27,8 @@ import {
   renderResumenConsejoHtml,
   fechaTituloCST,
   sendResumenEmail,
+  relojMatamoros,
+  HORA_ENVIO_LOCAL,
 } from '@/lib/dilesa/resumen-consejo-email';
 
 export const maxDuration = 120;
@@ -28,12 +36,6 @@ export const maxDuration = 120;
 const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 const CONSEJO_EMAIL = 'consejo@dilesa.mx';
 const FROM = 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>';
-
-/** Día de la semana en CST (UTC-6 fijo, México sin DST). 0 = domingo. */
-function diaSemanaCst(now: Date): number {
-  const cst = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-  return cst.getUTCDay();
-}
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim();
@@ -43,10 +45,20 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
+  const { hora, esDomingo } = relojMatamoros(now);
 
-  // Guard de domingo — el resumen del domingo no se envía.
-  if (diaSemanaCst(now) === 0) {
-    return NextResponse.json({ status: 'skipped', reason: 'domingo' });
+  // El cron dispara a las 01:00 y 02:00 UTC; solo la corrida que cae a las 20:00
+  // de Matamoros envía (la otra se salta). Auto-ajuste a DST sin doble envío.
+  if (hora !== HORA_ENVIO_LOCAL) {
+    const skip = { status: 'skipped', reason: `hora local ${hora}:00 != ${HORA_ENVIO_LOCAL}:00` };
+    console.log('[dilesa-resumen-consejo]', JSON.stringify(skip));
+    return NextResponse.json(skip);
+  }
+  // El resumen del domingo no se envía.
+  if (esDomingo) {
+    const skip = { status: 'skipped', reason: 'domingo' };
+    console.log('[dilesa-resumen-consejo]', JSON.stringify(skip));
+    return NextResponse.json(skip);
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -78,20 +90,10 @@ export async function GET(req: NextRequest) {
     fechaTitulo,
   });
 
-  // Destino con FAIL-SAFE: hasta el cutover NO se manda al Consejo.
-  //   - RESUMEN_CONSEJO_TEST_TO definida → manda ahí, subject con [PRUEBA].
-  //   - RESUMEN_CONSEJO_LIVE='1' (y sin TEST_TO) → manda al Consejo real.
-  //   - ninguna de las dos → skip sin enviar. Evita un envío accidental al
-  //     Consejo cuando el cron entra a prod antes de que Beto valide el correo.
+  // Destino: RESUMEN_CONSEJO_TEST_TO definida → modo prueba (subject [PRUEBA], NO
+  // toca al Consejo); en su defecto, el Consejo real. Sin candado extra — igual
+  // que el cron de tareas, el correo siempre se envía.
   const testTo = process.env.RESUMEN_CONSEJO_TEST_TO?.trim();
-  const live = process.env.RESUMEN_CONSEJO_LIVE === '1';
-  if (!testTo && !live) {
-    return NextResponse.json({
-      status: 'skipped',
-      reason:
-        'sin destino: configura RESUMEN_CONSEJO_TEST_TO (prueba) o RESUMEN_CONSEJO_LIVE=1 (Consejo)',
-    });
-  }
   const recipients = testTo ? [testTo] : [CONSEJO_EMAIL];
   const subject = `Resumen Diario Operación Dilesa 🏘️ ${fechaTitulo}${testTo ? ' [PRUEBA]' : ''}`;
 
@@ -102,7 +104,7 @@ export async function GET(req: NextRequest) {
     recipients,
   });
 
-  return NextResponse.json({
+  const summary = {
     status: res.ok ? 'sent' : 'error',
     recipients,
     secciones: {
@@ -115,5 +117,7 @@ export async function GET(req: NextRequest) {
       contratistas: data.contratistas.length,
     },
     error: res.ok ? undefined : res.error,
-  });
+  };
+  console.log('[dilesa-resumen-consejo]', JSON.stringify(summary));
+  return NextResponse.json(summary);
 }
