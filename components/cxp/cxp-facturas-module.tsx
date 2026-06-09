@@ -305,6 +305,40 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [proyectoNombreMap, setProyectoNombreMap] = useState<Map<string, string>>(new Map());
   const [partidaProyectoMap, setPartidaProyectoMap] = useState<Map<string, string>>(new Map());
 
+  // Columna "Partida" solo para empresas con presupuesto de obra (DILESA):
+  // hace visible el gasto que NO suma al control presupuestal — una factura
+  // de egreso sin OC y sin partida es invisible para `v_partida_control`
+  // (riesgo "gasto invisible", iniciativa dilesa-flujo-gasto S3).
+  const columnsConPartida = useMemo<Column<Factura>[]>(() => {
+    if (!usaPartidas) return columns;
+    const out = [...columns];
+    const idx = out.findIndex((c) => c.key === 'estado_cxp');
+    out.splice(Math.max(idx, 0) + 1, 0, {
+      key: 'partida',
+      label: 'Partida',
+      sortable: false,
+      render: (f) => {
+        if (f.partida_id) {
+          const label = partidaLabelMap.get(f.partida_id) ?? 'Ligada';
+          return (
+            <span className="block max-w-[180px] truncate text-xs text-muted-foreground">
+              {label}
+            </span>
+          );
+        }
+        if (f.orden_compra_id) return <span className="text-xs text-muted-foreground">Vía OC</span>;
+        if (f.estado_cxp === 'cancelada' || f.estado_cxp === 'borrador')
+          return <span className="text-muted-foreground">—</span>;
+        return (
+          <Badge variant="outline" className="border-amber-500/60 text-amber-600">
+            Sin partida
+          </Badge>
+        );
+      },
+    });
+    return out;
+  }, [usaPartidas, partidaLabelMap]);
+
   const fetchFacturas = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -519,7 +553,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         <ModuleContent>
           <DataTable<Factura>
             data={filtered}
-            columns={columns}
+            columns={columnsConPartida}
             rowKey="id"
             loading={loading}
             onRowClick={openDetail}

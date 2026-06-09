@@ -67,3 +67,5 @@ En la pestaña **Recepciones**. El recibir devenga (ejercido) contra la partida.
 
 Si una orden quedó en Borrador, recuerda que **no compromete** presupuesto hasta
 que la marques **Enviada**.
+
+> **Ver también:** **El viaje de una compra (flujo del gasto)** — en [el manual](/dilesa/manual) — el mapa completo Solicitar → Cotizar → Ordenar → Recibir → Facturar → Pagar, con glosario.

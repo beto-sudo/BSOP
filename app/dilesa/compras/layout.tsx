@@ -21,13 +21,10 @@ import { RoutedModuleTabs } from '@/components/module-page';
  * Cada `module` es un sub-slug que `<RoutedModuleTabs>` filtra por permiso;
  * los gates de acceso viven en cada sub-page (ADR-030 SS5), no en el layout.
  */
+// Tabs en el orden del flujo P2P (iniciativa `dilesa-flujo-gasto` S3):
+// Solicitar → Cotizar → Ordenar → Recibir. Las URLs NO cambian (no-goal D8);
+// el index `/dilesa/compras` sigue siendo Órdenes, solo se reordena el strip.
 const TABS = [
-  {
-    label: 'Órdenes',
-    href: '/dilesa/compras',
-    exact: true,
-    module: 'dilesa.compras.ordenes',
-  },
   {
     label: 'Requisiciones',
     href: '/dilesa/compras/requisiciones',
@@ -37,6 +34,12 @@ const TABS = [
     label: 'Cotizaciones',
     href: '/dilesa/compras/cotizaciones',
     module: 'dilesa.compras.cotizaciones',
+  },
+  {
+    label: 'Órdenes',
+    href: '/dilesa/compras',
+    exact: true,
+    module: 'dilesa.compras.ordenes',
   },
   {
     label: 'Recepciones',

@@ -152,9 +152,13 @@ export function AnteproyectosModule({ empresaId }: { empresaId: string }) {
       key: 'estado',
       label: 'Estado',
       type: 'custom',
+      // En un anteproyecto, 'completado' significa que se PROMOVIÓ a
+      // desarrollo (fn_proyecto_promote_anteproyecto), no que terminó.
+      // Label propio para no chocar con el "Completado" de los activos
+      // (glosario, iniciativa dilesa-flujo-gasto S3).
       render: (p) => (
-        <Badge tone={ESTADO_TONE[p.estado] ?? 'neutral'}>
-          {ESTADO_LABEL[p.estado] ?? p.estado}
+        <Badge tone={p.estado === 'completado' ? 'success' : (ESTADO_TONE[p.estado] ?? 'neutral')}>
+          {p.estado === 'completado' ? 'Promovido' : (ESTADO_LABEL[p.estado] ?? p.estado)}
         </Badge>
       ),
     },

@@ -19,8 +19,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ClipboardList,
+  FileSearch,
   Loader2,
   Plus,
   RefreshCw,
@@ -110,6 +112,7 @@ function toNum(s: string): number {
 }
 
 export function RequisicionesModule({ empresaId }: { empresaId: string }) {
+  const router = useRouter();
   const { permissions } = usePermissions();
   const toast = useToast();
   const puedeEscribir =
@@ -576,6 +579,70 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     [empresaId, accionId, toast, cargar]
   );
 
+  /**
+   * Pedir cotizaciones (RFQ) desde la requisición autorizada — S3 de
+   * `dilesa-flujo-gasto`. Crea la RFQ ligada (`cotizaciones.requisicion_id`,
+   * FK que ya existía sin uso) con las líneas copiadas, y navega a
+   * Cotizaciones con ?focus= para invitar proveedores de inmediato.
+   */
+  const pedirCotizaciones = useCallback(
+    async (req: ReqRow) => {
+      if (accionId) return;
+      setAccionId(req.id);
+      const sb = createSupabaseBrowserClient();
+      const folio = `RFQ-${Date.now().toString(36).toUpperCase()}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cotResp = await (sb.schema('erp') as any)
+        .from('cotizaciones')
+        .insert({
+          empresa_id: empresaId,
+          codigo: folio,
+          tipo: 'compra',
+          requisicion_id: req.id,
+          descripcion: `Cotización de ${req.codigo}`,
+          estado: 'abierta',
+        })
+        .select('id')
+        .single();
+      if (cotResp.error || !cotResp.data) {
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(cotResp.error, 'No se pudo crear la RFQ.'),
+          type: 'error',
+        });
+        setAccionId(null);
+        return;
+      }
+      const cotId = cotResp.data.id as string;
+      const lineas = req.lineas.map((l) => ({
+        empresa_id: empresaId,
+        cotizacion_id: cotId,
+        partida_id: l.partidaId,
+        descripcion: l.descripcion || null,
+        unidad: l.unidad,
+        cantidad: l.cantidad,
+      }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const linResp = await (sb.schema('erp') as any).from('cotizacion_lineas').insert(lineas);
+      setAccionId(null);
+      if (linResp.error) {
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(linResp.error, 'RFQ creada pero faltaron líneas.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({
+        title: 'RFQ creada',
+        description: `${folio} · desde ${req.codigo}`,
+        type: 'success',
+      });
+      router.push(`/dilesa/compras/cotizaciones?focus=${cotId}`);
+    },
+    [empresaId, accionId, toast, router]
+  );
+
   const columns: Column<ReqRow>[] = [
     { key: 'codigo', label: 'Folio', type: 'text', sticky: true, width: 'min-w-[120px]' },
     { key: 'solicitanteNombre', label: 'Solicitante', type: 'text', width: 'min-w-[160px]' },
@@ -645,14 +712,24 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
                     </button>
                   ) : null}
                   {puedeGenerarOc(r) ? (
-                    <button
-                      type="button"
-                      onClick={() => void generarOC(r)}
-                      disabled={accionId === r.id}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
-                    >
-                      <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void generarOC(r)}
+                        disabled={accionId === r.id}
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
+                      >
+                        <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void pedirCotizaciones(r)}
+                        disabled={accionId === r.id}
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
+                      >
+                        <FileSearch className="h-3.5 w-3.5" /> Pedir cotizaciones (RFQ)
+                      </button>
+                    </>
                   ) : null}
                 </RowActions>
               );

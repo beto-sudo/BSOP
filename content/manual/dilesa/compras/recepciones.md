@@ -53,3 +53,5 @@ No. Recibir devenga contra el presupuesto, pero el **pago** se maneja en CxP
 
 Si te equivocaste en la cantidad recibida, vuelve a abrir la orden y ajústala antes
 de cerrar.
+
+> **Ver también:** **El viaje de una compra (flujo del gasto)** — en [el manual](/dilesa/manual) — el mapa completo Solicitar → Cotizar → Ordenar → Recibir → Facturar → Pagar, con glosario.

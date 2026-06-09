@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
 **Estado:** in_progress
-**Próximo hito:** Aplicar migración `20260609230203` a prod (OK de Beto) + merge del PR de S2; luego Sprint 3 — navegación y lenguaje (reorden tabs Compras, "Pedir cotizaciones" desde requisición, glosario, alerta gasto sin partida, doc del manual)
+**Próximo hito:** Merge del PR de S3 (navegación y lenguaje); luego Sprint 4 — bandeja "Te toca" lite por rol + quick wins de compras (editar OC borrador, plantilla auto al crear anteproyecto, form financiero agrupado)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (S2 a PR — tab Gasto en el proyecto + mudanza de Costeo)
+**Última actualización:** 2026-06-09 (S2 en prod + migración aplicada; S3 a PR)
 
 ## Problema
 
@@ -182,6 +182,20 @@ Facturar → Pagar.
   estados, verificación de que el hilo completo ya existe en FKs, y stress
   test de 8 decisiones de forma. Beto decidió D1 (mover Costeo), D6 (bandeja
   en v1) y la promoción. Estado inicial: `planned`.
+- **2026-06-09 — Sprint 3 (navegación y lenguaje) a PR.** Tabs de Compras en
+  el orden del flujo (Requisiciones · Cotizaciones · Órdenes · Recepciones;
+  URLs sin cambio). "Pedir cotizaciones (RFQ)" desde la requisición
+  autorizada (usa `cotizaciones.requisicion_id` + copia líneas + redirige con
+  `?focus=`). Label "Promovido" para anteproyecto `completado`. Columna
+  "Partida" en CxP facturas DILESA con badge ámbar "Sin partida" (gasto
+  invisible al control). Doc del manual
+  `content/manual/dilesa/compras/flujo-del-gasto.md` (viaje completo +
+  glosario) + "Ver también" en los 4 docs de compras.
+- **2026-06-09 — Sprint 2 mergeado (#787) + migración aplicada a prod.**
+  Migración `20260609230203` aplicada vía MCP y verificada: módulo
+  `dilesa.proyectos.gasto` creado y 8 permisos clonados (paridad exacta con
+  los 8 de `dilesa.construccion.costeo`). El tab Gasto es visible para todo
+  rol que veía Costeo.
 - **2026-06-09 — Sprint 2 (el home) a PR.** Detalle de proyecto con routed
   tabs (`[id]/layout.tsx`: Resumen | Gasto); tab Gasto =
   `<CosteoModule proyectoIdFijo>` (selector/header ocultos, alta de partida
