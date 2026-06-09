@@ -239,6 +239,10 @@ async function main() {
         gastos_escrituracion: num(pick(v, cm, 'Gastos Escrituración')),
         numero_escritura: str(pick(v, cm, '#Escritura')),
         fecha_escritura: dateStr(pick(v, cm, 'Fecha de Escritura')),
+        // Fase 11 (Escriturada): cheque enviado a la notaría. Nombres exactos
+        // de Coda — verificar contra `coda.listColumns` antes del backfill.
+        numero_cheque_notaria: str(pick(v, cm, 'Numero Cheque Notaria')),
+        monto_cheque_notaria: num(pick(v, cm, 'Monto Cheque Notaria')),
         es_pep: boolOpt(pick(v, cm, 'Persona Políticamente Expuesta')),
         ocupacion: str(pick(v, cm, 'Actividad Ocupacion o Profesion')),
         ine_numero: str(pick(v, cm, 'Numero de Credencial INE')),
