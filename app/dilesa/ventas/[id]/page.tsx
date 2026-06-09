@@ -47,6 +47,10 @@ import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
 import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
 import { CuadraturaPanel } from '@/components/dilesa/cuadratura-panel';
+import {
+  CuadraturaAjustes,
+  type CuadraturaInputsStr,
+} from '@/components/dilesa/cuadratura-ajustes';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
@@ -98,6 +102,11 @@ type Venta = {
   gastos_escrituracion: number | null;
   monto_cheque_notaria: number | null;
   apoyo_infonavit: number | null;
+  descuento_precio: number | null;
+  descuento_equipamiento: number | null;
+  descuento_gastos_escrituracion: number | null;
+  descuento_nota_credito: number | null;
+  descuento_maximo_autorizado: number | null;
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
@@ -343,6 +352,15 @@ function DetailInner() {
   const [tab, setTab] = useState<'operacion' | 'cuadratura' | 'documentos' | 'bitacora'>(
     'operacion'
   );
+  const { permissions } = usePermissions();
+  const [cuadInputs, setCuadInputs] = useState<CuadraturaInputsStr>({
+    descuentoPrecio: '',
+    descuentoEquipamiento: '',
+    descuentoGastosEscr: '',
+    descuentoNotaCredito: '',
+    apoyoInfonavit: '',
+    descuentoMaximo: '',
+  });
   const [venta, setVenta] = useState<Venta | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -396,6 +414,15 @@ function DetailInner() {
       }
       const ventaRow = vRow as unknown as Venta;
       setVenta(ventaRow);
+      const numStr = (n: number | null): string => (n == null ? '' : String(n));
+      setCuadInputs({
+        descuentoPrecio: numStr(ventaRow.descuento_precio),
+        descuentoEquipamiento: numStr(ventaRow.descuento_equipamiento),
+        descuentoGastosEscr: numStr(ventaRow.descuento_gastos_escrituracion),
+        descuentoNotaCredito: numStr(ventaRow.descuento_nota_credito),
+        apoyoInfonavit: numStr(ventaRow.apoyo_infonavit),
+        descuentoMaximo: numStr(ventaRow.descuento_maximo_autorizado),
+      });
 
       const [pRes, fRes, cargosRes, abonosRes, uRes] = await Promise.all([
         sb
@@ -709,8 +736,12 @@ function DetailInner() {
         montoCreditoDirecto: venta?.monto_credito_directo ?? null,
         montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
-        apoyoInfonavit: venta?.apoyo_infonavit ?? null,
-        descuentoOtorgadoTotal: venta?.descuento_total ?? null,
+        apoyoInfonavit: cuadInputs.apoyoInfonavit === '' ? null : Number(cuadInputs.apoyoInfonavit),
+        descuentoOtorgadoTotal:
+          (Number(cuadInputs.descuentoPrecio) || 0) +
+          (Number(cuadInputs.descuentoEquipamiento) || 0) +
+          (Number(cuadInputs.descuentoGastosEscr) || 0) +
+          (Number(cuadInputs.descuentoNotaCredito) || 0),
         precioAsignacion: venta?.precio_asignacion ?? null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
@@ -718,7 +749,7 @@ function DetailInner() {
         })),
         proyectoNombre,
       }),
-    [venta, abonos, proyectoNombre]
+    [venta, abonos, proyectoNombre, cuadInputs]
   );
 
   if (loading) {
@@ -904,11 +935,22 @@ function DetailInner() {
       </div>
 
       {tab === 'cuadratura' ? (
-        <CuadraturaPanel
-          cuadratura={cuadratura}
-          valorEscrituracion={venta.valor_escrituracion}
-          chequeCapturado={venta.monto_cheque_notaria != null}
-        />
+        <div className="space-y-5">
+          <CuadraturaAjustes
+            ventaId={venta.id}
+            values={cuadInputs}
+            onPatch={(patch) => setCuadInputs((prev) => ({ ...prev, ...patch }))}
+            canWrite={
+              permissions.isAdmin ||
+              permissions.modulos.get('dilesa.ventas.fase13_facturada')?.write === true
+            }
+          />
+          <CuadraturaPanel
+            cuadratura={cuadratura}
+            valorEscrituracion={venta.valor_escrituracion}
+            chequeCapturado={venta.monto_cheque_notaria != null}
+          />
+        </div>
       ) : null}
 
       {tab === 'documentos' ? (
