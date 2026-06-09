@@ -496,7 +496,10 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   **518 fechas** que faltaban (193 extracción + 325 paquete) ahora en BSOP.
   Reconciliación de fechas Coda↔BSOP **100%** (`reconcile` comparativo #5). Las
   columnas `construccion.fecha_*` quedan vestigiales (sin lectores; no se usaban
-  fuera de RUV — verificado).
+  fuera de RUV — verificado). **El CUV es capturable** por lote en la página
+  (input editable, valida 16 dígitos + unicidad; server action `marcarCuv`):
+  INFONAVIT lo emite tras armar el paquete, así que la operadora lo carga cuando
+  llega.
 
 ## Decisiones registradas
 

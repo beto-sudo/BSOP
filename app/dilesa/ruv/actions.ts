@@ -254,3 +254,56 @@ export async function marcarHito(input: {
   revalidatePath('/dilesa/ruv');
   return { ok: true };
 }
+
+/**
+ * Captura/edita el CUV (Clave Única de Vivienda) de un lote. INFONAVIT lo emite
+ * tras registrar el paquete, así que se carga después. `cuv` vacío lo limpia.
+ * Valida 16 dígitos y unicidad (un CUV identifica una sola vivienda).
+ */
+export async function marcarCuv(input: {
+  unidadId: string;
+  cuv: string | null;
+}): Promise<ActionResult> {
+  await assertNotInPreview();
+  if (!input.unidadId) return { ok: false, error: 'Falta el lote.' };
+
+  const cuv = input.cuv?.trim() || null;
+  if (cuv && !/^\d{16}$/.test(cuv)) {
+    return { ok: false, error: 'El CUV debe ser de 16 dígitos.' };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // Unicidad: el CUV no puede estar ya asignado a otro lote.
+  if (cuv) {
+    const { data: existe } = await supabase
+      .schema('dilesa')
+      .from('unidades')
+      .select('id, identificador')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .eq('cuv', cuv)
+      .neq('id', input.unidadId)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (existe) {
+      return {
+        ok: false,
+        error: `Ese CUV ya está asignado al lote ${(existe.identificador as string) ?? existe.id}.`,
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('unidades')
+    .update({ cuv })
+    .eq('id', input.unidadId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo guardar el CUV.') };
+  }
+  revalidatePath('/dilesa/ruv');
+  return { ok: true };
+}

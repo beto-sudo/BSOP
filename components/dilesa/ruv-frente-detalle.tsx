@@ -33,7 +33,7 @@ import { buildAdjuntoPath } from '@/lib/storage/path';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/components/ui/toast';
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
-import { marcarDocumento, marcarHito, type RuvHito } from '@/app/dilesa/ruv/actions';
+import { marcarCuv, marcarDocumento, marcarHito, type RuvHito } from '@/app/dilesa/ruv/actions';
 
 type LoteRow = {
   id: string;
@@ -80,6 +80,41 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-xs text-[var(--text)]/55">{label}</span>
       <span className="text-sm font-medium text-[var(--text)] tabular-nums">{children}</span>
     </div>
+  );
+}
+
+/**
+ * Celda editable del CUV (16 dígitos). INFONAVIT lo emite tras registrar el
+ * paquete, así que se captura aquí cuando llega. Controlada con estado local
+ * para poder revertir si el guardado falla (formato/duplicado).
+ */
+function CuvCell({
+  lote,
+  onGuardar,
+}: {
+  lote: LoteRow;
+  onGuardar: (lote: LoteRow, cuv: string) => Promise<boolean>;
+}) {
+  const [val, setVal] = useState(lote.cuv ?? '');
+  const [saving, setSaving] = useState(false);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      maxLength={16}
+      value={val}
+      onChange={(e) => setVal(e.target.value.replace(/\D/g, ''))}
+      onBlur={async () => {
+        if ((val || null) === (lote.cuv ?? null)) return;
+        setSaving(true);
+        const ok = await onGuardar(lote, val);
+        setSaving(false);
+        if (!ok) setVal(lote.cuv ?? '');
+      }}
+      disabled={saving}
+      placeholder="— sin CUV —"
+      className="w-40 rounded-md border border-[var(--border)] bg-[var(--panel)] px-1.5 py-1 text-xs text-[var(--text)] tabular-nums"
+    />
   );
 }
 
@@ -207,6 +242,22 @@ export function RuvFrenteDetalle({ frenteId, empresaId }: { frenteId: string; em
         toast.add({ title: 'No se pudo guardar la fecha', description: res.error, type: 'error' });
         setLotes((prev) => prev.map((l) => (l.id === lote.id ? { ...l, [col]: anterior } : l)));
       }
+    },
+    [toast]
+  );
+
+  // Guardar el CUV de un lote. Retorna true si guardó (para que la celda revierta
+  // su input local en caso de error de validación/duplicado).
+  const guardarCuv = useCallback(
+    async (lote: LoteRow, cuv: string): Promise<boolean> => {
+      const valor = cuv.trim() || null;
+      const res = await marcarCuv({ unidadId: lote.id, cuv: valor });
+      if (!res.ok) {
+        toast.add({ title: 'No se pudo guardar el CUV', description: res.error, type: 'error' });
+        return false;
+      }
+      setLotes((prev) => prev.map((l) => (l.id === lote.id ? { ...l, cuv: valor } : l)));
+      return true;
     },
     [toast]
   );
@@ -381,8 +432,8 @@ export function RuvFrenteDetalle({ frenteId, empresaId }: { frenteId: string; em
                     <td className="whitespace-nowrap px-3 py-1.5 font-medium text-[var(--text)]">
                       {l.identificador}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-[var(--text)]/70 tabular-nums">
-                      {l.cuv ?? <span className="text-[var(--text)]/30">—</span>}
+                    <td className="px-3 py-1.5">
+                      <CuvCell lote={l} onGuardar={guardarCuv} />
                     </td>
                     {HITOS.map((h) => (
                       <td key={h.key} className="px-3 py-1.5">
