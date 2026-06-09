@@ -97,6 +97,7 @@ type Venta = {
   monto_avaluo: number | null;
   gastos_escrituracion: number | null;
   monto_cheque_notaria: number | null;
+  apoyo_infonavit: number | null;
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
@@ -708,6 +709,8 @@ function DetailInner() {
         montoCreditoDirecto: venta?.monto_credito_directo ?? null,
         montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
+        apoyoInfonavit: venta?.apoyo_infonavit ?? null,
+        descuentoOtorgadoTotal: venta?.descuento_total ?? null,
         precioAsignacion: venta?.precio_asignacion ?? null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
