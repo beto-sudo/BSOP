@@ -466,6 +466,14 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   lotes) + detail drawer editable (subir archivo a bucket `adjuntos` vía
   `buildAdjuntoPath`, marcar cargado/pendiente). `AdjuntoEntidad += 'frentes'`.
   CI local verde. PR **sin auto-merge** para que Beto pruebe el alta.
+- **2026-06-08 (Sprint 4 — filtro del dropdown de proyecto)** — Por feedback de
+  Beto, el selector de proyecto del alta solo muestra proyectos elegibles:
+  construcción no terminada (`estado <> 'completado'`) y con lotes aún por
+  registrar (`unidades.frente_id IS NULL`). Vista nueva
+  `dilesa.v_ruv_proyectos_disponibles` (migración `20260609020132`) con el conteo
+  de lotes disponibles, mostrado en cada opción. Hoy: 4 proyectos (Ampliación
+  Lomas de los Encinos 358, Lomas de las Delicias 165, Lomas de los Encinos 93,
+  Lomas del Sol 24).
 
 ## Decisiones registradas
 

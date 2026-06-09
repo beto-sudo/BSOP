@@ -34,7 +34,7 @@ const FrenteSchema = z.object({
 
 type FrenteValues = z.infer<typeof FrenteSchema>;
 
-type ProyectoOpt = { id: string; nombre: string };
+type ProyectoOpt = { id: string; nombre: string; lotesDisponibles: number };
 type LoteOpt = {
   id: string;
   identificador: string;
@@ -80,10 +80,12 @@ export function RuvFrenteCrearDrawer({
     let activo = true;
     void (async () => {
       const sb = createSupabaseBrowserClient();
+      // Solo proyectos con construcción no terminada y con lotes aún por
+      // registrar en un frente (vista dilesa.v_ruv_proyectos_disponibles).
       const { data, error } = await sb
         .schema('dilesa')
-        .from('proyectos')
-        .select('id, nombre')
+        .from('v_ruv_proyectos_disponibles')
+        .select('id, nombre, lotes_disponibles')
         .eq('empresa_id', empresaId)
         .order('nombre');
       if (!activo) return;
@@ -95,7 +97,13 @@ export function RuvFrenteCrearDrawer({
         });
         return;
       }
-      setProyectos((data ?? []).map((p) => ({ id: p.id as string, nombre: p.nombre as string })));
+      setProyectos(
+        (data ?? []).map((p) => ({
+          id: p.id as string,
+          nombre: p.nombre as string,
+          lotesDisponibles: Number(p.lotes_disponibles ?? 0),
+        }))
+      );
     })();
     return () => {
       activo = false;
@@ -237,10 +245,10 @@ export function RuvFrenteCrearDrawer({
               onChange={(e) => setProyectoSel(e.target.value)}
               className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--panel)] px-2 text-sm text-[var(--text)]"
             >
-              <option value="">Elige un proyecto para ver sus lotes…</option>
+              <option value="">Elige un proyecto con lotes disponibles…</option>
               {proyectos.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.nombre}
+                  {p.nombre} ({p.lotesDisponibles} {p.lotesDisponibles === 1 ? 'lote' : 'lotes'})
                 </option>
               ))}
             </select>
