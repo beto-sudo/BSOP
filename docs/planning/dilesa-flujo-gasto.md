@@ -1,0 +1,171 @@
+# Iniciativa — Flujo de Gasto end-to-end (Proyectos ↔ Compras ↔ CxP) DILESA
+
+**Slug:** `dilesa-flujo-gasto`
+**Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
+**Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
+**Estado:** planned
+**Próximo hito:** Sprint 1 — hilo visible: vista SQL + `<HiloGastoStepper>` en los 6 documentos del ciclo + bidireccionalidad OC→factura/pago
+**Dueño:** Beto
+**Creada:** 2026-06-09
+**Última actualización:** 2026-06-09 (promovida tras stress test; decisiones D1/D6/promoción tomadas por Beto en chat)
+
+## Problema
+
+Los módulos del ciclo de gasto de DILESA (Proyectos/Anteproyectos, Compras,
+Construcción, CxP) están bien construidos individualmente — flujo lineal sin
+recaptura, binding de partida heredado, control de 3 capas en
+`erp.v_partida_control`, aprobaciones server-side. Pero el sistema está
+**organizado por tipo de documento, no por flujo de trabajo**:
+
+- Una compra de proyecto cruza **4 hubs con 17 pantallas**, ~9 conceptos y ~30
+  estados. El usuario necesita traer el mapa en la cabeza; el sistema no se lo
+  da.
+- **El proyecto no responde la pregunta de negocio básica** ("¿cuánto llevamos
+  comprometido/ejercido/pagado de X?"). La pantalla que la responde (Costeo, 3
+  capas) vive como sexto tab de Construcción; el detalle de proyecto no tiene
+  ni un link hacia Compras o CxP.
+- **La trazabilidad es unidireccional**: desde la factura ves la OC, pero
+  desde la OC no ves factura ni pago; desde la requisición solo un estado
+  `con_oc`. La pregunta operativa #1 ("¿esta compra dónde quedó?") exige saber
+  qué tab abrir.
+- **El personal operativo no tiene "qué me toca"**: pendientes de autorizar /
+  enviar / recibir / programar / aprobar viven cada uno en su módulo.
+
+Hallazgo clave del análisis (2026-06-09): **el hilo completo ya existe en
+FKs** — `cotizaciones.requisicion_id`, `ordenes_compra.requisicion_id` +
+`cotizacion_id`, `contratos_construccion.cotizacion_id` + `partida_id`,
+`facturas.orden_compra_id` + `obra_estimacion_id` + `partida_id`,
+`cxp_pago_aplicaciones`, y `partida_id → presupuesto_partidas.proyecto_id`.
+La iniciativa es recomposición de UI + vistas de lectura, no migración.
+
+## Outcome
+
+Que cualquier usuario (Dirección u operativo) viva el gasto como **un solo
+flujo**: Solicitar → Cotizar (opcional) → Ordenar/Contratar → Recibir →
+Facturar → Pagar.
+
+1. **El proyecto es el home del gasto**: tab "Gasto" en el detalle de proyecto
+   con las 4 capas (presupuesto/comprometido/ejercido/pagado + disponible),
+   tabla por etapa › capítulo con drill-down, y actividad reciente. Costeo se
+   **muda** aquí (decisión D1).
+2. **Cada documento del ciclo muestra su hilo**: stepper compartido con los
+   pasos del ciclo, los documentos ligados clickeables en ambas direcciones, y
+   la siguiente acción sugerida.
+3. **El personal ve "qué me toca"**: bandeja lite de pendientes por rol en las
+   landings de Compras y CxP.
+4. **El lenguaje deja de estorbar**: labels unificados + glosario; navegación
+   en el orden del flujo.
+
+## Alcance
+
+### Dentro
+
+- Detalle de proyecto → routed tabs (ADR-005/ADR-030) con tab **Gasto**;
+  mudanza de Costeo (Construcción › Costeo → Proyecto › Gasto) con link de
+  regreso en Construcción.
+- Vista(s) SQL de lectura para el hilo del gasto (sin tablas nuevas).
+- `<HiloGastoStepper>` en Requisición, RFQ, OC, Recepción, Factura y Pago —
+  con 2 sabores (materiales / obra vía contrato-estimación) y soporte de hilos
+  truncados (gasto directo entra en "Facturada"; histórico sin requisición).
+- Bidireccionalidad OC → facturas/pagos ligados (hoy solo factura → OC).
+- Reorden de tabs de Compras al orden del flujo (Requisiciones · Cotizaciones
+  · Órdenes · Recepciones) + botón "Pedir cotizaciones" en requisición
+  autorizada (usa `cotizaciones.requisicion_id` existente).
+- Labels/glosario unificados (solo UI; la DB no cambia) — p.ej. anteproyecto
+  `completado` → "Promovido".
+- Alerta de gasto sin partida + bandeja "Sin proyecto/partida" (evitar gasto
+  invisible al control).
+- Bandeja lite "Te toca" por rol en landings de Compras y CxP (links directos
+  a la acción). Auto-autorización de requisiciones creadas por Dirección.
+- Quick wins de compras/proyectos: editar OC en borrador, auto-poblar
+  plantilla al crear anteproyecto, form de análisis financiero agrupado.
+- Doc "El viaje de una compra" + glosario como contenido del manual in-app
+  (coordina con iniciativa `manual-usuario`).
+
+### Fuera (no-goals duros)
+
+- **No** tocar el modelo de datos P2P (tablas/FKs/estados en DB).
+- **No** fusionar módulos físicamente ni mover URLs de Compras/CxP.
+- **No** migrar/renombrar estados en DB (solo labels UI).
+- **No** converger el mini-ciclo del checklist de anteproyecto
+  (pasos cotización/factura/pago de tareas) con el ciclo real — fase 2
+  explícita; v1 solo agrega links de salida del checklist.
+- **No** quick wins de CxP (pre-seleccionar vencidas, notificar aprobador):
+  pertenecen a la iniciativa `cxp` activa; se proponen allá.
+- **No** rollout multi-empresa (depende del P2P de cada empresa).
+
+## Diseño (resumen de decisiones de forma)
+
+- **Home (D1)**: el detalle de proyecto pasa a routed tabs; "Gasto" es un tab
+  (no otra sección del scroll). Costeo se muda completo (consulta + edición de
+  partidas); una sola superficie, sin drift. Público: Dirección.
+- **Hilo (D2)**: 100% derivado de FKs existentes; la complejidad vive en el
+  componente (2 sabores + hilos truncados), no en datos. Carga lazy por
+  documento (drawer), nunca en listados.
+- **Patrón heredado de `dilesa-ventas-expediente`**: separar datos del estado
+  del proceso; el proceso es una capa encima del expediente. Reuso de
+  patrones, no de componentes 1:1.
+- **RBAC**: sub-slugs nuevos del detalle de proyecto según ADR-030 (4 lugares
+  en el mismo PR + backfill de permisos clonando el padre).
+
+## Riesgos
+
+| Riesgo                                                                                                                  | Mitigación                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Scope creep (es la iniciativa "pegamento")                                                                              | No-goals duros arriba; lo que no esté en Alcance/Dentro no entra sin decisión de Beto                 |
+| Al exponer 3 capas en el proyecto afloran inconsistencias históricas (compras sin partida, ajuste F4 de OCs canceladas) | Tratarlas como hallazgo de datos, no bug de UI; bandeja "Sin partida" las hace visibles y trabajables |
+| Gasto invisible (docs sin `partida_id` no aparecen en el home)                                                          | Alerta al capturar + bandeja "Sin proyecto/partida" en v1                                             |
+| Performance del hilo (joins de 6+ tablas)                                                                               | Vista de lectura + carga lazy por documento                                                           |
+| Re-aprendizaje (mover Costeo, reordenar tabs; ~1 mes de hábitos)                                                        | Redirect desde Construcción › Costeo, aviso, entrada en manual                                        |
+| Colisión con `dilesa-ventas-expediente` (sesión paralela)                                                               | Carpetas distintas; Regla 2 para `INITIATIVES.md`; sin dependencia dura                               |
+
+## Métricas de éxito
+
+- "¿Cuánto va comprometido/pagado del proyecto X?" en **≤2 clicks** desde
+  `/dilesa/proyectos` (hoy: imposible sin conocer Construcción › Costeo).
+- Desde cualquier documento del ciclo, documentos ligados visibles en
+  **1 click, ambas direcciones** (hoy: solo factura→OC).
+- **0 gasto invisible**: toda factura/requisición DILESA con partida asignada
+  o listada en la bandeja "Sin asignar".
+- El flujo completo narrado en **1 doc del manual** al que las pantallas
+  apuntan.
+
+## Sprints
+
+- **S1 — El hilo**: vista SQL + `<HiloGastoStepper>` en los 6 documentos +
+  OC→facturas/pagos. Se entrega solo, valor inmediato.
+- **S2 — El home**: routed tabs en detalle de proyecto + tab Gasto (4 capas,
+  tabla etapa › capítulo, actividad, drill-down) + mudanza de Costeo.
+- **S3 — Navegación y lenguaje**: reorden tabs Compras, "Pedir cotizaciones"
+  desde requisición, labels/glosario, alerta gasto sin partida, doc del
+  manual.
+- **S4 — Bandeja "Te toca" (lite)** por rol + quick wins de compras (editar
+  OC borrador, plantilla auto, form financiero agrupado).
+
+## Decisiones registradas
+
+- **2026-06-09 — Costeo se muda al proyecto (D1).** Una sola superficie de
+  costeo (consulta + edición) en Proyecto › Gasto; link de regreso en
+  Construcción. Razón: dos superficies generan drift y "¿dónde edito?"; el
+  costeo es del proyecto y su público es Dirección. Decidido por Beto.
+- **2026-06-09 — El hilo es derivado, no tabla nueva (D2).** Todas las ligas
+  existen como FKs; una tabla "expediente de compra" sería sobre-ingeniería.
+- **2026-06-09 — Convergencia checklist ↔ ciclo real fuera de v1 (D5).**
+  Profunda (toca `populatePlantilla`, partidas auto, UX de tareas) y el dolor
+  dominante es visibilidad. V1: solo links de salida. Fase 2 explícita.
+- **2026-06-09 — Bandeja "Te toca" entra en v1 como S4 lite (D6).** Mayor
+  beneficio directo al personal operativo; queries por estado ya existen. Si
+  hay que recortar v1, se recorta esto antes que el hilo. Decidido por Beto.
+- **2026-06-09 — Quick wins de CxP van a la iniciativa `cxp` (D8).**
+  Pre-seleccionar vencidas y notificar aprobador tienen dueño activo; no se
+  duplican aquí.
+- **2026-06-09 — Vocabulario solo en UI (D4).** Labels + glosario
+  centralizados; migrar enums en prod es riesgo sin retorno.
+
+## Bitácora
+
+- **2026-06-09 — Promovida.** Nace del análisis UX de Proyectos ↔ Compras ↔
+  CxP (sesión de evaluación): mapeo de 17 superficies / 9 conceptos / ~30
+  estados, verificación de que el hilo completo ya existe en FKs, y stress
+  test de 8 decisiones de forma. Beto decidió D1 (mover Costeo), D6 (bandeja
+  en v1) y la promoción. Estado inicial: `planned`.
