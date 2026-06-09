@@ -1,3 +1,14 @@
+// ==============================================================================
+// Auto-generated Supabase database types.
+// Last regenerated: 2026-06-08T11:49:35Z
+// Project ref: ybklderteyhuugzfmxbi
+// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
+//
+// DO NOT EDIT BY HAND. Regenerate via:
+//   - GitHub Actions: trigger 'DB Types' workflow manually
+//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
+// ==============================================================================
+
 export type Json =
   | string
   | number
@@ -4669,6 +4680,7 @@ export type Database = {
           monto_credito_directo: number | null
           monto_credito_titular: number | null
           monto_detonado: number | null
+          monto_nota_credito: number | null
           motivo_desasignacion: string | null
           notario: string | null
           notario_id: string | null
@@ -4691,6 +4703,8 @@ export type Database = {
           uso_efectivo: string | null
           valor_comercial: number | null
           valor_escrituracion: number | null
+          valor_facturado: number | null
+          valor_real_venta_dilesa: number | null
           valuador_id: string | null
           vendedor: string | null
           vendedor_usuario_id: string | null
@@ -4744,6 +4758,7 @@ export type Database = {
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
           monto_detonado?: number | null
+          monto_nota_credito?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
           notario_id?: string | null
@@ -4766,6 +4781,8 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valor_facturado?: number | null
+          valor_real_venta_dilesa?: number | null
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
@@ -4819,6 +4836,7 @@ export type Database = {
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
           monto_detonado?: number | null
+          monto_nota_credito?: number | null
           motivo_desasignacion?: string | null
           notario?: string | null
           notario_id?: string | null
@@ -4841,6 +4859,8 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valor_facturado?: number | null
+          valor_real_venta_dilesa?: number | null
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
