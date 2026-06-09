@@ -1,122 +1,69 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
+import {
+  Briefcase,
+  Building2,
+  ClipboardList,
+  DollarSign,
+  FileText,
+  FolderKanban,
+  HandCoins,
+  HardHat,
+  House,
+  Landmark,
+  LayoutGrid,
+  MapPin,
+  Package,
+  Receipt,
+  ShoppingCart,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
 import { canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
-import Link from 'next/link';
-import {
-  ClipboardList,
-  Users,
-  FileText,
-  Briefcase,
-  Building2,
-  ShoppingCart,
-  FolderKanban,
-  MapPin,
-  DollarSign,
-  HardHat,
-} from 'lucide-react';
+import { NAV_ITEMS } from '@/components/app-shell/nav-config';
 
-type ModuleGroup = {
-  title: string;
-  items: {
-    label: string;
-    description?: string;
-    href: string;
-    icon: typeof ClipboardList;
-    color: string;
-  }[];
+type ModulePresentation = { icon: LucideIcon; color: string };
+
+/**
+ * Presentación (icono + color) por href de módulo DILESA.
+ *
+ * La ESTRUCTURA del panel — qué módulos existen, en qué sección y con qué
+ * label — NO se define aquí: se deriva de `NAV_ITEMS` (la misma fuente que
+ * alimenta el sidebar). Así el panel queda sincronizado solo cuando se libera
+ * un módulo nuevo, en vez de ser un lugar extra que actualizar a mano (ver
+ * ADR-014). Un href sin entrada en este mapa todavía aparece en el panel, con
+ * `DEFAULT_PRESENTATION` — visible aunque sin icono dedicado.
+ */
+const MODULE_PRESENTATION: Record<string, ModulePresentation> = {
+  '/dilesa/admin/tasks': { icon: ClipboardList, color: 'bg-blue-500/10 text-blue-500' },
+  '/dilesa/admin/juntas': { icon: Users, color: 'bg-violet-500/10 text-violet-500' },
+  '/dilesa/admin/documentos': { icon: FileText, color: 'bg-amber-500/10 text-amber-500' },
+  '/dilesa/cobranza': { icon: HandCoins, color: 'bg-lime-500/10 text-lime-500' },
+  '/dilesa/cxp': { icon: Receipt, color: 'bg-red-500/10 text-red-500' },
+  '/dilesa/saldos-bancos': { icon: Landmark, color: 'bg-sky-500/10 text-sky-500' },
+  '/dilesa/rh/personal': { icon: Users, color: 'bg-emerald-500/10 text-emerald-500' },
+  '/dilesa/rh/puestos': { icon: Briefcase, color: 'bg-cyan-500/10 text-cyan-500' },
+  '/dilesa/rh/departamentos': { icon: Building2, color: 'bg-rose-500/10 text-rose-500' },
+  '/dilesa/proveedores': { icon: ShoppingCart, color: 'bg-orange-500/10 text-orange-500' },
+  '/dilesa/compras': { icon: Package, color: 'bg-fuchsia-500/10 text-fuchsia-500' },
+  '/dilesa/portafolio': { icon: FolderKanban, color: 'bg-indigo-500/10 text-indigo-500' },
+  '/dilesa/proyectos': { icon: MapPin, color: 'bg-teal-500/10 text-teal-500' },
+  '/dilesa/ventas': { icon: DollarSign, color: 'bg-green-500/10 text-green-500' },
+  '/dilesa/construccion': { icon: HardHat, color: 'bg-yellow-500/10 text-yellow-500' },
+  '/dilesa/ruv': { icon: House, color: 'bg-purple-500/10 text-purple-500' },
 };
 
-const moduleGroups: ModuleGroup[] = [
-  {
-    title: 'Administración',
-    items: [
-      {
-        label: 'Tareas',
-        href: '/dilesa/admin/tasks',
-        icon: ClipboardList,
-        color: 'bg-blue-500/10 text-blue-500',
-      },
-      {
-        label: 'Juntas',
-        href: '/dilesa/admin/juntas',
-        icon: Users,
-        color: 'bg-violet-500/10 text-violet-500',
-      },
-      {
-        label: 'Documentos',
-        href: '/dilesa/admin/documentos',
-        icon: FileText,
-        color: 'bg-amber-500/10 text-amber-500',
-      },
-    ],
-  },
-  {
-    title: 'Recursos Humanos',
-    items: [
-      {
-        label: 'Personal',
-        href: '/dilesa/rh/personal',
-        icon: Users,
-        color: 'bg-emerald-500/10 text-emerald-500',
-      },
-      {
-        label: 'Puestos',
-        href: '/dilesa/rh/puestos',
-        icon: Briefcase,
-        color: 'bg-cyan-500/10 text-cyan-500',
-      },
-      {
-        label: 'Departamentos',
-        href: '/dilesa/rh/departamentos',
-        icon: Building2,
-        color: 'bg-rose-500/10 text-rose-500',
-      },
-    ],
-  },
-  {
-    title: 'Compras',
-    items: [
-      {
-        label: 'Proveedores',
-        href: '/dilesa/proveedores',
-        icon: ShoppingCart,
-        color: 'bg-orange-500/10 text-orange-500',
-      },
-    ],
-  },
-  {
-    title: 'Inmobiliario',
-    items: [
-      {
-        label: 'Portafolio',
-        href: '/dilesa/portafolio',
-        icon: FolderKanban,
-        color: 'bg-indigo-500/10 text-indigo-500',
-      },
-      {
-        label: 'Proyectos',
-        href: '/dilesa/proyectos',
-        icon: MapPin,
-        color: 'bg-teal-500/10 text-teal-500',
-      },
-      {
-        label: 'Ventas',
-        href: '/dilesa/ventas',
-        icon: DollarSign,
-        color: 'bg-green-500/10 text-green-500',
-      },
-      {
-        label: 'Construcción',
-        href: '/dilesa/construccion',
-        icon: HardHat,
-        color: 'bg-yellow-500/10 text-yellow-500',
-      },
-    ],
-  },
-];
+const DEFAULT_PRESENTATION: ModulePresentation = {
+  icon: LayoutGrid,
+  color: 'bg-slate-500/10 text-slate-500',
+};
+
+/** Secciones de DILESA tal como las define el sidebar (fuente única). */
+const DILESA_SECTIONS = NAV_ITEMS.find((item) => item.href === '/dilesa')?.sections ?? [];
 
 /**
  * @module DILESA (landing)
@@ -125,23 +72,27 @@ const moduleGroups: ModuleGroup[] = [
 export default function DilesaPage() {
   const { permissions } = usePermissions();
 
-  // Filter cards by the effective user's permissions. When admin is in
-  // "Viendo como" preview, this hides modules the impersonated user cannot
-  // access — same logic the sidebar uses (canAccessModulo). Modules without
-  // a route mapping or unrecognized are shown by default.
+  // Construye las tarjetas desde NAV_ITEMS y filtra por los permisos del
+  // usuario efectivo — misma lógica que el sidebar (canAccessModulo sobre
+  // ROUTE_TO_MODULE). Durante "Viendo como" esto oculta los módulos que el
+  // usuario impersonado no puede ver. Admin y estado de carga muestran todo.
   const visibleGroups = useMemo(() => {
-    if (permissions.loading) return moduleGroups;
-    if (permissions.isAdmin) return moduleGroups;
-    return moduleGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => {
-          const moduloSlug = ROUTE_TO_MODULE[item.href];
+    const showAll = permissions.loading || permissions.isAdmin;
+    return DILESA_SECTIONS.map((section) => ({
+      title: section.label,
+      items: section.children
+        .filter((child) => {
+          if (showAll) return true;
+          const moduloSlug = ROUTE_TO_MODULE[child.href];
           if (!moduloSlug) return true;
           return canAccessModulo(permissions, moduloSlug);
-        }),
-      }))
-      .filter((group) => group.items.length > 0);
+        })
+        .map((child) => ({
+          label: child.label,
+          href: child.href,
+          ...(MODULE_PRESENTATION[child.href] ?? DEFAULT_PRESENTATION),
+        })),
+    })).filter((group) => group.items.length > 0);
   }, [permissions]);
 
   return (
@@ -164,7 +115,7 @@ export default function DilesaPage() {
                 Panel DILESA
               </h1>
               <p className="mt-1 text-sm text-[var(--text)]/60">
-                Administración, recursos humanos, compras e inmobiliario de DILESA.
+                Administración, tesorería, recursos humanos, compras e inmobiliario de DILESA.
               </p>
             </div>
           </div>
@@ -191,11 +142,6 @@ export default function DilesaPage() {
                     <span className="block text-sm font-medium text-[var(--text)] group-hover:text-[var(--accent)]">
                       {mod.label}
                     </span>
-                    {mod.description ? (
-                      <span className="mt-0.5 block text-xs text-[var(--text)]/55">
-                        {mod.description}
-                      </span>
-                    ) : null}
                   </div>
                 </Link>
               ))}
