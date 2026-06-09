@@ -265,7 +265,8 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   9: '9-validacion-patronal',
   10: '10-firmas-programadas',
   11: '11-escriturada',
-  // 12–17 → próximos PRs del Sprint 7c
+  12: '12-detonada',
+  // 13–17 → próximos PRs del Sprint 7c
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
