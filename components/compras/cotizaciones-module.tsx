@@ -41,6 +41,8 @@ import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 import {
   buildProyectoOptions,
   type ProyectoOption,
@@ -140,6 +142,13 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
   // Captura de precios (matriz) de una RFQ existente
   const [capturaId, setCapturaId] = useState<string | null>(null);
   const [cancelarCot, setCancelarCot] = useState<CotizacionRow | null>(null);
+
+  // Drill-down (?focus=<cotizacion_id>) desde el hilo del gasto: abre la captura.
+  useFocusDrilldown(
+    rows,
+    (r) => r.id,
+    (row) => setCapturaId(row.id)
+  );
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -1232,6 +1241,13 @@ function CapturaPrecios({
         >
           <X className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="mb-4 rounded-md border border-[var(--border)]/60 bg-[var(--bg)] px-3 py-2.5">
+        <HiloGastoStepper
+          empresa={empresaSlug}
+          documento={{ tipo: 'cotizacion', id: cotizacion.id }}
+        />
       </div>
 
       {puedeEscribir ? (

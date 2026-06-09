@@ -48,11 +48,19 @@ import {
   deriveReqEstado,
   deriveReqKpis,
   puedeGenerarOc,
+  reqLineaTotal,
   reqTotal,
   type ReqEstado,
   type ReqLinea,
   type ReqRow,
 } from '@/lib/compras/requisiciones';
+import {
+  DetailDrawer,
+  DetailDrawerContent,
+  DetailDrawerSection,
+} from '@/components/detail-page/detail-drawer';
+import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 
 const SIN = '__sin__';
 /** Valor del selector para capturar una requisición libre (gasto suelto sin proyecto). */
@@ -123,6 +131,19 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
   const [accionId, setAccionId] = useState<string | null>(null);
+
+  const [detalle, setDetalle] = useState<ReqRow | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Drill-down (?focus=<req_id>) desde el hilo del gasto de otros módulos.
+  useFocusDrilldown(
+    rows,
+    (r) => r.id,
+    (row) => {
+      setDetalle(row);
+      setDrawerOpen(true);
+    }
+  );
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -852,12 +873,87 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(r) => {
+          setDetalle(r);
+          setDrawerOpen(true);
+        }}
         initialSort={{ key: 'fecha', dir: 'desc' }}
         emptyTitle="Sin requisiciones"
         emptyDescription="No hay requisiciones que coincidan. Crea una con “Nueva requisición”."
         emptyIcon={<ClipboardList className="h-6 w-6" />}
         maxHeight="calc(100vh - 320px)"
       />
+
+      <ReqDetalleDrawer req={detalle} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
+  );
+}
+
+/**
+ * Drawer de detalle de la requisición (Sprint 1 de `dilesa-flujo-gasto`):
+ * antes la requisición solo era una fila con acciones; aquí se ven sus líneas
+ * y el hilo del gasto (qué RFQ/OC/factura/pago derivaron de ella).
+ */
+function ReqDetalleDrawer({
+  req,
+  open,
+  onClose,
+}: {
+  req: ReqRow | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const estado = req ? deriveReqEstado(req) : null;
+  return (
+    <DetailDrawer
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      size="lg"
+      title={req?.codigo ?? 'Requisición'}
+      description={req?.solicitanteNombre || undefined}
+      meta={req && estado ? <Badge tone={ESTADO_TONE[estado]}>{ESTADO_LABEL[estado]}</Badge> : null}
+    >
+      <DetailDrawerContent>
+        {!req ? null : (
+          <>
+            <DetailDrawerSection title="Hilo del gasto" divider={false}>
+              <HiloGastoStepper empresa="dilesa" documento={{ tipo: 'requisicion', id: req.id }} />
+            </DetailDrawerSection>
+
+            <DetailDrawerSection title={`Líneas (${req.lineas.length})`}>
+              <div className="space-y-1.5 text-sm">
+                {req.lineas.map((l) => (
+                  <div
+                    key={l.id}
+                    className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1.5 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--text)]">
+                        {l.partidaLabel}
+                      </div>
+                      <div className="truncate text-xs text-[var(--text)]/55">
+                        {l.descripcion || '—'}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="tabular-nums text-[var(--text)]">
+                        {formatCurrency(reqLineaTotal(l))}
+                      </div>
+                      <div className="text-xs tabular-nums text-[var(--text)]/55">
+                        {l.cantidad} × {formatCurrency(l.precioEstimado)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-1 font-semibold text-[var(--text)]">
+                  <span>Total estimado</span>
+                  <span className="tabular-nums">{formatCurrency(reqTotal(req))}</span>
+                </div>
+              </div>
+            </DetailDrawerSection>
+          </>
+        )}
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }

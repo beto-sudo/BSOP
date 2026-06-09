@@ -49,12 +49,17 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import type { EmpresaSlug } from '@/lib/empresa-branding';
+import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 
 const TZ = 'America/Matamoros';
 
 export type CxpPagosModuleProps = {
   /** UUID de la empresa (`core.empresas.id`). Filtra todas las queries. */
   empresaId: string;
+  /** Slug de la empresa para armar links del hilo del gasto (dilesa, rdb, …). */
+  empresa: EmpresaSlug;
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -139,7 +144,7 @@ const ESTADO_OPTIONS = [
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 
-export function CxpPagosModule({ empresaId }: CxpPagosModuleProps) {
+export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
   const feedback = useActionFeedback();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +153,16 @@ export function CxpPagosModule({ empresaId }: CxpPagosModuleProps) {
 
   const [selected, setSelected] = useState<Pago | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Drill-down (?focus=<pago_id>) desde el hilo del gasto de otros módulos.
+  useFocusDrilldown(
+    pagos,
+    (p) => p.id,
+    (row) => {
+      setSelected(row);
+      setDrawerOpen(true);
+    }
+  );
 
   // Acción pendiente: aprobar / cancelar (confirm) o marcar pagado (dialog).
   const [aprobarPago, setAprobarPago] = useState<Pago | null>(null);
@@ -422,7 +437,12 @@ export function CxpPagosModule({ empresaId }: CxpPagosModuleProps) {
         </ModuleContent>
       </div>
 
-      <PagoDrawer pago={selected} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <PagoDrawer
+        pago={selected}
+        empresa={empresa}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
 
       {/* Aprobar — confirmación (el RPC valida Dirección). */}
       <ConfirmDialog
@@ -479,10 +499,12 @@ export function CxpPagosModule({ empresaId }: CxpPagosModuleProps) {
 
 function PagoDrawer({
   pago,
+  empresa,
   open,
   onClose,
 }: {
   pago: Pago | null;
+  empresa: EmpresaSlug;
   open: boolean;
   onClose: () => void;
 }) {
@@ -555,6 +577,10 @@ function PagoDrawer({
       <DetailDrawerContent>
         {!pago ? null : (
           <div className="space-y-6">
+            <HiloGastoSection empresa={empresa} documento={{ tipo: 'pago', id: pago.id }} />
+
+            <Separator />
+
             {/* Datos del pago */}
             <section className="space-y-2 text-sm">
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

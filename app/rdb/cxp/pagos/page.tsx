@@ -17,7 +17,7 @@ import { RDB_EMPRESA_ID } from '@/lib/empresa-constants';
 export default function CxpPagosPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.cxp.pagos">
-      <CxpPagosModule empresaId={RDB_EMPRESA_ID} />
+      <CxpPagosModule empresaId={RDB_EMPRESA_ID} empresa="rdb" />
     </RequireAccess>
   );
 }
