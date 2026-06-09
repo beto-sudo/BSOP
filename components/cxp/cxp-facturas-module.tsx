@@ -53,6 +53,9 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
+import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
+import { hrefDoc } from '@/lib/gasto/hilo';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { buildProyectoOptions, type ProyectoSelectorRow } from '@/lib/dilesa/proyectos-selector';
 
@@ -282,6 +285,16 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
   const [selected, setSelected] = useState<Factura | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Drill-down (?focus=<factura_id>) desde el hilo del gasto de otros módulos.
+  useFocusDrilldown(
+    facturas,
+    (f) => f.id,
+    (row) => {
+      setSelected(row);
+      setDrawerOpen(true);
+    }
+  );
   const [uploadOpen, setUploadOpen] = useState(false);
 
   // Binding de partida de presupuesto — solo empresas con presupuesto de obra (DILESA-first).
@@ -747,6 +760,10 @@ function FacturaDrawer({
 
             <Separator />
 
+            <HiloGastoSection empresa={empresa} documento={{ tipo: 'factura', id: factura.id }} />
+
+            <Separator />
+
             {/* Fechas */}
             <section className="space-y-2 text-sm">
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -803,7 +820,7 @@ function FacturaDrawer({
                     Orden de compra
                   </div>
                   <a
-                    href={`/${empresa}/ordenes-compra?focus=${factura.orden_compra_id}`}
+                    href={hrefDoc(empresa, 'oc', factura.orden_compra_id) ?? '#'}
                     className="inline-flex items-center gap-1.5 font-medium text-primary underline-offset-2 hover:underline"
                   >
                     <Link2 className="h-4 w-4" />

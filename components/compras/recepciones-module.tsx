@@ -23,6 +23,8 @@ import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 import {
   buildProyectoOptions,
   type ProyectoOption,
@@ -69,6 +71,13 @@ export function RecepcionesModule({ empresaId }: { empresaId: string }) {
   /** detalleId → cantidad recibida (total) en captura. */
   const [recibos, setRecibos] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Drill-down (?focus=<oc_id>) desde el hilo del gasto: expande la OC en la bandeja.
+  useFocusDrilldown(
+    rows,
+    (r) => r.id,
+    (row) => setExpandedId(row.id)
+  );
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -524,6 +533,9 @@ function ReceivePanel({
 }) {
   return (
     <div className="space-y-2">
+      <div className="rounded-md border border-[var(--border)]/60 bg-[var(--bg)] px-3 py-2.5">
+        <HiloGastoStepper empresa="dilesa" documento={{ tipo: 'oc', id: oc.id }} />
+      </div>
       <table className="min-w-full text-sm">
         <thead className="text-xs uppercase tracking-wide text-[var(--text)]/50">
           <tr>

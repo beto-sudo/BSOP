@@ -20,6 +20,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Coins, Loader2, Plus, RefreshCw, Search, Send, Trash2, X } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
+import {
+  DetailDrawer,
+  DetailDrawerContent,
+  DetailDrawerSection,
+} from '@/components/detail-page/detail-drawer';
+import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -36,11 +42,13 @@ import {
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import {
   deriveOcKpis,
+  lineaTotal,
   ocTotal,
   type OcEstado,
   type OcLinea,
   type OcRow,
 } from '@/lib/compras/ordenes';
+import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 
 const SIN = '__sin__';
 
@@ -117,6 +125,19 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const [proveedorId, setProveedorId] = useState('');
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
+
+  const [detalle, setDetalle] = useState<OcRow | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Drill-down (?focus=<oc_id>) desde el hilo del gasto de otros módulos.
+  useFocusDrilldown(
+    rows,
+    (r) => r.id,
+    (row) => {
+      setDetalle(row);
+      setDrawerOpen(true);
+    }
+  );
 
   const fetchData = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -786,12 +807,89 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
+        onRowClick={(r) => {
+          setDetalle(r);
+          setDrawerOpen(true);
+        }}
         initialSort={{ key: 'fecha', dir: 'desc' }}
         emptyTitle="Sin órdenes"
         emptyDescription="No hay órdenes de compra que coincidan. Crea una con “Nueva orden”."
         emptyIcon={<Coins className="h-6 w-6" />}
         maxHeight="calc(100vh - 320px)"
       />
+
+      <OcDetalleDrawer oc={detalle} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
+  );
+}
+
+/**
+ * Drawer de detalle de la OC (nuevo en Sprint 1 de `dilesa-flujo-gasto`):
+ * antes la OC solo existía como fila con acciones — el detalle (líneas) y el
+ * hilo del gasto (incluida la bidireccionalidad OC → facturas/pagos, que
+ * aporta el stepper con sus refs) no eran visibles desde ningún lado.
+ */
+function OcDetalleDrawer({
+  oc,
+  open,
+  onClose,
+}: {
+  oc: OcRow | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <DetailDrawer
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      size="lg"
+      title={oc?.codigo ?? 'Orden de compra'}
+      description={
+        oc ? [oc.proveedorNombre, oc.proyectoNombre].filter(Boolean).join(' · ') : undefined
+      }
+      meta={oc ? <Badge tone={ESTADO_TONE[oc.estado]}>{ESTADO_LABEL[oc.estado]}</Badge> : null}
+    >
+      <DetailDrawerContent>
+        {!oc ? null : (
+          <>
+            <DetailDrawerSection title="Hilo del gasto" divider={false}>
+              <HiloGastoStepper empresa="dilesa" documento={{ tipo: 'oc', id: oc.id }} />
+            </DetailDrawerSection>
+
+            <DetailDrawerSection title={`Líneas (${oc.lineas.length})`}>
+              <div className="space-y-1.5 text-sm">
+                {oc.lineas.map((l) => (
+                  <div
+                    key={l.id}
+                    className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1.5 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--text)]">
+                        {l.partidaLabel}
+                      </div>
+                      <div className="truncate text-xs text-[var(--text)]/55">
+                        {[l.descripcion, l.unidad].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="tabular-nums text-[var(--text)]">
+                        {formatCurrency(lineaTotal(l))}
+                      </div>
+                      <div className="text-xs tabular-nums text-[var(--text)]/55">
+                        {l.cantidadRecibida} / {l.cantidad} recibido
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-1 font-semibold text-[var(--text)]">
+                  <span>Total</span>
+                  <span className="tabular-nums">{formatCurrency(ocTotal(oc))}</span>
+                </div>
+              </div>
+            </DetailDrawerSection>
+          </>
+        )}
+      </DetailDrawerContent>
+    </DetailDrawer>
   );
 }

@@ -3,11 +3,11 @@
 **Slug:** `dilesa-flujo-gasto`
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
-**Estado:** planned
-**Próximo hito:** Sprint 1 — hilo visible: vista SQL + `<HiloGastoStepper>` en los 6 documentos del ciclo + bidireccionalidad OC→factura/pago
+**Estado:** in_progress
+**Próximo hito:** Sprint 2 — el home: detalle de proyecto a routed tabs + tab Gasto (4 capas + tabla etapa › capítulo + drill-down) + mudanza de Costeo (Construcción → Proyecto)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (promovida tras stress test; decisiones D1/D6/promoción tomadas por Beto en chat)
+**Última actualización:** 2026-06-09 (S1 entregado a PR — hilo del gasto en los 6 documentos)
 
 ## Problema
 
@@ -161,6 +161,19 @@ Facturar → Pagar.
   duplican aquí.
 - **2026-06-09 — Vocabulario solo en UI (D4).** Labels + glosario
   centralizados; migrar enums en prod es riesgo sin retorno.
+- **2026-06-09 — El hilo se arma en TypeScript, no en vista SQL (S1).** El
+  planning decía "vista SQL"; al implementar se eligió `lib/gasto/hilo.ts`
+  (builder puro testeable + fetch con queries dirigidas por ronda). Razones:
+  los embeds cross-schema de PostgREST no funcionan (erp ↔ dilesa, patrón ya
+  conocido del repo), el grafo del hilo varía por documento de arranque, y el
+  builder puro quedó cubierto por 17 tests de vitest — una vista SQL no
+  permitiría nada de eso. Cero migraciones en S1.
+- **2026-06-09 — Drawers de detalle nuevos para OC y Requisición (S1).** El
+  mapeo reveló que en Compras DILESA la OC y la requisición no tenían detalle
+  abrible (solo fila con acciones) y que el link OC←factura de CxP apuntaba a
+  `/{empresa}/ordenes-compra`, ruta inexistente en DILESA. S1 agregó ambos
+  drawers (líneas + hilo), soporte `?focus=` en los 6 módulos (hook
+  `useFocusDrilldown`) y centralizó los destinos en `hrefDoc` (fix del link).
 
 ## Bitácora
 
@@ -169,3 +182,11 @@ Facturar → Pagar.
   estados, verificación de que el hilo completo ya existe en FKs, y stress
   test de 8 decisiones de forma. Beto decidió D1 (mover Costeo), D6 (bandeja
   en v1) y la promoción. Estado inicial: `planned`.
+- **2026-06-09 — Sprint 1 (el hilo) a PR.** `lib/gasto/hilo.ts` (builder puro
+  - fetch, 17 tests) + `<HiloGastoStepper>` montado en los 6 documentos:
+    drawers nuevos de OC y Requisición (antes sin detalle), panel de captura de
+    RFQ, panel de recepción, drawers de CxP facturas y pagos. `?focus=` con
+    `hooks/use-focus-drilldown.ts` en los 6 módulos; `hrefDoc` centraliza
+    destinos y corrige el link OC desde CxP en DILESA. `CxpPagosModule` ganó la
+    prop `empresa` (slug) para los hrefs. Sin migraciones. PR en revisión con
+    Vercel Preview (UI visible → sin auto-merge).

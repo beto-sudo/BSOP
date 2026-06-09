@@ -17,7 +17,7 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 export default function CxpPagosPage() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.cxp.pagos">
-      <CxpPagosModule empresaId={DILESA_EMPRESA_ID} />
+      <CxpPagosModule empresaId={DILESA_EMPRESA_ID} empresa="dilesa" />
     </RequireAccess>
   );
 }
