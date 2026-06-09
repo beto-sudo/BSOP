@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
 **Estado:** in_progress
-**Próximo hito:** Sprints 1-3 en preview (schema + RBAC + import en prod; UI read-only en PR — listado de frentes + KPIs + detail drawer con checklist). **Pendiente: Beto revisa el preview y define el proceso de alta de frentes** → Sprint 4 (form de alta/edición de frente + marcado cargado/pendiente de documentos). D2 cerrada (RBAC)
+**Próximo hito:** Sprint 4 construido (alta de frentes con selección de lotes + carga documental a Storage). **Pendiente: Beto prueba el alta en preview y mergea.** Luego cierre v1 (queda fuera: Urgencias —reporte canvas— y el drop de `construccion.frente_id` vestigial, que requiere su OK). D2 cerrada (RBAC)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-08 (Sprint 3 UI construido: `RuvModule` (listado de frentes + 5 KPIs + filtros) + `RuvFrenteDetailDrawer` (datos de oferta + avance + checklist de documentos) + page real. Read-only en v1. PR sin auto-merge para que Beto vea el preview y definamos el proceso de alta de frentes nuevos)
+**Última actualización:** 2026-06-08 (Sprint 4: la liga lote→frente se movió a `dilesa.unidades.frente_id` —porque el alta selecciona lotes sin construcción— con backfill desde Coda Inventario (1381 lotes); vista `v_ruv_frente_avance` reescrita (deriva de unidades⋈construccion, agrega `lotes`). Form de alta (`RuvFrenteCrearDrawer`: nombre + selección de lotes disponibles → crea frente, liga lotes, inicializa 27 docs pendiente) + checklist editable con subida de archivos a Storage (`ruv_frente_documentos.archivo_url`). Server actions `crearFrente`/`marcarDocumento`. PR sin auto-merge para que Beto pruebe el alta)
 
 ## Problema
 
@@ -449,6 +449,23 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   Lee `v_ruv_frente_avance` + `ruv_frentes` + `ruv_documentos_catalogo` +
   `ruv_frente_documentos`. CI local verde. PR **sin auto-merge**: Beto revisa el
   preview y define el proceso de alta de frentes → Sprint 4.
+- **2026-06-08 (Sprint 4 — alta + carga documental)** — Beto definió el alta:
+  nombre + selección de lotes disponibles (sin frente) → con eso se arma; el
+  checklist nace en pendiente; se suben documentos. Cambio de modelo: la liga
+  lote→frente se mueve a **`dilesa.unidades.frente_id`** (el alta elige lotes sin
+  construcción, donde `construccion.frente_id` no aplica). Migración
+  `20260609005051`: `unidades.frente_id` + índice, backfill desde construccion,
+  vista `v_ruv_frente_avance` reescrita (unidades⋈construccion, agrega `lotes`),
+  init del checklist para frentes existentes. `construccion.frente_id` queda
+  **vestigial** (no se dropeó — el classifier lo bloqueó por destructivo sin OK
+  explícito de Beto; pendiente su confirmación). Backfill `unidades.frente_id`
+  desde Coda Inventario: **1381 lotes** (vs 1036 antes — incluye lotes sin obra),
+  0 sin match; 616 lotes disponibles para nuevos frentes. Server actions
+  `crearFrente` (inserta + liga lotes solo si siguen disponibles + inicializa 27
+  docs) y `marcarDocumento`. UI: `RuvFrenteCrearDrawer` (form + multi-select de
+  lotes) + detail drawer editable (subir archivo a bucket `adjuntos` vía
+  `buildAdjuntoPath`, marcar cargado/pendiente). `AdjuntoEntidad += 'frentes'`.
+  CI local verde. PR **sin auto-merge** para que Beto pruebe el alta.
 
 ## Decisiones registradas
 

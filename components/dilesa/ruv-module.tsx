@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileStack, RefreshCw, Search } from 'lucide-react';
+import { FileStack, Plus, RefreshCw, Search } from 'lucide-react';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -24,6 +24,7 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { RuvFrenteDetailDrawer } from '@/components/dilesa/ruv-frente-detail-drawer';
+import { RuvFrenteCrearDrawer } from '@/components/dilesa/ruv-frente-crear-drawer';
 import {
   avanceLabel,
   avanceTone,
@@ -44,6 +45,7 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
   const [detalle, setDetalle] = useState<RuvFrenteRow | null>(null);
+  const [crearOpen, setCrearOpen] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -63,7 +65,7 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
         .schema('dilesa')
         .from('v_ruv_frente_avance')
         .select(
-          'frente_id, viviendas, cuvs_emitidos, con_dtu, con_seguro_calidad, con_paquete_ruv, documentos_pendientes, pct_paquete_ruv'
+          'frente_id, lotes, viviendas, cuvs_emitidos, con_dtu, con_seguro_calidad, con_paquete_ruv, documentos_pendientes, pct_paquete_ruv'
         )
         .eq('empresa_id', empresaId),
       sb.schema('dilesa').from('proyectos').select('id, nombre').eq('empresa_id', empresaId),
@@ -107,6 +109,7 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
         viviendasOferta: numOrNull(f.viviendas_oferta),
         proyectoId: (f.proyecto_id as string | null) ?? null,
         proyectoNombre: f.proyecto_id ? (proyectoMap.get(f.proyecto_id as string) ?? '') : '',
+        lotes: numOrNull(a?.lotes) ?? 0,
         viviendas: numOrNull(a?.viviendas) ?? 0,
         cuvsEmitidos: numOrNull(a?.cuvs_emitidos) ?? 0,
         conDtu: numOrNull(a?.con_dtu) ?? 0,
@@ -283,14 +286,24 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
             documentos del paquete.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void cargar()}
-          className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Refrescar
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refrescar
+          </button>
+          <button
+            type="button"
+            onClick={() => setCrearOpen(true)}
+            className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo frente
+          </button>
+        </div>
       </header>
 
       <ModuleKpiStrip stats={kpis} cols={5} />
@@ -341,6 +354,14 @@ export function RuvModule({ empresaId = DILESA_EMPRESA_ID }: { empresaId?: strin
         onOpenChange={(o) => {
           if (!o) setDetalle(null);
         }}
+        onChanged={() => void cargar()}
+      />
+
+      <RuvFrenteCrearDrawer
+        empresaId={empresaId}
+        open={crearOpen}
+        onOpenChange={setCrearOpen}
+        onDone={() => void cargar()}
       />
     </div>
   );

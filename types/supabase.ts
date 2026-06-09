@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-06-08T11:49:35Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -4248,6 +4237,7 @@ export type Database = {
           es_esquina: boolean | null
           es_muestra: boolean
           estado: string
+          frente_id: string | null
           id: string
           identificador: string
           m2_construccion: number | null
@@ -4273,6 +4263,7 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          frente_id?: string | null
           id?: string
           identificador: string
           m2_construccion?: number | null
@@ -4298,6 +4289,7 @@ export type Database = {
           es_esquina?: boolean | null
           es_muestra?: boolean
           estado?: string
+          frente_id?: string | null
           id?: string
           identificador?: string
           m2_construccion?: number | null
@@ -4320,6 +4312,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "activos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "ruv_frentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_frente_id_fkey"
+            columns: ["frente_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_frente_avance"
+            referencedColumns: ["frente_id"]
           },
           {
             foreignKeyName: "unidades_producto_id_fkey"
@@ -4545,6 +4551,7 @@ export type Database = {
           id: string
           ine_numero: string | null
           monto_avaluo: number | null
+          monto_cheque_notaria: number | null
           monto_credito_cotitular: number | null
           monto_credito_directo: number | null
           monto_credito_titular: number | null
@@ -4558,6 +4565,7 @@ export type Database = {
           notif_hold_promovido_at: string | null
           notif_solicitud_avaluo_at: string | null
           notif_solicitud_dictamen_at: string | null
+          numero_cheque_notaria: string | null
           numero_escritura: string | null
           ocupacion: string | null
           persona_id: string
@@ -4616,6 +4624,7 @@ export type Database = {
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
+          monto_cheque_notaria?: number | null
           monto_credito_cotitular?: number | null
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
@@ -4629,6 +4638,7 @@ export type Database = {
           notif_hold_promovido_at?: string | null
           notif_solicitud_avaluo_at?: string | null
           notif_solicitud_dictamen_at?: string | null
+          numero_cheque_notaria?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id: string
@@ -4687,6 +4697,7 @@ export type Database = {
           id?: string
           ine_numero?: string | null
           monto_avaluo?: number | null
+          monto_cheque_notaria?: number | null
           monto_credito_cotitular?: number | null
           monto_credito_directo?: number | null
           monto_credito_titular?: number | null
@@ -4700,6 +4711,7 @@ export type Database = {
           notif_hold_promovido_at?: string | null
           notif_solicitud_avaluo_at?: string | null
           notif_solicitud_dictamen_at?: string | null
+          numero_cheque_notaria?: string | null
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id?: string
@@ -4925,6 +4937,7 @@ export type Database = {
           documentos_pendientes: number | null
           empresa_id: string | null
           frente_id: string | null
+          lotes: number | null
           nombre: string | null
           pct_paquete_ruv: number | null
           proyecto_id: string | null
