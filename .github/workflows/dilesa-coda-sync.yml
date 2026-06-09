@@ -1,8 +1,13 @@
 name: DILESA Coda Sync
 
-# Refresh nocturno del schema dilesa desde Coda. Corre los 5 imports en
-# serie (terrenos → proyectos → inventario → ventas → expediente) y
-# manda email con resumen vía Resend (siempre — éxito o fallo).
+# Refresh nocturno del schema dilesa desde Coda. Desde el 2026-06-09 el
+# daily corre SOLO ventas + expediente: construcción se cortó del sync
+# (cutover de obra a BSOP — los supervisores ya no palomean en Coda).
+# Manda email con resumen vía Resend (siempre — éxito o fallo).
+#
+# Corridas manuales: input `construccion` re-incluye los 6 scripts de
+# construcción (rezagos puntuales); input `full` corre todo (portafolio +
+# construcción + ventas + expediente).
 #
 # Idempotente: las ventas creadas nativas en BSOP (sin coda_row_id) se
 # preservan. Los adjuntos de expediente solo se descargan/suben si son
@@ -25,8 +30,12 @@ name: DILESA Coda Sync
 on:
   workflow_dispatch:
     inputs:
+      construccion:
+        description: 'Incluir los 6 scripts de construcción (cortados del daily el 2026-06-09) — para rezagos puntuales'
+        type: boolean
+        default: false
       full:
-        description: 'Refresh completo (incluye terrenos/proyectos/inventario) — por default solo ventas + expediente'
+        description: 'Refresh completo (portafolio + construcción + ventas + expediente)'
         type: boolean
         default: false
   schedule:
@@ -51,6 +60,7 @@ jobs:
       NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
       SYNC_FROM_EMAIL: ${{ secrets.SYNC_FROM_EMAIL }}
       FULL: ${{ inputs.full && '1' || '' }}
+      CONSTRUCCION: ${{ inputs.construccion && '1' || '' }}
 
     steps:
       - name: Checkout
