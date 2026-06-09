@@ -47,6 +47,10 @@ import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
 import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
 import { CuadraturaPanel } from '@/components/dilesa/cuadratura-panel';
+import {
+  CuadraturaAjustes,
+  type CuadraturaInputsStr,
+} from '@/components/dilesa/cuadratura-ajustes';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
@@ -98,6 +102,11 @@ type Venta = {
   gastos_escrituracion: number | null;
   monto_cheque_notaria: number | null;
   apoyo_infonavit: number | null;
+  descuento_precio: number | null;
+  descuento_equipamiento: number | null;
+  descuento_gastos_escrituracion: number | null;
+  descuento_nota_credito: number | null;
+  descuento_maximo_autorizado: number | null;
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
@@ -343,6 +352,17 @@ function DetailInner() {
   const [tab, setTab] = useState<'operacion' | 'cuadratura' | 'documentos' | 'bitacora'>(
     'operacion'
   );
+  const { permissions } = usePermissions();
+  const [cuadInputs, setCuadInputs] = useState<CuadraturaInputsStr>({
+    descuentoPrecio: '',
+    descuentoEquipamiento: '',
+    descuentoGastosEscr: '',
+    descuentoNotaCredito: '',
+    descuentoMaximo: '',
+  });
+  // Apoyo Infonavit derivado del catálogo `dilesa.tipos_credito` según el tipo
+  // de crédito de la venta (auto, no se captura). Misma fuente que el RPC.
+  const [apoyoInfonavit, setApoyoInfonavit] = useState(0);
   const [venta, setVenta] = useState<Venta | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -396,6 +416,38 @@ function DetailInner() {
       }
       const ventaRow = vRow as unknown as Venta;
       setVenta(ventaRow);
+      const numStr = (n: number | null): string => (n == null ? '' : String(n));
+      setCuadInputs({
+        descuentoPrecio: numStr(ventaRow.descuento_precio),
+        descuentoEquipamiento: numStr(ventaRow.descuento_equipamiento),
+        descuentoGastosEscr: numStr(ventaRow.descuento_gastos_escrituracion),
+        descuentoNotaCredito: numStr(ventaRow.descuento_nota_credito),
+        descuentoMaximo: numStr(ventaRow.descuento_maximo_autorizado),
+      });
+
+      // Resolver el tipo de crédito → id + apoyo Infonavit del catálogo
+      // `dilesa.tipos_credito`. El apoyo se deriva (no se captura) y el id se
+      // pasa al RPC para que el desglose calcule apoyo + costo adicional (ej.
+      // Fovissste +6%) de la misma fuente. Match por empresa + nombre.
+      let tipoCreditoId: string | null = null;
+      let apoyoDerivado = 0;
+      if (ventaRow.tipo_credito) {
+        const { data: tcRow } = await sb
+          .schema('dilesa')
+          .from('tipos_credito')
+          .select('id, apoyo_infonavit_monto')
+          .eq('empresa_id', ventaRow.empresa_id)
+          .eq('nombre', ventaRow.tipo_credito)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (tcRow) {
+          tipoCreditoId = (tcRow as { id: string }).id;
+          apoyoDerivado = Number(
+            (tcRow as { apoyo_infonavit_monto: number | null }).apoyo_infonavit_monto ?? 0
+          );
+        }
+      }
+      if (activo) setApoyoInfonavit(apoyoDerivado);
 
       const [pRes, fRes, cargosRes, abonosRes, uRes] = await Promise.all([
         sb
@@ -578,6 +630,7 @@ function DetailInner() {
       if (ventaRow.unidad_id) {
         const { data: calcRow } = await sb.schema('dilesa').rpc('fn_calcular_precio_venta', {
           p_unidad_id: ventaRow.unidad_id,
+          p_tipo_credito_id: tipoCreditoId ?? undefined,
           p_monto_credito_titular: Number(ventaRow.monto_credito_titular ?? 0),
           p_monto_credito_cotitular: Number(ventaRow.monto_credito_cotitular ?? 0),
           p_productos_adicionales: Number(ventaRow.productos_adicionales ?? 0),
@@ -709,8 +762,13 @@ function DetailInner() {
         montoCreditoDirecto: venta?.monto_credito_directo ?? null,
         montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
-        apoyoInfonavit: venta?.apoyo_infonavit ?? null,
-        descuentoOtorgadoTotal: venta?.descuento_total ?? null,
+        // Derivado del catálogo de tipos de crédito (auto, no capturado).
+        apoyoInfonavit,
+        descuentoOtorgadoTotal:
+          (Number(cuadInputs.descuentoPrecio) || 0) +
+          (Number(cuadInputs.descuentoEquipamiento) || 0) +
+          (Number(cuadInputs.descuentoGastosEscr) || 0) +
+          (Number(cuadInputs.descuentoNotaCredito) || 0),
         precioAsignacion: venta?.precio_asignacion ?? null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
@@ -718,7 +776,7 @@ function DetailInner() {
         })),
         proyectoNombre,
       }),
-    [venta, abonos, proyectoNombre]
+    [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit]
   );
 
   if (loading) {
@@ -904,11 +962,24 @@ function DetailInner() {
       </div>
 
       {tab === 'cuadratura' ? (
-        <CuadraturaPanel
-          cuadratura={cuadratura}
-          valorEscrituracion={venta.valor_escrituracion}
-          chequeCapturado={venta.monto_cheque_notaria != null}
-        />
+        <div className="space-y-5">
+          <CuadraturaAjustes
+            ventaId={venta.id}
+            values={cuadInputs}
+            onPatch={(patch) => setCuadInputs((prev) => ({ ...prev, ...patch }))}
+            apoyoInfonavit={apoyoInfonavit}
+            tipoCredito={venta.tipo_credito}
+            canWrite={
+              permissions.isAdmin ||
+              permissions.modulos.get('dilesa.ventas.fase13_facturada')?.write === true
+            }
+          />
+          <CuadraturaPanel
+            cuadratura={cuadratura}
+            valorEscrituracion={venta.valor_escrituracion}
+            chequeCapturado={venta.monto_cheque_notaria != null}
+          />
+        </div>
       ) : null}
 
       {tab === 'documentos' ? (

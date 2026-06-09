@@ -250,7 +250,8 @@ async function main() {
         descuento_equipamiento: num(pick(v, cm, 'Descuento Otorgado Equipamiento')),
         descuento_gastos_escrituracion: num(pick(v, cm, 'Descuento Otorgado Gastos Escrituración')),
         descuento_nota_credito: num(pick(v, cm, 'Descuento Otorgado Nota de Credito')),
-        apoyo_infonavit: num(pick(v, cm, 'Apoyo Escrituración Infonavit')),
+        // apoyo_infonavit NO se importa: se deriva del catálogo
+        // `dilesa.tipos_credito` (apoyo_infonavit_monto) según tipo_credito.
         descuento_maximo_autorizado: num(pick(v, cm, 'Descuento máximo Autorizado')),
         fecha_firma_programada: dateStr(pick(v, cm, 'Fecha y Hora de Firma Programada')),
         es_pep: boolOpt(pick(v, cm, 'Persona Políticamente Expuesta')),
