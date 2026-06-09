@@ -38,6 +38,13 @@ export default defineConfig({
     exclude: [
       'node_modules/**',
       '.next/**',
+      // Los worktrees de otras sesiones viven físicamente en
+      // `.claude/worktrees/` dentro del repo principal. Sin excluirlos,
+      // `test:run` desde la raíz escanea sus `*.test.ts` y produce fallos
+      // espurios (módulos ausentes en el checkout actual). CI no se afecta
+      // (corre en checkout limpio sin `.claude/`). Ver
+      // reference_vitest_worktrees_scan.
+      '**/.claude/**',
       'tests/e2e/**',
       'tests/integration/**',
       '**/*.integration.test.ts',
@@ -49,6 +56,7 @@ export default defineConfig({
       exclude: [
         '**/*.test.ts',
         '**/*.d.ts',
+        '**/.claude/**',
         // Helpers internos que solo sirven a tests.
         'app/api/**/_test-helpers.ts',
       ],
