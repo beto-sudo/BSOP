@@ -177,6 +177,7 @@ async function main() {
   // Inventario de Coda, ligada por "ID Lote" (= dilesa.unidades.identificador).
   const frenteIdPorNombre = new Map<string, string>();
   const unidadIdPorIdent = new Map<string, string>();
+  const unidadCuvPorIdent = new Map<string, string | null>();
   if (!DRY_RUN) {
     const [frentesDb, unidadesDb] = await Promise.all([
       sb
@@ -188,7 +189,7 @@ async function main() {
       sb
         .schema('dilesa')
         .from('unidades')
-        .select('id, identificador')
+        .select('id, identificador, cuv')
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
     ]);
@@ -200,7 +201,11 @@ async function main() {
     }
     for (const u of unidadesDb.data ?? []) {
       const ident = str(u.identificador);
-      if (ident) unidadIdPorIdent.set(ident.trim().toUpperCase(), u.id as string);
+      if (ident) {
+        const key = ident.trim().toUpperCase();
+        unidadIdPorIdent.set(key, u.id as string);
+        unidadCuvPorIdent.set(key, str(u.cuv));
+      }
     }
   } else {
     for (const f of frentesParaCargar) {
@@ -213,12 +218,30 @@ async function main() {
   const invMap = buildColumnMap(invCols);
   const invRows = await coda.listRowsAll(CODA_DOC, CODA_INVENTARIO, { limit: 500 });
 
-  // Agrupar ids de unidad por frente resuelto.
+  // Agrupar ids de unidad por frente resuelto + recolectar CUVs a escribir.
   const idsPorFrente = new Map<string, string[]>();
+  const cuvUpdates: Array<{ id: string; cuv: string }> = [];
   let sinFrenteTexto = 0; // filas de inventario sin "Frente RUV"
   let sinFrenteMatch = 0; // "Frente RUV" que no resuelve a un frente cargado
   let sinUnidad = 0; // "ID Lote" que no resuelve a una unidad en BSOP
+  let cuvNuevos = 0; // CUVs a escribir en unidades.cuv (faltaban o diferían)
   for (const row of invRows) {
+    const idLote = str(pick(row.values, invMap, 'ID Lote'));
+    const key = idLote ? idLote.trim().toUpperCase() : null;
+    const uid = DRY_RUN ? 'dry-run' : key ? unidadIdPorIdent.get(key) : undefined;
+
+    // (a) CUV del lote → unidades.cuv (solo si válido y falta o difiere).
+    const cuvLote = str(pick(row.values, invMap, 'CUV'));
+    if (cuvLote && /^\d{16}$/.test(cuvLote) && key) {
+      if (DRY_RUN) {
+        cuvNuevos++;
+      } else if (uid && unidadCuvPorIdent.get(key) !== cuvLote) {
+        cuvUpdates.push({ id: uid, cuv: cuvLote });
+        cuvNuevos++;
+      }
+    }
+
+    // (b) Frente del lote → unidades.frente_id.
     const frenteTexto = str(pick(row.values, invMap, 'Frente RUV'));
     if (!frenteTexto) {
       sinFrenteTexto++;
@@ -229,12 +252,6 @@ async function main() {
       sinFrenteMatch++;
       continue;
     }
-    const idLote = str(pick(row.values, invMap, 'ID Lote'));
-    const uid = DRY_RUN
-      ? 'dry-run'
-      : idLote
-        ? unidadIdPorIdent.get(idLote.trim().toUpperCase())
-        : undefined;
     if (!uid) {
       sinUnidad++;
       continue;
@@ -246,6 +263,9 @@ async function main() {
   log(
     `Backfill unidades.frente_id: ${totalLigar} lotes ligados ` +
       `(${sinFrenteTexto} sin Frente RUV en Coda, ${sinFrenteMatch} Frente sin match, ${sinUnidad} lote sin unidad en BSOP)`
+  );
+  log(
+    `Backfill unidades.cuv: ${cuvNuevos} CUVs ${DRY_RUN ? 'válidos en Coda (estimado)' : 'a escribir (faltaban o diferían)'}`
   );
 
   if (!DRY_RUN) {
@@ -260,6 +280,15 @@ async function main() {
           .in('id', chunk);
         if (error) throw error;
       }
+    }
+    // CUV: uno por unidad (cada lote tiene su clave única; no agrupable).
+    for (const u of cuvUpdates) {
+      const { error } = await sb
+        .schema('dilesa')
+        .from('unidades')
+        .update({ cuv: u.cuv })
+        .eq('id', u.id);
+      if (error) throw error;
     }
   }
 
