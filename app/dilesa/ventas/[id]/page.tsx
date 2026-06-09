@@ -45,6 +45,8 @@ import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
+import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
+import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
 import { useTriggerPrint } from '@/components/print';
@@ -93,6 +95,8 @@ type Venta = {
   anticipo_comision: number | null;
   monto_avaluo: number | null;
   gastos_escrituracion: number | null;
+  monto_cheque_notaria: number | null;
+  monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
   vendedor: string | null;
@@ -676,6 +680,28 @@ function DetailInner() {
     [abonos, aplicadoPorAbono]
   );
 
+  // Cuadratura de la operación (motor único — lib/dilesa/cuadratura.ts). Los
+  // depósitos vienen de CxC (abonos); fuente='cliente' aproxima "Directo
+  // Cliente". El detalle por depósito (recibo de caja) llega en Sprint 2.
+  const cuadratura = useMemo(
+    () =>
+      calcularCuadratura({
+        valorEscrituracion: venta?.valor_escrituracion ?? null,
+        montoCreditoTitular: venta?.monto_credito_titular ?? null,
+        montoCreditoCotitular: venta?.monto_credito_cotitular ?? null,
+        montoCreditoDirecto: venta?.monto_credito_directo ?? null,
+        montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
+        gastosEscrituracion: venta?.gastos_escrituracion ?? null,
+        precioAsignacion: venta?.precio_asignacion ?? null,
+        depositos: abonos.map((a) => ({
+          monto: a.monto_total,
+          directoCliente: a.fuente === 'cliente',
+        })),
+        proyectoNombre,
+      }),
+    [venta, abonos, proyectoNombre]
+  );
+
   if (loading) {
     return (
       <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -809,6 +835,29 @@ function DetailInner() {
       {holdSnapshot && holdSnapshot.estado !== 'no_aplica' ? (
         <HoldBanner snapshot={holdSnapshot} />
       ) : null}
+
+      {/* Zona A — cabecera persistente del Expediente de Operación. */}
+      <OperacionResumen
+        cliente={{
+          nombre: clienteNombre || '(sin nombre)',
+          contacto: [persona?.telefono, persona?.email].filter(Boolean).join(' · ') || null,
+          curp: persona?.curp ?? null,
+        }}
+        vivienda={{
+          proyecto: proyectoNombre,
+          mzLote: null,
+          prototipo: prototipoNombre,
+          domicilio: null,
+          identificador: unidad?.identificador ?? null,
+        }}
+        precioAsignacion={venta.precio_asignacion}
+        valorEscrituracion={venta.valor_escrituracion}
+        vendedor={vendedorNombre ?? venta.vendedor}
+        faseActual={venta.fase_actual}
+        fasePosicion={venta.fase_posicion}
+        totalFases={FASES_ORDEN.length}
+        cuadratura={cuadratura}
+      />
 
       <div className="flex flex-wrap gap-2">
         <PdfDownloadLink
