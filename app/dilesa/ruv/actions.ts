@@ -208,3 +208,49 @@ export async function marcarDocumento(input: MarcarDocumentoInput): Promise<Acti
   revalidatePath('/dilesa/ruv');
   return { ok: true };
 }
+
+const HITO_COLUMNA = {
+  dtu: 'fecha_dtu',
+  extraccion: 'fecha_extraccion',
+  seguro_calidad: 'fecha_seguro_calidad',
+  paquete_ruv: 'fecha_paquete_ruv',
+} as const;
+
+export type RuvHito = keyof typeof HITO_COLUMNA;
+
+/**
+ * Marca/edita la fecha de un hito del trámite RUV (DTU / extracción / seguro de
+ * calidad / paquete) de un lote (unidad). `fecha` null o vacío limpia el hito.
+ */
+export async function marcarHito(input: {
+  unidadId: string;
+  hito: RuvHito;
+  fecha: string | null;
+}): Promise<ActionResult> {
+  await assertNotInPreview();
+  if (!input.unidadId) return { ok: false, error: 'Falta el lote.' };
+  const columna = HITO_COLUMNA[input.hito];
+  if (!columna) return { ok: false, error: 'Hito inválido.' };
+
+  const supabase = await createSupabaseServerClient();
+  const patch: {
+    fecha_dtu?: string | null;
+    fecha_extraccion?: string | null;
+    fecha_seguro_calidad?: string | null;
+    fecha_paquete_ruv?: string | null;
+  } = {};
+  patch[columna] = dateOrNull(input.fecha);
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('unidades')
+    .update(patch)
+    .eq('id', input.unidadId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo actualizar el hito.') };
+  }
+  revalidatePath('/dilesa/ruv');
+  return { ok: true };
+}

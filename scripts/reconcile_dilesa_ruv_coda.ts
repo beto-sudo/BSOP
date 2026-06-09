@@ -21,7 +21,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-import { CodaClient, buildColumnMap, pick, str, int } from '../lib/coda-api';
+import { CodaClient, buildColumnMap, pick, str, int, dateStr } from '../lib/coda-api';
 
 const CODA_API_KEY = process.env.CODA_API_KEY ?? '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -263,6 +263,76 @@ async function main() {
   P(`  Frente distinto Coda↔BSOP: ${loteFrenteDistinto}`);
   P(`  ID Lote de Coda sin unidad en BSOP: ${loteSinUnidad}`);
 
+  // ── 5. FECHAS DE HITOS (DTU / Extracción / Seguro de Calidad / Paquete) ─────
+  // Las fechas viven en dilesa.unidades; se comparan por ID Lote → identificador.
+  type Fechas = {
+    dtu: string | null;
+    extraccion: string | null;
+    seguro: string | null;
+    paquete: string | null;
+  };
+  const bsopFechas = new Map<string, Fechas>();
+  for (const u of await readAll<{
+    identificador: string | null;
+    fecha_dtu: string | null;
+    fecha_extraccion: string | null;
+    fecha_seguro_calidad: string | null;
+    fecha_paquete_ruv: string | null;
+  }>((from, to) =>
+    sb
+      .schema('dilesa')
+      .from('unidades')
+      .select('identificador, fecha_dtu, fecha_extraccion, fecha_seguro_calidad, fecha_paquete_ruv')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .range(from, to)
+  )) {
+    if (u.identificador)
+      bsopFechas.set(u.identificador.trim().toUpperCase(), {
+        dtu: u.fecha_dtu,
+        extraccion: u.fecha_extraccion,
+        seguro: u.fecha_seguro_calidad,
+        paquete: u.fecha_paquete_ruv,
+      });
+  }
+  const hitos = [
+    { k: 'dtu' as const, label: 'DTU', col: 'c-NFHHfauqMX' },
+    { k: 'extraccion' as const, label: 'Extracción', col: 'c-8J3K9nJTnz' },
+    { k: 'seguro' as const, label: 'Seguro de Calidad', col: 'c-EQVKSVU4gf' },
+    { k: 'paquete' as const, label: 'Paquete RUV', col: 'c-TZ_W1Qp2Lp' },
+  ];
+  P('\n── 5. FECHAS DE HITOS (por lote, vs unidades) ──────────');
+  let fechasProblemas = 0;
+  for (const h of hitos) {
+    let codaCon = 0;
+    let coincide = 0;
+    let difiere = 0;
+    let faltaBsop = 0;
+    const ej: string[] = [];
+    for (const r of invRows) {
+      const codaFecha = dateStr(r.values[h.col]);
+      if (!codaFecha) continue;
+      codaCon++;
+      const idLote = str(pick(r.values, iMap, 'ID Lote'));
+      const ident = idLote ? idLote.trim().toUpperCase() : null;
+      const bsopFecha = ident ? (bsopFechas.get(ident)?.[h.k] ?? null) : null;
+      if (!bsopFecha) {
+        faltaBsop++;
+        if (ej.length < 6) ej.push(`${idLote}: Coda ${codaFecha} / BSOP —`);
+      } else if (bsopFecha === codaFecha) {
+        coincide++;
+      } else {
+        difiere++;
+        if (ej.length < 6) ej.push(`${idLote}: ${codaFecha} ≠ ${bsopFecha}`);
+      }
+    }
+    fechasProblemas += faltaBsop + difiere;
+    P(
+      `  ${h.label}: Coda ${codaCon} → coinciden ${coincide}, difieren ${difiere}, faltan en BSOP ${faltaBsop}`
+    );
+    if (ej.length) P('    → ' + ej.join(' | '));
+  }
+
   // ── VEREDICTO ───────────────────────────────────────────────────────────────
   const ok =
     frentesFaltan.length === 0 &&
@@ -270,7 +340,8 @@ async function main() {
     docsFaltan.length === 0 &&
     cuvFaltan.length === 0 &&
     loteSinFrenteBsop === 0 &&
-    loteFrenteDistinto === 0;
+    loteFrenteDistinto === 0 &&
+    fechasProblemas === 0;
   P('\n══════════════════════════════════════════════════════════════');
   P(
     ok

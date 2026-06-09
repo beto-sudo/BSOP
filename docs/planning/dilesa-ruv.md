@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (3 tablas nuevas: `ruv_frentes`, `ruv_documentos_catalogo`, `ruv_frente_documentos` + columna `construccion.frente_id` + vista `v_ruv_frente_avance`), `core.modulos` (slug nuevo + backfill de permisos)
 **Estado:** done
-**Próximo hito:** — (desarrollo completo; el cutoff operativo —cerrar acceso a Coda + informar al equipo de que BSOP es el sistema de RUV— lo ejecuta Beto). Follow-ups sueltos: Urgencias RUV (v1.1, reporte en canvas)
+**Próximo hito:** — (v1.1 entregada: detalle como página completa con lotes + marcado de hitos. El cutoff operativo —cerrar acceso a Coda + avisar al equipo— lo ejecuta Beto). Follow-up suelto: Urgencias RUV (reporte en canvas)
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-06-09 (CIERRE: comparativo Coda↔BSOP **100%** en las 4 dimensiones — frentes 78=78, catálogo 27=27, **CUVs 1140=1140**, lotes→frente 1381 sin discrepancias. Fix de cutoff: el CUV se movió a `dilesa.unidades.cuv` (cubre lotes sin obra; cerró la brecha de 166 CUVs que solo vivían en `construccion.cuv`). Dropeada `construccion.frente_id` vestigial (autorizado). Nala dada de alta como Asistente de Proyectos. Listo para cerrar Coda)
+**Última actualización:** 2026-06-09 (v1.1: el detalle del frente pasó de drawer a **página completa** `/dilesa/ruv/[id]` con la lista de **lotes del frente** y el **marcado de hitos** (DTU/extracción/seguro de calidad/paquete RUV) editable por lote. Los 4 hitos se movieron a `dilesa.unidades.fecha_*` con backfill completo desde Coda (cerró 518 fechas faltantes: 193 extracción + 325 paquete). Reconciliación de fechas Coda↔BSOP **100%** (DTU 1219, extracción 797, seguro 280, paquete 1347, 0 difieren))
 
 ## Problema
 
@@ -485,6 +485,18 @@ NULL` + flag de revisión manual, **no** bloquear el import.
   `20260609151439`, autorizado por Beto). Beto dio de alta a **Nala** como
   Asistente de Proyectos. Iniciativa `done`; el cierre de acceso a Coda + aviso
   al equipo lo ejecuta Beto. Urgencias RUV queda como follow-up v1.1.
+- **2026-06-09 (v1.1 — página + hitos por lote)** — Por feedback de Beto: el
+  detalle del frente pasó de side-drawer a **página completa** `/dilesa/ruv/[id]`
+  (`RuvFrenteDetalle`) con la lista de **lotes del frente** y el **marcado de los
+  4 hitos** (DTU / extracción / seguro de calidad / paquete RUV) editable por lote
+  (inputs date inline → server action `marcarHito`). El drawer
+  `ruv-frente-detail-drawer` se eliminó; el listado ahora navega a la página. Los
+  4 hitos se movieron a `dilesa.unidades.fecha_*` (migración `20260609153715`) con
+  backfill desde construccion + completado desde Coda Inventario (import paso 3):
+  **518 fechas** que faltaban (193 extracción + 325 paquete) ahora en BSOP.
+  Reconciliación de fechas Coda↔BSOP **100%** (`reconcile` comparativo #5). Las
+  columnas `construccion.fecha_*` quedan vestigiales (sin lectores; no se usaban
+  fuera de RUV — verificado).
 
 ## Decisiones registradas
 
