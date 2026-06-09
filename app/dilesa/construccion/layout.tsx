@@ -55,11 +55,10 @@ const TABS = [
     href: '/dilesa/construccion/estimaciones',
     module: 'dilesa.construccion.estimaciones',
   },
-  {
-    label: 'Costeo',
-    href: '/dilesa/construccion/costeo',
-    module: 'dilesa.construccion.costeo',
-  },
+  // El tab "Costeo" se mudó al detalle de proyecto (Proyectos › [id] › Gasto)
+  // en S2 de `dilesa-flujo-gasto` (decisión D1: el costeo es del proyecto).
+  // La ruta /dilesa/construccion/costeo queda como aviso de mudanza para
+  // bookmarks; ya no es tab del hub.
 ] as const;
 
 export default function ConstruccionLayout({ children }: { children: ReactNode }) {

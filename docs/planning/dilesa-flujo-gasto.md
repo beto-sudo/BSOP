@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — el home: detalle de proyecto a routed tabs + tab Gasto (4 capas + tabla etapa › capítulo + drill-down) + mudanza de Costeo (Construcción → Proyecto)
+**Próximo hito:** Aplicar migración `20260609230203` a prod (OK de Beto) + merge del PR de S2; luego Sprint 3 — navegación y lenguaje (reorden tabs Compras, "Pedir cotizaciones" desde requisición, glosario, alerta gasto sin partida, doc del manual)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (S1 entregado a PR — hilo del gasto en los 6 documentos)
+**Última actualización:** 2026-06-09 (S2 a PR — tab Gasto en el proyecto + mudanza de Costeo)
 
 ## Problema
 
@@ -182,6 +182,21 @@ Facturar → Pagar.
   estados, verificación de que el hilo completo ya existe en FKs, y stress
   test de 8 decisiones de forma. Beto decidió D1 (mover Costeo), D6 (bandeja
   en v1) y la promoción. Estado inicial: `planned`.
+- **2026-06-09 — Sprint 2 (el home) a PR.** Detalle de proyecto con routed
+  tabs (`[id]/layout.tsx`: Resumen | Gasto); tab Gasto =
+  `<CosteoModule proyectoIdFijo>` (selector/header ocultos, alta de partida
+  pre-fijada al proyecto, gate `dilesa.proyectos.gasto`) +
+  `<GastoActividad>` (últimos movimientos OC/factura con drill-down).
+  Construcción pierde el tab Costeo; su URL queda como aviso de mudanza
+  (gate con el slug viejo). Migración `20260609230203` (sub-slug + backfill
+  clonando permisos de `dilesa.construccion.costeo`) viaja en el PR — se
+  aplica a prod con OK de Beto antes del merge; mientras no esté, el tab
+  solo lo ven admins (nadie pierde nada: el aviso de Costeo sigue gateado
+  por el slug viejo).
+- **2026-06-09 — S2 mínimo coherente: tabs Resumen | Gasto.** Repartir el
+  resto del scroll-largo (Unidades/Obras/Checklist como tabs propios) queda
+  para decisión de Beto al ver el preview — no se infla S2 con un re-layout
+  total no pedido.
 - **2026-06-09 — Sprint 1 (el hilo) a PR.** `lib/gasto/hilo.ts` (builder puro
   - fetch, 17 tests) + `<HiloGastoStepper>` montado en los 6 documentos:
     drawers nuevos de OC y Requisición (antes sin detalle), panel de captura de

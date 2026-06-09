@@ -192,6 +192,11 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // 20260526210000_dilesa_proyectos_subscope_permissions.sql.
   'dilesa.proyectos.activos',
   'dilesa.proyectos.anteproyectos',
+  // Tab Gasto del detalle de proyecto (iniciativa `dilesa-flujo-gasto` S2):
+  // Costeo mudado de Construcción; permisos clonados de
+  // `dilesa.construccion.costeo`. Migración
+  // 20260609230203_modulos_dilesa_proyectos_gasto.sql.
+  'dilesa.proyectos.gasto',
   'dilesa.ventas',
   // Sub-slugs del hub Ventas (sprint tabs-hub, ADR-030). El padre
   // `dilesa.ventas` queda como umbrella en sidebar; cada tab (Ventas /
