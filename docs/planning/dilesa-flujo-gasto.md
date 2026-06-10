@@ -3,11 +3,11 @@
 **Slug:** `dilesa-flujo-gasto`
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
-**Estado:** in_progress
-**Próximo hito:** Merge del PR de F3 (detalle de proyecto en tabs + banda + parámetros) → re-cerrar la iniciativa
+**Estado:** done
+**Próximo hito:** — (v1 + F2 convergencia + F3 tabs/detalle entregados; sin fases pendientes)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-10 (F2 mergeada + migración RPC aplicada/verificada; F3 a PR)
+**Última actualización:** 2026-06-10 (CERRADA — F3 mergeada #792; iniciativa completa: 4 sprints + 2 fases)
 
 ## Problema
 
@@ -176,6 +176,15 @@ Facturar → Pagar.
   `useFocusDrilldown`) y centralizó los destinos en `hrefDoc` (fix del link).
 
 ## Bitácora
+
+- **2026-06-10 — CERRADA (completa: v1 + F2 + F3).** F3 mergeada (#792):
+  detalle de proyecto en tabs con banda de contexto, "Editar parámetros"
+  gateado a Dirección (Precio m² excedente expuesto y protegido), campos
+  muertos de Coda fuera de la UI, promoción del anteproyecto arriba.
+  Total de la iniciativa: 8 PRs de producto (#784 #787 #788 #789 #791 #792
+  - promoción #781 + cierres), 2 migraciones aplicadas y verificadas
+    (sub-slug Gasto + RPC promoción a canónica), 1443 tests verdes al cierre.
+    Barrido de Reminders: limpio.
 
 - **2026-06-10 — Fase 3 (detalle en tabs + dieta de campos) a PR.** Pedida
   por Beto al revisar el preview. (a) Detalle de PROYECTO repartido en tabs
