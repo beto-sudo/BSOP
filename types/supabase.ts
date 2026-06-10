@@ -1,14 +1,3 @@
-// ==============================================================================
-// Auto-generated Supabase database types.
-// Last regenerated: 2026-06-08T11:49:35Z
-// Project ref: ybklderteyhuugzfmxbi
-// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
-//
-// DO NOT EDIT BY HAND. Regenerate via:
-//   - GitHub Actions: trigger 'DB Types' workflow manually
-//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
-// ==============================================================================
-
 export type Json =
   | string
   | number
@@ -6259,6 +6248,13 @@ export type Database = {
             referencedRelation: "v_partida_control"
             referencedColumns: ["partida_id"]
           },
+          {
+            foreignKeyName: "cotizacion_lineas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["partida_id"]
+          },
         ]
       }
       cotizacion_proveedor_precios: {
@@ -7649,6 +7645,13 @@ export type Database = {
             referencedColumns: ["partida_id"]
           },
           {
+            foreignKeyName: "facturas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["partida_id"]
+          },
+          {
             foreignKeyName: "facturas_persona_id_fkey"
             columns: ["persona_id"]
             isOneToOne: false
@@ -8669,6 +8672,13 @@ export type Database = {
             referencedColumns: ["partida_id"]
           },
           {
+            foreignKeyName: "ordenes_compra_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["partida_id"]
+          },
+          {
             foreignKeyName: "ordenes_compra_detalle_producto_id_fkey"
             columns: ["producto_id"]
             isOneToOne: false
@@ -9198,6 +9208,199 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_empleados_full"
             referencedColumns: ["persona_id"]
+          },
+        ]
+      }
+      presupuesto_baseline_partidas: {
+        Row: {
+          baseline_id: string
+          concepto_texto: string | null
+          empresa_id: string
+          etapa: string | null
+          id: string
+          monto_baseline: number
+          partida_id: string
+        }
+        Insert: {
+          baseline_id: string
+          concepto_texto?: string | null
+          empresa_id: string
+          etapa?: string | null
+          id?: string
+          monto_baseline?: number
+          partida_id: string
+        }
+        Update: {
+          baseline_id?: string
+          concepto_texto?: string | null
+          empresa_id?: string
+          etapa?: string | null
+          id?: string
+          monto_baseline?: number
+          partida_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_baseline_partidas_baseline_id_fkey"
+            columns: ["baseline_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_baselines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_baseline_partidas_baseline_id_fkey"
+            columns: ["baseline_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["baseline_id"]
+          },
+          {
+            foreignKeyName: "presupuesto_baseline_partidas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_baseline_partidas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
+          },
+          {
+            foreignKeyName: "presupuesto_baseline_partidas_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["partida_id"]
+          },
+        ]
+      }
+      presupuesto_baselines: {
+        Row: {
+          autorizado_at: string
+          autorizado_por: string
+          created_at: string
+          empresa_id: string
+          id: string
+          notas: string | null
+          partidas_count: number
+          proyecto_id: string
+          total: number
+        }
+        Insert: {
+          autorizado_at?: string
+          autorizado_por: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          partidas_count?: number
+          proyecto_id: string
+          total?: number
+        }
+        Update: {
+          autorizado_at?: string
+          autorizado_por?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          partidas_count?: number
+          proyecto_id?: string
+          total?: number
+        }
+        Relationships: []
+      }
+      presupuesto_cambios: {
+        Row: {
+          cancelada_at: string | null
+          cancelada_por: string | null
+          created_at: string
+          empresa_id: string
+          estado: string
+          id: string
+          monto_aprobado_antes: number | null
+          monto_aprobado_despues: number | null
+          monto_delta: number
+          motivo: string
+          motivo_categoria: string
+          motivo_rechazo: string | null
+          partida_id: string
+          proyecto_id: string
+          resuelto_at: string | null
+          resuelto_por: string | null
+          solicitado_at: string
+          solicitado_por: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          created_at?: string
+          empresa_id: string
+          estado?: string
+          id?: string
+          monto_aprobado_antes?: number | null
+          monto_aprobado_despues?: number | null
+          monto_delta: number
+          motivo: string
+          motivo_categoria: string
+          motivo_rechazo?: string | null
+          partida_id: string
+          proyecto_id: string
+          resuelto_at?: string | null
+          resuelto_por?: string | null
+          solicitado_at?: string
+          solicitado_por: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          created_at?: string
+          empresa_id?: string
+          estado?: string
+          id?: string
+          monto_aprobado_antes?: number | null
+          monto_aprobado_despues?: number | null
+          monto_delta?: number
+          motivo?: string
+          motivo_categoria?: string
+          motivo_rechazo?: string | null
+          partida_id?: string
+          proyecto_id?: string
+          resuelto_at?: string | null
+          resuelto_por?: string | null
+          solicitado_at?: string
+          solicitado_por?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_cambios_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "presupuesto_partidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuesto_cambios_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
+          },
+          {
+            foreignKeyName: "presupuesto_cambios_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
+            referencedColumns: ["partida_id"]
           },
         ]
       }
@@ -9932,6 +10135,13 @@ export type Database = {
             columns: ["partida_id"]
             isOneToOne: false
             referencedRelation: "v_partida_control"
+            referencedColumns: ["partida_id"]
+          },
+          {
+            foreignKeyName: "requisiciones_detalle_partida_id_fkey"
+            columns: ["partida_id"]
+            isOneToOne: false
+            referencedRelation: "v_presupuesto_reconciliacion"
             referencedColumns: ["partida_id"]
           },
           {
@@ -10698,6 +10908,21 @@ export type Database = {
           },
         ]
       }
+      v_presupuesto_reconciliacion: {
+        Row: {
+          baseline_id: string | null
+          cambios_netos: number | null
+          concepto_texto: string | null
+          drift: number | null
+          empresa_id: string | null
+          etapa: string | null
+          monto_baseline: number | null
+          partida_id: string | null
+          proyecto_id: string | null
+          vigente: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       cxc_cargo_ajustar: {
@@ -10802,6 +11027,7 @@ export type Database = {
         Args: { p_levantamiento_id: string }
         Returns: undefined
       }
+      fn_es_direccion: { Args: { p_empresa_id: string }; Returns: boolean }
       fn_firmar_levantamiento: {
         Args: {
           p_comentario?: string
@@ -10882,6 +11108,18 @@ export type Database = {
       fn_oc_recalcular_estado: {
         Args: { p_orden_id: string }
         Returns: undefined
+      }
+      fn_presupuesto_baseline_autorizar: {
+        Args: { p_notas?: string; p_proyecto_id: string }
+        Returns: string
+      }
+      fn_presupuesto_cambio_resolver: {
+        Args: {
+          p_cambio_id: string
+          p_decision: string
+          p_motivo_rechazo?: string
+        }
+        Returns: Json
       }
       oc_cancelar_pendiente_linea: {
         Args: { p_detalle_id: string; p_motivo?: string }
