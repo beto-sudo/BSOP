@@ -393,7 +393,13 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     ? lineas.some((l) => l.descripcion.trim() !== '' && toNum(l.cantidad) > 0)
     : proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
 
-  async function onSubmit() {
+  /**
+   * `autorizarAlCrear` (S4 dilesa-flujo-gasto): quien tiene permiso de
+   * autorizar (write en este módulo es el mismo gate del botón "Marcar
+   * autorizada") puede crear la requisición ya autorizada en un paso —
+   * evita el trámite consigo mismo cuando Dirección captura.
+   */
+  async function onSubmit(autorizarAlCrear = false) {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
@@ -410,6 +416,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         codigo: folio,
         solicitante_id: auth?.user?.id ?? null,
         justificacion: justificacion.trim() || null,
+        autorizada_at: autorizarAlCrear ? new Date().toISOString() : null,
       })
       .select('id')
       .single();
@@ -447,7 +454,11 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       setSubmitting(false);
       return;
     }
-    toast.add({ title: 'Requisición creada', description: folio, type: 'success' });
+    toast.add({
+      title: autorizarAlCrear ? 'Requisición creada y autorizada' : 'Requisición creada',
+      description: folio,
+      type: 'success',
+    });
     setSubmitting(false);
     setFormOpen(false);
     void cargar();
@@ -931,7 +942,14 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={onSubmit} disabled={!canSubmit || submitting}>
+            <Button
+              variant="outline"
+              onClick={() => onSubmit(true)}
+              disabled={!canSubmit || submitting}
+            >
+              Crear y autorizar
+            </Button>
+            <Button onClick={() => onSubmit()} disabled={!canSubmit || submitting}>
               {submitting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

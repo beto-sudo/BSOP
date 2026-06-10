@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Coins, Loader2, Plus, RefreshCw, Search, Send, Trash2, X } from 'lucide-react';
+import { Coins, Loader2, Pencil, Plus, RefreshCw, Search, Send, Trash2, X } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import {
@@ -125,6 +125,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const [proveedorId, setProveedorId] = useState('');
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
+  /** OC en edición (solo borrador, quick win S4 — antes: cancelar y recrear). */
+  const [editOc, setEditOc] = useState<OcRow | null>(null);
 
   const [detalle, setDetalle] = useState<OcRow | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -378,8 +380,31 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const partidaGrupos = proyectoActivo ? (partidasByProyecto.get(proyectoActivo) ?? []) : [];
 
   function abrirAlta() {
+    setEditOc(null);
     setProveedorId('');
     setLineas([emptyLinea()]);
+    setFormOpen(true);
+  }
+
+  /** Edición de una OC en borrador: form de alta pre-poblado (S4). */
+  function abrirEdicionOc(oc: OcRow) {
+    if (oc.estado !== 'borrador') return;
+    if (oc.proyectoId) setProyectoFiltro(oc.proyectoId);
+    setEditOc(oc);
+    setProveedorId(oc.proveedorId ?? '');
+    setLineas(
+      oc.lineas.length > 0
+        ? oc.lineas.map((l) => ({
+            key: crypto.randomUUID(),
+            partidaId: l.partidaId ?? '',
+            descripcion: l.descripcion,
+            unidad: l.unidad ?? '',
+            cantidad: String(l.cantidad),
+            precio: String(l.precioUnitario),
+          }))
+        : [emptyLinea()]
+    );
+    setDrawerOpen(false);
     setFormOpen(true);
   }
 
@@ -395,29 +420,74 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
     const validas = lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
-    const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+    const total = validas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ocResp = await (sb.schema('erp') as any)
-      .from('ordenes_compra')
-      .insert({
-        empresa_id: empresaId,
-        codigo: folio,
-        proveedor_id: proveedorId || null,
-        estado: 'borrador',
-        total: validas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0),
-      })
-      .select('id')
-      .single();
-    if (ocResp.error || !ocResp.data) {
-      toast.add({
-        title: 'Error',
-        description: getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la OC.'),
-        type: 'error',
-      });
-      setSubmitting(false);
-      return;
+    const erp = sb.schema('erp') as any;
+
+    let ocId: string;
+    let folio: string;
+    if (editOc) {
+      // Edición de borrador: actualiza cabecera y REEMPLAZA las líneas
+      // (sin recepciones en borrador, el replace es seguro). El filtro
+      // .eq('estado','borrador') evita pisar una OC que otro usuario ya envió.
+      ocId = editOc.id;
+      folio = editOc.codigo;
+      const upd = await erp
+        .from('ordenes_compra')
+        .update({
+          proveedor_id: proveedorId || null,
+          total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editOc.id)
+        .eq('estado', 'borrador')
+        .select('id');
+      if (upd.error || (upd.data ?? []).length === 0) {
+        toast.add({
+          title: 'No se pudo editar',
+          description: upd.error
+            ? getSupabaseErrorMessage(upd.error, 'Error al actualizar la OC.')
+            : 'La orden ya no está en borrador (alguien la envió). Refresca e intenta de nuevo.',
+          type: 'error',
+        });
+        setSubmitting(false);
+        return;
+      }
+      const del = await erp.from('ordenes_compra_detalle').delete().eq('orden_compra_id', ocId);
+      if (del.error) {
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(del.error, 'No se pudieron reemplazar las líneas.'),
+          type: 'error',
+        });
+        setSubmitting(false);
+        return;
+      }
+    } else {
+      folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+      const ocResp = await erp
+        .from('ordenes_compra')
+        .insert({
+          empresa_id: empresaId,
+          codigo: folio,
+          proveedor_id: proveedorId || null,
+          estado: 'borrador',
+          total,
+        })
+        .select('id')
+        .single();
+      if (ocResp.error || !ocResp.data) {
+        toast.add({
+          title: 'Error',
+          description: getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la OC.'),
+          type: 'error',
+        });
+        setSubmitting(false);
+        return;
+      }
+      ocId = ocResp.data.id as string;
     }
-    const ocId = ocResp.data.id as string;
+
     const detalle = validas.map((l) => ({
       empresa_id: empresaId,
       orden_compra_id: ocId,
@@ -429,20 +499,27 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       precio_unitario: toNum(l.precio),
       subtotal: toNum(l.cantidad) * toNum(l.precio),
     }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const detResp = await (sb.schema('erp') as any).from('ordenes_compra_detalle').insert(detalle);
+    const detResp = await erp.from('ordenes_compra_detalle').insert(detalle);
     if (detResp.error) {
       toast.add({
         title: 'Error',
-        description: getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.'),
+        description: getSupabaseErrorMessage(
+          detResp.error,
+          editOc ? 'OC actualizada pero faltaron líneas.' : 'OC creada pero faltaron líneas.'
+        ),
         type: 'error',
       });
       setSubmitting(false);
       return;
     }
-    toast.add({ title: 'Orden creada', description: folio, type: 'success' });
+    toast.add({
+      title: editOc ? 'Orden actualizada' : 'Orden creada',
+      description: folio,
+      type: 'success',
+    });
     setSubmitting(false);
     setFormOpen(false);
+    setEditOc(null);
     void cargar();
   }
 
@@ -571,13 +648,22 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                 }
               >
                 {r.estado === 'borrador' ? (
-                  <button
-                    type="button"
-                    onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                  >
-                    <Send className="h-3.5 w-3.5" /> Marcar enviada
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => abrirEdicionOc(r)}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar borrador
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                    >
+                      <Send className="h-3.5 w-3.5" /> Marcar enviada
+                    </button>
+                  </>
                 ) : null}
                 {r.estado === 'enviada' || r.estado === 'parcial' ? (
                   <button
@@ -668,7 +754,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-              Nueva orden ·{' '}
+              {editOc ? `Editar orden · ${editOc.codigo}` : 'Nueva orden'} ·{' '}
               {proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto'}
             </h2>
             <select
@@ -794,7 +880,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
               ) : (
                 <Plus className="size-4" />
               )}
-              Crear orden (borrador)
+              {editOc ? 'Guardar cambios' : 'Crear orden (borrador)'}
             </Button>
           </div>
         </div>
