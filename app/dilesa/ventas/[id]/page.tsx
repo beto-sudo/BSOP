@@ -288,7 +288,17 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   11: '11-escriturada',
   12: '12-detonada',
   13: '13-facturada',
-  // 14–17 → próximos PRs del Sprint 7c
+  14: '14-preparada-entrega',
+  // 15–17 → próximos PRs (S5 dilesa-ventas-expediente)
+};
+
+/**
+ * Gate de apertura por fase cuando NO es la inmediata anterior. Beto
+ * (2026-06-10): la preparación de entrega (14) arranca desde que se registra
+ * la escritura (11) — no espera Detonada (12) ni Facturada (13).
+ */
+const GATE_PREVIA_OVERRIDE: Record<number, number> = {
+  14: 11,
 };
 
 /** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
@@ -747,7 +757,8 @@ function DetailInner() {
       const rolesCargados = new Set(cargados.map((a) => a.rol));
       const faltantes = roles.filter((r) => !rolesCargados.has(r));
       const slugCaptura = CAPTURAR_SLUG_BY_POSICION[pos];
-      const previaCerrada = pos === 1 || posicionesAlcanzadas.has(pos - 1);
+      const previaCerrada =
+        pos === 1 || posicionesAlcanzadas.has(GATE_PREVIA_OVERRIDE[pos] ?? pos - 1);
       const alcanzada = !!f?.fecha;
       // Si la venta ya está desasignada, el pipeline queda como histórico
       // — el operador no puede avanzar fases. La unidad está liberada.
@@ -1135,6 +1146,13 @@ function DetailInner() {
                 ventaId={venta.id}
                 tipo="pagare-credito-directo"
                 label="Pagaré (crédito directo)"
+              />
+            ) : null}
+            {(venta.fase_posicion ?? 0) >= 11 ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="checklist-entrega"
+                label="Checklist Pre-Entrega"
               />
             ) : null}
           </div>
@@ -1827,7 +1845,8 @@ function PdfDownloadLink({
     | 'solicitud-avaluo'
     | 'solicitud-dictamen'
     | 'poliza-garantia'
-    | 'pagare-credito-directo';
+    | 'pagare-credito-directo'
+    | 'checklist-entrega';
   label: string;
 }) {
   return (
