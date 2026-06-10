@@ -32,6 +32,10 @@ import {
 import { PolizaGarantiaPDF, type PolizaGarantiaData } from '@/lib/dilesa/pdf/poliza-garantia';
 import { ChecklistEntregaPDF, type ChecklistEntregaData } from '@/lib/dilesa/pdf/checklist-entrega';
 import {
+  ChecklistEntregaClientePDF,
+  type ChecklistEntregaClienteData,
+} from '@/lib/dilesa/pdf/checklist-entrega-cliente';
+import {
   PagareCreditoDirectoPDF,
   type PagareCreditoDirectoData,
 } from '@/lib/dilesa/pdf/pagare-credito-directo';
@@ -49,6 +53,7 @@ const TIPOS = [
   'poliza-garantia',
   'pagare-credito-directo',
   'checklist-entrega',
+  'checklist-entrega-cliente',
 ] as const;
 type TipoPdf = (typeof TIPOS)[number];
 
@@ -348,6 +353,25 @@ export async function GET(
     };
     const buf = await renderToBuffer(<ChecklistEntregaPDF data={data} />);
     return pdfResponse(buf, `checklist-pre-entrega-${identificacionInventario || id}.pdf`);
+  }
+
+  if (tipo === 'checklist-entrega-cliente') {
+    // Checklist de Entrega de Vivienda (Fase 15): lo firman el cliente y
+    // Atención a Clientes en la entrega física; el escaneado se sube en la
+    // captura de la fase.
+    const data: ChecklistEntregaClienteData = {
+      fechaTexto,
+      fraccionamiento: pdfFraccionamiento,
+      manzana: pdfManzana,
+      lote: pdfLote,
+      domicilioOficial: pdfDomicilioOficial,
+      prototipo: pdfPrototipo ?? (pdfDataExtra.prototipo || null),
+      identificacionInventario,
+      clienteNombre,
+      watermark: watermarkText,
+    };
+    const buf = await renderToBuffer(<ChecklistEntregaClientePDF data={data} />);
+    return pdfResponse(buf, `checklist-entrega-${identificacionInventario || id}.pdf`);
   }
 
   if (tipo === 'poliza-garantia') {

@@ -289,7 +289,8 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   12: '12-detonada',
   13: '13-facturada',
   14: '14-preparada-entrega',
-  // 15–17 → próximos PRs (S5 dilesa-ventas-expediente)
+  15: '15-entregada',
+  // 16–17 → próximos PRs (S5 dilesa-ventas-expediente)
 };
 
 /**
@@ -1155,6 +1156,13 @@ function DetailInner() {
                 label="Checklist Pre-Entrega"
               />
             ) : null}
+            {(venta.fase_posicion ?? 0) >= 14 ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="checklist-entrega-cliente"
+                label="Checklist de Entrega (cliente)"
+              />
+            ) : null}
           </div>
 
           <MovimientosAdministrativos
@@ -1846,7 +1854,8 @@ function PdfDownloadLink({
     | 'solicitud-dictamen'
     | 'poliza-garantia'
     | 'pagare-credito-directo'
-    | 'checklist-entrega';
+    | 'checklist-entrega'
+    | 'checklist-entrega-cliente';
   label: string;
 }) {
   return (
