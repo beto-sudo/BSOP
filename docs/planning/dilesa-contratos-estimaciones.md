@@ -4,7 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `erp` (`facturas.contrato_id` nuevo, `cxp_pagos.obra_estimacion_id` nuevo, redefinición de la capa "ejercido" en `v_partida_control`), `dilesa` (`obra_estimaciones`: ciclo de estados + autorización), UI en `app/dilesa/construccion/**` y `app/dilesa/cxp/**`
 **Estado:** in_progress
-**Próximo hito:** Beto revisa Preview de S2 (PR #804) → OK para aplicar migraciones `20260610223000` + `20260610224834` a prod → merge S2. En paralelo: Sprint 3 (pago desde estimación + hilo del gasto + glosario)
+**Próximo hito:** Beto revisa Previews (PR #804 S2 → PR #805 S3) → OK para aplicar las 3 migraciones (`20260610223000`, `20260610224834`, `20260610230502`) a prod + regenerar SCHEMA_REF/types → merge #804 → #805 → closeout
 **Dueño:** Beto
 **Creada:** 2026-06-10
 **Última actualización:** 2026-06-10
@@ -189,6 +189,24 @@ las 3 capas (ADR-042).
 
 ## Bitácora
 
+- **2026-06-10 — S3 (CxP end-to-end + hilo + lenguaje) — PR #805, stacked
+  sobre #804 (mismo gate de salida).** RPC `erp.cxp_pago_desde_estimacion`
+  (migración `20260610230502`, archivo): pago por el neto (monto −
+  retención) aplicado a la factura propia o a la TOTAL del contrato,
+  reusando `cxp_pago_programar`; al ejecutarse el pago, el sync de S1
+  marca la estimación `pagada`. UI: columna Pago en el detalle (badge +
+  link a CxP·Pagos, botón "Programar pago" en autorizadas con factura
+  destino). `GastoActividad` gana estimaciones de obra (zona de contacto
+  asignada aquí; `costeo-module.tsx` intacto). Hilo del gasto: refs
+  clickeables en el paso Estimada (→ contrato), devengo por estado
+  (borradores como "sin autorizar", `hecho` al alcanzar lo contratado),
+  facturas por `contrato_id` (la factura total entra al hilo) con dedup;
+  +6 tests. Lenguaje: glosario del flujo del gasto separa Contrato de obra
+  / Estimación de contrato / Destajos semanales; manual nuevo
+  `contratos-obra.md` + notas cruzadas en `estimaciones.md` (re-titulado
+  "destajos semanales de vivienda") y `contratos.md` (sub-vistas). Con
+  esto los 3 sprints del alcance están construidos; queda el gate de
+  salida (Preview → migraciones con OK de Beto → merges) y el closeout.
 - **2026-06-10 — S2 (UI del contrato) — PR #804, abierto SIN auto-merge
   (gated por aplicar la migración de S1 a prod).** Sub-vistas Vivienda |
   Obra de proyecto en el tab Contratos (segmented control, badge de tipo,
