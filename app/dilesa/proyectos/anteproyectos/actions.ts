@@ -320,9 +320,14 @@ async function syncPartidaDesdeTarea(
     return { ok: true };
   }
 
+  // Fase 2 dilesa-flujo-gasto: la partida vive en el modelo CANÓNICO
+  // `erp.presupuesto_partidas` (ADR-040) — la tabla dilesa.* quedó deprecada
+  // tras el rediseño del costeo y este sync seguía apuntándole (bug latente,
+  // 0 filas afectadas). Solo así la partida del checklist es visible para el
+  // control de 3 capas (tab Gasto / v_partida_control) y el ciclo P2P real.
   const { data: existing, error: eErr } = await supabase
-    .schema('dilesa')
-    .from('proyecto_presupuesto_partidas')
+    .schema('erp')
+    .from('presupuesto_partidas')
     .select('id, estado')
     .eq('tarea_origen_id', tareaId)
     .is('deleted_at', null)
@@ -333,16 +338,16 @@ async function syncPartidaDesdeTarea(
     if (existing.estado !== 'preliminar') return { ok: true };
     if (monto === null) {
       const { error } = await supabase
-        .schema('dilesa')
-        .from('proyecto_presupuesto_partidas')
+        .schema('erp')
+        .from('presupuesto_partidas')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', existing.id);
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     }
     const { error } = await supabase
-      .schema('dilesa')
-      .from('proyecto_presupuesto_partidas')
+      .schema('erp')
+      .from('presupuesto_partidas')
       .update({ monto_estimado: monto })
       .eq('id', existing.id);
     if (error) return { ok: false, error: error.message };
@@ -350,11 +355,11 @@ async function syncPartidaDesdeTarea(
   }
 
   if (monto !== null) {
-    const { error } = await supabase.schema('dilesa').from('proyecto_presupuesto_partidas').insert({
+    const { error } = await supabase.schema('erp').from('presupuesto_partidas').insert({
       empresa_id: t.empresa_id,
       proyecto_id: t.proyecto_id,
       tarea_origen_id: tareaId,
-      partida: t.titulo,
+      concepto_texto: t.titulo,
       monto_estimado: monto,
       estado: 'preliminar',
       fuente: 'cotizacion',
@@ -379,8 +384,8 @@ export async function autorizarPartida(partidaId: string): Promise<SimpleResult>
   if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
 
   const { error } = await supabase
-    .schema('dilesa')
-    .from('proyecto_presupuesto_partidas')
+    .schema('erp')
+    .from('presupuesto_partidas')
     .update({
       estado: 'autorizada',
       autorizado_at: new Date().toISOString(),

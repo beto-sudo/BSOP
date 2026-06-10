@@ -191,7 +191,7 @@ function fmtMonto(n: number): string {
  *   como pendientes (el stepper dice qué sigue).
  * - "Cotizada" solo aparece si hubo RFQ o si se mira desde la RFQ.
  */
-export function buildHiloPasos(registros: HiloRegistros, actual: HiloDoc): HiloGasto {
+export function buildHiloPasos(registros: HiloRegistros, actual: HiloDoc | null): HiloGasto {
   const reqs = registros.requisiciones;
   const cots = registros.cotizaciones;
   const ocs = registros.ocs;
@@ -200,19 +200,22 @@ export function buildHiloPasos(registros: HiloRegistros, actual: HiloDoc): HiloG
   const facturas = registros.facturas;
   const pagos = registros.pagos;
 
+  // `actual` null = el hilo se mira desde fuera del ciclo (p.ej. una tarea
+  // del checklist vía su partida): ningún paso es "estás aquí" y el sabor
+  // directo se infiere solo de los datos.
   const esDirecto =
     ocs.length === 0 &&
-    (actual.tipo === 'factura' || actual.tipo === 'pago') &&
+    (actual === null || actual.tipo === 'factura' || actual.tipo === 'pago') &&
     (facturas.length > 0 || pagos.length > 0);
   const sabor: HiloSabor =
-    contratos.length > 0 || actual.tipo === 'contrato'
+    contratos.length > 0 || actual?.tipo === 'contrato'
       ? 'obra'
       : esDirecto
         ? 'directo'
         : 'materiales';
 
   const pasos: HiloPaso[] = [];
-  const esActual = (tipo: HiloDocTipo) => actual.tipo === tipo;
+  const esActual = (tipo: HiloDocTipo) => actual?.tipo === tipo;
 
   // — Solicitada (requisición) —
   if (reqs.length > 0 || esActual('requisicion')) {
@@ -646,4 +649,129 @@ export async function fetchHiloRegistros(sb: Sb, doc: HiloDoc): Promise<HiloRegi
     fetchCots(uniq(ocs.map((o) => o.cotizacion_id))),
   ]);
   return out;
+}
+
+/**
+ * Hilo del gasto POR PARTIDA (fase 2 — convergencia checklist ↔ ciclo real).
+ *
+ * Entrada para superficies que no son un documento del ciclo (la tarea del
+ * checklist mira el ciclo a través de su partida: `tarea_origen_id` →
+ * partida → todo lo anclado a ella). Junta RFQs (vía `cotizacion_lineas`),
+ * OCs (vía `ordenes_compra_detalle`), contratos, facturas (directas + de OC +
+ * de estimación) y sus pagos. Render con `buildHiloPasos(registros, null)`.
+ */
+export async function fetchHiloRegistrosPorPartida(
+  sb: Sb,
+  partidaId: string
+): Promise<HiloRegistros> {
+  const erp = () => sb.schema('erp');
+  const dilesa = () => sb.schema('dilesa');
+  const out = emptyRegistros();
+  const fail = (e: { message?: string } | null): never => {
+    throw new Error(e?.message ?? 'No se pudo cargar el hilo del gasto.');
+  };
+
+  // Ronda 1: todo lo anclado directo a la partida.
+  const [detRes, cotLinRes, contratosRes, factDirRes] = await Promise.all([
+    erp().from('ordenes_compra_detalle').select('orden_compra_id').eq('partida_id', partidaId),
+    erp().from('cotizacion_lineas').select('cotizacion_id').eq('partida_id', partidaId),
+    dilesa()
+      .from('contratos_construccion')
+      .select(CONTRATO_COLS)
+      .eq('partida_id', partidaId)
+      .is('deleted_at', null),
+    erp().from('facturas').select(FACT_COLS).eq('partida_id', partidaId),
+  ]);
+  if (detRes.error) fail(detRes.error);
+  if (cotLinRes.error) fail(cotLinRes.error);
+  if (contratosRes.error) fail(contratosRes.error);
+  if (factDirRes.error) fail(factDirRes.error);
+
+  const ocIds = uniq(
+    ((detRes.data ?? []) as { orden_compra_id: string }[]).map((d) => d.orden_compra_id)
+  );
+  const cotIds = uniq(
+    ((cotLinRes.data ?? []) as { cotizacion_id: string }[]).map((c) => c.cotizacion_id)
+  );
+  out.contratos = (contratosRes.data ?? []) as ContratoReg[];
+
+  // Ronda 2: documentos por id + estimaciones de los contratos.
+  const [ocsRes, cotsRes, estimsRes] = await Promise.all([
+    ocIds.length
+      ? erp().from('ordenes_compra').select(OC_COLS).in('id', ocIds).is('deleted_at', null)
+      : Promise.resolve({ data: [], error: null }),
+    cotIds.length
+      ? erp().from('cotizaciones').select(COT_COLS).in('id', cotIds)
+      : Promise.resolve({ data: [], error: null }),
+    out.contratos.length
+      ? dilesa()
+          .from('obra_estimaciones')
+          .select(ESTIM_COLS)
+          .in(
+            'contrato_id',
+            out.contratos.map((c) => c.id)
+          )
+          .is('deleted_at', null)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (ocsRes.error) fail(ocsRes.error);
+  if (cotsRes.error) fail(cotsRes.error);
+  if (estimsRes.error) fail(estimsRes.error);
+  out.ocs = ((ocsRes.data ?? []) as OcRaw[]).map(mapOc);
+  out.cotizaciones = (cotsRes.data ?? []) as CotReg[];
+  out.estimaciones = (estimsRes.data ?? []) as EstimReg[];
+
+  // Ronda 3: facturas de OCs/estimaciones + merge con las directas (dedup).
+  const [factOcRes, factEstimRes] = await Promise.all([
+    out.ocs.length
+      ? erp()
+          .from('facturas')
+          .select(FACT_COLS)
+          .in(
+            'orden_compra_id',
+            out.ocs.map((o) => o.id)
+          )
+      : Promise.resolve({ data: [], error: null }),
+    out.estimaciones.length
+      ? erp()
+          .from('facturas')
+          .select(FACT_COLS)
+          .in(
+            'obra_estimacion_id',
+            out.estimaciones.map((e) => e.id)
+          )
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (factOcRes.error) fail(factOcRes.error);
+  if (factEstimRes.error) fail(factEstimRes.error);
+  const facturasMap = new Map<string, FacturaReg>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const raw of [factDirRes.data, factOcRes.data, factEstimRes.data] as any[][]) {
+    for (const f of raw ?? []) facturasMap.set(f.id as string, mapFactura(f));
+  }
+  out.facturas = [...facturasMap.values()];
+
+  // Ronda 4: pagos de todas las facturas.
+  if (out.facturas.length) {
+    const apps2 = await erp()
+      .from('cxp_pago_aplicaciones')
+      .select('pago_id')
+      .in(
+        'factura_id',
+        out.facturas.map((f) => f.id)
+      );
+    if (apps2.error) fail(apps2.error);
+    const pagoIds = uniq(((apps2.data ?? []) as { pago_id: string }[]).map((a) => a.pago_id));
+    if (pagoIds.length) {
+      const pagosRes = await erp().from('cxp_pagos').select(PAGO_COLS).in('id', pagoIds);
+      if (pagosRes.error) fail(pagosRes.error);
+      out.pagos = (pagosRes.data ?? []) as PagoReg[];
+    }
+  }
+  return out;
+}
+
+/** ¿El hilo tiene actividad real más allá de pendientes? (algún doc existente). */
+export function hiloTieneActividad(h: HiloGasto): boolean {
+  return h.pasos.some((p) => p.refs.length > 0 || p.estado === 'parcial' || p.estado === 'hecho');
 }

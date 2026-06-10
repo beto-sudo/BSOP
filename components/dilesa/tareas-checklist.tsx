@@ -24,6 +24,7 @@ import { ChevronRight, MessageSquare, Paperclip } from 'lucide-react';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { updateTareaEstado, updateTareaNotas } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { TAREA_ESTADOS_VALIDOS, type TareaEstado } from './tareas-checklist-types';
+import { TareaCicloReal } from './tarea-ciclo-real';
 import {
   TareaPasos,
   type PasoRow,
@@ -133,6 +134,8 @@ export function TareasChecklist({
   empresaId,
   empresaSlug,
   puedeAutorizar = false,
+  proyectoId,
+  partidasPorTarea,
   onChange,
 }: {
   tareas: readonly TareaChecklistRow[];
@@ -141,6 +144,10 @@ export function TareasChecklist({
   empresaId: string;
   empresaSlug: EmpresaSlug;
   puedeAutorizar?: boolean;
+  /** Para el link al tab Gasto desde el ciclo real (fase 2 dilesa-flujo-gasto). */
+  proyectoId?: string;
+  /** tareaId → partida canónica creada por la tarea (tarea_origen_id). */
+  partidasPorTarea?: ReadonlyMap<string, { id: string; concepto: string }>;
   onChange?: () => void;
 }) {
   const tareasSource: readonly TareaChecklistRow[] = Array.isArray(tareasInicial)
@@ -240,6 +247,8 @@ export function TareasChecklist({
                     empresaId={empresaId}
                     empresaSlug={empresaSlug}
                     puedeAutorizar={puedeAutorizar}
+                    proyectoId={proyectoId}
+                    partida={partidasPorTarea?.get(t.id) ?? null}
                     onPatch={patchLocal}
                     onError={setError}
                     onChange={onChange}
@@ -417,6 +426,8 @@ function TareaRowExpanded({
   empresaId,
   empresaSlug,
   puedeAutorizar,
+  proyectoId,
+  partida,
   onPatch,
   onError,
   onChange,
@@ -427,6 +438,8 @@ function TareaRowExpanded({
   empresaId: string;
   empresaSlug: EmpresaSlug;
   puedeAutorizar: boolean;
+  proyectoId?: string;
+  partida?: { id: string; concepto: string } | null;
   onPatch: (id: string, patch: Partial<TareaChecklistRow>) => void;
   onError: (msg: string | null) => void;
   onChange?: () => void;
@@ -466,6 +479,19 @@ function TareaRowExpanded({
   return (
     <tr className="border-b border-[var(--border)]/60 bg-[var(--card)]/30">
       <td colSpan={7} className="px-3 py-3">
+        {/* Ciclo real (fase 2 dilesa-flujo-gasto): solo cuando la tarea ya
+            originó una partida canónica — el stepper muestra RFQ/OC/factura/
+            pago reales anclados a ella. */}
+        {partida && proyectoId ? (
+          <div className="mb-3">
+            <TareaCicloReal
+              empresaId={empresaId}
+              proyectoId={proyectoId}
+              partidaId={partida.id}
+              concepto={partida.concepto}
+            />
+          </div>
+        ) : null}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text)]/60">
             {tarea.tipo_snapshot && (

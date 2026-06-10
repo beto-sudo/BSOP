@@ -14,7 +14,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildHiloPasos, emptyRegistros, hrefDoc, type HiloPaso, type HiloRegistros } from './hilo';
+import {
+  buildHiloPasos,
+  emptyRegistros,
+  hiloTieneActividad,
+  hrefDoc,
+  type HiloPaso,
+  type HiloRegistros,
+} from './hilo';
 
 const reg = (partial: Partial<HiloRegistros>): HiloRegistros => ({
   ...emptyRegistros(),
@@ -185,6 +192,24 @@ describe('buildHiloPasos · estados (H4, H5)', () => {
     );
     expect(paso(h, 'facturada').refs).toHaveLength(2);
     expect(paso(h, 'ordenada').refs).toHaveLength(2);
+  });
+});
+
+describe('buildHiloPasos · actual=null (hilo por partida, fase 2)', () => {
+  it('nada es esActual y el sabor sale solo de los datos', () => {
+    const h = buildHiloPasos(reg({ ocs: [OC()], facturas: [FACT()] }), null);
+    expect(h.sabor).toBe('materiales');
+    expect(h.pasos.every((p) => !p.esActual)).toBe(true);
+  });
+
+  it('factura sin OC con actual=null es gasto directo', () => {
+    const h = buildHiloPasos(reg({ facturas: [FACT()] }), null);
+    expect(h.sabor).toBe('directo');
+  });
+
+  it('hiloTieneActividad distingue hilo vacío de hilo con avance', () => {
+    expect(hiloTieneActividad(buildHiloPasos(reg({}), null))).toBe(false);
+    expect(hiloTieneActividad(buildHiloPasos(reg({ ocs: [OC()] }), null))).toBe(true);
   });
 });
 

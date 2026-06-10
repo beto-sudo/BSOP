@@ -3,11 +3,11 @@
 **Slug:** `dilesa-flujo-gasto`
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
-**Estado:** done
-**Próximo hito:** — (v1 entregado; fase 2 candidata si algún día se quiere: convergencia del checklist del anteproyecto con el ciclo P2P real)
+**Estado:** in_progress
+**Próximo hito:** Fase 2 a PR — aplicar migración `20260610003301` (fix RPC promoción → partidas canónicas) con OK de Beto + merge; luego re-cerrar la iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-10 (cerrada — v1 completo en prod: S1 #784, S2 #787 + migración, S3 #788, S4 #789)
+**Última actualización:** 2026-06-10 (REABIERTA por pedido de Beto — Fase 2: convergencia checklist ↔ ciclo real)
 
 ## Problema
 
@@ -176,6 +176,22 @@ Facturar → Pagar.
   `useFocusDrilldown`) y centralizó los destinos en `hrefDoc` (fix del link).
 
 ## Bitácora
+
+- **2026-06-10 — Fase 2 (convergencia checklist ↔ ciclo real) a PR.**
+  Hallazgo al mapear: el canal tarea→partida seguía apuntando a la tabla
+  DEPRECADA `dilesa.proyecto_presupuesto_partidas` (sync de
+  `syncPartidaDesdeTarea`, `autorizarPartida` y el paso 6 de
+  `fn_proyecto_promote_anteproyecto`) — bug latente con 0 filas afectadas.
+  Entregado: (P1) canal redirigido al modelo canónico
+  `erp.presupuesto_partidas` (actions + migración `20260610003301` con el
+  CREATE OR REPLACE de la RPC, resto idéntico); (P2) sección "Ciclo real" en
+  la tarea expandida del checklist — `<TareaCicloReal>` con el hilo POR
+  PARTIDA (`fetchHiloRegistrosPorPartida`, `buildHiloPasos(reg, null)`,
+  `<HiloPasosView>` extraído del stepper) + "Pedir cotizaciones (RFQ)" con
+  línea pre-cargada a la partida + link al tab Gasto; (P3) banner que
+  de-enfatiza la captura manual cuando el ciclo real avanza (la captura
+  sigue disponible para cotizaciones informales). `<PartidasPresupuestales>`
+  resultó huérfano (sin montar) — anotado para limpieza futura, no se tocó.
 
 - **2026-06-10 — CERRADA (v1 completo, 4 sprints en ~1 día).** S1 hilo del
   gasto (#784) · S2 home del gasto en el proyecto + mudanza de Costeo +

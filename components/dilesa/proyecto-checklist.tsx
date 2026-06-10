@@ -57,6 +57,25 @@ export type ProyectoTarea = {
 
 export type TareaDep = { tarea_id: string; depende_de_tarea_id: string };
 
+/** Partida canónica originada por una tarea (fase 2 dilesa-flujo-gasto). */
+type PartidaTareaRow = {
+  id: string;
+  tarea_origen_id: string | null;
+  concepto_texto: string | null;
+};
+
+function buildPartidasPorTarea(res: {
+  data: PartidaTareaRow[] | null;
+  error: unknown;
+}): Map<string, { id: string; concepto: string }> {
+  const m = new Map<string, { id: string; concepto: string }>();
+  if (res.error || !Array.isArray(res.data)) return m;
+  for (const p of res.data) {
+    if (p.tarea_origen_id) m.set(p.tarea_origen_id, { id: p.id, concepto: p.concepto_texto ?? '' });
+  }
+  return m;
+}
+
 /** Estados de tarea que NO son terminales — candidatos a "marcar histórico". */
 const ESTADOS_NO_TERMINALES = ['pendiente', 'en_curso', 'bloqueada'];
 
@@ -120,6 +139,9 @@ export function ProyectoChecklist({
   const [tareas, setTareas] = useState<ProyectoTarea[]>([]);
   const [dependencias, setDependencias] = useState<TareaDep[]>([]);
   const [pasos, setPasos] = useState<PasoRow[]>([]);
+  const [partidasPorTarea, setPartidasPorTarea] = useState<
+    Map<string, { id: string; concepto: string }>
+  >(new Map());
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -148,11 +170,12 @@ export function ProyectoChecklist({
       Array.isArray(tareasRes.data) && tareasRes.data.length > 0
         ? tareasRes.data.map((t) => t.id as string)
         : [];
-    const [depsRes, pasosRes] =
+    const [depsRes, pasosRes, partidasRes] =
       tareaIds.length === 0
         ? [
             { data: [] as TareaDep[], error: null },
             { data: [] as PasoRow[], error: null },
+            { data: [] as PartidaTareaRow[], error: null },
           ]
         : await Promise.all([
             supabase
@@ -168,13 +191,21 @@ export function ProyectoChecklist({
               )
               .in('tarea_id', tareaIds)
               .is('deleted_at', null),
+            // Partidas canónicas originadas por tareas (fase 2 dilesa-flujo-gasto):
+            // habilitan la sección "Ciclo real" en la tarea expandida.
+            supabase
+              .schema('erp')
+              .from('presupuesto_partidas')
+              .select('id, tarea_origen_id, concepto_texto')
+              .in('tarea_origen_id', tareaIds)
+              .is('deleted_at', null),
           ]);
-    return [tareasRes, depsRes, pasosRes] as const;
+    return [tareasRes, depsRes, pasosRes, partidasRes] as const;
   }, []);
 
   const cargarExtras = useCallback(
     async (id: string) => {
-      const [tareasRes, depsRes, pasosRes] = await fetchExtras(id);
+      const [tareasRes, depsRes, pasosRes, partidasRes] = await fetchExtras(id);
       if (tareasRes.error) {
         setExtrasError(
           getSupabaseErrorMessage(tareasRes.error, 'No se pudieron cargar las tareas.')
@@ -188,6 +219,7 @@ export function ProyectoChecklist({
         !depsRes.error && Array.isArray(depsRes.data) ? (depsRes.data as TareaDep[]) : []
       );
       setPasos(!pasosRes.error && Array.isArray(pasosRes.data) ? (pasosRes.data as PasoRow[]) : []);
+      setPartidasPorTarea(buildPartidasPorTarea(partidasRes));
       setLoadedId(id);
     },
     [fetchExtras]
@@ -197,7 +229,7 @@ export function ProyectoChecklist({
   // para no encadenar renders (regla ESLint react-hooks del repo).
   useEffect(() => {
     let activo = true;
-    void fetchExtras(proyectoId).then(([tareasRes, depsRes, pasosRes]) => {
+    void fetchExtras(proyectoId).then(([tareasRes, depsRes, pasosRes, partidasRes]) => {
       if (!activo) return;
       if (tareasRes.error) {
         setExtrasError(
@@ -212,6 +244,7 @@ export function ProyectoChecklist({
         !depsRes.error && Array.isArray(depsRes.data) ? (depsRes.data as TareaDep[]) : []
       );
       setPasos(!pasosRes.error && Array.isArray(pasosRes.data) ? (pasosRes.data as PasoRow[]) : []);
+      setPartidasPorTarea(buildPartidasPorTarea(partidasRes));
       setLoadedId(proyectoId);
     });
     return () => {
@@ -336,6 +369,8 @@ export function ProyectoChecklist({
             empresaId={empresaId}
             empresaSlug={empresaSlug}
             puedeAutorizar={puedeAutorizar}
+            proyectoId={proyectoId}
+            partidasPorTarea={partidasPorTarea}
             onChange={() => void cargarExtras(proyectoId)}
           />
         </div>
