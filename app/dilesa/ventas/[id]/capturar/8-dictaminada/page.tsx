@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 8 — Dictaminada (Sprint 7f, fallback manual).
+ * Captura Fase 8 — Dictaminada (Sprint 7f, fallback manual + análisis IA).
  *
  * Cierra la fase de Dictaminación: Gerencia Ventas captura manualmente
  * la Carta de Instrucción Notarial cuando el notario no usa el magic
@@ -9,11 +9,20 @@
  *
  * El flujo principal es que el notario suba via magic link
  * (`/dilesa/notario/dictamen/<token>`), que cierra F8 automáticamente.
- * Esta page es el fallback.
+ * Esta page es el fallback — y el lugar donde Gerencia sube las
+ * Condiciones Financieras y captura los números.
  *
  * Captura:
  *   - PDF Carta de Instrucción Notarial (rol `carta_instruccion_notarial`)
- *   - Fecha del dictamen (default hoy)
+ *   - PDF Condiciones Financieras Anexo B (rol `condiciones_financieras`,
+ *     opcional — los créditos no-Infonavit pueden no traerlo)
+ *   - Fecha del dictamen (default hoy) + montos/referencias del crédito
+ *
+ * Análisis IA automático (Beto, 2026-06-10): al seleccionar cualquiera de
+ * los dos PDFs se analiza con Claude y se PRECARGAN los campos del form
+ * (valor de escrituración, monto crédito, referencia, gastos) + chips de
+ * verificación cruzada (NSS, nombre, domicilio vs unidad, CLABE de DILESA).
+ * Nada se escribe a la venta hasta "Guardar" — la precarga es editable.
  *
  * Enforcement: Fase 7 (Solicitud de Dictaminación) debe estar cerrada.
  *
@@ -23,7 +32,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, MinusCircle, Save, Sparkles, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -33,6 +42,8 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import { buildAdjuntoPath } from '@/lib/storage/path';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 type VentaCtx = {
   id: string;
@@ -44,6 +55,31 @@ type VentaCtx = {
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   gastos_escrituracion: number | null;
+  valor_escrituracion: number | null;
+};
+
+type Verificaciones = {
+  nss_coincide: boolean | null;
+  nombre_coincide: boolean | null;
+  domicilio_coincide: boolean | null;
+  clabe_es_dilesa: boolean | null;
+  vendedor_es_dilesa: boolean | null;
+};
+type Extraccion = {
+  tipo_documento: string;
+  nombre_titular: string;
+  nss: string;
+  numero_credito: string;
+  institucion_credito: string;
+  precio_compraventa: number;
+  monto_credito: number;
+  gastos_titulacion: number;
+  impuestos_derechos: number;
+  costo_avaluo: number;
+  domicilio_inmueble: string;
+  vendedor: string;
+  clabe_beneficiario: string;
+  banco_beneficiario: string;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -78,16 +114,88 @@ function CapturarFase8Body() {
 
   const [fechaDictamen, setFechaDictamen] = useState<string>(new Date().toISOString().slice(0, 10));
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [archivoCondiciones, setArchivoCondiciones] = useState<File | null>(null);
   // Confirmar/editar (acarrean de Fase 6) + capturar gastos de escrituración.
   const [montoTitular, setMontoTitular] = useState<string>('');
   const [montoCotitular, setMontoCotitular] = useState<string>('');
   const [creditoTitularRef, setCreditoTitularRef] = useState<string>('');
   const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
   const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
+  const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
+
+  // Análisis IA automático al subir documentos.
+  const [analizando, setAnalizando] = useState(false);
+  const [verif, setVerif] = useState<Verificaciones | null>(null);
+  const [extracciones, setExtracciones] = useState<Extraccion[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Analiza el PDF con Claude apenas se selecciona y PRECARGA los campos del
+   * form (el operador revisa/edita antes de guardar — nada se persiste aquí).
+   * Si la extracción falla o el doc no trae un dato, los campos quedan como
+   * están y se capturan a mano (créditos no-Infonavit, escaneos malos, etc.).
+   */
+  const analizarArchivo = useCallback(
+    async (f: File) => {
+      setAnalizando(true);
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await fetch(`/api/dilesa/ventas/${ventaId}/analizar-notarial`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(body?.error ?? `HTTP ${res.status}`);
+        }
+        const { extraccion, verificaciones } = (await res.json()) as {
+          extraccion: Extraccion;
+          verificaciones: Verificaciones;
+        };
+
+        // Precarga: lo extraído manda (es el dato del documento oficial);
+        // el operador puede corregir antes de guardar.
+        if (extraccion.precio_compraventa > 0)
+          setValorEscrituracion(String(extraccion.precio_compraventa));
+        if (extraccion.monto_credito > 0) setMontoTitular(String(extraccion.monto_credito));
+        if (extraccion.numero_credito) {
+          const inst = extraccion.institucion_credito ? `${extraccion.institucion_credito} ` : '';
+          setCreditoTitularRef(`${inst}${extraccion.numero_credito}`);
+        }
+        const gastos = extraccion.gastos_titulacion + extraccion.impuestos_derechos;
+        if (gastos > 0) setGastosEscrituracion(String(gastos));
+
+        // Las verificaciones se acumulan entre documentos: un false o un true
+        // nuevo pisa un null previo, pero un null nunca borra un resultado.
+        setVerif((prev) => {
+          const next = { ...(prev ?? verificaciones) };
+          (Object.keys(verificaciones) as (keyof Verificaciones)[]).forEach((k) => {
+            if (verificaciones[k] !== null) next[k] = verificaciones[k];
+          });
+          return next;
+        });
+        setExtracciones((prev) => [...prev, extraccion]);
+        toast.add({
+          title: 'Documento analizado',
+          description: 'Campos precargados — revisa los datos antes de guardar.',
+          type: 'success',
+        });
+      } catch (e) {
+        toast.add({
+          title: 'No se pudo analizar el documento',
+          description: `${e instanceof Error ? e.message : 'Error'}. Captura los datos manualmente.`,
+          type: 'error',
+        });
+      } finally {
+        setAnalizando(false);
+      }
+    },
+    [toast, ventaId]
+  );
 
   useEffect(() => {
     if (!ventaId) return;
@@ -101,7 +209,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion'
+          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -124,6 +232,7 @@ function CapturarFase8Body() {
       if (v.credito_titular_ref) setCreditoTitularRef(v.credito_titular_ref);
       if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
       if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
+      if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
 
       const [pRes, uRes, fRes, notRes] = await Promise.all([
         sb
@@ -219,11 +328,14 @@ function CapturarFase8Body() {
       const userId = userRes?.user?.id ?? null;
 
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
+      const docs = [{ rol: 'carta_instruccion_notarial', archivo }];
+      if (archivoCondiciones)
+        docs.push({ rol: 'condiciones_financieras', archivo: archivoCondiciones });
       const result = await marcarFase(sb, {
         ventaId: venta.id,
         faseNombre: 'Dictaminada',
         faseposicion: 8,
-        docs: [{ rol: 'carta_instruccion_notarial', archivo }],
+        docs,
         camposVenta: {
           fecha_dictaminada: fechaDictamen,
           monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
@@ -231,6 +343,7 @@ function CapturarFase8Body() {
           credito_titular_ref: creditoTitularRef.trim() || null,
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
           gastos_escrituracion: gastosNum,
+          valor_escrituracion: valorEscrituracion.trim() ? Number(valorEscrituracion) : null,
         },
         notas: null,
         registradoPor: userId,
@@ -254,12 +367,14 @@ function CapturarFase8Body() {
     },
     [
       archivo,
+      archivoCondiciones,
       fechaDictamen,
       montoTitular,
       montoCotitular,
       creditoTitularRef,
       creditoCotitularRef,
       gastosEscrituracion,
+      valorEscrituracion,
       router,
       sb,
       toast,
@@ -270,12 +385,55 @@ function CapturarFase8Body() {
   // Caso magic link: el notario ya cerró F8 subiendo la carta, pero los
   // datos administrativos (número de crédito + gastos de escrituración)
   // los captura Gerencia Ventas. Este path hace UPDATE directo de la venta
-  // SIN insertar otra fila en venta_fases (la fase ya está cerrada).
+  // SIN insertar otra fila en venta_fases (la fase ya está cerrada). Si
+  // se subieron las Condiciones Financieras aquí, se archivan como adjunto.
   const onActualizarDatos = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
       setSubmitting(true);
+      const { data: userRes } = await sb.auth.getUser();
+      const userId = userRes?.user?.id ?? null;
+
+      if (archivoCondiciones) {
+        const path = buildAdjuntoPath({
+          empresa: 'dilesa',
+          entidad: 'ventas',
+          entidadId: venta.id,
+          filename: archivoCondiciones.name,
+        });
+        const { error: upStorageErr } = await sb.storage
+          .from('adjuntos')
+          .upload(path, archivoCondiciones, {
+            contentType: archivoCondiciones.type || 'application/octet-stream',
+            upsert: false,
+          });
+        if (!upStorageErr) {
+          await sb
+            .schema('erp')
+            .from('adjuntos')
+            .insert({
+              empresa_id: DILESA_EMPRESA_ID,
+              entidad_tipo: 'venta',
+              entidad_id: venta.id,
+              rol: 'condiciones_financieras',
+              nombre: archivoCondiciones.name,
+              url: path,
+              tipo_mime: archivoCondiciones.type || null,
+              tamano_bytes: archivoCondiciones.size,
+              uploaded_by: userId,
+            });
+        } else {
+          toast.add({
+            title: 'No se pudo subir el PDF de condiciones',
+            description: upStorageErr.message,
+            type: 'error',
+          });
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
       const { error: upErr } = await sb
         .schema('dilesa')
@@ -286,6 +444,7 @@ function CapturarFase8Body() {
           credito_titular_ref: creditoTitularRef.trim() || null,
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
           gastos_escrituracion: gastosNum,
+          valor_escrituracion: valorEscrituracion.trim() ? Number(valorEscrituracion) : null,
         })
         .eq('id', venta.id);
       setSubmitting(false);
@@ -299,17 +458,19 @@ function CapturarFase8Body() {
       }
       toast.add({
         title: 'Datos actualizados',
-        description: 'Números de crédito y gastos de escrituración guardados.',
+        description: 'Números de crédito y datos de escrituración guardados.',
         type: 'success',
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
     [
+      archivoCondiciones,
       montoTitular,
       montoCotitular,
       creditoTitularRef,
       creditoCotitularRef,
       gastosEscrituracion,
+      valorEscrituracion,
       router,
       sb,
       toast,
@@ -363,8 +524,36 @@ function CapturarFase8Body() {
             body="La Carta de Instrucción ya está capturada. Aquí puedes confirmar/actualizar los números de crédito y los gastos de escrituración (útil si el notario cerró la fase desde el enlace del correo)."
           />
           <form onSubmit={onActualizarDatos} className="mt-4 space-y-6">
+            <Section title="Condiciones Financieras (Anexo B)">
+              <FileSlot
+                label="Condiciones Financieras Definitivas (opcional)"
+                archivo={archivoCondiciones}
+                onChange={(f) => {
+                  setArchivoCondiciones(f);
+                  if (f) void analizarArchivo(f);
+                }}
+              />
+              <Hint>
+                Al subirlo se analiza automáticamente y se precargan los datos del crédito — revisa
+                y guarda. Si el crédito no es Infonavit y no hay anexo, captura manual.
+              </Hint>
+            </Section>
+
+            <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
+
             <Section title="Datos del crédito y escrituración">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Valor de Escrituración">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={valorEscrituracion}
+                    onChange={(e) => setValorEscrituracion(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Hint>{money(Number(valorEscrituracion) || 0)} — precio de compra-venta</Hint>
+                </Field>
                 <Field label="Monto Crédito Titular">
                   <Input
                     type="number"
@@ -462,13 +651,33 @@ function CapturarFase8Body() {
             </div>
           ) : null}
 
-          <Section title="Carta de Instrucción Notarial">
-            <FileSlot
-              label="Carta de Instrucción firmada por el notario *"
-              archivo={archivo}
-              onChange={setArchivo}
-            />
+          <Section title="Documentos del notario">
+            <div className="space-y-3">
+              <FileSlot
+                label="Carta de Instrucción firmada por el notario *"
+                archivo={archivo}
+                onChange={(f) => {
+                  setArchivo(f);
+                  if (f) void analizarArchivo(f);
+                }}
+              />
+              <FileSlot
+                label="Condiciones Financieras Definitivas — Anexo B (opcional)"
+                archivo={archivoCondiciones}
+                onChange={(f) => {
+                  setArchivoCondiciones(f);
+                  if (f) void analizarArchivo(f);
+                }}
+              />
+            </div>
+            <Hint>
+              Al seleccionar cada PDF se analiza automáticamente y se precargan los campos de abajo
+              — revisa antes de guardar. Créditos no-Infonavit: se extrae lo que el documento
+              traiga; lo demás se captura manual.
+            </Hint>
           </Section>
+
+          <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
 
           <Section title="Datos del dictamen">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -479,6 +688,17 @@ function CapturarFase8Body() {
                   onChange={(e) => setFechaDictamen(e.target.value)}
                   required
                 />
+              </Field>
+              <Field label="Valor de Escrituración">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={valorEscrituracion}
+                  onChange={(e) => setValorEscrituracion(e.target.value)}
+                  placeholder="0"
+                />
+                <Hint>{money(Number(valorEscrituracion) || 0)} — precio de compra-venta</Hint>
               </Field>
               <Field label="Gastos de Escrituración">
                 <Input
@@ -570,6 +790,90 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {title}
       </h2>
       {children}
+    </section>
+  );
+}
+
+/**
+ * Resultado del análisis IA: chips de verificación cruzada contra la venta +
+ * resumen de lo extraído. Solo informativo — los valores editables viven en
+ * los campos del form (precargados).
+ */
+function PanelAnalisis({
+  analizando,
+  verif,
+  extracciones,
+}: {
+  analizando: boolean;
+  verif: Verificaciones | null;
+  extracciones: Extraccion[];
+}) {
+  if (analizando) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--text)]/70">
+        <Loader2 className="size-4 animate-spin" /> Analizando documento…
+      </div>
+    );
+  }
+  if (!verif || extracciones.length === 0) return null;
+
+  const checks: Array<{ label: string; valor: boolean | null }> = [
+    { label: 'NSS coincide con el cliente', valor: verif.nss_coincide },
+    { label: 'Nombre coincide con el cliente', valor: verif.nombre_coincide },
+    { label: 'Domicilio coincide con la unidad', valor: verif.domicilio_coincide },
+    { label: 'CLABE de depósito es de DILESA', valor: verif.clabe_es_dilesa },
+    { label: 'Vendedor es DILESA', valor: verif.vendedor_es_dilesa },
+  ];
+  const ultima = extracciones[extracciones.length - 1];
+  const hayRojo = checks.some((c) => c.valor === false);
+
+  return (
+    <section
+      className={`rounded-lg border p-4 ${
+        hayRojo
+          ? 'border-red-400/50 bg-red-50 dark:bg-red-950/20'
+          : 'border-[var(--border)] bg-[var(--card)]'
+      }`}
+    >
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/60">
+        <Sparkles className="size-3.5" /> Análisis del documento
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        {checks.map((c) => (
+          <span
+            key={c.label}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+              c.valor === true
+                ? 'border-emerald-400/50 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                : c.valor === false
+                  ? 'border-red-400/60 bg-red-100 font-medium text-red-800 dark:bg-red-950/40 dark:text-red-200'
+                  : 'border-[var(--border)] text-[var(--text)]/45'
+            }`}
+          >
+            {c.valor === true ? (
+              <CheckCircle2 className="size-3" />
+            ) : c.valor === false ? (
+              <XCircle className="size-3" />
+            ) : (
+              <MinusCircle className="size-3" />
+            )}
+            {c.label}
+          </span>
+        ))}
+      </div>
+      {hayRojo ? (
+        <p className="mt-2 text-xs font-medium text-red-700 dark:text-red-300">
+          ⚠ Hay datos del documento que NO coinciden con la venta — verifica antes de guardar.
+        </p>
+      ) : null}
+      {ultima ? (
+        <p className="mt-2 text-[11px] text-[var(--text)]/55">
+          Último documento: {ultima.tipo_documento.replace('_', ' ')}
+          {ultima.numero_credito ? ` · crédito ${ultima.numero_credito}` : ''}
+          {ultima.banco_beneficiario ? ` · depósito vía ${ultima.banco_beneficiario}` : ''}
+          {ultima.costo_avaluo > 0 ? ` · costo avalúo ${moneyFmt.format(ultima.costo_avaluo)}` : ''}
+        </p>
+      ) : null}
     </section>
   );
 }
