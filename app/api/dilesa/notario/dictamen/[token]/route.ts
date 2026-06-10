@@ -53,6 +53,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const fecha = (form.get('fecha') as string | null)?.trim() || null;
   const comentarios = (form.get('comentarios') as string | null)?.trim() || null;
   const archivo = form.get('archivo');
+  // Opcional: Condiciones Financieras Definitivas (Anexo B) — el notario las
+  // manda junto con la carta en créditos INFONAVIT.
+  const archivoCondiciones = form.get('archivo_condiciones');
 
   if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return NextResponse.json(
@@ -72,6 +75,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   if (archivo.size > MAX_FILE_BYTES) {
     return NextResponse.json(
       { ok: false, error: `El archivo supera el límite de ${MAX_FILE_BYTES / 1024 / 1024}MB.` },
+      { status: 413 }
+    );
+  }
+  if (archivoCondiciones instanceof File && archivoCondiciones.size > MAX_FILE_BYTES) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Las condiciones financieras superan el límite de ${MAX_FILE_BYTES / 1024 / 1024}MB.`,
+      },
       { status: 413 }
     );
   }
@@ -173,6 +185,51 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
       { ok: false, error: 'Archivo subido pero no se registró. Contacta a Gerencia.' },
       { status: 500 }
     );
+  }
+
+  // Condiciones Financieras (opcional) — mismo tratamiento, rol propio.
+  if (archivoCondiciones instanceof File && archivoCondiciones.size > 0) {
+    const cfFilename = sanitizeFilename(archivoCondiciones.name);
+    const cfPath = buildAdjuntoPath({
+      empresa: 'dilesa',
+      entidad: 'ventas',
+      entidadId: ventaId,
+      filename: cfFilename,
+    });
+    const { error: cfUpErr } = await admin.storage
+      .from('adjuntos')
+      .upload(cfPath, archivoCondiciones, {
+        contentType: archivoCondiciones.type || 'application/pdf',
+        upsert: false,
+      });
+    if (cfUpErr) {
+      console.warn('[notario-dictamen-upload] condiciones storage error:', cfUpErr.message);
+      return NextResponse.json(
+        { ok: false, error: 'No se pudieron subir las condiciones financieras. Intenta de nuevo.' },
+        { status: 500 }
+      );
+    }
+    const { error: cfAdjErr } = await admin
+      .schema('erp')
+      .from('adjuntos')
+      .insert({
+        empresa_id: DILESA_EMPRESA_ID,
+        entidad_tipo: 'venta',
+        entidad_id: ventaId,
+        rol: 'condiciones_financieras',
+        nombre: cfFilename,
+        url: cfPath,
+        tipo_mime: archivoCondiciones.type || 'application/pdf',
+        tamano_bytes: archivoCondiciones.size,
+        uploaded_by: null,
+      });
+    if (cfAdjErr) {
+      console.warn('[notario-dictamen-upload] condiciones insert error:', cfAdjErr.message);
+      return NextResponse.json(
+        { ok: false, error: 'Condiciones subidas pero no registradas. Contacta a Gerencia.' },
+        { status: 500 }
+      );
+    }
   }
 
   const { error: vUpErr } = await admin
