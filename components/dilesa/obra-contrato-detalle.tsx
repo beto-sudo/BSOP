@@ -28,7 +28,16 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Loader2, Plus, Receipt, Send, ShieldCheck } from 'lucide-react';
+import {
+  Ban,
+  Banknote,
+  CheckCircle2,
+  Loader2,
+  Plus,
+  Receipt,
+  Send,
+  ShieldCheck,
+} from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useEffectiveUser, usePermissions } from '@/components/providers';
 import { Input } from '@/components/ui/input';
@@ -65,6 +74,16 @@ export type ObraEstimacion = {
 };
 
 type FacturaContrato = FacturaCuenta & { id: string; fecha_emision: string | null };
+
+/** Pago CxP ligado a una estimación (S3: cxp_pagos.obra_estimacion_id). */
+type PagoEstimacion = { id: string; estado: string };
+
+/** Badge del pago CxP ligado (ciclo programado → aprobado → pagado). */
+const ESTADO_PAGO: Record<string, { label: string; cls: string }> = {
+  programado: { label: 'pago programado', cls: 'bg-amber-500/15 text-amber-600' },
+  aprobado: { label: 'pago aprobado', cls: 'bg-amber-500/15 text-amber-600' },
+  pagado: { label: 'pagado', cls: 'bg-emerald-500/15 text-emerald-600' },
+};
 
 /** Estado CxP de la factura de egreso ligada → etiqueta + estilo del badge. */
 const ESTADO_CXP: Record<string, { label: string; cls: string }> = {
@@ -109,8 +128,11 @@ export function ObraContratoDetalle({
   const [estimaciones, setEstimaciones] = useState<ObraEstimacion[]>([]);
   /** Facturas del contrato (total + por estimación), via contrato_id (S1). */
   const [facturas, setFacturas] = useState<FacturaContrato[]>([]);
+  /** Pago CxP activo por estimación (S3). */
+  const [pagosByEst, setPagosByEst] = useState<Map<string, PagoEstimacion>>(new Map());
   const [emitiendo, setEmitiendo] = useState<string | null>(null);
   const [autorizando, setAutorizando] = useState<string | null>(null);
+  const [programando, setProgramando] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,6 +216,35 @@ export function ObraContratoDetalle({
         fecha_emision: (f.fecha_emision as string | null) ?? null,
       }))
     );
+
+    // Pagos CxP ligados a las estimaciones (S3) — solo activos.
+    const pagoMap = new Map<string, PagoEstimacion>();
+    if (rows.length) {
+      // `obra_estimacion_id` (S1) aún no en types — mismo cast.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: pagos, error: pe } = await (sb.schema('erp') as any)
+        .from('cxp_pagos')
+        .select('id, estado, obra_estimacion_id')
+        .in(
+          'obra_estimacion_id',
+          rows.map((r) => r.id)
+        )
+        .is('deleted_at', null);
+      if (pe) {
+        setError(getSupabaseErrorMessage(pe, 'No se pudieron cargar los pagos ligados.'));
+        setLoading(false);
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const p of (pagos ?? []) as any[]) {
+        const eid = p.obra_estimacion_id as string | null;
+        const estado = (p.estado as string) ?? 'programado';
+        if (eid && estado !== 'cancelado' && estado !== 'rechazado') {
+          pagoMap.set(eid, { id: p.id as string, estado });
+        }
+      }
+    }
+    setPagosByEst(pagoMap);
     setLoading(false);
   }, [sb, contratoId]);
 
@@ -238,6 +289,36 @@ export function ObraContratoDetalle({
       await cargar();
     },
     [sb, toast, cargar]
+  );
+
+  // Programar pago (S3): neto tras retención, aplicado a la factura propia
+  // o a la factura TOTAL del contrato. El pago sigue el ciclo CxP normal.
+  const programarPago = useCallback(
+    async (est: ObraEstimacion) => {
+      if (programando) return;
+      setProgramando(est.id);
+      // RPC S3 aún no en types — mismo cast.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: e } = await (sb.schema('erp') as any).rpc('cxp_pago_desde_estimacion', {
+        p_estimacion_id: est.id,
+      });
+      if (e) {
+        toast.add({
+          title: 'No se pudo programar el pago',
+          description: getSupabaseErrorMessage(e, 'Error al programar el pago de la estimación.'),
+          type: 'error',
+        });
+      } else {
+        toast.add({
+          title: 'Pago programado',
+          description: `Neto de «${est.etiqueta}» en CxP — sigue aprobar y pagar allá.`,
+          type: 'success',
+        });
+        await cargar();
+      }
+      setProgramando(null);
+    },
+    [sb, toast, cargar, programando]
   );
 
   // Autorizar (D2): solo Dirección; la RPC re-valida server-side y deja audit_log.
@@ -529,6 +610,7 @@ export function ObraContratoDetalle({
                   <th className="py-1.5 pr-3 text-right">Monto</th>
                   <th className="py-1.5 pr-3">Nota</th>
                   <th className="py-1.5 pr-3">CxP</th>
+                  <th className="py-1.5 pr-3">Pago</th>
                   <th className="py-1.5 pr-3" />
                 </tr>
               </thead>
@@ -584,6 +666,16 @@ export function ObraContratoDetalle({
                         puedeCrear={puedeCrear}
                         emitiendo={emitiendo === e.id}
                         onEmitir={() => void emitir(e.id)}
+                      />
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <CeldaPago
+                        est={e}
+                        pago={pagosByEst.get(e.id) ?? null}
+                        tieneFactura={facturaByEst.has(e.id) || facturaTotal != null}
+                        puedeCrear={puedeCrear}
+                        programando={programando === e.id}
+                        onProgramar={() => void programarPago(e)}
                       />
                     </td>
                     <td className="py-1.5 pr-3 text-right">
@@ -703,6 +795,64 @@ function CeldaCxP({
       >
         {emitiendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
         Emitir
+      </button>
+    );
+  }
+  return <span className="text-[var(--text)]/30">—</span>;
+}
+
+/**
+ * Celda Pago por estimación (S3): el pago CxP ligado (programado → aprobado →
+ * pagado, link a CxP·Pagos) o el botón "Programar pago" — solo estimaciones
+ * AUTORIZADAS con neto > 0 y con factura destino (propia o total del
+ * contrato). La RPC re-valida todo server-side.
+ */
+function CeldaPago({
+  est,
+  pago,
+  tieneFactura,
+  puedeCrear,
+  programando,
+  onProgramar,
+}: {
+  est: ObraEstimacion;
+  pago: PagoEstimacion | null;
+  tieneFactura: boolean;
+  puedeCrear: boolean;
+  programando: boolean;
+  onProgramar: () => void;
+}) {
+  if (pago) {
+    const meta = ESTADO_PAGO[pago.estado] ?? {
+      label: pago.estado,
+      cls: 'bg-[var(--text)]/10 text-[var(--text)]/60',
+    };
+    return (
+      <Link
+        href={`/dilesa/cxp/pagos?focus=${pago.id}`}
+        title="Ver en CxP · Pagos"
+        className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium ${meta.cls}`}
+      >
+        {meta.label}
+      </Link>
+    );
+  }
+  const neto = (est.monto_total ?? 0) - (est.retencion ?? 0);
+  if (est.estado === 'autorizada' && neto > 0 && tieneFactura && puedeCrear) {
+    return (
+      <button
+        type="button"
+        onClick={onProgramar}
+        disabled={programando}
+        title={`Programar pago en CxP por el neto (${formatCurrency(neto)})`}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text)]/70 hover:border-[var(--accent)] hover:text-[var(--text)] disabled:opacity-50"
+      >
+        {programando ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Banknote className="h-3 w-3" />
+        )}
+        Programar pago
       </button>
     );
   }

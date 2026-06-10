@@ -229,3 +229,82 @@ describe('hrefDoc (H6)', () => {
     expect(hrefDoc('rdb', 'contrato', 'x')).toBeNull();
   });
 });
+
+describe('paso Estimada · ciclo D4 (dilesa-contratos-estimaciones S3)', () => {
+  const CONTRATO = { id: 'k1', codigo: 'CON-1', valor_total: 1000, cancelada_at: null };
+  const EST = (over: Partial<HiloRegistros['estimaciones'][number]> = {}) => ({
+    id: 'e1',
+    etiqueta: '1',
+    monto_total: 400,
+    estado: 'autorizada',
+    contrato_id: 'k1',
+    cancelada_at: null,
+    ...over,
+  });
+
+  it('solo las autorizadas cuentan como devengo; borradores se reportan aparte', () => {
+    const h = buildHiloPasos(
+      reg({
+        contratos: [CONTRATO],
+        estimaciones: [
+          EST(),
+          EST({ id: 'e2', etiqueta: '2', monto_total: 100, estado: 'borrador' }),
+        ],
+      }),
+      null
+    );
+    const p = paso(h, 'estimada');
+    expect(p.estado).toBe('parcial');
+    expect(p.detalle).toContain('1 ·');
+    expect(p.detalle).toContain('1 sin autorizar');
+  });
+
+  it('hecho cuando el devengo alcanza lo contratado', () => {
+    const h = buildHiloPasos(
+      reg({
+        contratos: [CONTRATO],
+        estimaciones: [EST({ monto_total: 1000, estado: 'pagada' })],
+      }),
+      null
+    );
+    expect(paso(h, 'estimada').estado).toBe('hecho');
+  });
+
+  it('solo borradores: parcial con detalle "sin autorizar"', () => {
+    const h = buildHiloPasos(
+      reg({ contratos: [CONTRATO], estimaciones: [EST({ estado: 'borrador' })] }),
+      null
+    );
+    const p = paso(h, 'estimada');
+    expect(p.estado).toBe('parcial');
+    expect(p.detalle).toBe('1 sin autorizar');
+  });
+
+  it('estado null (histórico pre-ciclo) cuenta como devengo (back-compat)', () => {
+    const h = buildHiloPasos(
+      reg({ contratos: [CONTRATO], estimaciones: [EST({ estado: null })] }),
+      null
+    );
+    expect(paso(h, 'estimada').detalle).toContain('1 ·');
+  });
+
+  it('refs clickeables apuntan al contrato (la estimación vive ahí)', () => {
+    const h = buildHiloPasos(reg({ contratos: [CONTRATO], estimaciones: [EST()] }), null);
+    const p = paso(h, 'estimada');
+    expect(p.refs).toEqual([{ tipo: 'estimacion', id: 'k1', codigo: '1' }]);
+    expect(hrefDoc('dilesa', 'estimacion', 'k1')).toBe('/dilesa/construccion/contratos/k1');
+  });
+
+  it('canceladas no generan ref ni devengo (H4)', () => {
+    const h = buildHiloPasos(
+      reg({
+        contratos: [CONTRATO],
+        estimaciones: [EST({ estado: 'cancelada', cancelada_at: '2026-06-09' })],
+      }),
+      null
+    );
+    const p = paso(h, 'estimada');
+    expect(p.estado).toBe('pendiente');
+    expect(p.refs).toEqual([]);
+  });
+});

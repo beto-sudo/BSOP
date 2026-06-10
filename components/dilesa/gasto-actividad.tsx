@@ -2,23 +2,26 @@
 
 /**
  * GastoActividad — actividad reciente del gasto de un proyecto (iniciativa
- * `dilesa-flujo-gasto` · Sprint 2, tab Gasto del detalle de proyecto).
+ * `dilesa-flujo-gasto` · Sprint 2, tab Gasto del detalle de proyecto;
+ * estimaciones de obra desde `dilesa-contratos-estimaciones` · Sprint 3).
  *
  * Junta los últimos movimientos del ciclo P2P del proyecto (OCs por línea con
- * partida del proyecto + facturas ligadas a sus partidas) en una lista
- * compacta con links de drill-down (`hrefDoc` + `?focus=`). Lectura pura:
- * 3 queries dirigidas (partidas → OCs/facturas), sin embeds cross-schema.
+ * partida del proyecto + facturas ligadas a sus partidas + estimaciones de
+ * los contratos de obra de esas partidas) en una lista compacta con links de
+ * drill-down (`hrefDoc` + `?focus=`). Lectura pura: queries dirigidas
+ * (partidas → OCs/facturas/contratos→estimaciones), sin embeds cross-schema.
  */
 
 import { useEffect, useState } from 'react';
-import { FileText, ShoppingCart } from 'lucide-react';
+import { FileText, HardHat, ShoppingCart } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { formatCurrency } from '@/lib/format';
 import { hrefDoc } from '@/lib/gasto/hilo';
 
 type Item = {
   key: string;
-  tipo: 'oc' | 'factura';
+  tipo: 'oc' | 'factura' | 'estimacion';
+  /** Para 'estimacion' es el contrato_id (la estimación vive en su contrato). */
   id: string;
   titulo: string;
   detalle: string;
@@ -56,7 +59,9 @@ export function GastoActividad({ proyectoId }: { proyectoId: string }) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const erp = sb.schema('erp') as any;
-      const [detRes, factRes] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dilesa = sb.schema('dilesa') as any;
+      const [detRes, factRes, contratosRes] = await Promise.all([
         erp
           .from('ordenes_compra_detalle')
           .select(
@@ -70,7 +75,30 @@ export function GastoActividad({ proyectoId }: { proyectoId: string }) {
           .in('partida_id', partidaIds)
           .order('created_at', { ascending: false })
           .limit(5),
+        dilesa
+          .from('contratos_construccion')
+          .select('id, codigo')
+          .in('partida_id', partidaIds)
+          .is('deleted_at', null),
       ]);
+      if (!activo) return;
+
+      // Estimaciones de los contratos de obra de las partidas (devengo, D4).
+      const contratoCodigo = new Map<string, string>(
+        ((contratosRes.data ?? []) as { id: string; codigo: string | null }[]).map((ct) => [
+          ct.id,
+          ct.codigo ?? 'Contrato',
+        ])
+      );
+      const estRes = contratoCodigo.size
+        ? await dilesa
+            .from('obra_estimaciones')
+            .select('id, contrato_id, etiqueta, monto_total, estado, updated_at, created_at')
+            .in('contrato_id', [...contratoCodigo.keys()])
+            .is('deleted_at', null)
+            .order('updated_at', { ascending: false })
+            .limit(5)
+        : { data: [] };
       if (!activo) return;
 
       const out: Item[] = [];
@@ -116,6 +144,25 @@ export function GastoActividad({ proyectoId }: { proyectoId: string }) {
           fecha: f.updated_at ?? f.created_at,
         });
       }
+      for (const e of (estRes.data ?? []) as {
+        id: string;
+        contrato_id: string;
+        etiqueta: string | null;
+        monto_total: number | null;
+        estado: string | null;
+        updated_at: string | null;
+        created_at: string;
+      }[]) {
+        if (e.estado === 'cancelada') continue;
+        out.push({
+          key: `e-${e.id}`,
+          tipo: 'estimacion',
+          id: e.contrato_id,
+          titulo: `Est. ${e.etiqueta ?? '—'} · ${contratoCodigo.get(e.contrato_id) ?? ''}`,
+          detalle: `${e.estado ?? ''} · ${formatCurrency(Number(e.monto_total ?? 0))}`,
+          fecha: e.updated_at ?? e.created_at,
+        });
+      }
       out.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
       setItems(out.slice(0, 8));
     })();
@@ -138,6 +185,8 @@ export function GastoActividad({ proyectoId }: { proyectoId: string }) {
             <li key={it.key} className="flex items-center gap-2 text-sm">
               {it.tipo === 'oc' ? (
                 <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-[var(--text)]/40" />
+              ) : it.tipo === 'estimacion' ? (
+                <HardHat className="h-3.5 w-3.5 shrink-0 text-[var(--text)]/40" />
               ) : (
                 <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--text)]/40" />
               )}
