@@ -3,8 +3,8 @@
 **Slug:** `dilesa-contratos-estimaciones`
 **Empresas:** DILESA
 **Schemas afectados:** `erp` (`facturas.contrato_id` nuevo, `cxp_pagos.obra_estimacion_id` nuevo, redefinición de la capa "ejercido" en `v_partida_control`), `dilesa` (`obra_estimaciones`: ciclo de estados + autorización), UI en `app/dilesa/construccion/**` y `app/dilesa/cxp/**`
-**Estado:** planned
-**Próximo hito:** Sprint 1 — modelo (facturas.contrato_id + ciclo de estados de obra_estimaciones + estimación→pago CxP + ejercido por estimaciones)
+**Estado:** in_progress
+**Próximo hito:** Sprint 2 — UI del contrato (sub-vistas Vivienda | Obra, estado de cuenta, ciclo con autorización Dirección); aplicar migración `20260610223000` a prod con OK de Beto junto con S2
 **Dueño:** Beto
 **Creada:** 2026-06-10
 **Última actualización:** 2026-06-10
@@ -174,9 +174,46 @@ las 3 capas (ADR-042).
   `obra_estimacion_id` existente conviven: factura-por-estimación y
   factura-total-del-contrato son ambos válidos; la liga estimación↔pago
   (`cxp_pagos.obra_estimacion_id`) es la que cierra el rastro.
+- **2026-06-10 — Implementación S1 (CC, decisiones de forma).** (a) La
+  emisión a CxP (`cxp_factura_desde_estimacion`) exige estimación
+  `autorizada` desde S1 — el gobierno no espera a S3; transición: aplicar
+  la migración junto con la UI de S2. (b) El mismo RPC bloquea el modo
+  mixto: contrato con factura TOTAL activa no emite facturas por
+  estimación (duplicaría el cargo). (c) Las facturas de estimación heredan
+  `partida_id` del contrato — sin eso la capa "pagado" de
+  `v_partida_control` no ve los pagos de obra. (d) El paso a `pagada` es
+  un trigger de sync sobre `erp.cxp_pagos` (con reversa si el pago se
+  cancela/rechaza/re-apunta), no una modificación a los RPCs de CxP —
+  menos invasivo al flujo vivo. (e) Backfill a `pagada` solo con factura
+  activa `estado_cxp='pagada'` (en prod resultó: 0 casos).
 
 ## Bitácora
 
+- **2026-06-10 — S1 (modelo) — PR #802.** Migración `20260610223000`:
+  `erp.facturas.contrato_id` (+ índice + backfill desde
+  `obra_estimacion_id`, que también hereda `partida_id` del contrato para
+  la capa "pagado"); ciclo `borrador → autorizada → pagada` en
+  `dilesa.obra_estimaciones` (+ `autorizada_por/at`, `pagada_at`, CHECK,
+  guard trigger con flag `app.obra_estimacion_gate`: estado y montos
+  inmutables post-autorización); RPC `dilesa.obra_estimacion_autorizar`
+  (gate `erp.fn_es_direccion` + `core.audit_log`) y
+  `obra_estimacion_cancelar` actualizado (estado + bloqueos por
+  pago/pagada); `erp.cxp_pagos.obra_estimacion_id` (FK + UNIQUE parcial
+  anti-duplicado + trigger de integridad + sync pago-ejecutado→estimación
+  pagada con reversa); `cxp_factura_desde_estimacion` exige autorizada,
+  hereda contrato/partida y bloquea modo mixto; `v_partida_control`:
+  ejercido de partidas con contrato = Σ estimaciones autorizadas.
+  **Validación contra prod** (query comparativa read-only): 275
+  estimaciones activas (0 canceladas, 0 con factura ligada — el puente
+  ADR-039 nunca operó) → todas backfillean a `autorizada` (Σ $42.67M; 18
+  negativas de amortización, 21 anticipos). 16 partidas (urbanización de
+  Lomas de los Encinos / Lomas del Sol) ganan ejercido que hoy es $0:
+  total $306K → $42.59M, delta = exactamente la Σ de estimaciones de los
+  31 contratos con partida — el devengo de obra era invisible al control
+  presupuestal y los montos cuadran contra su comprometido. **La
+  migración queda como archivo; se aplica a prod con OK de Beto,
+  idealmente junto con S2** (la emisión a CxP ahora exige estimación
+  autorizada y la UI de autorizar llega en S2).
 - **2026-06-10 — Promovida (estado inicial: `planned`).** Nace del análisis
   de contratos/estimaciones pedido por Beto en la sesión de control del
   gasto (la misma que promovió `dilesa-presupuesto-baseline`): mapeo DB+UI
