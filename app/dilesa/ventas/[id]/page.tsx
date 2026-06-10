@@ -257,7 +257,7 @@ const FASE_ROLES: Record<string, string[]> = {
   // notarial queda en Dictaminada (sale después con el dictamen jurídico).
   Inscrita: ['constancia_credito_titular', 'constancia_credito_cotitular'],
   'Solicitud de Dictaminación': ['aprobacion_credito'],
-  Dictaminada: ['carta_instruccion_notarial'],
+  Dictaminada: ['carta_instruccion_notarial', 'condiciones_financieras'],
   'Validación Patronal': ['validacion_patronal'],
   'Firmas Programadas': [],
   Escriturada: ['pagare'],
