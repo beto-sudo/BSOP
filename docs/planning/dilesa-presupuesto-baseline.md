@@ -3,11 +3,11 @@
 **Slug:** `dilesa-presupuesto-baseline`
 **Empresas:** DILESA (golden; el patrón baseline + órdenes de cambio es replicable a las otras empresas cuando tengan presupuesto por partidas)
 **Schemas afectados:** `erp` (nuevas `presupuesto_baselines`, `presupuesto_baseline_partidas`, `presupuesto_cambios`; trigger guard + RPCs sobre `presupuesto_partidas`; escribe `core.audit_log`), `core.modulos` (sin slugs nuevos — reusa `dilesa.proyectos.gasto`), UI en `app/dilesa/proyectos/[id]/gasto` y componentes de Costeo
-**Estado:** planned
-**Próximo hito:** Sprint 1 — gobierno duro del monto (tablas baseline/cambios + trigger guard + RPCs con audit_log + fix de gates Dirección)
+**Estado:** in_progress
+**Próximo hito:** Aplicar migración `20260610212116` a prod (OK de Beto) + Sprint 2 — UI de baseline y órdenes de cambio
 **Dueño:** Beto
 **Creada:** 2026-06-10
-**Última actualización:** 2026-06-10
+**Última actualización:** 2026-06-10 (S1 a PR)
 
 ## Problema
 
@@ -184,6 +184,21 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
 
 ## Bitácora
 
+- **2026-06-10 — Sprint 1 (gobierno duro del monto) a PR.** Migración
+  `20260610212116_erp_presupuesto_baseline_cambios.sql` (NO aplicada a
+  prod — espera OK de Beto): 3 tablas (baselines sin grants de
+  escritura — inmutables por construcción; cambios con resolución
+  solo-RPC), trigger guard sobre `presupuesto_partidas` (INSERT con
+  monto, UPDATE de `presupuesto_aprobado`, soft-delete con vigente ≠ 0 y
+  cambio de proyecto — todo bloqueado post-baseline salvo flag de sesión
+  de las RPCs), `erp.fn_es_direccion` (espejo SQL del gate app), RPCs
+  `fn_presupuesto_baseline_autorizar` / `fn_presupuesto_cambio_resolver`
+  con `core.audit_log` (patrón CxC), y vista
+  `erp.v_presupuesto_reconciliacion`. En app: helper
+  `lib/auth/direccion-gate.ts` (`checkDireccionEmpresa`, 8 tests) y fix
+  de gates — `autorizarPartida` (antes sin gate) y `autorizarPaso`
+  (antes solo `rol='admin'`) ahora exigen Dirección;
+  `promoteAnteproyecto` refactorizado al helper (−50 líneas duplicadas).
 - **2026-06-10 — Promovida (estado inicial: `planned`).** Nace de la sesión
   de evaluación del proceso de control del gasto (post-cierre de
   `dilesa-flujo-gasto`): mapeo DB + UI confirmó que el presupuesto no tiene
