@@ -3,11 +3,11 @@
 **Slug:** `dilesa-flujo-gasto`
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
-**Estado:** in_progress
-**Próximo hito:** Merge del PR de S4 (bandeja "Te toca" + quick wins) → cerrar v1: Estado done + barrido de Reminders + entrada en `## Done` de INITIATIVES
+**Estado:** done
+**Próximo hito:** — (v1 entregado; fase 2 candidata si algún día se quiere: convergencia del checklist del anteproyecto con el ciclo P2P real)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (S3 mergeado; S4 a PR — último sprint del v1)
+**Última actualización:** 2026-06-10 (cerrada — v1 completo en prod: S1 #784, S2 #787 + migración, S3 #788, S4 #789)
 
 ## Problema
 
@@ -176,6 +176,17 @@ Facturar → Pagar.
   `useFocusDrilldown`) y centralizó los destinos en `hrefDoc` (fix del link).
 
 ## Bitácora
+
+- **2026-06-10 — CERRADA (v1 completo, 4 sprints en ~1 día).** S1 hilo del
+  gasto (#784) · S2 home del gasto en el proyecto + mudanza de Costeo +
+  migración RBAC aplicada y verificada 8/8 permisos (#787) · S3 navegación y
+  lenguaje (#788) · S4 bandeja "Te toca" + alta simple de partidas + editar
+  OC borrador + crear-y-autorizar (#789). Métricas de éxito del doc:
+  cumplidas — gasto del proyecto a 1 click desde el detalle, hilo
+  bidireccional en los 6 documentos, gasto sin partida visible (badge),
+  flujo narrado en el manual. Barrido de Reminders: limpio. Fuera de v1 por
+  decisión: convergencia checklist↔ciclo (fase 2 explícita), plantilla-auto
+  (sin alta en UI) y form financiero (ya agrupado).
 
 - **2026-06-09 — Promovida.** Nace del análisis UX de Proyectos ↔ Compras ↔
   CxP (sesión de evaluación): mapeo de 17 superficies / 9 conceptos / ~30
