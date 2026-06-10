@@ -52,6 +52,7 @@ import {
   type CuadraturaInputsStr,
 } from '@/components/dilesa/cuadratura-ajustes';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
+import { camposCapturadosPorFase } from '@/lib/dilesa/captura/campos-capturados';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
 import { useTriggerPrint } from '@/components/print';
@@ -100,6 +101,7 @@ type Venta = {
   anticipo_comision: number | null;
   monto_avaluo: number | null;
   gastos_escrituracion: number | null;
+  numero_cheque_notaria: string | null;
   monto_cheque_notaria: number | null;
   apoyo_infonavit: number | null;
   descuento_precio: number | null;
@@ -110,6 +112,17 @@ type Venta = {
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
+  // Fechas/montos por fase (resumen "qué se capturó" del pipeline).
+  fecha_solicitud_avaluo: string | null;
+  fecha_avaluo_cerrado: string | null;
+  fecha_solicitud_dictamen: string | null;
+  fecha_dictaminada: string | null;
+  fecha_validacion_patronal: string | null;
+  fecha_firma_programada: string | null;
+  fecha_detonacion: string | null;
+  valor_facturado: number | null;
+  valor_real_venta_dilesa: number | null;
+  monto_nota_credito: number | null;
   vendedor: string | null;
   notario: string | null;
   casa_valuadora: string | null;
@@ -1277,78 +1290,112 @@ function DetailInner() {
                       </span>
                     </div>
                     <ol className="space-y-1 border-l-2 border-[var(--border)] pl-2">
-                      {filas.map((r) => (
-                        <li
-                          key={r.pos}
-                          className={
-                            'flex items-start gap-3 rounded-md px-2 py-1.5 ' +
-                            (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
-                          }
-                        >
-                          {/* Status circle + posición */}
-                          <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
-                            {r.alcanzada ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
-                            )}
-                            <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
-                              {r.pos}
-                            </span>
-                          </div>
-
-                          {/* Nombre + fecha */}
-                          <div className="min-w-[200px] shrink-0">
-                            <div className="text-sm font-medium text-[var(--text)]">{r.nombre}</div>
-                            <div className="text-[11px] text-[var(--text)]/50">
-                              {r.fecha ? fmtFecha(r.fecha) : '—'}
-                            </div>
-                          </div>
-
-                          {/* Docs cargados + faltantes */}
-                          <div className="flex flex-1 flex-wrap items-center gap-1">
-                            {r.cargados.map((a) => (
-                              <AdjuntoLink key={a.id} a={a} compact />
-                            ))}
-                            {r.faltantes.map((rol) => (
-                              <span
-                                key={rol}
-                                className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
-                                title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
-                              >
-                                <FileText className="h-2.5 w-2.5" />
-                                {ROL_LABEL[rol] ?? rol}
-                              </span>
-                            ))}
-                            {r.cargados.length === 0 && r.faltantes.length === 0 ? (
-                              <span className="text-[10px] text-[var(--text)]/30">—</span>
-                            ) : null}
-                          </div>
-
-                          {/* Capturar fase — solo si la página está implementada y aplica */}
-                          {r.slugCaptura ? (
-                            <div className="shrink-0">
-                              {r.puedeCapturar ? (
-                                <Link
-                                  href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
-                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                                >
-                                  <Pencil className="h-2.5 w-2.5" />
-                                  Capturar fase
-                                </Link>
-                              ) : r.alcanzada ? null : (
-                                <span
-                                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
-                                  title={`Falta cerrar la fase ${r.pos - 1} primero.`}
-                                >
-                                  <Pencil className="h-2.5 w-2.5" />
-                                  Capturar
+                      {filas.map((r) => {
+                        const capturados =
+                          r.alcanzada && venta
+                            ? camposCapturadosPorFase(r.pos, venta, fmtMoney)
+                            : [];
+                        return (
+                          <li
+                            key={r.pos}
+                            className={
+                              'rounded-md px-2 py-1.5 ' +
+                              (r.alcanzada ? 'bg-[var(--bg)]/40' : 'opacity-60')
+                            }
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Status circle + posición */}
+                              <div className="flex w-8 shrink-0 items-center gap-1.5 pt-0.5">
+                                {r.alcanzada ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                ) : (
+                                  <Circle className="h-3.5 w-3.5 text-[var(--text)]/30" />
+                                )}
+                                <span className="font-mono text-[10px] tabular-nums text-[var(--text)]/40">
+                                  {r.pos}
                                 </span>
-                              )}
+                              </div>
+
+                              {/* Nombre + fecha */}
+                              <div className="min-w-[200px] shrink-0">
+                                <div className="text-sm font-medium text-[var(--text)]">
+                                  {r.nombre}
+                                </div>
+                                <div className="text-[11px] text-[var(--text)]/50">
+                                  {r.fecha ? fmtFecha(r.fecha) : '—'}
+                                </div>
+                              </div>
+
+                              {/* Docs cargados + faltantes */}
+                              <div className="flex flex-1 flex-wrap items-center gap-1">
+                                {r.cargados.map((a) => (
+                                  <AdjuntoLink key={a.id} a={a} compact />
+                                ))}
+                                {r.faltantes.map((rol) => (
+                                  <span
+                                    key={rol}
+                                    className="inline-flex items-center gap-1 rounded border border-dashed border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text)]/40"
+                                    title={`Falta cargar: ${ROL_LABEL[rol] ?? rol}`}
+                                  >
+                                    <FileText className="h-2.5 w-2.5" />
+                                    {ROL_LABEL[rol] ?? rol}
+                                  </span>
+                                ))}
+                                {r.cargados.length === 0 && r.faltantes.length === 0 ? (
+                                  <span className="text-[10px] text-[var(--text)]/30">—</span>
+                                ) : null}
+                              </div>
+
+                              {/* Capturar fase — solo si la página está implementada y aplica */}
+                              {r.slugCaptura ? (
+                                <div className="shrink-0">
+                                  {r.puedeCapturar ? (
+                                    <Link
+                                      href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                                    >
+                                      <Pencil className="h-2.5 w-2.5" />
+                                      Capturar fase
+                                    </Link>
+                                  ) : r.alcanzada ? null : (
+                                    <span
+                                      className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
+                                      title={`Falta cerrar la fase ${r.pos - 1} primero.`}
+                                    >
+                                      <Pencil className="h-2.5 w-2.5" />
+                                      Capturar
+                                    </span>
+                                  )}
+                                </div>
+                              ) : null}
                             </div>
-                          ) : null}
-                        </li>
-                      ))}
+
+                            {/* Qué se capturó en esta fase (expandible) */}
+                            {capturados.length > 0 ? (
+                              <details className="ml-11 mt-0.5">
+                                <summary className="cursor-pointer select-none text-[10px] text-[var(--text)]/45 hover:text-[var(--text)]/70">
+                                  Datos capturados ({capturados.length})
+                                </summary>
+                                <dl className="mt-1 grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-3">
+                                  {capturados.map(([label, value]) => (
+                                    <div
+                                      key={label}
+                                      className="flex items-baseline gap-2 text-[11px]"
+                                    >
+                                      <dt className="shrink-0 text-[var(--text)]/45">{label}:</dt>
+                                      <dd className="font-medium tabular-nums text-[var(--text)]/85">
+                                        {value.match(/^\d{4}-\d{2}-\d{2}$/)
+                                          ? fmtFecha(value)
+                                          : value}
+                                      </dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              </details>
+                            ) : null}
+                          </li>
+                        );
+                      })}
                     </ol>
                   </div>
                 );
