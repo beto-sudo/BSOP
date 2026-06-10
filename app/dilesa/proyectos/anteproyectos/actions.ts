@@ -43,6 +43,7 @@ import {
   normalizarPrototiposReferencia,
   validarCampoAnalisis,
 } from '@/components/dilesa/analisis-financiero-types';
+import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
@@ -110,59 +111,22 @@ export async function promoteAnteproyecto(
   const supabase = await makeServerClient();
 
   // Role gate (Sprint 4A): admin global O rol "Dirección" en la empresa
-  // del anteproyecto. Patrón consistente con `autorizarPaso` /
-  // `autorizarPartida`, pero ampliado al rol por empresa (`core.roles`).
-  const { data: userRes, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
-  const email = userRes.user.email;
-  if (!email) return { ok: false, error: 'JWT sin email' };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const coreSb = supabase.schema('core') as any;
-
-  const { data: coreUser, error: userLookupErr } = await coreSb
-    .from('usuarios')
-    .select('id, rol')
-    .eq('email', email)
+  // del anteproyecto. Centralizado en `checkDireccionEmpresa`
+  // (iniciativa dilesa-presupuesto-baseline S1) — mismo gate que
+  // `autorizarPartida` / `autorizarPaso`.
+  const { data: ap, error: apErr } = await supabase
+    .schema('dilesa')
+    .from('proyectos')
+    .select('empresa_id')
+    .eq('id', anteproyectoId)
     .maybeSingle();
-  if (userLookupErr) return { ok: false, error: userLookupErr.message };
-  if (!coreUser) return { ok: false, error: 'Usuario no encontrado en core.usuarios' };
-
-  const isAdmin = coreUser.rol === 'admin';
-
-  // Si no es admin global, validar rol "Dirección" en la empresa del
-  // anteproyecto. Necesitamos primero leer la empresa.
-  let autorizado = isAdmin;
-  if (!autorizado) {
-    const { data: ap, error: apErr } = await supabase
-      .schema('dilesa')
-      .from('proyectos')
-      .select('empresa_id')
-      .eq('id', anteproyectoId)
-      .maybeSingle();
-    if (apErr || !ap) {
-      return { ok: false, error: apErr?.message || 'Anteproyecto no encontrado' };
-    }
-
-    const { data: direccionRoles } = await coreSb
-      .from('roles')
-      .select('id')
-      .eq('empresa_id', ap.empresa_id)
-      .ilike('nombre', 'direcci%n');
-    const roleIds = (direccionRoles ?? []).map((r: { id: string }) => r.id);
-    if (roleIds.length > 0) {
-      const { data: asgs } = await coreSb
-        .from('usuarios_empresas')
-        .select('rol_id')
-        .eq('usuario_id', coreUser.id)
-        .eq('empresa_id', ap.empresa_id)
-        .eq('activo', true)
-        .in('rol_id', roleIds);
-      autorizado = (asgs ?? []).length > 0;
-    }
+  if (apErr || !ap) {
+    return { ok: false, error: apErr?.message || 'Anteproyecto no encontrado' };
   }
 
-  if (!autorizado) {
+  const gate = await checkDireccionEmpresa(supabase, ap.empresa_id);
+  if (!gate.ok) return gate;
+  if (!gate.autorizado) {
     return {
       ok: false,
       error: 'Solo dirección puede autorizar y promover a desarrollo.',
@@ -371,8 +335,12 @@ async function syncPartidaDesdeTarea(
 
 /**
  * Mueve una partida de `preliminar` → `autorizada`. Set
- * `autorizado_at=NOW()` y `autorizado_por=<userId>`. RLS de la tabla
- * sigue gobernando quién puede actualizar (rol gate).
+ * `autorizado_at=NOW()` y `autorizado_por=<userId>`.
+ *
+ * Gate Dirección (iniciativa dilesa-presupuesto-baseline S1): antes la
+ * RLS por-empresa era el único control — cualquier miembro podía
+ * autorizar. Ahora requiere admin global O rol "Dirección" en la
+ * empresa de la partida.
  *
  * Idempotente: si la partida ya está en `autorizada+`, no hace nada.
  */
@@ -380,8 +348,21 @@ export async function autorizarPartida(partidaId: string): Promise<SimpleResult>
   if (!partidaId) return { ok: false, error: 'partidaId requerido' };
   const supabase = await makeServerClient();
 
-  const { data: userRes, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
+  const { data: partida, error: pErr } = await supabase
+    .schema('erp')
+    .from('presupuesto_partidas')
+    .select('id, empresa_id')
+    .eq('id', partidaId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (pErr) return { ok: false, error: pErr.message };
+  if (!partida) return { ok: false, error: 'Partida no encontrada' };
+
+  const gate = await checkDireccionEmpresa(supabase, partida.empresa_id);
+  if (!gate.ok) return gate;
+  if (!gate.autorizado) {
+    return { ok: false, error: 'Solo Dirección puede autorizar partidas.' };
+  }
 
   const { error } = await supabase
     .schema('erp')
@@ -389,7 +370,7 @@ export async function autorizarPartida(partidaId: string): Promise<SimpleResult>
     .update({
       estado: 'autorizada',
       autorizado_at: new Date().toISOString(),
-      autorizado_por: userRes.user.id,
+      autorizado_por: gate.authUserId,
     })
     .eq('id', partidaId)
     .eq('estado', 'preliminar');
@@ -594,9 +575,12 @@ export async function marcarPasoEstado(
 
 /**
  * Autoriza un paso (típicamente `cotizacion`) por dirección. Setea
- * `autorizado_at=NOW()` y `autorizado_por=<user>`. Requiere usuario
- * admin (Sprint 3.5 v1: solo admin puede autorizar; roles director
- * específicos vendrán después si Beto los pide).
+ * `autorizado_at=NOW()` y `autorizado_por=<user>`.
+ *
+ * Gate Dirección (iniciativa dilesa-presupuesto-baseline S1): antes
+ * solo `core.usuarios.rol='admin'`, que excluía al rol "Dirección"
+ * legítimo de la empresa. Ahora: admin global O rol "Dirección" en la
+ * empresa de la tarea (`checkDireccionEmpresa`).
  *
  * Idempotente: si el paso ya está autorizado, no-op silencioso.
  */
@@ -607,22 +591,20 @@ export async function autorizarPaso(tareaId: string, paso: TareaPaso): Promise<S
   }
 
   const supabase = await makeServerClient();
-  const { data: userRes, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userRes?.user) return { ok: false, error: 'No autenticado' };
-  const userId = userRes.user.id;
-  const email = userRes.user.email;
-  if (!email) return { ok: false, error: 'JWT sin email' };
 
-  // Role gate: solo admin por ahora. El check se hace contra
-  // core.usuarios.rol (mismo patrón que `lib/empresas/admin-guard.ts`).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: coreUser, error: roleErr } = await (supabase.schema('core') as any)
-    .from('usuarios')
-    .select('rol')
-    .eq('email', email)
+  const { data: tarea, error: tErr } = await supabase
+    .schema('dilesa')
+    .from('proyecto_tareas')
+    .select('id, empresa_id')
+    .eq('id', tareaId)
+    .is('deleted_at', null)
     .maybeSingle();
-  if (roleErr) return { ok: false, error: roleErr.message };
-  if (!coreUser || coreUser.rol !== 'admin') {
+  if (tErr) return { ok: false, error: tErr.message };
+  if (!tarea) return { ok: false, error: 'Tarea no encontrada' };
+
+  const gate = await checkDireccionEmpresa(supabase, (tarea as { empresa_id: string }).empresa_id);
+  if (!gate.ok) return gate;
+  if (!gate.autorizado) {
     return { ok: false, error: 'Requiere rol admin/dirección para autorizar' };
   }
 
@@ -631,7 +613,7 @@ export async function autorizarPaso(tareaId: string, paso: TareaPaso): Promise<S
     .from('proyecto_tarea_pasos')
     .update({
       autorizado_at: new Date().toISOString(),
-      autorizado_por: userId,
+      autorizado_por: gate.authUserId,
     })
     .eq('tarea_id', tareaId)
     .eq('paso', paso)
