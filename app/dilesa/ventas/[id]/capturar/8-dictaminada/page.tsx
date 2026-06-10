@@ -30,7 +30,7 @@
  */
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Loader2, MinusCircle, Save, Sparkles, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
@@ -81,6 +81,13 @@ type Extraccion = {
   clabe_beneficiario: string;
   banco_beneficiario: string;
 };
+type AdjuntoNotarial = {
+  id: string;
+  rol: string;
+  metadata: {
+    analisis_notarial?: { extraccion: Extraccion; verificaciones: Verificaciones };
+  } | null;
+};
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -123,14 +130,51 @@ function CapturarFase8Body() {
   const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
   const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
 
-  // Análisis IA automático al subir documentos.
+  // Análisis IA automático al subir documentos (o de los ya cargados).
   const [analizando, setAnalizando] = useState(false);
   const [verif, setVerif] = useState<Verificaciones | null>(null);
   const [extracciones, setExtracciones] = useState<Extraccion[]>([]);
+  const [adjuntosNotariales, setAdjuntosNotariales] = useState<AdjuntoNotarial[]>([]);
+  // Evita re-analizar los adjuntos existentes en cada re-render.
+  const adjuntosProcesadosRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Aplica un resultado de análisis al estado: precarga campos + acumula
+   * verificaciones. `pisar=true` cuando el operador acaba de subir el archivo
+   * (lo extraído manda); `pisar=false` para análisis de adjuntos ya cargados
+   * al abrir la página (solo rellena campos vacíos — no pisa lo guardado).
+   */
+  const registrarAnalisis = useCallback(
+    (extraccion: Extraccion, verificaciones: Verificaciones, pisar: boolean) => {
+      const setSuave = (setter: (fn: (prev: string) => string) => void, valor: string) =>
+        setter((prev) => (pisar || !prev.trim() ? valor : prev));
+      if (extraccion.precio_compraventa > 0)
+        setSuave(setValorEscrituracion, String(extraccion.precio_compraventa));
+      if (extraccion.monto_credito > 0) setSuave(setMontoTitular, String(extraccion.monto_credito));
+      if (extraccion.numero_credito) {
+        const inst = extraccion.institucion_credito ? `${extraccion.institucion_credito} ` : '';
+        setSuave(setCreditoTitularRef, `${inst}${extraccion.numero_credito}`);
+      }
+      const gastos = extraccion.gastos_titulacion + extraccion.impuestos_derechos;
+      if (gastos > 0) setSuave(setGastosEscrituracion, String(gastos));
+
+      // Las verificaciones se acumulan entre documentos: un false o un true
+      // nuevo pisa un null previo, pero un null nunca borra un resultado.
+      setVerif((prev) => {
+        const next = { ...(prev ?? verificaciones) };
+        (Object.keys(verificaciones) as (keyof Verificaciones)[]).forEach((k) => {
+          if (verificaciones[k] !== null) next[k] = verificaciones[k];
+        });
+        return next;
+      });
+      setExtracciones((prev) => [...prev, extraccion]);
+    },
+    []
+  );
 
   /**
    * Analiza el PDF con Claude apenas se selecciona y PRECARGA los campos del
@@ -156,29 +200,7 @@ function CapturarFase8Body() {
           extraccion: Extraccion;
           verificaciones: Verificaciones;
         };
-
-        // Precarga: lo extraído manda (es el dato del documento oficial);
-        // el operador puede corregir antes de guardar.
-        if (extraccion.precio_compraventa > 0)
-          setValorEscrituracion(String(extraccion.precio_compraventa));
-        if (extraccion.monto_credito > 0) setMontoTitular(String(extraccion.monto_credito));
-        if (extraccion.numero_credito) {
-          const inst = extraccion.institucion_credito ? `${extraccion.institucion_credito} ` : '';
-          setCreditoTitularRef(`${inst}${extraccion.numero_credito}`);
-        }
-        const gastos = extraccion.gastos_titulacion + extraccion.impuestos_derechos;
-        if (gastos > 0) setGastosEscrituracion(String(gastos));
-
-        // Las verificaciones se acumulan entre documentos: un false o un true
-        // nuevo pisa un null previo, pero un null nunca borra un resultado.
-        setVerif((prev) => {
-          const next = { ...(prev ?? verificaciones) };
-          (Object.keys(verificaciones) as (keyof Verificaciones)[]).forEach((k) => {
-            if (verificaciones[k] !== null) next[k] = verificaciones[k];
-          });
-          return next;
-        });
-        setExtracciones((prev) => [...prev, extraccion]);
+        registrarAnalisis(extraccion, verificaciones, true);
         toast.add({
           title: 'Documento analizado',
           description: 'Campos precargados — revisa los datos antes de guardar.',
@@ -194,8 +216,56 @@ function CapturarFase8Body() {
         setAnalizando(false);
       }
     },
-    [toast, ventaId]
+    [registrarAnalisis, toast, ventaId]
   );
+
+  /**
+   * Análisis de los documentos YA cargados (típico: el notario los subió por
+   * su magic link). Los que ya tienen `metadata.analisis_notarial` se
+   * muestran al instante; los que no, se analizan una vez (el endpoint
+   * persiste el resultado). Precarga suave: solo campos vacíos.
+   */
+  useEffect(() => {
+    if (adjuntosProcesadosRef.current || adjuntosNotariales.length === 0) return;
+    adjuntosProcesadosRef.current = true;
+    let activo = true;
+
+    (async () => {
+      const pendientes: AdjuntoNotarial[] = [];
+      for (const adj of adjuntosNotariales) {
+        const previo = adj.metadata?.analisis_notarial;
+        if (previo) {
+          registrarAnalisis(previo.extraccion, previo.verificaciones, false);
+        } else {
+          pendientes.push(adj);
+        }
+      }
+      if (pendientes.length === 0) return;
+      setAnalizando(true);
+      try {
+        for (const adj of pendientes) {
+          const res = await fetch(`/api/dilesa/ventas/${ventaId}/analizar-notarial`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adjunto_id: adj.id }),
+          });
+          if (!activo) return;
+          if (!res.ok) continue; // best-effort: el doc se puede analizar después
+          const { extraccion, verificaciones } = (await res.json()) as {
+            extraccion: Extraccion;
+            verificaciones: Verificaciones;
+          };
+          registrarAnalisis(extraccion, verificaciones, false);
+        }
+      } finally {
+        if (activo) setAnalizando(false);
+      }
+    })();
+
+    return () => {
+      activo = false;
+    };
+  }, [adjuntosNotariales, registrarAnalisis, ventaId]);
 
   useEffect(() => {
     if (!ventaId) return;
@@ -302,6 +372,18 @@ function CapturarFase8Body() {
       const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
       setFase7Cerrada(posiciones.includes(7));
       setYaCerrada(posiciones.includes(8));
+
+      // Documentos del notario ya cargados (magic link o captura previa) —
+      // disparan el análisis IA automático (efecto aparte).
+      const { data: adjs } = await sb
+        .schema('erp')
+        .from('adjuntos')
+        .select('id, rol, metadata')
+        .eq('entidad_tipo', 'venta')
+        .eq('entidad_id', v.id)
+        .in('rol', ['carta_instruccion_notarial', 'condiciones_financieras']);
+      if (activo) setAdjuntosNotariales((adjs ?? []) as AdjuntoNotarial[]);
+
       setLoading(false);
     })();
 
