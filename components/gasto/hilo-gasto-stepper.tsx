@@ -102,6 +102,23 @@ export function HiloGastoStepper({
     );
   }
 
+  return <HiloPasosView hilo={hilo} empresa={empresa} actualDocId={documento.id} />;
+}
+
+/**
+ * Render puro de los pasos del hilo (extraído en fase 2 para reusar desde
+ * superficies con fetch propio, como la tarea del checklist vía partida).
+ * `actualDocId` evita auto-linkear el documento desde el que se mira.
+ */
+export function HiloPasosView({
+  hilo,
+  empresa,
+  actualDocId,
+}: {
+  hilo: HiloGasto;
+  empresa: string;
+  actualDocId?: string;
+}) {
   return (
     <ol className="flex items-start gap-0 overflow-x-auto pb-1" aria-label="Hilo del gasto">
       {hilo.pasos.map((paso, i) => (
@@ -130,7 +147,7 @@ export function HiloGastoStepper({
             {paso.refs.length > 0 ? (
               <span className="flex max-w-full flex-col items-center">
                 {paso.refs.slice(0, 3).map((ref) => {
-                  const href = ref.id === documento.id ? null : hrefDoc(empresa, ref.tipo, ref.id);
+                  const href = ref.id === actualDocId ? null : hrefDoc(empresa, ref.tipo, ref.id);
                   return href ? (
                     <a
                       key={ref.id}
