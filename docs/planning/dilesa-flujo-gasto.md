@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
 **Estado:** in_progress
-**Próximo hito:** Merge del PR de S3 (navegación y lenguaje); luego Sprint 4 — bandeja "Te toca" lite por rol + quick wins de compras (editar OC borrador, plantilla auto al crear anteproyecto, form financiero agrupado)
+**Próximo hito:** Merge del PR de S4 (bandeja "Te toca" + quick wins) → cerrar v1: Estado done + barrido de Reminders + entrada en `## Done` de INITIATIVES
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (S2 en prod + migración aplicada; S3 a PR)
+**Última actualización:** 2026-06-09 (S3 mergeado; S4 a PR — último sprint del v1)
 
 ## Problema
 
@@ -182,6 +182,21 @@ Facturar → Pagar.
   estados, verificación de que el hilo completo ya existe en FKs, y stress
   test de 8 decisiones de forma. Beto decidió D1 (mover Costeo), D6 (bandeja
   en v1) y la promoción. Estado inicial: `planned`.
+- **2026-06-09 — Sprint 4 (bandeja + quick wins) a PR.** `<TeTocaStrip>` en
+  los hubs Compras y CxP (6 chips accionables por conteo, gateados por write
+  del módulo destino). Alta simple de partidas: 3 campos (clasificación,
+  concepto, presupuesto) — los campos legacy (etapa texto, proveedor, gasto
+  real, previo, fecha) solo en edición; pedida por Beto al ver el form de 9
+  campos en el preview de S2. Editar OC en borrador (form de alta
+  pre-poblado; UPDATE cabecera + replace de líneas con guard
+  `eq('estado','borrador')`). "Crear y autorizar" en alta de requisición
+  (un paso para quien puede autorizar).
+- **2026-06-09 — Quick wins descartados en S4 (con razón).** (a) "Plantilla
+  auto al crear anteproyecto": no existe alta de anteproyecto en la UI (se
+  crean por fuera) — no hay callsite; el botón "Poblar plantilla" del
+  checklist es el punto de entrada correcto. (b) "Form de análisis
+  financiero agrupado": el componente ya agrupa en secciones con derivados;
+  el hallazgo describía el estado pre-rediseño.
 - **2026-06-09 — Sprint 3 (navegación y lenguaje) a PR.** Tabs de Compras en
   el orden del flujo (Requisiciones · Cotizaciones · Órdenes · Recepciones;
   URLs sin cambio). "Pedir cotizaciones (RFQ)" desde la requisición

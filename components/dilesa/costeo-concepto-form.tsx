@@ -182,26 +182,40 @@ export function CosteoConceptoForm({
     onSaved();
   }
 
+  // Alta simple (iniciativa dilesa-flujo-gasto · S4): una partida NUEVA es
+  // Clasificación + Concepto + Presupuesto. El resto (etapa texto, proveedor,
+  // gasto real, previo/actualizado, fecha) es legacy del costeo pre-P2P o
+  // historia de revisiones — solo aparece en edición. El gasto de una partida
+  // nueva llega derivado del ciclo (OC → recepción → factura → pago).
+  const proyectoFijoNombre =
+    !isEdit && defaultProyectoId
+      ? (proyectos.find((p) => p.id === defaultProyectoId)?.nombre ?? null)
+      : null;
+  const muestraSelectorProyecto = isEdit || !defaultProyectoId;
+
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--card)] p-4">
       <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
         {isEdit ? 'Editar partida' : 'Nueva partida de presupuesto'}
+        {proyectoFijoNombre ? ` · ${proyectoFijoNombre}` : ''}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Proyecto *">
-          <select
-            value={proyectoId}
-            onChange={(e) => setProyectoId(e.target.value)}
-            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-          >
-            <option value="">Selecciona…</option>
-            {proyectos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {proyectoOptionLabel(p)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {muestraSelectorProyecto ? (
+          <Field label="Proyecto *">
+            <select
+              value={proyectoId}
+              onChange={(e) => setProyectoId(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+            >
+              <option value="">Selecciona…</option>
+              {proyectos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {proyectoOptionLabel(p)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         <Field label="Clasificación (catálogo)">
           <select
             value={conceptoId}
@@ -227,29 +241,33 @@ export function CosteoConceptoForm({
             placeholder="Red de agua potable, Barda perimetral…"
           />
         </Field>
-        <Field label="Etapa (texto)">
-          <Input
-            value={etapa}
-            onChange={(e) => setEtapa(e.target.value)}
-            placeholder="Urbanización, Cabecera…"
-          />
-        </Field>
-        <Field label="Proveedor">
-          <select
-            value={proveedorSel}
-            onChange={(e) => setProveedorSel(e.target.value)}
-            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-          >
-            <option value="">Por definir</option>
-            {proveedores.map((p) => (
-              <option key={p.personaId} value={p.personaId}>
-                {p.label}
-              </option>
-            ))}
-            <option value={PROV_OTRO}>Otro (texto libre)…</option>
-          </select>
-        </Field>
-        {proveedorSel === PROV_OTRO ? (
+        {isEdit ? (
+          <Field label="Etapa (texto)">
+            <Input
+              value={etapa}
+              onChange={(e) => setEtapa(e.target.value)}
+              placeholder="Urbanización, Cabecera…"
+            />
+          </Field>
+        ) : null}
+        {isEdit ? (
+          <Field label="Proveedor">
+            <select
+              value={proveedorSel}
+              onChange={(e) => setProveedorSel(e.target.value)}
+              className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+            >
+              <option value="">Por definir</option>
+              {proveedores.map((p) => (
+                <option key={p.personaId} value={p.personaId}>
+                  {p.label}
+                </option>
+              ))}
+              <option value={PROV_OTRO}>Otro (texto libre)…</option>
+            </select>
+          </Field>
+        ) : null}
+        {isEdit && proveedorSel === PROV_OTRO ? (
           <Field label="Proveedor (texto libre)">
             <Input
               value={proveedorTexto}
@@ -257,19 +275,21 @@ export function CosteoConceptoForm({
               placeholder="Nombre del proveedor no catalogado"
             />
           </Field>
-        ) : (
+        ) : isEdit ? (
           <div className="hidden sm:block" />
-        )}
-        <Field label="Presupuesto previo (c/IVA)">
-          <Input
-            type="number"
-            step="0.01"
-            value={presupuestoPrevio}
-            onChange={(e) => setPresupuestoPrevio(e.target.value)}
-            placeholder="0.00"
-          />
-        </Field>
-        <Field label="Presupuesto actualizado (c/IVA)">
+        ) : null}
+        {isEdit ? (
+          <Field label="Presupuesto previo (c/IVA)">
+            <Input
+              type="number"
+              step="0.01"
+              value={presupuestoPrevio}
+              onChange={(e) => setPresupuestoPrevio(e.target.value)}
+              placeholder="0.00"
+            />
+          </Field>
+        ) : null}
+        <Field label={isEdit ? 'Presupuesto actualizado (c/IVA)' : 'Presupuesto (c/IVA)'}>
           <Input
             type="number"
             step="0.01"
@@ -278,23 +298,27 @@ export function CosteoConceptoForm({
             placeholder="0.00"
           />
         </Field>
-        <Field label="Gasto real (c/IVA)">
-          <Input
-            type="number"
-            step="0.01"
-            value={gastoReal}
-            onChange={(e) => setGastoReal(e.target.value)}
-            placeholder="0.00"
-          />
-        </Field>
-        <Field label="Fecha compromiso">
-          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-        </Field>
+        {isEdit ? (
+          <Field label="Gasto real (c/IVA)">
+            <Input
+              type="number"
+              step="0.01"
+              value={gastoReal}
+              onChange={(e) => setGastoReal(e.target.value)}
+              placeholder="0.00"
+            />
+          </Field>
+        ) : null}
+        {isEdit ? (
+          <Field label="Fecha compromiso">
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Field>
+        ) : null}
       </div>
       <p className="mt-2 text-[11px] text-[var(--text)]/50">
-        La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución
-        se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado).
-        Montos con IVA incluido.
+        {isEdit
+          ? 'La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado). Montos con IVA incluido.'
+          : 'La clasificación agrupa la partida por el catálogo de conceptos. El gasto (comprometido, ejercido, pagado) llega solo desde las órdenes, recepciones y facturas ligadas a la partida. Monto con IVA incluido.'}
       </p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <div>

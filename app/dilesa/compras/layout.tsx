@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react';
 import { RoutedModuleTabs } from '@/components/module-page';
+import { TeTocaStrip } from '@/components/gasto/te-toca-strip';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 /**
  * Layout compartido del hub Compras (DILESA) — ciclo P2P constructora-first.
@@ -51,7 +53,8 @@ const TABS = [
 export default function ComprasLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <div className="px-4 pt-4 sm:px-6 sm:pt-6">
+      <div className="space-y-3 px-4 pt-4 sm:px-6 sm:pt-6">
+        <TeTocaStrip empresaId={DILESA_EMPRESA_ID} empresa="dilesa" />
         <RoutedModuleTabs tabs={TABS} />
       </div>
       {children}
