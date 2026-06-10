@@ -1,76 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
 import { RequireAccess } from '@/components/require-access';
 import { DesktopOnlyNotice } from '@/components/responsive';
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  ProyectoDetalle,
-  type ProyectoDetalle as ProyectoDetalleType,
-  PROYECTO_DETALLE_COLUMNAS,
-} from '@/components/dilesa/proyecto-detalle';
+import { ProyectoDetallePageBody } from '@/components/dilesa/proyecto-detalle-page-body';
 
 /**
- * @module Proyectos · Detalle (DILESA)
+ * @module Proyectos · Detalle · Resumen (DILESA)
  * @responsive desktop-only
  *
- * Iniciativa `dilesa-drawers-a-paginas` Sprint 1. Antes vivía como
- * side drawer (`<ProyectoDetailDrawer>`); ahora es página completa
- * con layout scroll-largo (decisión 3 de Beto).
+ * Tab default del detalle de proyecto. Desde fase 3 de `dilesa-flujo-gasto`
+ * el detalle es un hub con tabs (Resumen / Unidades / Obras / Checklist /
+ * Gasto) y banda de contexto permanente en el layout; este tab concentra
+ * identidad + avances + plano + "Editar parámetros" (solo Dirección).
  *
- * El sub-slug RBAC es `dilesa.proyectos.activos` (el detalle
- * pertenece a la misma tab del listado). Anteproyectos tienen su
- * propia ruta `/dilesa/proyectos/anteproyectos/[id]`.
+ * El sub-slug RBAC es `dilesa.proyectos.activos` (el detalle pertenece a la
+ * misma tab del listado). Anteproyectos tienen su propia ruta.
  */
 export default function Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.proyectos.activos">
       <DesktopOnlyNotice module="Proyecto" />
       <div className="hidden sm:block">
-        <Body />
+        <ProyectoDetallePageBody seccion="resumen" />
       </div>
     </RequireAccess>
-  );
-}
-
-function Body() {
-  const { id } = useParams<{ id: string }>();
-  const [proyecto, setProyecto] = useState<ProyectoDetalleType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-    let activo = true;
-    void createSupabaseBrowserClient()
-      .schema('dilesa')
-      .from('proyectos')
-      .select(PROYECTO_DETALLE_COLUMNAS)
-      .eq('id', id)
-      .is('deleted_at', null)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!activo) return;
-        if (!data) setNotFound(true);
-        else setProyecto(data as unknown as ProyectoDetalleType);
-        setLoading(false);
-      });
-    return () => {
-      activo = false;
-    };
-  }, [id]);
-
-  return (
-    <div>
-      {/* El "Volver a proyectos" + tabs viven en el layout del detalle (S2 dilesa-flujo-gasto). */}
-      {loading && <p className="p-6 text-sm text-[var(--text)]/60">Cargando proyecto…</p>}
-      {notFound && (
-        <p className="p-6 text-sm text-red-600/80">
-          No se encontró el proyecto. Probablemente fue eliminado.
-        </p>
-      )}
-      {!loading && !notFound && proyecto && <ProyectoDetalle proyecto={proyecto} />}
-    </div>
   );
 }

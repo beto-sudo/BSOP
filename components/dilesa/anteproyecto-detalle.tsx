@@ -317,63 +317,20 @@ export function AnteproyectoDetalle({
         </div>
       </header>
 
-      <AnteproyectoAnalisisFinanciero
-        snapshot={toAnalisisSnapshot(anteproyecto)}
-        productosDisponibles={productosCatalogo}
-        onChange={() => void onAnteproyectoChange?.()}
-      />
-
-      <PlanoAnteproyecto
-        proyectoId={anteproyecto.id}
-        empresaId={DILESA_EMPRESA_ID}
-        empresaSlug="dilesa"
-        onAnalisisAplicado={() => {
-          void onAnteproyectoChange?.();
-        }}
-        collapsible
-        defaultCollapsed
-      />
-
-      {/* Ficha física + Costos estimados + Análisis derivado quedaron
-          reemplazadas por la sección Análisis Financiero arriba
-          (Sprint 4B refinamiento — Beto: "la ficha ya puede salir
-          sobrando"). */}
-
-      {anteproyecto.notas ? (
-        <DetailDrawerSection title="Notas" collapsible defaultCollapsed>
-          <p className="whitespace-pre-line text-sm text-[var(--text)]/80">{anteproyecto.notas}</p>
-        </DetailDrawerSection>
-      ) : null}
-
-      <ProyectoChecklist
-        proyectoId={anteproyecto.id}
-        tipo="anteproyecto"
-        fechaArranque={anteproyecto.fecha_inicio}
-        empresaId={DILESA_EMPRESA_ID}
-        empresaSlug="dilesa"
-        puedeAutorizar={puedeAutorizar}
-        onChecklistState={handleChecklistState}
-        collapsible
-        defaultCollapsed
-      />
-
-      {/* La sección "Presupuesto" (partidas presupuestales del Sprint 2)
-          se eliminó en Sprint 4E refinamiento. El flujo de entrada
-          original — capturar monto en tareas de cotización — ya no
-          existe: las 4 tareas de cotización + comité se eliminaron en
-          Sprint 4A. El análisis financiero del Sprint 4B captura
-          todos los costos (urbanización, materiales, MO, RUV, seguro,
-          comercialización) con su comparativo referencia vs proyecto.
-          La tabla `dilesa.proyecto_presupuesto_partidas` se mantiene
-          para histórico y para uso en desarrollo. */}
-
-      <DetailDrawerSection title="Autorización y promoción a desarrollo" description={gate.razon}>
+      {/* Fase 3 dilesa-flujo-gasto: la promoción es la acción más importante
+          del anteproyecto — vive arriba, visible sin scrollear (antes estaba
+          al fondo de la página). */}
+      <DetailDrawerSection
+        title="Autorización y promoción a desarrollo"
+        description={gate.razon}
+        divider={false}
+      >
         {promoteSuccess ? (
           <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
             <div className="font-medium">Ejecución autorizada y anteproyecto promovido.</div>
             <div className="mt-1 text-xs">
               Nuevo desarrollo creado con ID <code>{promoteSuccess}</code>. El anteproyecto queda
-              como histórico (estado completado). Cambia a la tab Activos para verlo.
+              como histórico (estado Promovido). Cambia a la tab Activos para verlo.
             </div>
           </div>
         ) : confirmingPromote ? (
@@ -425,6 +382,56 @@ export function AnteproyectoDetalle({
         )}
         {promoteError && <p className="mt-2 text-sm text-red-600/80">{promoteError}</p>}
       </DetailDrawerSection>
+
+      <AnteproyectoAnalisisFinanciero
+        snapshot={toAnalisisSnapshot(anteproyecto)}
+        productosDisponibles={productosCatalogo}
+        onChange={() => void onAnteproyectoChange?.()}
+      />
+
+      <PlanoAnteproyecto
+        proyectoId={anteproyecto.id}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        onAnalisisAplicado={() => {
+          void onAnteproyectoChange?.();
+        }}
+        collapsible
+        defaultCollapsed
+      />
+
+      {/* Ficha física + Costos estimados + Análisis derivado quedaron
+          reemplazadas por la sección Análisis Financiero arriba
+          (Sprint 4B refinamiento — Beto: "la ficha ya puede salir
+          sobrando"). */}
+
+      {anteproyecto.notas ? (
+        <DetailDrawerSection title="Notas" collapsible defaultCollapsed>
+          <p className="whitespace-pre-line text-sm text-[var(--text)]/80">{anteproyecto.notas}</p>
+        </DetailDrawerSection>
+      ) : null}
+
+      <ProyectoChecklist
+        proyectoId={anteproyecto.id}
+        tipo="anteproyecto"
+        fechaArranque={anteproyecto.fecha_inicio}
+        empresaId={DILESA_EMPRESA_ID}
+        empresaSlug="dilesa"
+        puedeAutorizar={puedeAutorizar}
+        onChecklistState={handleChecklistState}
+        collapsible
+        defaultCollapsed
+      />
+
+      {/* La sección "Presupuesto" (partidas presupuestales del Sprint 2)
+          se eliminó en Sprint 4E refinamiento. El flujo de entrada
+          original — capturar monto en tareas de cotización — ya no
+          existe: las 4 tareas de cotización + comité se eliminaron en
+          Sprint 4A. El análisis financiero del Sprint 4B captura
+          todos los costos (urbanización, materiales, MO, RUV, seguro,
+          comercialización) con su comparativo referencia vs proyecto.
+          La tabla `dilesa.proyecto_presupuesto_partidas` se mantiene
+          para histórico y para uso en desarrollo. */}
     </div>
   );
 }
