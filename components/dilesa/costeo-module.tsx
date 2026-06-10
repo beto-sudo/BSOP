@@ -39,7 +39,7 @@
  * KPI agregado "Contratado".
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
@@ -780,15 +780,26 @@ export function CosteoModule({
 
   function abrirAlta() {
     setEditRow(null);
+    setSolicitarPara(null);
     setFormOpen(true);
   }
   function abrirEdicion(row: CosteoRow) {
+    setSolicitarPara(null);
+    // Toggle: presionar la fila que ya está en edición la cierra.
+    if (formOpen && editRow?.id === row.id) {
+      cerrarForm();
+      return;
+    }
     setEditRow(row);
     setFormOpen(true);
   }
   function cerrarForm() {
     setFormOpen(false);
     setEditRow(null);
+  }
+  function abrirSolicitudCambio(row: CosteoRow) {
+    cerrarForm();
+    setSolicitarPara((prev) => (prev?.id === row.id ? null : row));
   }
 
   const toggleGrupo = useCallback((key: string) => {
@@ -900,6 +911,57 @@ export function CosteoModule({
   // Click en la fila abre la edición (solo si puede escribir).
   const onRowClick = puedeEscribir ? abrirEdicion : undefined;
 
+  // Panel expandido inline bajo la fila presionada: edición de la partida o
+  // solicitud de orden de cambio (mutuamente exclusivos).
+  const expandidoId = solicitarPara?.id ?? (formOpen ? (editRow?.id ?? null) : null);
+  const renderExpandido = (r: CosteoRow) => {
+    if (solicitarPara?.id === r.id && proyectoSeleccionado) {
+      return (
+        <SolicitarCambioCard
+          empresaId={empresaId}
+          proyectoId={proyectoSeleccionado}
+          partida={{
+            id: solicitarPara.id,
+            concepto: solicitarPara.concepto || '(sin concepto)',
+            vigente: solicitarPara.presupuesto ?? 0,
+          }}
+          onClose={() => setSolicitarPara(null)}
+          onCreated={() => void cargar()}
+        />
+      );
+    }
+    if (formOpen && editRow?.id === r.id) {
+      return (
+        <CosteoConceptoForm
+          key={editRow.id}
+          empresaId={empresaId}
+          proyectos={proyectos}
+          optgroups={catalogo.optgroups}
+          proveedores={proveedores}
+          rows={rows}
+          editRow={editRow}
+          defaultProyectoId={proyectoIdFijo}
+          baselineActivo={editRow.proyecto_id ? baselines.has(editRow.proyecto_id) : false}
+          onSolicitarCambio={() => abrirSolicitudCambio(editRow)}
+          onClose={cerrarForm}
+          onSaved={() => {
+            cerrarForm();
+            void cargar();
+          }}
+          onDelete={
+            puedeEscribir
+              ? async (motivo) => {
+                  const ok = await eliminar(editRow, motivo ?? '');
+                  if (ok) cerrarForm();
+                }
+              : undefined
+          }
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6 p-6">
       {proyectoIdFijo ? null : (
@@ -992,60 +1054,25 @@ export function CosteoModule({
         </div>
       </div>
 
-      {formOpen ? (
+      {/* Alta de partida (sin fila de referencia) — se abre bajo los
+          controles. La EDICIÓN y la solicitud de cambio se expanden inline
+          bajo el renglón presionado (feedback de Beto en el preview de S2). */}
+      {formOpen && !editRow ? (
         <CosteoConceptoForm
-          key={editRow?.id ?? 'nuevo'}
+          key="nuevo"
           empresaId={empresaId}
           proyectos={proyectos}
           optgroups={catalogo.optgroups}
           proveedores={proveedores}
           rows={rows}
-          editRow={editRow}
+          editRow={null}
           defaultProyectoId={proyectoIdFijo}
-          baselineActivo={
-            // El candado del baseline aplica por el proyecto de la PARTIDA en
-            // edición (o el seleccionado en alta).
-            editRow?.proyecto_id
-              ? baselines.has(editRow.proyecto_id)
-              : proyectoSeleccionado
-                ? hayBaseline
-                : false
-          }
-          onSolicitarCambio={
-            editRow
-              ? () => {
-                  setSolicitarPara(editRow);
-                  cerrarForm();
-                }
-              : undefined
-          }
+          baselineActivo={proyectoSeleccionado ? hayBaseline : false}
           onClose={cerrarForm}
           onSaved={() => {
             cerrarForm();
             void cargar();
           }}
-          onDelete={
-            editRow && puedeEscribir
-              ? async (motivo) => {
-                  const ok = await eliminar(editRow, motivo ?? '');
-                  if (ok) cerrarForm();
-                }
-              : undefined
-          }
-        />
-      ) : null}
-
-      {solicitarPara && proyectoSeleccionado ? (
-        <SolicitarCambioCard
-          empresaId={empresaId}
-          proyectoId={proyectoSeleccionado}
-          partida={{
-            id: solicitarPara.id,
-            concepto: solicitarPara.concepto || '(sin concepto)',
-            vigente: solicitarPara.presupuesto ?? 0,
-          }}
-          onClose={() => setSolicitarPara(null)}
-          onCreated={() => void cargar()}
         />
       ) : null}
 
@@ -1132,7 +1159,9 @@ export function CosteoModule({
                     onRowClick={onRowClick}
                     hayBaseline={hayBaseline}
                     onHistorial={setHistorialRow}
-                    onSolicitarCambio={puedeEscribir ? setSolicitarPara : undefined}
+                    onSolicitarCambio={puedeEscribir ? abrirSolicitudCambio : undefined}
+                    expandidoId={expandidoId}
+                    renderExpandido={renderExpandido}
                   />
                 );
               })}
@@ -1177,6 +1206,8 @@ function GrupoFragment({
   hayBaseline,
   onHistorial,
   onSolicitarCambio,
+  expandidoId,
+  renderExpandido,
 }: {
   etapa: CosteoEtapa;
   etapaCollapsed: boolean;
@@ -1187,6 +1218,9 @@ function GrupoFragment({
   hayBaseline: boolean;
   onHistorial: (r: CosteoRow) => void;
   onSolicitarCambio?: (r: CosteoRow) => void;
+  /** id de la partida con panel inline abierto (edición / orden de cambio). */
+  expandidoId: string | null;
+  renderExpandido: (r: CosteoRow) => React.ReactNode;
 }) {
   return (
     <>
@@ -1244,6 +1278,8 @@ function GrupoFragment({
               hayBaseline={hayBaseline}
               onHistorial={onHistorial}
               onSolicitarCambio={onSolicitarCambio}
+              expandidoId={expandidoId}
+              renderExpandido={renderExpandido}
             />
           );
         })}
@@ -1272,6 +1308,8 @@ function CapituloFragment({
   hayBaseline,
   onHistorial,
   onSolicitarCambio,
+  expandidoId,
+  renderExpandido,
 }: {
   cap: CosteoCapitulo;
   capCollapsed: boolean;
@@ -1280,7 +1318,11 @@ function CapituloFragment({
   hayBaseline: boolean;
   onHistorial: (r: CosteoRow) => void;
   onSolicitarCambio?: (r: CosteoRow) => void;
+  expandidoId: string | null;
+  renderExpandido: (r: CosteoRow) => React.ReactNode;
 }) {
+  // Concepto + montos (+3 de gobierno y +1 de acciones con baseline).
+  const totalCols = hayBaseline ? 9 : 6;
   return (
     <>
       {/* Nivel 2 · Capítulo */}
@@ -1329,72 +1371,80 @@ function CapituloFragment({
 
       {!capCollapsed &&
         cap.partidas.map((r) => (
-          <tr
-            key={r.id}
-            onClick={onRowClick ? () => onRowClick(r) : undefined}
-            title={onRowClick ? 'Editar partida' : undefined}
-            className={`border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40 ${
-              onRowClick ? 'cursor-pointer' : ''
-            }`}
-          >
-            <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
-            {hayBaseline ? (
-              <>
-                <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
-                  {r.montoBaseline == null ? '—' : formatCurrency(r.montoBaseline)}
-                </td>
-                <CambiosTd value={r.cambiosNetos} pad="px-3 py-1.5" />
-              </>
-            ) : null}
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
-            </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {fmtMonto(r.comprometido)}
-            </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {fmtMonto(r.ejercido)}
-            </td>
-            <DisponibleTd
-              presupuesto={r.presupuesto ?? 0}
-              comprometido={r.comprometido}
-              pad="px-3 py-1.5"
-              normalColor="text-[var(--text)]"
-            />
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
-              {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
-            </td>
-            {hayBaseline ? (
-              <td className="px-2 py-1.5">
-                <div className="flex items-center justify-end gap-0.5">
-                  <button
-                    type="button"
-                    title="Historial del presupuesto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onHistorial(r);
-                    }}
-                    className="rounded p-1 text-[var(--text)]/40 hover:bg-[var(--card)] hover:text-[var(--text)]"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                  </button>
-                  {onSolicitarCambio ? (
+          <Fragment key={r.id}>
+            <tr
+              onClick={onRowClick ? () => onRowClick(r) : undefined}
+              title={onRowClick ? 'Editar partida' : undefined}
+              className={`border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40 ${
+                onRowClick ? 'cursor-pointer' : ''
+              } ${expandidoId === r.id ? 'bg-[var(--card)]/50' : ''}`}
+            >
+              <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
+              {hayBaseline ? (
+                <>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+                    {r.montoBaseline == null ? '—' : formatCurrency(r.montoBaseline)}
+                  </td>
+                  <CambiosTd value={r.cambiosNetos} pad="px-3 py-1.5" />
+                </>
+              ) : null}
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {fmtMonto(r.comprometido)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {fmtMonto(r.ejercido)}
+              </td>
+              <DisponibleTd
+                presupuesto={r.presupuesto ?? 0}
+                comprometido={r.comprometido}
+                pad="px-3 py-1.5"
+                normalColor="text-[var(--text)]"
+              />
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+                {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
+              </td>
+              {hayBaseline ? (
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center justify-end gap-0.5">
                     <button
                       type="button"
-                      title="Solicitar cambio de presupuesto"
+                      title="Historial del presupuesto"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onSolicitarCambio(r);
+                        onHistorial(r);
                       }}
-                      className="rounded p-1 text-[var(--text)]/40 hover:bg-[var(--card)] hover:text-[var(--text)]"
+                      className="rounded p-1 text-[var(--text)]/60 hover:bg-[var(--card)] hover:text-[var(--text)]"
                     >
-                      <Scale className="h-3.5 w-3.5" />
+                      <History className="h-4 w-4" />
                     </button>
-                  ) : null}
-                </div>
-              </td>
+                    {onSolicitarCambio ? (
+                      <button
+                        type="button"
+                        title="Solicitar cambio de presupuesto"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSolicitarCambio(r);
+                        }}
+                        className="rounded p-1 text-[var(--text)]/60 hover:bg-[var(--card)] hover:text-[var(--text)]"
+                      >
+                        <Scale className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
+            </tr>
+            {expandidoId === r.id ? (
+              <tr className="border-b border-[var(--border)]/40">
+                <td colSpan={totalCols} className="bg-[var(--bg)] p-3">
+                  {renderExpandido(r)}
+                </td>
+              </tr>
             ) : null}
-          </tr>
+          </Fragment>
         ))}
     </>
   );
