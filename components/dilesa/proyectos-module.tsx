@@ -338,17 +338,6 @@ export function ProyectosModule({
         ),
     },
     {
-      key: 'objetivo_trimestral',
-      label: 'Obj. trim.',
-      type: 'number',
-      render: (p) =>
-        p.objetivo_trimestral != null ? (
-          String(p.objetivo_trimestral)
-        ) : (
-          <span className="text-[var(--text)]/30">—</span>
-        ),
-    },
-    {
       key: 'area_vendible_m2',
       label: 'Área vendible m²',
       type: 'number',

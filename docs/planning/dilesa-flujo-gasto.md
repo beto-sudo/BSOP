@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón hilo + home de gasto es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (Next.js App Router); vistas SQL de lectura en `erp` (hilo del gasto sobre FKs existentes), `core.modulos` (sub-slugs RBAC del detalle de proyecto con routed tabs). **Cero cambios al modelo de datos P2P** — todas las ligas del hilo ya existen como FKs.
 **Estado:** in_progress
-**Próximo hito:** Fase 2 a PR — aplicar migración `20260610003301` (fix RPC promoción → partidas canónicas) con OK de Beto + merge; luego re-cerrar la iniciativa
+**Próximo hito:** Merge del PR de F3 (detalle de proyecto en tabs + banda + parámetros) → re-cerrar la iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-10 (REABIERTA por pedido de Beto — Fase 2: convergencia checklist ↔ ciclo real)
+**Última actualización:** 2026-06-10 (F2 mergeada + migración RPC aplicada/verificada; F3 a PR)
 
 ## Problema
 
@@ -176,6 +176,28 @@ Facturar → Pagar.
   `useFocusDrilldown`) y centralizó los destinos en `hrefDoc` (fix del link).
 
 ## Bitácora
+
+- **2026-06-10 — Fase 3 (detalle en tabs + dieta de campos) a PR.** Pedida
+  por Beto al revisar el preview. (a) Detalle de PROYECTO repartido en tabs
+  (Resumen / Unidades / Obras / Checklist / Gasto) vía prop `seccion` de
+  `<ProyectoDetalle>` + `<ProyectoDetallePageBody>`; banda de contexto
+  permanente `<ProyectoBanda>` en el layout (nombre + badges + avances mini
+  - estado sugerido). Tabs nuevos gobernados por `dilesa.proyectos.activos`
+    (sin sub-slugs nuevos — mismo dominio; solo Gasto conserva el suyo). (b)
+    "Documentos y configuración" eliminada: los 4 campos muertos de paridad
+    Coda (plano_oficial_url, image_url, acreditacion_escritura,
+    objetivo_trimestral) salen de la UI (quedan en DB como histórico) y la
+    columna "Obj. trim." sale del listado; nace **"Editar parámetros"** en
+    Resumen, visible solo con `puedeAutorizar` (admin/Dirección) — ahí vive el
+    **Precio m² excedente** (alimenta la determinación de precios, decisión de
+    Beto) junto con clasificación, áreas y costo MO. (c) ANTEPROYECTO: sin
+    tabs (ya quedó podado en Sprint 4B/4E a 4 secciones; tabs separarían el
+    gate de promoción de su fuente) — en su lugar, la sección de promoción se
+    movió ARRIBA (la acción más importante, visible sin scrollear) y su copy
+    dice "Promovido" (glosario S3).
+- **2026-06-10 — F2 mergeada (#791) + migración `20260610003301` aplicada a
+  prod y verificada** (la RPC de promoción ya escribe en
+  `erp.presupuesto_partidas`).
 
 - **2026-06-10 — Fase 2 (convergencia checklist ↔ ciclo real) a PR.**
   Hallazgo al mapear: el canal tarea→partida seguía apuntando a la tabla

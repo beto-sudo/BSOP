@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { RoutedModuleTabs } from '@/components/module-page';
+import { ProyectoBanda } from '@/components/dilesa/proyecto-banda';
 
 /**
  * Layout del detalle de proyecto (DILESA) — routed tabs (ADR-005/ADR-030).
@@ -37,9 +38,23 @@ export default function ProyectoDetalleLayout({ children }: { children: ReactNod
         </Link>
       </div>
       <div className="px-4 pt-3 sm:px-6">
+        <ProyectoBanda proyectoId={id} />
+      </div>
+      <div className="px-4 pt-3 sm:px-6">
         <RoutedModuleTabs
           tabs={[
             { label: 'Resumen', href: base, exact: true, module: 'dilesa.proyectos.activos' },
+            {
+              label: 'Unidades',
+              href: `${base}/unidades`,
+              module: 'dilesa.proyectos.activos',
+            },
+            { label: 'Obras', href: `${base}/obras`, module: 'dilesa.proyectos.activos' },
+            {
+              label: 'Checklist',
+              href: `${base}/checklist`,
+              module: 'dilesa.proyectos.activos',
+            },
             { label: 'Gasto', href: `${base}/gasto`, module: 'dilesa.proyectos.gasto' },
           ]}
         />
