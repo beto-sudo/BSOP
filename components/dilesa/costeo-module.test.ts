@@ -21,6 +21,9 @@ function r(overrides: Partial<CosteoRow>): CosteoRow {
     fechaCompromiso: null,
     orden: 0,
     ratio: null,
+    estado: 'planeada',
+    montoBaseline: null,
+    cambiosNetos: 0,
     ...overrides,
   };
 }

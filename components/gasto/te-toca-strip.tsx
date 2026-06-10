@@ -19,19 +19,24 @@
 import { useEffect, useState } from 'react';
 import { ListChecks } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 
 type Chip = {
   key: string;
   count: number;
   label: (n: number) => string;
   href: string;
-  /** Sub-slug cuyo `write` habilita el chip. */
-  modulo: string;
+  /** Sub-slug cuyo `write` habilita el chip. null = gate por `direccion`. */
+  modulo: string | null;
+  /** Chip exclusivo de Dirección (admin global O rol Dirección en la empresa). */
+  direccion?: boolean;
 };
 
 export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa: string }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
+  const esDireccion =
+    !!effectiveUser?.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
   const [chips, setChips] = useState<Chip[]>([]);
 
   useEffect(() => {
@@ -107,6 +112,20 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
           ),
         ]
       );
+      // Órdenes de cambio presupuestal pendientes (gobierno del baseline,
+      // iniciativa dilesa-presupuesto-baseline): las resuelve Dirección en el
+      // tab Gasto del proyecto. Sin head — los proyecto_id arman el href.
+      const cambiosRes = esDilesa
+        ? await erp
+            .from('presupuesto_cambios')
+            .select('proyecto_id')
+            .eq('empresa_id', empresaId)
+            .eq('estado', 'solicitada')
+        : { data: [], error: null };
+      const cambiosProyectos: string[] = cambiosRes.error
+        ? []
+        : ((cambiosRes.data ?? []) as { proyecto_id: string }[]).map((c) => c.proyecto_id);
+      const cambiosUnicos = [...new Set(cambiosProyectos)];
       if (!activo) return;
 
       setChips([
@@ -152,6 +171,17 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
           href: `/${empresa}/cxp/pagos`,
           modulo: `${empresa}.cxp.pagos`,
         },
+        {
+          key: 'presupuesto',
+          count: cambiosProyectos.length,
+          label: (n) => `${n} cambio${n === 1 ? '' : 's'} de presupuesto por autorizar`,
+          href:
+            cambiosUnicos.length === 1
+              ? `/dilesa/proyectos/${cambiosUnicos[0]}/gasto`
+              : '/dilesa/proyectos',
+          modulo: null,
+          direccion: true,
+        },
       ]);
     })();
     return () => {
@@ -159,9 +189,13 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
     };
   }, [empresaId, empresa]);
 
-  const visibles = chips.filter(
-    (c) => c.count > 0 && (permissions.isAdmin || permissions.modulos.get(c.modulo)?.write === true)
-  );
+  const visibles = chips.filter((c) => {
+    if (c.count === 0) return false;
+    if (c.direccion) return esDireccion;
+    return (
+      permissions.isAdmin || (c.modulo != null && permissions.modulos.get(c.modulo)?.write === true)
+    );
+  });
   if (visibles.length === 0) return null;
 
   return (
