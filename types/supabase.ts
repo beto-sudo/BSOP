@@ -6588,42 +6588,69 @@ export type Database = {
           activo: boolean
           banco: string | null
           clabe: string | null
+          contacto: string | null
+          contrato: string | null
           created_at: string
           empresa_id: string
           id: string
+          moneda: string | null
           moneda_id: string | null
           nombre: string
+          notas: string | null
+          numero_cliente: string | null
           numero_cuenta: string | null
+          producto: string | null
           saldo_actual: number | null
+          sucursal: string | null
+          telefono: string | null
           tipo: string | null
+          titular: string | null
           updated_at: string | null
         }
         Insert: {
           activo?: boolean
           banco?: string | null
           clabe?: string | null
+          contacto?: string | null
+          contrato?: string | null
           created_at?: string
           empresa_id: string
           id?: string
+          moneda?: string | null
           moneda_id?: string | null
           nombre: string
+          notas?: string | null
+          numero_cliente?: string | null
           numero_cuenta?: string | null
+          producto?: string | null
           saldo_actual?: number | null
+          sucursal?: string | null
+          telefono?: string | null
           tipo?: string | null
+          titular?: string | null
           updated_at?: string | null
         }
         Update: {
           activo?: boolean
           banco?: string | null
           clabe?: string | null
+          contacto?: string | null
+          contrato?: string | null
           created_at?: string
           empresa_id?: string
           id?: string
+          moneda?: string | null
           moneda_id?: string | null
           nombre?: string
+          notas?: string | null
+          numero_cliente?: string | null
           numero_cuenta?: string | null
+          producto?: string | null
           saldo_actual?: number | null
+          sucursal?: string | null
+          telefono?: string | null
           tipo?: string | null
+          titular?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -7614,6 +7641,80 @@ export type Database = {
             columns: ["puesto_id"]
             isOneToOne: false
             referencedRelation: "puestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estados_cuenta: {
+        Row: {
+          archivo_path: string | null
+          capturado_por: string | null
+          comisiones: number | null
+          created_at: string
+          cuenta_id: string
+          depositos: number
+          empresa_id: string
+          extraccion: Json | null
+          fecha_corte: string
+          id: string
+          notas: string | null
+          num_abonos: number | null
+          num_cargos: number | null
+          periodo: string
+          retiros: number
+          saldo_final: number
+          saldo_inicial: number
+          saldo_inversiones: number
+          updated_at: string | null
+        }
+        Insert: {
+          archivo_path?: string | null
+          capturado_por?: string | null
+          comisiones?: number | null
+          created_at?: string
+          cuenta_id: string
+          depositos?: number
+          empresa_id: string
+          extraccion?: Json | null
+          fecha_corte: string
+          id?: string
+          notas?: string | null
+          num_abonos?: number | null
+          num_cargos?: number | null
+          periodo: string
+          retiros?: number
+          saldo_final: number
+          saldo_inicial: number
+          saldo_inversiones?: number
+          updated_at?: string | null
+        }
+        Update: {
+          archivo_path?: string | null
+          capturado_por?: string | null
+          comisiones?: number | null
+          created_at?: string
+          cuenta_id?: string
+          depositos?: number
+          empresa_id?: string
+          extraccion?: Json | null
+          fecha_corte?: string
+          id?: string
+          notas?: string | null
+          num_abonos?: number | null
+          num_cargos?: number | null
+          periodo?: string
+          retiros?: number
+          saldo_final?: number
+          saldo_inicial?: number
+          saldo_inversiones?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estados_cuenta_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_bancarias"
             referencedColumns: ["id"]
           },
         ]

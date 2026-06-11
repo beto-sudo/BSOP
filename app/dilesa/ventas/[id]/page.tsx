@@ -55,6 +55,7 @@ import { FASE_ROLES, ROL_LABEL, rolesOpcionales } from '@/lib/dilesa/captura/fas
 import { evaluarCierre } from '@/lib/dilesa/copiloto-cierre';
 import { CopilotoCierre } from '@/components/dilesa/copiloto-cierre';
 import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
+import { domicilioTexto, kycEfectivo } from '@/lib/dilesa/kyc-efectivo';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
 import { useTriggerPrint } from '@/components/print';
@@ -158,6 +159,21 @@ type Persona = {
   tipo_persona: string | null;
   estado_civil: string | null;
   domicilio: string | null;
+  // KYC + INE + domicilio estructurado (form Sprint 7c-2) — la resolución
+  // persona-vs-venta vive en lib/dilesa/kyc-efectivo.
+  ocupacion: string | null;
+  forma_pago_kyc: string | null;
+  uso_efectivo_kyc: string | null;
+  conocimiento_dueno_beneficiario: string | null;
+  es_pep: boolean | null;
+  numero_credencial_ine: string | null;
+  domicilio_calle: string | null;
+  domicilio_numero_exterior: string | null;
+  domicilio_numero_interior: string | null;
+  domicilio_colonia: string | null;
+  domicilio_codigo_postal: string | null;
+  domicilio_ciudad: string | null;
+  domicilio_estado: string | null;
 };
 
 type UnidadInfo = {
@@ -473,7 +489,7 @@ function DetailInner() {
           .schema('erp')
           .from('personas')
           .select(
-            'nombre, apellido_paterno, apellido_materno, email, telefono, curp, numero_credencial_ine, rfc, nss, fecha_nacimiento, nacionalidad, tipo_persona, estado_civil, domicilio'
+            'nombre, apellido_paterno, apellido_materno, email, telefono, curp, rfc, nss, fecha_nacimiento, nacionalidad, tipo_persona, estado_civil, domicilio, ocupacion, forma_pago_kyc, uso_efectivo_kyc, conocimiento_dueno_beneficiario, es_pep, numero_credencial_ine, domicilio_calle, domicilio_numero_exterior, domicilio_numero_interior, domicilio_colonia, domicilio_codigo_postal, domicilio_ciudad, domicilio_estado'
           )
           .eq('id', ventaRow.persona_id)
           .maybeSingle(),
@@ -999,21 +1015,25 @@ function DetailInner() {
           ['Nacionalidad', persona.nacionalidad],
           ['Estado civil', persona.estado_civil],
           ['Tipo persona', persona.tipo_persona],
-          ['Domicilio', persona.domicilio],
+          ['Domicilio', domicilioTexto(persona)],
         ] as [string, string | null][]
       )
         .filter((r): r is [string, string] => r[1] != null && r[1] !== '')
         .map(([label, value]) => ({ label, value }))
     : [];
 
+  // KYC efectivo: ventas Coda lo traen per-venta, capturas BSOP en la
+  // persona — sin la resolución, las nativas mostraban este bloque vacío.
+  const kycResuelto = kycEfectivo(persona, venta);
+  const pepConocido = persona?.es_pep != null || venta.es_pep != null;
   const kyc: { label: string; value: string }[] = (
     [
-      ['PEP', venta.es_pep == null ? null : venta.es_pep ? 'Sí' : 'No'],
-      ['Ocupación', venta.ocupacion],
-      ['INE', venta.ine_numero],
-      ['Forma de pago', venta.forma_pago],
-      ['Uso de efectivo', venta.uso_efectivo],
-      ['Dueño beneficiario', venta.conocimiento_dueno_beneficiario],
+      ['PEP', pepConocido ? (kycResuelto.esPep ? 'Sí' : 'No') : null],
+      ['Ocupación', kycResuelto.ocupacion],
+      ['INE', kycResuelto.ineNumero],
+      ['Forma de pago', kycResuelto.formaPago],
+      ['Uso de efectivo', kycResuelto.usoEfectivo],
+      ['Dueño beneficiario', kycResuelto.conocimientoDuenoBeneficiario],
     ] as [string, string | null][]
   )
     .filter((r): r is [string, string] => r[1] != null && r[1] !== '')

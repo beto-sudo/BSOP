@@ -542,10 +542,25 @@ function NuevaSolicitudForm() {
         personaId = ins.id as string;
       }
 
-      // 2) Usuario actual (para vendedor_usuario_id)
+      // 2) Usuario actual (para vendedor_usuario_id) + snapshot del nombre
+      //    en venta.vendedor (text). El snapshot evita el lookup a
+      //    core.usuarios al renderizar docs/pantalla: su RLS es self-only,
+      //    así que a cualquier usuario distinto del vendedor el nombre le
+      //    salía vacío (FICU/solicitud impresos por gerencia).
       const {
         data: { user },
       } = await sb.auth.getUser();
+      let vendedorSnapshot: string | null = null;
+      if (user?.id) {
+        const { data: yo } = await sb
+          .schema('core')
+          .from('usuarios')
+          .select('first_name, last_name, email')
+          .eq('id', user.id)
+          .maybeSingle();
+        vendedorSnapshot =
+          [yo?.first_name, yo?.last_name].filter(Boolean).join(' ').trim() || yo?.email || null;
+      }
 
       // 3) Crear venta
       const unidad = unidades.find((u) => u.id === unidadId);
@@ -558,6 +573,7 @@ function NuevaSolicitudForm() {
           persona_id: personaId,
           unidad_id: unidadId,
           vendedor_usuario_id: user?.id ?? null,
+          vendedor: vendedorSnapshot,
           estado: 'activa',
           fase_actual: 'Solicitud de Asignación',
           fase_posicion: 1,

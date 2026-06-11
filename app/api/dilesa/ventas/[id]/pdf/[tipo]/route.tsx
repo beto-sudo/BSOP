@@ -41,6 +41,8 @@ import {
 } from '@/lib/dilesa/pdf/pagare-credito-directo';
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
+import { domicilioEstructurado, domicilioTexto, kycEfectivo } from '@/lib/dilesa/kyc-efectivo';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 import { getNotaria } from '@/lib/dilesa/notarios';
@@ -123,13 +125,15 @@ export async function GET(
         ? 'EXPIRADA'
         : null;
 
-  // Persona (cliente) cross-schema — FICU + Promesa necesitan todos los KYC
-  // fields que el form de Sprint 7c-2 persistió aquí (no en `dilesa.ventas`).
+  // Persona (cliente) cross-schema — FICU + Promesa necesitan los KYC del
+  // form (Sprint 7c-2), la INE y el domicilio estructurado. La resolución
+  // persona-vs-venta vive en lib/dilesa/kyc-efectivo (dos poblaciones:
+  // Coda per-venta, BSOP en persona).
   const { data: persona } = await sb
     .schema('erp')
     .from('personas')
     .select(
-      'nombre, apellido_paterno, apellido_materno, fecha_nacimiento, curp, rfc, email, telefono, nacionalidad, tipo_persona, domicilio, forma_pago_kyc, uso_efectivo_kyc, ocupacion, conocimiento_dueno_beneficiario, es_pep'
+      'nombre, apellido_paterno, apellido_materno, fecha_nacimiento, curp, rfc, email, telefono, nacionalidad, tipo_persona, domicilio, forma_pago_kyc, uso_efectivo_kyc, ocupacion, conocimiento_dueno_beneficiario, es_pep, numero_credencial_ine, domicilio_calle, domicilio_numero_exterior, domicilio_numero_interior, domicilio_colonia, domicilio_codigo_postal, domicilio_ciudad, domicilio_estado'
     )
     .eq('id', venta.persona_id)
     .maybeSingle();
@@ -138,27 +142,21 @@ export async function GET(
       .filter(Boolean)
       .join(' ') || '(sin nombre)';
 
-  // KYC efectivo: el form de captura persiste estos campos en erp.personas,
-  // pero las ventas importadas de Coda los traen per-venta en dilesa.ventas
-  // y nunca poblaron la persona. Gana la fuente con dato (persona primero).
-  // PEP es OR de ambas fuentes: nunca degradar un true.
-  const kycOcupacion = persona?.ocupacion ?? venta.ocupacion ?? null;
-  const kycFormaPago = persona?.forma_pago_kyc ?? venta.forma_pago ?? null;
-  const kycUsoEfectivo = persona?.uso_efectivo_kyc ?? venta.uso_efectivo ?? null;
-  const kycConocimientoDB =
-    persona?.conocimiento_dueno_beneficiario ?? venta.conocimiento_dueno_beneficiario ?? null;
-  const kycEsPep = Boolean(persona?.es_pep || venta.es_pep);
+  const kyc = kycEfectivo(persona, venta);
+  const domEstructurado = domicilioEstructurado(persona);
+  const domTexto = domicilioTexto(persona);
 
   // Vendedor (asesor de ventas) — el form persiste `vendedor_usuario_id`
-  // (FK a core.usuarios); el campo legacy `venta.vendedor` (text) puede
-  // estar vacío en ventas nuevas. Resolvemos el nombre completo via lookup.
-  // Concatena `first_name + ' ' + last_name`; si falta last_name, queda
-  // solo el first_name; si falta first_name, fallback a email; si nada,
-  // al campo text legacy de la venta.
+  // (FK a core.usuarios). El lookup va con el ADMIN client: la RLS de
+  // core.usuarios es self-only (usuarios_select_own), así que con el client
+  // de la sesión el nombre solo salía cuando imprimía el propio vendedor.
+  // Solo se extrae nombre/email para estamparlos en el documento; el acceso
+  // a la venta ya pasó por la RLS de dilesa.ventas arriba.
   let vendedorNombre = (venta.vendedor ?? '').toString();
   let vendedorEmail: string | null = null;
   if (venta.vendedor_usuario_id) {
-    const { data: u } = await sb
+    const lookupClient = getSupabaseAdminClient() ?? sb;
+    const { data: u } = await lookupClient
       .schema('core')
       .from('usuarios')
       .select('first_name, last_name, email')
@@ -547,7 +545,7 @@ export async function GET(
       beneficiario,
       beneficiarioDomicilio,
       deudorNombre: clienteNombre,
-      deudorDomicilio: (persona?.domicilio as string | null) ?? null,
+      deudorDomicilio: domTexto,
       deudorIdentificacion: persona?.curp || persona?.rfc || null,
       identificacionInventario,
       fraccionamiento: pdfFraccionamiento,
@@ -674,9 +672,9 @@ export async function GET(
         curp: persona?.curp ?? null,
         rfc: persona?.rfc ?? null,
         estadoCivil: null, // TODO sprint-7c: capturar estado civil en form
-        profesion: kycOcupacion,
-        domicilio: persona?.domicilio ?? null,
-        ineNumero: venta.ine_numero ?? null,
+        profesion: kyc.ocupacion,
+        domicilio: domTexto,
+        ineNumero: kyc.ineNumero,
       },
       coTitular: null, // TODO sprint-7c: agregar FK persona_cotitular_id
       inmueble: {
@@ -712,9 +710,9 @@ export async function GET(
     const riesgo = evaluarRiesgo({
       tipoPersona: persona?.tipo_persona,
       nacionalidad: persona?.nacionalidad,
-      esPep: kycEsPep,
-      formaPago: kycFormaPago,
-      usoEfectivo: kycUsoEfectivo,
+      esPep: kyc.esPep,
+      formaPago: kyc.formaPago,
+      usoEfectivo: kyc.usoEfectivo,
     });
     const fechaNac = persona?.fecha_nacimiento
       ? new Date(`${persona.fecha_nacimiento}T12:00:00`).toLocaleDateString('es-MX', {
@@ -734,20 +732,20 @@ export async function GET(
       rfc: (persona?.rfc ?? '').toUpperCase(),
       identificacion: {
         tipo: 'INE / Credencial para Votar',
-        numero: venta.ine_numero ?? '',
+        numero: kyc.ineNumero ?? '',
         autoridad: 'Instituto Nacional Electoral',
         vigencia: 'Vigente',
       },
-      domicilio: { integrado: persona?.domicilio ?? null },
+      domicilio: { ...domEstructurado, integrado: persona?.domicilio ?? null },
       telefono: persona?.telefono ?? '',
       correo: persona?.email ?? '',
       personalidad: (persona?.tipo_persona ?? 'persona física').toUpperCase(),
       nacionalidad: (persona?.nacionalidad ?? '').toUpperCase(),
-      esPep: kycEsPep,
-      formaPago: (kycFormaPago ?? '').toUpperCase(),
-      usoEfectivo: (kycUsoEfectivo ?? '').toUpperCase(),
-      ocupacion: (kycOcupacion ?? '').toUpperCase(),
-      conocimientoDuenoBeneficiario: kycConocimientoDB ?? '—',
+      esPep: kyc.esPep,
+      formaPago: (kyc.formaPago ?? '').toUpperCase(),
+      usoEfectivo: (kyc.usoEfectivo ?? '').toUpperCase(),
+      ocupacion: (kyc.ocupacion ?? '').toUpperCase(),
+      conocimientoDuenoBeneficiario: kyc.conocimientoDuenoBeneficiario ?? '—',
       criteriosRiesgo: riesgo.criterios,
       scoreTotal: riesgo.scoreTotal,
       clasificacionRiesgo: riesgo.clasificacion,
