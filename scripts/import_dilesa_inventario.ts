@@ -109,6 +109,7 @@ async function main() {
         tipo_lote: str(pick(v, cm, 'Tipo de Lote')),
         es_esquina: bool(pick(v, cm, 'Esquina')),
         tiene_frente_verde: bool(pick(v, cm, 'Frente Verde')),
+        problema_zcu: bool(pick(v, cm, 'Problema ZCU')),
         m2_construccion: num(pick(v, cm, 'M² de Construcción')),
       },
     };

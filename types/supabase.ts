@@ -4351,6 +4351,7 @@ export type Database = {
           numero_lote: string | null
           numero_oficial: string | null
           precio: number | null
+          problema_zcu: boolean
           producto_id: string | null
           proyecto_id: string
           tiene_frente_verde: boolean | null
@@ -4382,6 +4383,7 @@ export type Database = {
           numero_lote?: string | null
           numero_oficial?: string | null
           precio?: number | null
+          problema_zcu?: boolean
           producto_id?: string | null
           proyecto_id: string
           tiene_frente_verde?: boolean | null
@@ -4413,6 +4415,7 @@ export type Database = {
           numero_lote?: string | null
           numero_oficial?: string | null
           precio?: number | null
+          problema_zcu?: boolean
           producto_id?: string | null
           proyecto_id?: string
           tiene_frente_verde?: boolean | null
