@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (S6: cutover ejecutado — último sync, paridad 14,186/14,186 fases + 1438/1438 ventas, fix merge venta_fases, daily apagado. Pagaré: desglose de intereses + tasas TIIE+4 / moratorio 3×)
+**Última actualización:** 2026-06-11 (hotfix post-cutover: 61 ventas falsas-desasignadas reactivadas tras cruce Coda↔BSOP; regla de desasignación corregida en el import)
 
 ## Problema
 
@@ -295,6 +295,19 @@ expediente, copiloto), no reescritura.
   notario. La edición de contacto vive en el módulo Proveedores. Pendiente
   operativo: desactivar las 18 personas-notario legacy tras el deploy y
   capturar email de las 8 notarías que siguen sin correo.
+- **2026-06-11 (hotfix falsas desasignadas):** Beto reportó que Arizpe Luna
+  aparecía "Desasignada" estando vigente (reubicado a M10-L34-LDLE). Causa:
+  en Coda la fila de venta se reutilizaba al reubicar — `F📅Desasigna🚫` +
+  motivo quedaban como rastro de la unidad anterior — y el import marcaba
+  `desasignada` con solo ver la fecha, sin checar si la fila aún tenía
+  `Inventario`. Auditoría Coda↔BSOP (`scripts/audit_dilesa_ventas_desasignadas.ts`):
+  de 262 desasignadas, 200 reales y 62 falsas (Inventario vigente al cutoff;
+  0 conflictos de unidad). Fix aplicado en prod con confirmación de Beto:
+  61 reactivadas (`estado='activa'`, `motivo_desasignacion` conservado como
+  histórico, `unidad_id` ya era correcto); la #62 es el registro de prueba
+  "ADALBERTO SANTOS PRUEBA" — excluido, sigue desasignada. La regla quedó
+  corregida también en `import_dilesa_ventas.ts` por si se usa el sync
+  manual de rescate (#842).
 
 ## Decisiones registradas
 
@@ -350,3 +363,9 @@ expediente, copiloto), no reescritura.
   M21-L33, M20-L28) **no se corrigen**: la exención ZCU se autorizó hoy y
   aplica solo a asignaciones nuevas; lo capturado antes queda como estaba.
   Cierra el pendiente abierto en el PR #816.
+- **2026-06-11 (regla de desasignación al cutoff — Beto):** Una fila de Coda
+  con `Inventario` poblado al cutoff es una venta **vigente** en esa unidad,
+  tenga o no fecha/motivo de desasignación (rastro de la unidad anterior por
+  la reutilización de filas en Coda). Desasignada de verdad ⇔ ya sin
+  `Inventario`. El `motivo_desasignacion` se conserva en ventas reactivadas
+  como histórico de la reubicación.

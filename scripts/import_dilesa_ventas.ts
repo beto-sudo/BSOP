@@ -212,7 +212,11 @@ async function main() {
       const inv = str(pick(v, cm, 'Inventario'));
       const invDesasignado = str(pick(v, cm, 'Inventario Desasignado'));
       const unidadId = resolveUnidad(inv, unidadMap) ?? resolveUnidad(invDesasignado, unidadMap);
-      const desasignada = dateStr(pick(v, cm, 'F📅Desasigna🚫')) !== null;
+      // En Coda la fila se reutilizaba al reubicar de unidad: la fecha de
+      // desasignación + motivo quedan como rastro de la unidad ANTERIOR.
+      // Si la fila aún tiene `Inventario`, la venta está vigente en esa
+      // unidad — desasignada solo si ya no tiene inventario asignado.
+      const desasignada = dateStr(pick(v, cm, 'F📅Desasigna🚫')) !== null && !inv;
 
       const venta = {
         empresa_id: empresaId,
