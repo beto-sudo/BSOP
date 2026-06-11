@@ -50,10 +50,11 @@ export type PagareCreditoDirectoData = {
   totalCapitalFmt: string;
   totalInteresFmt?: string;
   totalPagarFmt?: string;
-  // Intereses
+  // Intereses (regla 2026-06-11): ordinario = TIIE 28d + spread (mín. 4);
+  // moratorio = 3× la tasa ordinaria pactada.
   interesOrdinarioPct: number | null;
   tiie28Pct: number | null;
-  spreadMoratorioPct: number | null;
+  spreadOrdinarioPct: number | null;
   tasaMoratoriaPct: number | null;
   // Aval (opcional)
   avalNombre: string | null;
@@ -225,9 +226,12 @@ export function PagareCreditoDirectoPDF({ data }: { data: PagareCreditoDirectoDa
         {tieneOrdinario ? (
           <Text style={local.clausula}>
             <Text style={local.bold}>INTERÉS ORDINARIO. </Text>La suerte principal generará un
-            interés ordinario a razón del {data.interesOrdinarioPct}% anual, calculado sobre saldos
-            insolutos sobre la base de un año comercial de 360 días, pagadero junto con cada
-            parcialidad conforme al desglose de la tabla anterior
+            interés ordinario a razón del {data.interesOrdinarioPct}% anual
+            {data.tiie28Pct != null && data.spreadOrdinarioPct != null
+              ? `, resultado de la Tasa de Interés Interbancaria de Equilibrio (TIIE) a 28 días vigente a la fecha de suscripción del presente (${data.tiie28Pct}%) más ${data.spreadOrdinarioPct} puntos porcentuales`
+              : ''}
+            , calculado sobre saldos insolutos sobre la base de un año comercial de 360 días,
+            pagadero junto con cada parcialidad conforme al desglose de la tabla anterior
             {data.totalInteresFmt && data.totalPagarFmt
               ? `; los intereses ordinarios del plan ascienden a ${data.totalInteresFmt}, para un total a pagar de ${data.totalPagarFmt}`
               : ''}
@@ -237,13 +241,11 @@ export function PagareCreditoDirectoPDF({ data }: { data: PagareCreditoDirectoDa
 
         <Text style={local.clausula}>
           <Text style={local.bold}>INTERÉS MORATORIO. </Text>En caso de falta de pago oportuno,
-          la(s) cantidad(es) vencida(s) causará(n) un interés moratorio a razón de la Tasa de
-          Interés Interbancaria de Equilibrio (TIIE) a 28 días vigente a la fecha de suscripción del
-          presente
-          {data.tiie28Pct != null ? ` (${data.tiie28Pct}%)` : ''} más {data.spreadMoratorioPct ?? 4}{' '}
-          puntos porcentuales
-          {data.tasaMoratoriaPct != null ? `, es decir, ${data.tasaMoratoriaPct}% anual` : ''},
-          computado desde la fecha de vencimiento y hasta el día de su total liquidación.
+          la(s) cantidad(es) vencida(s) causará(n) un interés moratorio
+          {data.tasaMoratoriaPct != null
+            ? ` a razón del ${data.tasaMoratoriaPct}% anual, equivalente a tres veces la tasa de interés ordinario pactada`
+            : ' a razón de tres veces la tasa de interés ordinario pactada'}
+          , computado desde la fecha de vencimiento y hasta el día de su total liquidación.
         </Text>
 
         <Text style={local.clausula}>
