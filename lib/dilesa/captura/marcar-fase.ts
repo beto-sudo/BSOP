@@ -199,7 +199,7 @@ export const FASES_PIPELINE = [
   { posicion: 13, nombre: 'Facturada', slug: '13-facturada' },
   { posicion: 14, nombre: 'Preparada para Entrega', slug: '14-preparada-entrega' },
   { posicion: 15, nombre: 'Entregada', slug: '15-entregada' },
-  { posicion: 16, nombre: 'Comisión Pagada', slug: '16-comision-pagada' },
+  { posicion: 16, nombre: 'Conformidad del Cliente', slug: '16-conformidad' },
   { posicion: 17, nombre: 'Operación Terminada', slug: '17-operacion-terminada' },
 ] as const;
 
