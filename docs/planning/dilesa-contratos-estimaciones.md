@@ -4,7 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `erp` (`facturas.contrato_id` nuevo, `cxp_pagos.obra_estimacion_id` nuevo, redefinición de la capa "ejercido" en `v_partida_control`), `dilesa` (`obra_estimaciones`: ciclo de estados + autorización), UI en `app/dilesa/construccion/**` y `app/dilesa/cxp/**`
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — UI del contrato (sub-vistas Vivienda | Obra, estado de cuenta, ciclo con autorización Dirección); aplicar migración `20260610223000` a prod con OK de Beto junto con S2
+**Próximo hito:** Beto revisa Preview de S2 (PR #804) → OK para aplicar migraciones `20260610223000` + `20260610224834` a prod → merge S2. En paralelo: Sprint 3 (pago desde estimación + hilo del gasto + glosario)
 **Dueño:** Beto
 **Creada:** 2026-06-10
 **Última actualización:** 2026-06-10
@@ -189,6 +189,21 @@ las 3 capas (ADR-042).
 
 ## Bitácora
 
+- **2026-06-10 — S2 (UI del contrato) — PR #804, abierto SIN auto-merge
+  (gated por aplicar la migración de S1 a prod).** Sub-vistas Vivienda |
+  Obra de proyecto en el tab Contratos (segmented control, badge de tipo,
+  KPIs propios `deriveKpisObra`); estado de cuenta del contrato
+  (`lib/dilesa/contratos-estado-cuenta.ts`, derivación pura + tests:
+  contratado/devengado/por devengar/pendiente de autorizar/facturado/
+  pagado/retenciones/anticipo); ciclo de estimaciones con botón Autorizar
+  (Dirección vía `useEffectiveUser().direccionEmpresaIds`, re-validado
+  server-side) y emisión a CxP solo de autorizadas; captura de factura
+  TOTAL del contrato vía RPC nueva `erp.cxp_factura_total_contrato`
+  (migración `20260610224834`, como archivo — espejo de
+  `cxp_factura_desde_estimacion`, bloquea modo mixto y tope = valor del
+  contrato). El Supabase Preview del PR corre ambas migraciones → el
+  Vercel Preview es funcional para revisión. Secuencia de salida: Preview
+  OK → aplicar 2 migraciones a prod + regenerar SCHEMA_REF/types → merge.
 - **2026-06-10 — S1 (modelo) — PR #802.** Migración `20260610223000`:
   `erp.facturas.contrato_id` (+ índice + backfill desde
   `obra_estimacion_id`, que también hereda `partida_id` del contrato para
