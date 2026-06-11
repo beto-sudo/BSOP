@@ -56,6 +56,12 @@ capas por partida: **Presupuesto · Comprometido · Ejercido · Pagado** (y el
 disponible). Si el disponible sale en rojo, esa partida está
 sobre-contratada.
 
+El presupuesto contra el que se mide todo esto tiene su propio gobierno:
+una vez **autorizado el presupuesto inicial** del proyecto, los montos solo
+cambian con **órdenes de cambio** (aditivas/deductivas) autorizadas por
+Dirección, con motivo y soporte documental. Ver **"Presupuesto del proyecto:
+autorizarlo y modificarlo"** en el manual de Proyectos.
+
 ## Glosario rápido
 
 | Término                              | Qué significa                                                                               |
