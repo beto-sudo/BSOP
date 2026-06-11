@@ -42,7 +42,8 @@ export type AdjuntoEntidad =
   | 'proyecto_tarea_pasos'
   | 'proyecto_planos'
   | 'cotizaciones'
-  | 'frentes';
+  | 'frentes'
+  | 'presupuesto_cambios';
 
 export type BuildAdjuntoPathOpts = {
   empresa: EmpresaSlug;

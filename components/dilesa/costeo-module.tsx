@@ -39,14 +39,37 @@
  * KPI agregado "Contratado".
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Input } from '@/components/ui/input';
-import { ChevronDown, ChevronRight, Coins, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
-import { usePermissions } from '@/components/providers';
+import {
+  ChevronDown,
+  ChevronRight,
+  Coins,
+  History,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Scale,
+  Search,
+} from 'lucide-react';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
+import {
+  BaselineBanner,
+  CambiosPendientesPanel,
+  SolicitarCambioCard,
+} from '@/components/dilesa/presupuesto-cambios';
+import { PresupuestoHistorialDrawer } from '@/components/dilesa/presupuesto-historial-drawer';
+import {
+  cambiosNetosPorPartida,
+  mapOrdenCambio,
+  ordenesPendientes,
+  type BaselineInfo,
+  type OrdenCambio,
+} from '@/lib/presupuesto/ordenes-cambio';
 import {
   buildProyectoOptions,
   type ProyectoOption,
@@ -97,6 +120,16 @@ export type CosteoRow = {
   orden: number;
   /** gastoReal / presupuesto (0–1) o null si no hay presupuesto. */
   ratio: number | null;
+  /** Estado del ciclo de la partida (preliminar/autorizada/planeada/…). */
+  estado: string;
+  /**
+   * Snapshot del presupuesto inicial (gobierno presupuestal,
+   * `erp.presupuesto_baseline_partidas`). null = el proyecto no tiene
+   * baseline o la partida nació después (su original es 0).
+   */
+  montoBaseline: number | null;
+  /** Σ órdenes de cambio AUTORIZADAS (con signo). 0 si no hay. */
+  cambiosNetos: number;
 };
 
 /** Opción de proveedor para el dropdown del form (persona_id + nombre). */
@@ -118,6 +151,10 @@ export type CosteoCapitulo = {
   gastoReal: number;
   comprometido: number;
   ejercido: number;
+  /** Subtotal del snapshot original (solo partidas con baseline). */
+  original: number;
+  /** Subtotal de cambios netos autorizados. */
+  cambios: number;
 };
 
 /** Una etapa agrupada con sus capítulos y subtotales. */
@@ -130,6 +167,8 @@ export type CosteoEtapa = {
   gastoReal: number;
   comprometido: number;
   ejercido: number;
+  original: number;
+  cambios: number;
 };
 
 /**
@@ -153,6 +192,8 @@ export function groupCosteo(
     gastoReal: number;
     comprometido: number;
     ejercido: number;
+    original: number;
+    cambios: number;
   };
   const etapas = new Map<string, EtapaAcc>();
 
@@ -173,6 +214,8 @@ export function groupCosteo(
         gastoReal: 0,
         comprometido: 0,
         ejercido: 0,
+        original: 0,
+        cambios: 0,
       };
       etapas.set(etapaKey, e);
     }
@@ -189,6 +232,8 @@ export function groupCosteo(
           gastoReal: 0,
           comprometido: 0,
           ejercido: 0,
+          original: 0,
+          cambios: 0,
         },
         orderKey: res ? res.capituloCodigo : '￿',
       };
@@ -197,15 +242,20 @@ export function groupCosteo(
 
     const p = r.presupuesto ?? 0;
     const g = r.gastoReal ?? 0;
+    const o = r.montoBaseline ?? 0;
     c.cap.partidas.push(r);
     c.cap.presupuesto += p;
     c.cap.gastoReal += g;
     c.cap.comprometido += r.comprometido;
     c.cap.ejercido += r.ejercido;
+    c.cap.original += o;
+    c.cap.cambios += r.cambiosNetos;
     e.presupuesto += p;
     e.gastoReal += g;
     e.comprometido += r.comprometido;
     e.ejercido += r.ejercido;
+    e.original += o;
+    e.cambios += r.cambiosNetos;
   }
 
   return [...etapas.values()]
@@ -218,6 +268,8 @@ export function groupCosteo(
       gastoReal: e.gastoReal,
       comprometido: e.comprometido,
       ejercido: e.ejercido,
+      original: e.original,
+      cambios: e.cambios,
       capitulos: [...e.capitulos.values()]
         .sort((a, b) => a.orderKey.localeCompare(b.orderKey))
         .map(({ cap }) => {
@@ -304,6 +356,8 @@ type FetchResult = {
   catalogo?: CatalogoConceptos;
   proveedores?: ProveedorOption[];
   proveedorNombreById?: Map<string, string>;
+  baselines?: Map<string, BaselineInfo>;
+  ordenes?: OrdenCambio[];
   error?: string;
 };
 
@@ -320,9 +374,15 @@ export function CosteoModule({
   proyectoIdFijo?: string;
 }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const toast = useToast();
   const writeSlug = proyectoIdFijo ? 'dilesa.proyectos.gasto' : 'dilesa.construccion.costeo';
   const puedeEscribir = permissions.isAdmin || permissions.modulos.get(writeSlug)?.write === true;
+  // Gobierno presupuestal: autorizar baseline y resolver órdenes de cambio es
+  // de Dirección (admin global O rol "Dirección" en la empresa) — mismo
+  // criterio que las RPCs server-side (`erp.fn_es_direccion`).
+  const puedeAutorizarDireccion =
+    !!effectiveUser?.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const [rows, setRows] = useState<CosteoRow[]>([]);
   /** contratado/pagado por proyecto_id (Capa B). */
@@ -352,6 +412,13 @@ export function CosteoModule({
   const [editRow, setEditRow] = useState<CosteoRow | null>(null);
   /** Colapsado de grupos (keys de etapa y capítulo). Default: todo expandido. */
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  /** Gobierno presupuestal: baseline por proyecto + órdenes de cambio. */
+  const [baselines, setBaselines] = useState<Map<string, BaselineInfo>>(new Map());
+  const [ordenes, setOrdenes] = useState<OrdenCambio[]>([]);
+  /** Partida para la que se está solicitando una orden de cambio. */
+  const [solicitarPara, setSolicitarPara] = useState<CosteoRow | null>(null);
+  /** Partida cuyo historial presupuestal está abierto en el drawer. */
+  const [historialRow, setHistorialRow] = useState<CosteoRow | null>(null);
 
   const fetchCosteo = useCallback(async (): Promise<FetchResult> => {
     const sb = createSupabaseBrowserClient();
@@ -366,6 +433,9 @@ export function CosteoModule({
       catalogoRes,
       proveedoresRes,
       controlRes,
+      baselinesRes,
+      baselinePartidasRes,
+      cambiosRes,
     ] = await Promise.all([
       // Capa A migrada al modelo canónico erp.presupuesto_partidas (ADR-040).
       // Cast `as any`: la tabla aún no está en types (se difiere al workflow
@@ -374,7 +444,7 @@ export function CosteoModule({
       (sb.schema('erp') as any)
         .from('presupuesto_partidas')
         .select(
-          'id, proyecto_id, etapa, concepto_texto, concepto_id, presupuesto_aprobado, presupuesto_previo, gasto_real_total, proveedor_persona_id, proveedor_texto, fecha_compromiso, orden'
+          'id, proyecto_id, etapa, concepto_texto, concepto_id, presupuesto_aprobado, presupuesto_previo, gasto_real_total, proveedor_persona_id, proveedor_texto, fecha_compromiso, orden, estado'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -421,6 +491,26 @@ export function CosteoModule({
         .from('v_partida_control')
         .select('partida_id, comprometido, ejercido')
         .eq('empresa_id', empresaId),
+      // Gobierno presupuestal (iniciativa dilesa-presupuesto-baseline):
+      // baseline por proyecto + snapshot por partida + órdenes de cambio.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('presupuesto_baselines')
+        .select('id, proyecto_id, total, partidas_count, notas, autorizado_por, autorizado_at')
+        .eq('empresa_id', empresaId),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('presupuesto_baseline_partidas')
+        .select('partida_id, monto_baseline')
+        .eq('empresa_id', empresaId),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sb.schema('erp') as any)
+        .from('presupuesto_cambios')
+        .select(
+          'id, proyecto_id, partida_id, tipo, monto_delta, motivo_categoria, motivo, estado, solicitado_por, solicitado_at, resuelto_por, resuelto_at, motivo_rechazo, monto_aprobado_antes, monto_aprobado_despues'
+        )
+        .eq('empresa_id', empresaId)
+        .order('solicitado_at', { ascending: true }),
     ]);
 
     const firstErr =
@@ -430,7 +520,10 @@ export function CosteoModule({
       estimacionesRes.error ??
       catalogoRes.error ??
       proveedoresRes.error ??
-      controlRes.error;
+      controlRes.error ??
+      baselinesRes.error ??
+      baselinePartidasRes.error ??
+      cambiosRes.error;
     if (firstErr) {
       return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar el costeo.') };
     }
@@ -507,6 +600,40 @@ export function CosteoModule({
       .map(([personaId, label]) => ({ personaId, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
+    // Gobierno presupuestal: baseline por proyecto, snapshot por partida y
+    // órdenes de cambio (los netos autorizados alimentan la columna Cambios).
+    type BaselineRaw = {
+      id: string;
+      proyecto_id: string;
+      total: number | string | null;
+      partidas_count: number | null;
+      notas: string | null;
+      autorizado_por: string | null;
+      autorizado_at: string;
+    };
+    const baselines = new Map<string, BaselineInfo>();
+    for (const b of (baselinesRes.data ?? []) as BaselineRaw[]) {
+      baselines.set(b.proyecto_id, {
+        id: b.id,
+        proyectoId: b.proyecto_id,
+        total: Number(b.total ?? 0),
+        partidasCount: Number(b.partidas_count ?? 0),
+        notas: b.notas ?? null,
+        autorizadoPor: b.autorizado_por ?? null,
+        autorizadoAt: b.autorizado_at,
+      });
+    }
+    const baselineMontoByPartida = new Map<string, number>();
+    for (const bp of (baselinePartidasRes.data ?? []) as {
+      partida_id: string;
+      monto_baseline: number | string | null;
+    }[]) {
+      baselineMontoByPartida.set(bp.partida_id, Number(bp.monto_baseline ?? 0));
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ordenes = ((cambiosRes.data ?? []) as any[]).map(mapOrdenCambio);
+    const netosByPartida = cambiosNetosPorPartida(ordenes);
+
     // El SELECT va por cast `as any`; tipamos la fila cruda aquí para conservar
     // el chequeo en el mapeo.
     type PartidaRaw = {
@@ -522,6 +649,7 @@ export function CosteoModule({
       proveedor_texto: string | null;
       fecha_compromiso: string | null;
       orden: number | null;
+      estado: string | null;
     };
     const out: CosteoRow[] = ((presupuestoRes.data ?? []) as PartidaRaw[]).map((r) => {
       const presupuesto =
@@ -555,10 +683,23 @@ export function CosteoModule({
           presupuesto != null && presupuesto > 0 && gastoReal != null
             ? gastoReal / presupuesto
             : null,
+        estado: r.estado ?? 'planeada',
+        montoBaseline:
+          pid && baselines.has(pid) ? (baselineMontoByPartida.get(r.id as string) ?? null) : null,
+        cambiosNetos: netosByPartida.get(r.id as string) ?? 0,
       };
     });
 
-    return { rows: out, agg, proyectos, catalogo, proveedores, proveedorNombreById };
+    return {
+      rows: out,
+      agg,
+      proyectos,
+      catalogo,
+      proveedores,
+      proveedorNombreById,
+      baselines,
+      ordenes,
+    };
   }, [empresaId]);
 
   const applyResult = useCallback((res: FetchResult) => {
@@ -570,6 +711,8 @@ export function CosteoModule({
       setProveedores([]);
       setProveedorNombreById(new Map());
       setCatalogo({ byConcepto: new Map(), optgroups: [] });
+      setBaselines(new Map());
+      setOrdenes([]);
     } else {
       setError(null);
       setRows(res.rows ?? []);
@@ -578,6 +721,8 @@ export function CosteoModule({
       setCatalogo(res.catalogo ?? { byConcepto: new Map(), optgroups: [] });
       setProveedores(res.proveedores ?? []);
       setProveedorNombreById(res.proveedorNombreById ?? new Map());
+      setBaselines(res.baselines ?? new Map());
+      setOrdenes(res.ordenes ?? []);
     }
   }, []);
 
@@ -635,15 +780,26 @@ export function CosteoModule({
 
   function abrirAlta() {
     setEditRow(null);
+    setSolicitarPara(null);
     setFormOpen(true);
   }
   function abrirEdicion(row: CosteoRow) {
+    setSolicitarPara(null);
+    // Toggle: presionar la fila que ya está en edición la cierra.
+    if (formOpen && editRow?.id === row.id) {
+      cerrarForm();
+      return;
+    }
     setEditRow(row);
     setFormOpen(true);
   }
   function cerrarForm() {
     setFormOpen(false);
     setEditRow(null);
+  }
+  function abrirSolicitudCambio(row: CosteoRow) {
+    cerrarForm();
+    setSolicitarPara((prev) => (prev?.id === row.id ? null : row));
   }
 
   const toggleGrupo = useCallback((key: string) => {
@@ -712,10 +868,99 @@ export function CosteoModule({
     [filtrados, catalogo.byConcepto]
   );
 
+  // ─── Gobierno presupuestal (derivados del proyecto seleccionado) ──────────
+  // El baseline aplica POR PROYECTO: banner/columnas solo cuando hay un
+  // proyecto único seleccionado (modo home con proyectoIdFijo, o el filtro).
+  const proyectoSeleccionado =
+    proyectoIdFijo ?? (proyectoFiltro !== '' && proyectoFiltro !== SIN ? proyectoFiltro : null);
+  const baselineActual = proyectoSeleccionado
+    ? (baselines.get(proyectoSeleccionado) ?? null)
+    : null;
+  const hayBaseline = baselineActual != null;
+  const preliminaresCount = useMemo(
+    () =>
+      proyectoSeleccionado
+        ? rows.filter((r) => r.proyecto_id === proyectoSeleccionado && r.estado === 'preliminar')
+            .length
+        : 0,
+    [rows, proyectoSeleccionado]
+  );
+  const ordenesProyecto = useMemo(
+    () =>
+      proyectoSeleccionado ? ordenes.filter((o) => o.proyectoId === proyectoSeleccionado) : [],
+    [ordenes, proyectoSeleccionado]
+  );
+  const pendientes = useMemo(() => ordenesPendientes(ordenesProyecto), [ordenesProyecto]);
+  const partidaLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows) m.set(r.id, r.concepto || '(sin concepto)');
+    return m;
+  }, [rows]);
+  const totalVigenteProyecto = useMemo(
+    () =>
+      proyectoSeleccionado
+        ? rows
+            .filter((r) => r.proyecto_id === proyectoSeleccionado)
+            .reduce((acc, r) => acc + (r.presupuesto ?? 0), 0)
+        : 0,
+    [rows, proyectoSeleccionado]
+  );
+
   // Al buscar, ignora el colapsado para que los matches sean visibles.
   const isSearching = q.length > 0;
   // Click en la fila abre la edición (solo si puede escribir).
   const onRowClick = puedeEscribir ? abrirEdicion : undefined;
+
+  // Panel expandido inline bajo la fila presionada: edición de la partida o
+  // solicitud de orden de cambio (mutuamente exclusivos).
+  const expandidoId = solicitarPara?.id ?? (formOpen ? (editRow?.id ?? null) : null);
+  const renderExpandido = (r: CosteoRow) => {
+    if (solicitarPara?.id === r.id && proyectoSeleccionado) {
+      return (
+        <SolicitarCambioCard
+          empresaId={empresaId}
+          proyectoId={proyectoSeleccionado}
+          partida={{
+            id: solicitarPara.id,
+            concepto: solicitarPara.concepto || '(sin concepto)',
+            vigente: solicitarPara.presupuesto ?? 0,
+          }}
+          onClose={() => setSolicitarPara(null)}
+          onCreated={() => void cargar()}
+        />
+      );
+    }
+    if (formOpen && editRow?.id === r.id) {
+      return (
+        <CosteoConceptoForm
+          key={editRow.id}
+          empresaId={empresaId}
+          proyectos={proyectos}
+          optgroups={catalogo.optgroups}
+          proveedores={proveedores}
+          rows={rows}
+          editRow={editRow}
+          defaultProyectoId={proyectoIdFijo}
+          baselineActivo={editRow.proyecto_id ? baselines.has(editRow.proyecto_id) : false}
+          onSolicitarCambio={() => abrirSolicitudCambio(editRow)}
+          onClose={cerrarForm}
+          onSaved={() => {
+            cerrarForm();
+            void cargar();
+          }}
+          onDelete={
+            puedeEscribir
+              ? async (motivo) => {
+                  const ok = await eliminar(editRow, motivo ?? '');
+                  if (ok) cerrarForm();
+                }
+              : undefined
+          }
+        />
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -735,6 +980,28 @@ export function CosteoModule({
       )}
 
       <ModuleKpiStrip stats={kpis} cols={5} />
+
+      {proyectoSeleccionado ? (
+        <BaselineBanner
+          proyectoId={proyectoSeleccionado}
+          baseline={baselineActual}
+          preliminaresCount={preliminaresCount}
+          totalVigente={totalVigenteProyecto}
+          puedeAutorizar={puedeAutorizarDireccion}
+          onChanged={() => void cargar()}
+        />
+      ) : null}
+
+      {proyectoSeleccionado && pendientes.length > 0 ? (
+        <CambiosPendientesPanel
+          empresaId={empresaId}
+          ordenes={pendientes}
+          partidaLabelById={partidaLabelById}
+          puedeAutorizar={puedeAutorizarDireccion}
+          puedeEscribir={puedeEscribir}
+          onResolved={() => void cargar()}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         {proyectoIdFijo ? null : (
@@ -787,31 +1054,50 @@ export function CosteoModule({
         </div>
       </div>
 
-      {formOpen ? (
+      {/* Alta de partida (sin fila de referencia) — se abre bajo los
+          controles. La EDICIÓN y la solicitud de cambio se expanden inline
+          bajo el renglón presionado (feedback de Beto en el preview de S2). */}
+      {formOpen && !editRow ? (
         <CosteoConceptoForm
-          key={editRow?.id ?? 'nuevo'}
+          key="nuevo"
           empresaId={empresaId}
           proyectos={proyectos}
           optgroups={catalogo.optgroups}
           proveedores={proveedores}
           rows={rows}
-          editRow={editRow}
+          editRow={null}
           defaultProyectoId={proyectoIdFijo}
+          baselineActivo={proyectoSeleccionado ? hayBaseline : false}
           onClose={cerrarForm}
           onSaved={() => {
             cerrarForm();
             void cargar();
           }}
-          onDelete={
-            editRow && puedeEscribir
-              ? async (motivo) => {
-                  const ok = await eliminar(editRow, motivo ?? '');
-                  if (ok) cerrarForm();
-                }
-              : undefined
-          }
         />
       ) : null}
+
+      <PresupuestoHistorialDrawer
+        open={historialRow != null}
+        onOpenChange={(open) => {
+          if (!open) setHistorialRow(null);
+        }}
+        empresaId={empresaId}
+        partida={
+          historialRow
+            ? {
+                id: historialRow.id,
+                concepto: historialRow.concepto || '(sin concepto)',
+                vigente: historialRow.presupuesto ?? 0,
+              }
+            : null
+        }
+        baseline={
+          historialRow?.proyecto_id ? (baselines.get(historialRow.proyecto_id) ?? null) : null
+        }
+        montoBaseline={historialRow?.montoBaseline ?? null}
+        cambiosNetos={historialRow?.cambiosNetos ?? 0}
+        ordenes={historialRow ? ordenes.filter((o) => o.partidaId === historialRow.id) : []}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 rounded-md border border-[var(--border)] py-16 text-sm text-[var(--text)]/60">
@@ -843,11 +1129,20 @@ export function CosteoModule({
             <thead className="sticky top-0 z-10 bg-[var(--card)] text-xs uppercase tracking-wide text-[var(--text)]/50">
               <tr className="border-b border-[var(--border)]">
                 <th className="px-3 py-2.5 text-left">Concepto</th>
-                <th className="w-32 px-3 py-2.5 text-right">Presupuesto</th>
+                {hayBaseline ? (
+                  <>
+                    <th className="w-32 px-3 py-2.5 text-right">Original</th>
+                    <th className="w-28 px-3 py-2.5 text-right">Cambios</th>
+                    <th className="w-32 px-3 py-2.5 text-right">Vigente</th>
+                  </>
+                ) : (
+                  <th className="w-32 px-3 py-2.5 text-right">Presupuesto</th>
+                )}
                 <th className="w-32 px-3 py-2.5 text-right">Comprometido</th>
                 <th className="w-32 px-3 py-2.5 text-right">Ejercido</th>
                 <th className="w-32 px-3 py-2.5 text-right">Disponible</th>
                 <th className="w-32 px-3 py-2.5 text-right">Gasto real</th>
+                {hayBaseline ? <th className="w-20 px-2 py-2.5" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -862,6 +1157,11 @@ export function CosteoModule({
                     isSearching={isSearching}
                     onToggle={toggleGrupo}
                     onRowClick={onRowClick}
+                    hayBaseline={hayBaseline}
+                    onHistorial={setHistorialRow}
+                    onSolicitarCambio={puedeEscribir ? abrirSolicitudCambio : undefined}
+                    expandidoId={expandidoId}
+                    renderExpandido={renderExpandido}
                   />
                 );
               })}
@@ -903,6 +1203,11 @@ function GrupoFragment({
   isSearching,
   onToggle,
   onRowClick,
+  hayBaseline,
+  onHistorial,
+  onSolicitarCambio,
+  expandidoId,
+  renderExpandido,
 }: {
   etapa: CosteoEtapa;
   etapaCollapsed: boolean;
@@ -910,6 +1215,12 @@ function GrupoFragment({
   isSearching: boolean;
   onToggle: (key: string) => void;
   onRowClick?: (r: CosteoRow) => void;
+  hayBaseline: boolean;
+  onHistorial: (r: CosteoRow) => void;
+  onSolicitarCambio?: (r: CosteoRow) => void;
+  /** id de la partida con panel inline abierto (edición / orden de cambio). */
+  expandidoId: string | null;
+  renderExpandido: (r: CosteoRow) => React.ReactNode;
 }) {
   return (
     <>
@@ -925,6 +1236,14 @@ function GrupoFragment({
             {etapa.nombre}
           </button>
         </td>
+        {hayBaseline ? (
+          <>
+            <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]/80">
+              {fmtMonto(etapa.original)}
+            </td>
+            <CambiosTd value={etapa.cambios} pad="px-3 py-2 font-semibold" />
+          </>
+        ) : null}
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]">
           {fmtMonto(etapa.presupuesto)}
         </td>
@@ -943,6 +1262,7 @@ function GrupoFragment({
         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--text)]/70">
           {fmtMonto(etapa.gastoReal)}
         </td>
+        {hayBaseline ? <td className="px-2 py-2" /> : null}
       </tr>
 
       {!etapaCollapsed &&
@@ -955,10 +1275,26 @@ function GrupoFragment({
               capCollapsed={capCollapsed}
               onToggle={onToggle}
               onRowClick={onRowClick}
+              hayBaseline={hayBaseline}
+              onHistorial={onHistorial}
+              onSolicitarCambio={onSolicitarCambio}
+              expandidoId={expandidoId}
+              renderExpandido={renderExpandido}
             />
           );
         })}
     </>
+  );
+}
+
+/** Celda de cambios netos (±, ámbar si neto negativo). */
+function CambiosTd({ value, pad }: { value: number; pad: string }) {
+  return (
+    <td
+      className={`${pad} text-right tabular-nums ${value < 0 ? 'text-amber-600' : 'text-[var(--text)]/80'}`}
+    >
+      {value === 0 ? '—' : `${value > 0 ? '+' : ''}${formatCurrency(value)}`}
+    </td>
   );
 }
 
@@ -969,12 +1305,24 @@ function CapituloFragment({
   capCollapsed,
   onToggle,
   onRowClick,
+  hayBaseline,
+  onHistorial,
+  onSolicitarCambio,
+  expandidoId,
+  renderExpandido,
 }: {
   cap: CosteoCapitulo;
   capCollapsed: boolean;
   onToggle: (key: string) => void;
   onRowClick?: (r: CosteoRow) => void;
+  hayBaseline: boolean;
+  onHistorial: (r: CosteoRow) => void;
+  onSolicitarCambio?: (r: CosteoRow) => void;
+  expandidoId: string | null;
+  renderExpandido: (r: CosteoRow) => React.ReactNode;
 }) {
+  // Concepto + montos (+3 de gobierno y +1 de acciones con baseline).
+  const totalCols = hayBaseline ? 9 : 6;
   return (
     <>
       {/* Nivel 2 · Capítulo */}
@@ -992,6 +1340,14 @@ function CapituloFragment({
             </span>
           </button>
         </td>
+        {hayBaseline ? (
+          <>
+            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+              {fmtMonto(cap.original)}
+            </td>
+            <CambiosTd value={cap.cambios} pad="px-3 py-1.5" />
+          </>
+        ) : null}
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/80">
           {fmtMonto(cap.presupuesto)}
         </td>
@@ -1010,38 +1366,85 @@ function CapituloFragment({
         <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/60">
           {fmtMonto(cap.gastoReal)}
         </td>
+        {hayBaseline ? <td className="px-2 py-1.5" /> : null}
       </tr>
 
       {!capCollapsed &&
         cap.partidas.map((r) => (
-          <tr
-            key={r.id}
-            onClick={onRowClick ? () => onRowClick(r) : undefined}
-            title={onRowClick ? 'Editar partida' : undefined}
-            className={`border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40 ${
-              onRowClick ? 'cursor-pointer' : ''
-            }`}
-          >
-            <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
-            </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {fmtMonto(r.comprometido)}
-            </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
-              {fmtMonto(r.ejercido)}
-            </td>
-            <DisponibleTd
-              presupuesto={r.presupuesto ?? 0}
-              comprometido={r.comprometido}
-              pad="px-3 py-1.5"
-              normalColor="text-[var(--text)]"
-            />
-            <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
-              {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
-            </td>
-          </tr>
+          <Fragment key={r.id}>
+            <tr
+              onClick={onRowClick ? () => onRowClick(r) : undefined}
+              title={onRowClick ? 'Editar partida' : undefined}
+              className={`border-b border-[var(--border)]/40 transition-colors hover:bg-[var(--card)]/40 ${
+                onRowClick ? 'cursor-pointer' : ''
+              } ${expandidoId === r.id ? 'bg-[var(--card)]/50' : ''}`}
+            >
+              <td className="px-3 py-1.5 pl-12 text-[var(--text)]">{r.concepto || '—'}</td>
+              {hayBaseline ? (
+                <>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+                    {r.montoBaseline == null ? '—' : formatCurrency(r.montoBaseline)}
+                  </td>
+                  <CambiosTd value={r.cambiosNetos} pad="px-3 py-1.5" />
+                </>
+              ) : null}
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {r.presupuesto == null ? '—' : formatCurrency(r.presupuesto)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {fmtMonto(r.comprometido)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]">
+                {fmtMonto(r.ejercido)}
+              </td>
+              <DisponibleTd
+                presupuesto={r.presupuesto ?? 0}
+                comprometido={r.comprometido}
+                pad="px-3 py-1.5"
+                normalColor="text-[var(--text)]"
+              />
+              <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text)]/70">
+                {r.gastoReal == null ? '—' : formatCurrency(r.gastoReal)}
+              </td>
+              {hayBaseline ? (
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center justify-end gap-0.5">
+                    <button
+                      type="button"
+                      title="Historial del presupuesto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onHistorial(r);
+                      }}
+                      className="rounded p-1 text-[var(--text)]/60 hover:bg-[var(--card)] hover:text-[var(--text)]"
+                    >
+                      <History className="h-4 w-4" />
+                    </button>
+                    {onSolicitarCambio ? (
+                      <button
+                        type="button"
+                        title="Solicitar cambio de presupuesto"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSolicitarCambio(r);
+                        }}
+                        className="rounded p-1 text-[var(--text)]/60 hover:bg-[var(--card)] hover:text-[var(--text)]"
+                      >
+                        <Scale className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
+            </tr>
+            {expandidoId === r.id ? (
+              <tr className="border-b border-[var(--border)]/40">
+                <td colSpan={totalCols} className="bg-[var(--bg)] p-3">
+                  {renderExpandido(r)}
+                </td>
+              </tr>
+            ) : null}
+          </Fragment>
         ))}
     </>
   );
