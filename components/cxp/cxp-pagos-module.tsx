@@ -12,12 +12,18 @@
  *     rol "Dirección"; si el caller no lo es, se muestra el error del RPC
  *     con un toast claro. El botón NO se esconde por rol en cliente —
  *     defensa: manda el RPC.
- *   - Marcar pagado (aprobado → pagado): dialog con fecha + referencia,
- *     `cxp_pago_marcar_pagado`. **Confirmación fuerte** (egreso real).
+ *   - Marcar pagado (aprobado → pagado): dialog con fecha + referencia +
+ *     comprobante (imagen/PDF de la transferencia, `<FileAttachments>`
+ *     sobre `erp.adjuntos`), `cxp_pago_marcar_pagado`. **Confirmación
+ *     fuerte** (egreso real).
  *   - Cancelar (si no pagado): `cxp_pago_cancelar` con motivo.
  *
+ * Filtro default `'pendientes'` = programados + aprobados: lo vivo que aún
+ * no se ejecuta nunca sale de la vista hasta estar pagado.
+ *
  * El drawer de detalle muestra las facturas aplicadas
- * (`cxp_pago_aplicaciones` → `facturas`), montos, y quién aprobó/pagó.
+ * (`cxp_pago_aplicaciones` → `facturas`), montos, quién aprobó/pagó y los
+ * comprobantes adjuntos.
  *
  * No inventa lógica financiera: solo cablea las RPCs con buenas
  * confirmaciones. Parametrizado por `empresaId` (UUID). RDB y DILESA lo
@@ -49,6 +55,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { FileAttachments } from '@/components/file-attachments';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
 import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
@@ -81,6 +88,8 @@ type Pago = {
   aprobado_at: string | null;
   pagado_at: string | null;
   notas: string | null;
+  /** Cuántas facturas cubre el pago (Programación agrupa por proveedor). */
+  facturas_count: number;
 };
 
 type FacturaAplicada = {
@@ -134,13 +143,33 @@ const METODO_LABEL: Record<string, string> = {
   tarjeta: 'Tarjeta',
 };
 
+/** Rol canónico del adjunto (ADR-022 FA4) para `erp.adjuntos.rol`. */
+const COMPROBANTE_ROLES = [{ id: 'comprobante', label: 'Comprobante de pago' }];
+
 const ESTADO_OPTIONS = [
+  { value: 'pendientes', label: 'Pendientes (programados + aprobados)' },
   { value: 'programado', label: 'Programado' },
   { value: 'aprobado', label: 'Aprobado' },
   { value: 'pagado', label: 'Pagado' },
   { value: 'cancelado', label: 'Cancelado' },
   { value: 'rechazado', label: 'Rechazado' },
 ];
+
+/**
+ * Filtro de la lista. `'pendientes'` (default) = todo lo vivo que aún no se
+ * ejecuta — programados Y aprobados — para que un pago aprobado no desaparezca
+ * de la vista hasta estar pagado. `''` = todos los estados.
+ */
+export function filtrarPagosPorEstado<T extends { estado: EstadoPago }>(
+  pagos: T[],
+  estado: string
+): T[] {
+  if (!estado) return pagos;
+  if (estado === 'pendientes') {
+    return pagos.filter((p) => p.estado === 'programado' || p.estado === 'aprobado');
+  }
+  return pagos.filter((p) => p.estado === estado);
+}
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 
@@ -149,7 +178,7 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [estado, setEstado] = useState('programado');
+  const [estado, setEstado] = useState('pendientes');
 
   const [selected, setSelected] = useState<Pago | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -184,10 +213,25 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
         .order('created_at', { ascending: false });
       if (qErr) throw qErr;
 
-      type Raw = Omit<Pago, 'proveedor_nombre' | 'cuenta_nombre' | 'monto_total'> & {
+      type Raw = Omit<
+        Pago,
+        'proveedor_nombre' | 'cuenta_nombre' | 'monto_total' | 'facturas_count'
+      > & {
         monto_total: number | null;
       };
       const rows = (data ?? []) as Raw[];
+
+      // Cuántas facturas cubre cada pago — un pago por proveedor puede agrupar
+      // varias (la duda "¿dónde quedó mi factura?" se responde aquí).
+      const { data: apls } = await sb
+        .schema('erp')
+        .from('cxp_pago_aplicaciones')
+        .select('pago_id')
+        .eq('empresa_id', empresaId);
+      const facturasPorPago = new Map<string, number>();
+      for (const a of (apls ?? []) as { pago_id: string }[]) {
+        facturasPorPago.set(a.pago_id, (facturasPorPago.get(a.pago_id) ?? 0) + 1);
+      }
 
       // Nombres de proveedor (erp.personas) y de cuenta bancaria. Chunk a 150.
       const proveedorIds = [
@@ -234,6 +278,7 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
           cuenta_nombre: r.cuenta_bancaria_id
             ? (cuentaPorId.get(r.cuenta_bancaria_id) ?? null)
             : null,
+          facturas_count: facturasPorPago.get(r.id) ?? 0,
         }))
       );
     } catch (e) {
@@ -247,10 +292,7 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
     void fetchPagos();
   }, [fetchPagos]);
 
-  const filtered = useMemo(
-    () => (estado ? pagos.filter((p) => p.estado === estado) : pagos),
-    [pagos, estado]
-  );
+  const filtered = useMemo(() => filtrarPagosPorEstado(pagos, estado), [pagos, estado]);
 
   const openDetail = useCallback((p: Pago) => {
     setSelected(p);
@@ -363,11 +405,12 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
                           <div className="truncate font-medium">
                             {p.proveedor_nombre ?? '(sin proveedor)'}
                           </div>
-                          {p.referencia ? (
-                            <div className="font-mono text-xs text-muted-foreground">
-                              {p.referencia}
-                            </div>
-                          ) : null}
+                          <div className="text-xs text-muted-foreground">
+                            {p.facturas_count} factura{p.facturas_count !== 1 ? 's' : ''}
+                            {p.referencia ? (
+                              <span className="font-mono"> · {p.referencia}</span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="py-2 pr-2">
                           <Badge variant={b.variant} className={b.className}>
@@ -439,6 +482,7 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
 
       <PagoDrawer
         pago={selected}
+        empresaId={empresaId}
         empresa={empresa}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -496,6 +540,8 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
         <MarcarPagadoDialog
           key={pagarPago.id}
           pago={pagarPago}
+          empresaId={empresaId}
+          empresa={empresa}
           onClose={() => setPagarPago(null)}
           onDone={() => {
             setPagarPago(null);
@@ -511,6 +557,7 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
 
 function PagoDrawer({
   pago,
+  empresaId,
   empresa,
   open,
   onClose,
@@ -519,6 +566,7 @@ function PagoDrawer({
   onCancelar,
 }: {
   pago: Pago | null;
+  empresaId: string;
   empresa: EmpresaSlug;
   open: boolean;
   onClose: () => void;
@@ -713,6 +761,24 @@ function PagoDrawer({
                 </ul>
               )}
             </section>
+
+            <Separator />
+
+            {/* Comprobante (imagen/PDF de la transferencia o cheque) */}
+            <section className="space-y-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comprobante
+              </div>
+              <FileAttachments
+                empresaId={empresaId}
+                empresaSlug={empresa}
+                entidad="cxp_pagos"
+                entidadId={pago.id}
+                roles={COMPROBANTE_ROLES}
+                variant="flat"
+                readOnly={pago.estado === 'cancelado' || pago.estado === 'rechazado'}
+              />
+            </section>
           </div>
         )}
       </DetailDrawerContent>
@@ -733,11 +799,15 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
 
 function MarcarPagadoDialog({
   pago,
+  empresaId,
+  empresa,
   onClose,
   onDone,
 }: {
   /** Siempre presente: el padre monta este dialog on-demand con key. */
   pago: Pago;
+  empresaId: string;
+  empresa: EmpresaSlug;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -805,6 +875,19 @@ function MarcarPagadoDialog({
               value={referencia}
               onChange={(e) => setReferencia(e.target.value)}
               placeholder="Ej. SPEI 0123456789"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-xs text-muted-foreground">
+              Comprobante (imagen o PDF de la transferencia)
+            </span>
+            <FileAttachments
+              empresaId={empresaId}
+              empresaSlug={empresa}
+              entidad="cxp_pagos"
+              entidadId={pago.id}
+              roles={COMPROBANTE_ROLES}
+              variant="flat"
             />
           </div>
         </div>
