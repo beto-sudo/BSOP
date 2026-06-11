@@ -184,6 +184,17 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
 
 ## Bitácora
 
+- **2026-06-10 — S3 resto (adjuntos en partida + timeline) a PR.**
+  `<FileAttachments entidad="presupuesto_partidas">` en el form de
+  edición (rol "Documentos de la partida" — el soporte del estimado vive
+  con la partida) y visible read-only en el drawer de historial.
+  `<PresupuestoTimeline>` (colapsable) en el tab Gasto: cronología del
+  gobierno — baseline + cada orden (solicitada → autorizada/rechazada/
+  retirada) con quién/cuándo, derivada de `buildTimelinePresupuesto`
+  (helper puro + 3 tests; `OrdenCambio` ganó cancelada_por/at). Cero
+  queries extra (reusa los datos del módulo). Falta solo el baseline
+  retroactivo de Delicias/Ampliación (acto de Beto) para cerrar.
+
 - **2026-06-10 — Sprint 2 (UI de baseline y órdenes de cambio) a PR.**
   Tab Gasto: `<BaselineBanner>` (autorizar presupuesto inicial con notas,
   gate Dirección, aviso de preliminares; post-baseline muestra

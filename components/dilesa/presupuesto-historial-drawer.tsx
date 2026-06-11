@@ -39,9 +39,9 @@ const fmtFechaHora = (iso: string) =>
 /**
  * Resuelve nombres de usuario para el audit trail. Falla silencioso a Map
  * vacío (la UI muestra solo fechas) — el historial no depende de poder leer
- * `core.usuarios`.
+ * `core.usuarios`. Compartido con `<PresupuestoTimeline>`.
  */
-function useUsuarioNombres(ids: readonly (string | null)[]) {
+export function useUsuarioNombres(ids: readonly (string | null)[]) {
   const [nombres, setNombres] = useState<Map<string, string>>(new Map());
   const key = [...new Set(ids.filter(Boolean) as string[])].sort().join(',');
 
@@ -133,6 +133,26 @@ export function PresupuestoHistorialDrawer({
                 {formatCurrency(partida.vigente)}
               </div>
             </div>
+          </div>
+
+          {/* Documentos de la partida (soporte del estimado — formación) */}
+          <div className="rounded border border-dashed border-[var(--border)] bg-[var(--bg)] p-1">
+            <FileAttachments
+              empresaId={empresaId}
+              empresaSlug="dilesa"
+              entidad="presupuesto_partidas"
+              entidadId={partida.id}
+              roles={[
+                {
+                  id: 'soporte',
+                  label: 'Documentos de la partida',
+                  icon: <FileText className="h-3 w-3" />,
+                },
+              ]}
+              defaultUploadRole="soporte"
+              variant="flat"
+              readOnly
+            />
           </div>
 
           {/* Punto de partida: baseline */}
