@@ -58,14 +58,17 @@ export const NAV_ITEMS: NavItem[] = [
       },
       {
         // Tesorería agrupa el ciclo de efectivo: CxC (ingresos), CxP (egresos)
-        // y Saldos Bancos (posición de caja). Ver iniciativa `tesoreria`.
+        // y Bancos (posición de caja). Ver iniciativa `tesoreria`.
         label: 'Tesorería',
         children: [
           // CxC — hub con 2 tabs. URL/slug internos siguen siendo `cobranza`.
           { label: 'CxC', href: '/dilesa/cobranza' },
           // CxP — hub con 5 tabs. El padre `dilesa.cxp` es umbrella del sidebar.
           { label: 'CxP', href: '/dilesa/cxp' },
-          { label: 'Saldos Bancos', href: '/dilesa/saldos-bancos' },
+          // "Bancos" (antes "Saldos Bancos"): el módulo ya cubre ficha +
+          // saldos + estados de cuenta + conciliación. URL y slugs RBAC
+          // conservan `saldos-bancos` — solo cambió el label (2026-06-11).
+          { label: 'Bancos', href: '/dilesa/saldos-bancos' },
         ],
       },
       {

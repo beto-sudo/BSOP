@@ -36,7 +36,7 @@ export default function SaldosBancosLayout({ children }: { children: ReactNode }
   return (
     <ModulePage>
       <ModuleHeader
-        title="Saldos Bancos"
+        title="Bancos"
         subtitle="Saldo actual, estados de cuenta y conciliación mensual de las cuentas bancarias de DILESA"
       />
       <HubAccessRedirect tabs={TABS} />

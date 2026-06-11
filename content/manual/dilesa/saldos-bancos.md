@@ -1,7 +1,7 @@
 ---
-titulo: 'Tesorería — Saldos Bancos'
+titulo: 'Tesorería — Bancos'
 modulo: dilesa.saldos-bancos
-version: '2.0.0'
+version: '2.1.0'
 actualizado: '2026-06-11'
 ---
 
@@ -14,7 +14,8 @@ de cuenta** con conciliación. Es la fuente del bloque "Saldos Bancos" del
 
 ## Cómo llegar
 
-**Sidebar → DILESA → Tesorería → Saldos Bancos.**
+**Sidebar → DILESA → Tesorería → Bancos.** (Hasta jun-2026 el módulo se
+llamaba "Saldos Bancos" — misma URL.)
 
 Dos pestañas: **Saldos** (captura diaria) y **Estados de cuenta** (archivo
 mensual + conciliación).

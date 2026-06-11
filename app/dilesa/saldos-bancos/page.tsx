@@ -22,7 +22,7 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 export default function Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.saldos-bancos.saldos">
-      <DesktopOnlyNotice module="Saldos Bancos" />
+      <DesktopOnlyNotice module="Bancos" />
       <div className="hidden sm:block">
         <SaldosBancosModule empresaId={DILESA_EMPRESA_ID} />
       </div>
