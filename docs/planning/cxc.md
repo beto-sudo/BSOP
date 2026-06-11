@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Aplicar a prod la migración `20260611032126_cxc_liquidacion_historica_saldos` (regla aprobada por Beto 2026-06-10; bloqueada para ejecución autónoma, la dispara Beto) + verificar aging. Pendientes posteriores: ~$2.0M en saldos a favor (185 ventas), Sprint 4 (recordatorios) + Sprint 5 (retiro de Coda "Depositos Clientes")
+**Próximo hito:** Limpieza de ~$2.0M en saldos a favor (185 ventas, depósitos Infonavit/Fovissste capturados ≥ precio — requiere regla + OK de Beto). Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Liquidación histórica de $721.7M aplicada y verificada 2026-06-10
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-10 (liquidación histórica aprobada y migración lista; aplicación a prod pendiente de Beto)
+**Última actualización:** 2026-06-10 (liquidación histórica aplicada a prod y verificada: aging queda solo con cartera en proceso, 69 ventas / $79.7M)
 
 ## Problema
 
@@ -268,7 +268,7 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
 
 ## Bitácora
 
-### 2026-06-10 — Migración de liquidación histórica creada (aplicación a prod pendiente)
+### 2026-06-10 — Migración de liquidación histórica creada y APLICADA a prod
 
 Con la regla aprobada (ver Decisiones registradas), se creó la migración
 `20260611032126_cxc_liquidacion_historica_saldos.sql` (data-only):
@@ -276,12 +276,18 @@ cancela los cargos de desasignadas + inserta abonos `LIQ-HIST` aplicados
 1:1 a los cargos abiertos de pre/era-Coda. **Self-verificante** (aborta con
 rollback si los buckets no cuadran con 646/180/53 ventas y sus montos, o si
 el estado final ≠ 69 ventas / \$79,722,814), **idempotente** (marcador
-`referencia='LIQ-HIST'`) y no-op en Preview vacío. Dry-run de `db push`
-verificado limpio (solo esta migración pendiente). **La aplicación a prod
-quedó en manos de Beto**: el classifier del harness bloqueó (correctamente)
-que CC ejecutara por sí solo una migración financiera de \$721.7M; tras
-aplicarse, verificar que el aging quede solo con la cartera en proceso y
-asentarlo aquí.
+`referencia='LIQ-HIST'`) y no-op en Preview vacío. El classifier del
+harness bloqueó la ejecución autónoma (correcto para una migración
+financiera de \$721.7M); **Beto la disparó en chat** ("adelante aplícala")
+y se aplicó vía `db push` el 2026-06-10 ~21:40 CST.
+
+**Verificación post-aplicación (queries independientes a prod):** 102
+cargos cancelados (desasignadas) + 1,391 abonos `LIQ-HIST` por
+\$676,033,322 con Σ aplicaciones = monto exacto en el 100% (0
+desbalanceados). Saldo abierto restante: **69 ventas / \$79,722,814** —
+solo cartera en proceso, exacto a lo aprobado. Spot-checks: Irma G.
+Hernández \$0, Iván C. García \$0, venta PRUEBA \$0 (1 cargo cancelado).
+El aging de `/dilesa/cobranza/aging` queda limpio.
 
 ### 2026-06-10 — Radiografía de saldos abiertos históricos (read-only, sin tocar datos)
 
