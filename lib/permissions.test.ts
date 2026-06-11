@@ -357,6 +357,10 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // ROUTE_TO_MODULE + page llegan con la UI (Fase 2). Migración
   // 20260605191000_erp_cotizaciones_rfq.sql (INSERT slug + backfill permisos).
   'dilesa.compras.cotizaciones',
+  // Costo final de materiales por vivienda terminada — tab del hub Compras,
+  // puente post-cutoff Coda mientras el control de materiales vive en
+  // CONTPAQ. Migración 20260611022746_dilesa_compras_costo_materiales.sql.
+  'dilesa.compras.costo_materiales',
   // Manual de usuario (iniciativa `manual-usuario`). Módulo top-level
   // read-only visible para todo miembro de DILESA. Migración
   // 20260607170000_modulo_dilesa_manual.sql.

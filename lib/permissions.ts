@@ -105,6 +105,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/compras/requisiciones': 'dilesa.compras.requisiciones',
   '/dilesa/compras/cotizaciones': 'dilesa.compras.cotizaciones',
   '/dilesa/compras/recepciones': 'dilesa.compras.recepciones',
+  // Costo final de materiales por vivienda terminada (puente CONTPAQ →
+  // futuro módulo de control de materiales). Write re-validado server-side
+  // en dilesa.fn_construccion_capturar_costo_materiales.
+  '/dilesa/compras/costo-materiales': 'dilesa.compras.costo_materiales',
   // Manual de usuario (iniciativa `manual-usuario`). Módulo top-level visible
   // para todo miembro de DILESA; la ayuda contextual por pantalla hereda el
   // gate de cada módulo. Ver docs/planning/manual-usuario.md.
