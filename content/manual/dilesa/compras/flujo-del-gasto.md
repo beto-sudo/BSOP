@@ -64,7 +64,9 @@ sobre-contratada.
 | **RFQ / Cotización**                 | Pedir precios a varios proveedores para comparar. Opcional.                                 |
 | **Orden de compra (OC)**             | El pedido formal al proveedor. Al enviarse, **compromete** presupuesto.                     |
 | **Recepción**                        | Registrar lo que llegó. Convierte lo comprometido en **ejercido**.                          |
-| **Contrato / Estimación**            | El equivalente de OC/recepción para obra con contratistas.                                  |
+| **Contrato de obra**                 | El equivalente de la OC para obra con contratistas: compromete su partida.                  |
+| **Estimación de contrato**           | El avance de un contrato de obra. Dirección la **autoriza** y ahí se vuelve ejercido.       |
+| **Destajos semanales**               | El pago semanal a contratistas de **vivienda** por tareas terminadas (otra cosa, otro tab). |
 | **Factura**                          | El documento fiscal (XML) del proveedor. Entra a Cuentas por Pagar.                         |
 | **Pago**                             | La salida de dinero. Se programa → se aprueba → se paga.                                    |
 | **Partida**                          | El renglón del presupuesto del proyecto al que se carga todo lo anterior.                   |

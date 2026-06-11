@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/dilesa-resumen-consejo",
       "schedule": "0 1,2 * * *"
+    },
+    {
+      "path": "/api/cron/dilesa-encuestas",
+      "schedule": "0 16 * * *"
     }
   ]
 }
