@@ -20,6 +20,10 @@ import { useEffect, useState } from 'react';
 import { ListChecks } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions, useEffectiveUser } from '@/components/providers';
+import {
+  pendientesDeProgramar,
+  type AplicacionViva,
+} from '@/components/cxp/cxp-programacion-module';
 
 type Chip = {
   key: string;
@@ -93,15 +97,33 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
                   .is('deleted_at', null)
               )
             : 0,
-          count(
-            erp
-              .from('facturas')
-              .select('id', { count: 'exact', head: true })
-              .eq('empresa_id', empresaId)
-              .eq('flujo', 'egreso')
-              .in('estado_cxp', ['por_pagar', 'parcial'])
-              .gt('saldo', 0)
-          ),
+          // Por programar = mismo criterio que la pantalla de Programación:
+          // saldo abierto MENOS lo comprometido en pagos vivos sin ejecutar
+          // (un count plano contaría facturas ya 100% programadas).
+          (async () => {
+            const [factsRes, aplsRes] = await Promise.all([
+              erp
+                .from('facturas')
+                .select('id, saldo')
+                .eq('empresa_id', empresaId)
+                .eq('flujo', 'egreso')
+                .in('estado_cxp', ['por_pagar', 'parcial'])
+                .gt('saldo', 0),
+              erp
+                .from('cxp_pago_aplicaciones')
+                .select(
+                  'factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)'
+                )
+                .eq('empresa_id', empresaId)
+                .in('pago.estado', ['programado', 'aprobado'])
+                .is('pago.deleted_at', null),
+            ]);
+            if (factsRes.error || aplsRes.error) return 0;
+            const facts = ((factsRes.data ?? []) as { id: string; saldo: number | null }[]).map(
+              (f) => ({ id: f.id, saldo: Number(f.saldo ?? 0) })
+            );
+            return pendientesDeProgramar(facts, (aplsRes.data ?? []) as AplicacionViva[]).length;
+          })(),
           count(
             erp
               .from('cxp_pagos')
