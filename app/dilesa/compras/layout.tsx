@@ -48,6 +48,13 @@ const TABS = [
     href: '/dilesa/compras/recepciones',
     module: 'dilesa.compras.recepciones',
   },
+  // Cierre del ciclo por vivienda: costo final de materiales (CONTPAQ) por
+  // construcción terminada — puente hasta el módulo de control de materiales.
+  {
+    label: 'Costo materiales',
+    href: '/dilesa/compras/costo-materiales',
+    module: 'dilesa.compras.costo_materiales',
+  },
 ] as const;
 
 export default function ComprasLayout({ children }: { children: ReactNode }) {

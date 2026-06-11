@@ -595,3 +595,21 @@ Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` +
   **precios persistidos** (avisa "guarda antes de adjudicar"). 5 checks verdes (1305 tests).
   **Preview-first.** Con esto el sprint Cotizaciones queda **completo** (Fases 0-3); cierra
   el círculo P2P de DILESA.
+- **2026-06-10** — **Tab "Costo materiales" (post-cierre, puente CONTPAQ).** Auditoría
+  pre-cutoff del sync Coda→BSOP de `construccion.costo_materiales`
+  (`scripts/check_dilesa_costo_materiales_sync.ts`, read-only): 1,310 OK / 0 mismatch /
+  **50 faltantes** (capturadas en Coda post-backfill, ~$9.1M, todas LDLE) → pendiente
+  re-correr `backfill_dilesa_costo_materiales.ts` (write a prod, espera OK de Beto). Para capturar el costo
+  final de materiales de viviendas que se van terminando ya sin Coda (mientras el control
+  de materiales sigue en CONTPAQ y no exista su módulo en BSOP): 5to tab del hub
+  `/dilesa/compras/costo-materiales` (sub-slug `dilesa.compras.costo_materiales`,
+  ADR-030) con vista Pendientes/Todas sobre construcciones terminadas
+  (terminada/dtu/seguro_calidad/extraida) y captura inline MoneyCell (commit on-blur).
+  Write vía RPC `dilesa.fn_construccion_capturar_costo_materiales` (SECURITY DEFINER):
+  gate admin OR escritura efectiva del sub-slug (semántica excepción>rol de
+  `lib/permissions.ts`), exige estado terminado, `round(,2)`, recalcula
+  `productos.costo_materiales_referencia` (WHERE canónico de 20260530210000) y deja
+  `core.audit_log` con valor anterior/nuevo. Migración
+  `20260611022746_dilesa_compras_costo_materiales.sql` (slug + backfill permisos clonando
+  el padre + RPC, guard para Preview sin datos). 6 checks verdes (1531 tests).
+  **Preview-first.**
