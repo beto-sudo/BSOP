@@ -167,6 +167,8 @@ function InventarioStockBody() {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Producto pre-seleccionado al abrir el registro desde el drawer de detalle.
+  const [movimientoProductoId, setMovimientoProductoId] = useState<string | undefined>(undefined);
 
   const fetchStock = useCallback(async () => {
     setLoadingStock(true);
@@ -443,13 +445,22 @@ function InventarioStockBody() {
           item={selectedItem}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+          onRegistrarMovimiento={(item) => {
+            setDrawerOpen(false);
+            setMovimientoProductoId(item.id);
+            setDialogOpen(true);
+          }}
         />
 
         <RegistrarMovimientoDialog
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+            setMovimientoProductoId(undefined);
+          }}
           productos={items}
           onSuccess={handleSuccess}
+          defaultProductoId={movimientoProductoId}
         />
       </div>
     </>

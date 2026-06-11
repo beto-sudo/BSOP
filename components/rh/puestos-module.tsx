@@ -27,7 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, RefreshCw, Loader2, Briefcase } from 'lucide-react';
+import { Plus, RefreshCw, Loader2, Briefcase, Power, Trash2 } from 'lucide-react';
 
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import {
@@ -55,6 +55,7 @@ import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { RowActions } from '@/components/shared/row-actions';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -269,6 +270,8 @@ export function PuestosModule({
     };
   }, [fetchEmpresaIds, fetchAll]);
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -353,7 +356,7 @@ export function PuestosModule({
     await fetchAll(empresaIds);
   };
 
-  const handleSoftDelete = async (p: Puesto) => {
+  const handleSoftDelete = async (p: Puesto): Promise<boolean> => {
     const { error: err } = await supabase
       .schema('erp')
       .from('puestos')
@@ -361,10 +364,11 @@ export function PuestosModule({
       .eq('id', p.id);
     if (err) {
       toast.add({ title: 'No se pudo eliminar', description: err.message, type: 'error' });
-      return;
+      return false;
     }
     toast.add({ title: `Puesto "${p.nombre}" eliminado`, type: 'success' });
     await fetchAll(empresaIds);
+    return true;
   };
 
   const visible = puestos.filter(
@@ -488,6 +492,30 @@ export function PuestosModule({
       </Button>
     </>
   );
+
+  // En edición, el detalle expone también las acciones de entidad del menú ⋯
+  // de la fila (ADR-044): activar/desactivar y eliminar.
+  const editing = editingId ? (puestos.find((p) => p.id === editingId) ?? null) : null;
+  const EntityActions = editing ? (
+    <>
+      <Button
+        variant="outline"
+        onClick={() => void handleToggleActivo(editing)}
+        className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)]"
+      >
+        <Power className="h-4 w-4" />
+        {editing.activo ? 'Desactivar' : 'Activar'}
+      </Button>
+      <Button
+        variant="outline"
+        onClick={() => setConfirmDelete(true)}
+        className="gap-1.5 rounded-xl border-[var(--border)] text-red-500 hover:text-red-600"
+      >
+        <Trash2 className="h-4 w-4" />
+        Eliminar
+      </Button>
+    </>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -647,7 +675,9 @@ export function PuestosModule({
                       onEdit={{ onClick: () => openEdit(p) }}
                       onToggle={{ activo: p.activo, onClick: () => handleToggleActivo(p) }}
                       onDelete={{
-                        onConfirm: () => handleSoftDelete(p),
+                        onConfirm: async () => {
+                          await handleSoftDelete(p);
+                        },
                         confirmTitle: `¿Eliminar "${p.nombre}"?`,
                         confirmDescription:
                           'Esta acción marcará el puesto como eliminado. ' +
@@ -673,7 +703,12 @@ export function PuestosModule({
           onOpenChange={setShowDialog}
           size="md"
           title={editingId ? 'Editar puesto' : 'Nuevo puesto'}
-          footer={<div className="flex flex-wrap items-center gap-2">{FormActions}</div>}
+          footer={
+            <div className="flex w-full flex-wrap items-center gap-2">
+              {EntityActions}
+              <div className="ml-auto flex items-center gap-2">{FormActions}</div>
+            </div>
+          }
         >
           <DetailDrawerContent>{FormBody}</DetailDrawerContent>
         </DetailDrawer>
@@ -684,10 +719,30 @@ export function PuestosModule({
               <DialogTitle>{editingId ? 'Editar puesto' : 'Nuevo puesto'}</DialogTitle>
             </DialogHeader>
             {FormBody}
-            <DialogFooter className="gap-2">{FormActions}</DialogFooter>
+            <DialogFooter className="gap-2">
+              {EntityActions}
+              {FormActions}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Eliminar desde el detalle — mismo confirm que el menú ⋯ de la fila. */}
+      {editing ? (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          onConfirm={async () => {
+            const ok = await handleSoftDelete(editing);
+            if (ok) setShowDialog(false);
+          }}
+          title={`¿Eliminar "${editing.nombre}"?`}
+          description={
+            'Esta acción marcará el puesto como eliminado. ' +
+            'Los empleados asignados conservarán su historial y podrá restaurarse desde auditoría.'
+          }
+        />
+      ) : null}
     </div>
   );
 }

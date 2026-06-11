@@ -26,6 +26,7 @@ import {
   DetailDrawerSection,
 } from '@/components/detail-page/detail-drawer';
 import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -130,6 +131,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
 
   const [detalle, setDetalle] = useState<OcRow | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cancelarOcRow, setCancelarOcRow] = useState<OcRow | null>(null);
 
   // Drill-down (?focus=<oc_id>) desde el hilo del gasto de otros módulos.
   useFocusDrilldown(
@@ -348,6 +350,13 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     });
   }, [rows, q, proyectoFiltro]);
 
+  // El drawer lee la fila viva: tras una acción (enviar / cerrar) el refetch
+  // actualiza `rows` y el detalle abierto refleja el estado nuevo.
+  const detalleActual = useMemo(
+    () => (detalle ? (rows.find((r) => r.id === detalle.id) ?? detalle) : null),
+    [rows, detalle]
+  );
+
   const kpisData = useMemo(() => deriveOcKpis(filtrados), [filtrados]);
   const kpis: ModuleKpi[] = [
     { key: 'total', label: 'Órdenes', value: kpisData.total === 0 ? '—' : String(kpisData.total) },
@@ -546,7 +555,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   );
 
   const cancelar = useCallback(
-    async (oc: OcRow, motivo: string) => {
+    async (oc: OcRow, motivo: string): Promise<boolean> => {
       const sb = createSupabaseBrowserClient();
       const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -565,10 +574,11 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           description: getSupabaseErrorMessage(e, 'No se pudo cancelar.'),
           type: 'error',
         });
-        return;
+        return false;
       }
       toast.add({ title: 'Orden cancelada', description: oc.codigo, type: 'success' });
       void cargar();
+      return true;
     },
     [toast, cargar]
   );
@@ -636,7 +646,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                 onDelete={
                   r.estado === 'borrador' || r.estado === 'enviada'
                     ? {
-                        onConfirm: (motivo) => cancelar(r, motivo ?? ''),
+                        onConfirm: async (motivo) => {
+                          await cancelar(r, motivo ?? '');
+                        },
                         label: 'Cancelar OC',
                         confirmTitle: `¿Cancelar ${r.codigo}?`,
                         confirmDescription:
@@ -904,7 +916,33 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         maxHeight="calc(100vh - 320px)"
       />
 
-      <OcDetalleDrawer oc={detalle} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <OcDetalleDrawer
+        oc={detalleActual}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        puedeEscribir={puedeEscribir}
+        onEditar={(r) => {
+          setDrawerOpen(false);
+          abrirEdicionOc(r);
+        }}
+        onMarcarEnviada={(r) => void cambiarEstado(r, 'enviada', 'Orden enviada')}
+        onCerrarOrden={(r) => void cerrar(r)}
+        onCancelar={(r) => setCancelarOcRow(r)}
+      />
+
+      {cancelarOcRow ? (
+        <CancelarConMotivoDialog
+          key={cancelarOcRow.id}
+          title={`¿Cancelar ${cancelarOcRow.codigo}?`}
+          description="La orden quedará cancelada y dejará de comprometer presupuesto."
+          confirmLabel="Cancelar OC"
+          onClose={() => setCancelarOcRow(null)}
+          onConfirm={async (motivo) => {
+            const ok = await cancelar(cancelarOcRow, motivo);
+            if (ok) setDrawerOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -914,16 +952,33 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
  * antes la OC solo existía como fila con acciones — el detalle (líneas) y el
  * hilo del gasto (incluida la bidireccionalidad OC → facturas/pagos, que
  * aporta el stepper con sus refs) no eran visibles desde ningún lado.
+ *
+ * El footer expone el set completo de acciones del documento (ADR-044): las
+ * mismas del menú ⋯ de la fila, con los mismos gates de permiso y estado.
  */
 function OcDetalleDrawer({
   oc,
   open,
   onClose,
+  puedeEscribir,
+  onEditar,
+  onMarcarEnviada,
+  onCerrarOrden,
+  onCancelar,
 }: {
   oc: OcRow | null;
   open: boolean;
   onClose: () => void;
+  puedeEscribir: boolean;
+  onEditar: (oc: OcRow) => void;
+  onMarcarEnviada: (oc: OcRow) => void;
+  onCerrarOrden: (oc: OcRow) => void;
+  onCancelar: (oc: OcRow) => void;
 }) {
+  const conAcciones =
+    !!oc &&
+    puedeEscribir &&
+    (oc.estado === 'borrador' || oc.estado === 'enviada' || oc.estado === 'parcial');
   return (
     <DetailDrawer
       open={open}
@@ -934,6 +989,36 @@ function OcDetalleDrawer({
         oc ? [oc.proveedorNombre, oc.proyectoNombre].filter(Boolean).join(' · ') : undefined
       }
       meta={oc ? <Badge tone={ESTADO_TONE[oc.estado]}>{ESTADO_LABEL[oc.estado]}</Badge> : null}
+      footer={
+        conAcciones ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {oc.estado === 'borrador' ? (
+              <>
+                <Button variant="outline" onClick={() => onEditar(oc)}>
+                  <Pencil className="size-4" /> Editar borrador
+                </Button>
+                <Button onClick={() => onMarcarEnviada(oc)}>
+                  <Send className="size-4" /> Marcar enviada
+                </Button>
+              </>
+            ) : null}
+            {oc.estado === 'enviada' || oc.estado === 'parcial' ? (
+              <Button variant="outline" onClick={() => onCerrarOrden(oc)}>
+                <X className="size-4" /> Cerrar orden
+              </Button>
+            ) : null}
+            {oc.estado === 'borrador' || oc.estado === 'enviada' ? (
+              <Button
+                variant="ghost"
+                className="ml-auto text-[var(--text)]/60 hover:text-red-600"
+                onClick={() => onCancelar(oc)}
+              >
+                <Trash2 className="size-4" /> Cancelar OC
+              </Button>
+            ) : null}
+          </div>
+        ) : null
+      }
     >
       <DetailDrawerContent>
         {!oc ? null : (

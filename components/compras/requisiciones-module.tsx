@@ -61,6 +61,7 @@ import {
   DetailDrawerContent,
   DetailDrawerSection,
 } from '@/components/detail-page/detail-drawer';
+import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 
@@ -137,6 +138,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
 
   const [detalle, setDetalle] = useState<ReqRow | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cancelarReq, setCancelarReq] = useState<ReqRow | null>(null);
 
   // Drill-down (?focus=<req_id>) desde el hilo del gasto de otros módulos.
   useFocusDrilldown(
@@ -371,6 +373,13 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     },
   ];
 
+  // El drawer lee la fila viva: tras una acción (autorizar / generar OC) el
+  // refetch actualiza `rows` y el detalle abierto refleja el estado nuevo.
+  const detalleActual = useMemo(
+    () => (detalle ? (rows.find((r) => r.id === detalle.id) ?? detalle) : null),
+    [rows, detalle]
+  );
+
   const modoLibre = proyectoFiltro === LIBRE;
   const proyectoActivo =
     proyectoFiltro && proyectoFiltro !== SIN && proyectoFiltro !== LIBRE ? proyectoFiltro : '';
@@ -489,7 +498,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   );
 
   const cancelar = useCallback(
-    async (req: ReqRow, motivo: string) => {
+    async (req: ReqRow, motivo: string): Promise<boolean> => {
       const sb = createSupabaseBrowserClient();
       const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -503,10 +512,11 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           description: getSupabaseErrorMessage(e, 'No se pudo cancelar.'),
           type: 'error',
         });
-        return;
+        return false;
       }
       toast.add({ title: 'Requisición cancelada', description: req.codigo, type: 'success' });
       void cargar();
+      return true;
     },
     [toast, cargar]
   );
@@ -702,7 +712,9 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
                   onDelete={
                     estado !== 'con_oc'
                       ? {
-                          onConfirm: (motivo) => cancelar(r, motivo ?? ''),
+                          onConfirm: async (motivo) => {
+                            await cancelar(r, motivo ?? '');
+                          },
                           label: 'Cancelar requisición',
                           confirmTitle: `¿Cancelar ${r.codigo}?`,
                           confirmDescription: 'La requisición quedará cancelada (borrado suave).',
@@ -979,7 +991,31 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         maxHeight="calc(100vh - 320px)"
       />
 
-      <ReqDetalleDrawer req={detalle} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <ReqDetalleDrawer
+        req={detalleActual}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        puedeEscribir={puedeEscribir}
+        accionBusy={accionId !== null}
+        onAutorizar={(r) => void autorizar(r)}
+        onGenerarOc={(r) => void generarOC(r)}
+        onPedirRfq={(r) => void pedirCotizaciones(r)}
+        onCancelar={(r) => setCancelarReq(r)}
+      />
+
+      {cancelarReq ? (
+        <CancelarConMotivoDialog
+          key={cancelarReq.id}
+          title={`¿Cancelar ${cancelarReq.codigo}?`}
+          description="La requisición quedará cancelada (borrado suave)."
+          confirmLabel="Cancelar requisición"
+          onClose={() => setCancelarReq(null)}
+          onConfirm={async (motivo) => {
+            const ok = await cancelar(cancelarReq, motivo);
+            if (ok) setDrawerOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -988,17 +1024,33 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
  * Drawer de detalle de la requisición (Sprint 1 de `dilesa-flujo-gasto`):
  * antes la requisición solo era una fila con acciones; aquí se ven sus líneas
  * y el hilo del gasto (qué RFQ/OC/factura/pago derivaron de ella).
+ *
+ * El footer expone el set completo de acciones del documento (ADR-044): las
+ * mismas del menú ⋯ de la fila, con los mismos gates de permiso y estado.
  */
 function ReqDetalleDrawer({
   req,
   open,
   onClose,
+  puedeEscribir,
+  accionBusy,
+  onAutorizar,
+  onGenerarOc,
+  onPedirRfq,
+  onCancelar,
 }: {
   req: ReqRow | null;
   open: boolean;
   onClose: () => void;
+  puedeEscribir: boolean;
+  accionBusy: boolean;
+  onAutorizar: (req: ReqRow) => void;
+  onGenerarOc: (req: ReqRow) => void;
+  onPedirRfq: (req: ReqRow) => void;
+  onCancelar: (req: ReqRow) => void;
 }) {
   const estado = req ? deriveReqEstado(req) : null;
+  const conAcciones = !!req && puedeEscribir && estado !== 'con_oc';
   return (
     <DetailDrawer
       open={open}
@@ -1007,6 +1059,35 @@ function ReqDetalleDrawer({
       title={req?.codigo ?? 'Requisición'}
       description={req?.solicitanteNombre || undefined}
       meta={req && estado ? <Badge tone={ESTADO_TONE[estado]}>{ESTADO_LABEL[estado]}</Badge> : null}
+      footer={
+        conAcciones ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {estado === 'pendiente' ? (
+              <Button variant="outline" onClick={() => onAutorizar(req)} disabled={accionBusy}>
+                <ClipboardList className="size-4" /> Marcar autorizada
+              </Button>
+            ) : null}
+            {puedeGenerarOc(req) ? (
+              <>
+                <Button onClick={() => onGenerarOc(req)} disabled={accionBusy}>
+                  <ShoppingCart className="size-4" /> Generar orden de compra
+                </Button>
+                <Button variant="outline" onClick={() => onPedirRfq(req)} disabled={accionBusy}>
+                  <FileSearch className="size-4" /> Pedir cotizaciones (RFQ)
+                </Button>
+              </>
+            ) : null}
+            <Button
+              variant="ghost"
+              className="ml-auto text-[var(--text)]/60 hover:text-red-600"
+              onClick={() => onCancelar(req)}
+              disabled={accionBusy}
+            >
+              <Trash2 className="size-4" /> Cancelar
+            </Button>
+          </div>
+        ) : null
+      }
     >
       <DetailDrawerContent>
         {!req ? null : (

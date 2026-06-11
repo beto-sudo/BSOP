@@ -31,6 +31,8 @@ export interface RegistrarMovimientoDialogProps {
   onClose: () => void;
   productos: StockItem[];
   onSuccess: () => void;
+  /** Pre-selecciona el producto (ej. al abrir desde el drawer de detalle). */
+  defaultProductoId?: string;
 }
 
 export function RegistrarMovimientoDialog({
@@ -38,6 +40,7 @@ export function RegistrarMovimientoDialog({
   onClose,
   productos,
   onSuccess,
+  defaultProductoId,
 }: RegistrarMovimientoDialogProps) {
   const [productoId, setProductoId] = useState('');
   const [productoPopoverOpen, setProductoPopoverOpen] = useState(false);
@@ -49,13 +52,13 @@ export function RegistrarMovimientoDialog({
 
   useEffect(() => {
     if (open) {
-      setProductoId('');
+      setProductoId(defaultProductoId ?? '');
       setTipo('ajuste_positivo');
       setCantidad('');
       setNotas('');
       setFormError(null);
     }
-  }, [open]);
+  }, [open, defaultProductoId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -510,6 +510,8 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         throw e; // mantiene abierto el diálogo de motivo
       }
       toast.add({ title: 'Cotización cancelada', description: c.codigo, type: 'success' });
+      // Si la cancelada era la captura abierta, ciérrala (quedaría editable en falso).
+      setCapturaId((cur) => (cur === c.id ? null : cur));
       void cargar();
     },
     [toast, cargar]
@@ -852,6 +854,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
             void cargar();
           }}
           onRefresh={() => void cargar()}
+          onCancelarCotizacion={() => setCancelarCot(enCaptura)}
         />
       ) : null}
 
@@ -898,6 +901,7 @@ function CapturaPrecios({
   onClose,
   onSaved,
   onRefresh,
+  onCancelarCotizacion,
 }: {
   cotizacion: CotizacionRow;
   empresaId: string;
@@ -907,6 +911,8 @@ function CapturaPrecios({
   onClose: () => void;
   onSaved: () => void;
   onRefresh: () => void;
+  /** Cancela la RFQ desde el detalle — misma acción que la X de la fila (ADR-044). */
+  onCancelarCotizacion: () => void;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
@@ -1485,14 +1491,26 @@ function CapturaPrecios({
         </div>
       ) : null}
 
-      <div className="mt-4 flex items-center justify-end gap-2">
-        <Button variant="outline" onClick={onClose} disabled={saving}>
-          Cerrar
-        </Button>
-        <Button onClick={guardar} disabled={saving || !puedeEscribir}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Guardar precios
-        </Button>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {puedeEscribir && (cotizacion.estado === 'abierta' || cotizacion.estado === 'comparada') ? (
+          <Button
+            variant="ghost"
+            onClick={onCancelarCotizacion}
+            disabled={saving}
+            className="text-[var(--text)]/60 hover:text-red-600"
+          >
+            <X className="size-4" /> Cancelar cotización
+          </Button>
+        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cerrar
+          </Button>
+          <Button onClick={guardar} disabled={saving || !puedeEscribir}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Guardar precios
+          </Button>
+        </div>
       </div>
     </div>
   );

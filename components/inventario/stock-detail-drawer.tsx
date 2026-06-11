@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Plus } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import {
   DetailDrawer,
@@ -32,9 +32,16 @@ export interface StockDetailDrawerProps {
   item: StockItem | null;
   open: boolean;
   onClose: () => void;
+  /** Abre el registro de movimiento con este producto pre-seleccionado (ADR-044). */
+  onRegistrarMovimiento?: (item: StockItem) => void;
 }
 
-export function StockDetailDrawer({ item, open, onClose }: StockDetailDrawerProps) {
+export function StockDetailDrawer({
+  item,
+  open,
+  onClose,
+  onRegistrarMovimiento,
+}: StockDetailDrawerProps) {
   const [kardex, setKardex] = useState<MovimientoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const triggerPrint = useTriggerPrint();
@@ -75,9 +82,17 @@ export function StockDetailDrawer({ item, open, onClose }: StockDetailDrawerProp
       title={item.nombre}
       description={`${item.categoria ?? 'Sin categoría'} · ${item.unidad ?? 'pieza'}`}
       actions={
-        <Button variant="outline" size="sm" onClick={triggerPrint}>
-          Imprimir
-        </Button>
+        <>
+          {onRegistrarMovimiento ? (
+            <Button size="sm" className="gap-1.5" onClick={() => onRegistrarMovimiento(item)}>
+              <Plus className="h-3.5 w-3.5" />
+              Registrar movimiento
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" onClick={triggerPrint}>
+            Imprimir
+          </Button>
+        </>
       }
     >
       {/* Membrete solo para impresión */}
