@@ -3,11 +3,11 @@
 **Slug:** `dilesa-ventas-expediente`
 **Empresas:** DILESA (golden; el patrón de "workspace de operación" es replicable a las otras empresas)
 **Schemas afectados:** principalmente UI (Next.js App Router); `dilesa` (posible vista `v_venta_cuadratura` + columnas/slugs de fases 14-17), `core.modulos` (sub-slugs RBAC de 14-17). Reusa lo existente: `dilesa.ventas`, `dilesa.venta_fases`, `erp.adjuntos`, `erp.cxc_pagos`/`cxc_cargos`
-**Estado:** in_progress
-**Próximo hito:** Verificación final de Beto + S6 (cutover Coda de ventas: paridad final, apagar daily ventas/expediente, cortar accesos de captura) → cierre de la iniciativa
+**Estado:** done
+**Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (problema ZCU + desglose de intereses en pagaré de crédito directo)
+**Última actualización:** 2026-06-11 (S6: cutover ejecutado — último sync, paridad 14,186/14,186 fases + 1438/1438 ventas, fix merge venta_fases, daily apagado)
 
 ## Problema
 
@@ -225,6 +225,22 @@ expediente, copiloto), no reescritura.
   comercial 360, redondeo por fila) + tests; el PDF ahora desglosa Capital /
   Interés / Pago total por parcialidad con fila TOTAL, y la fase 10 muestra
   preview en vivo del mismo motor antes de generar.
+- **2026-06-11 (S6 — cutover de ventas, cierre):** Cutoff ejecutado. Beto
+  creó los usuarios del equipo (5 con rol Vendedor + Edgar en Gerencia
+  Ventas), asignó perfiles, mandó invitaciones y retiró la escritura en
+  Coda (queda solo consulta). Último sync manual corrido (run GH 27322758419) y **paridad certificada**: ventas 1438/1438, pagos 1126
+  (+9 depósitos huérfanos conocidos sin venta), fases 14,186/14,186
+  (re-run del import reporta 0 nuevas + 0 cambiadas, 0 duplicadas),
+  expediente 8/8 adjuntos, puente CxC OK. De paso se destapó y reparó que
+  los syncs del 8-10 jun NO actualizaban `venta_fases`: la migración
+  `20260608004732` convirtió `venta_fases_uk` en partial unique index
+  (`WHERE deleted_at IS NULL`) y el `ON CONFLICT` de PostgREST no matchea
+  índices parciales — los 29 chunks fallaban en silencio (el wrapper lo
+  trataba como no-fatal). `import_dilesa_ventas.ts` ahora hace merge manual
+  (SELECT activas → diff → INSERT/UPDATE); las 52 fases del gap se
+  recuperaron. Daily apagado (el `schedule:` salió del workflow; queda
+  `workflow_dispatch` manual como vía de rescate), runbook actualizado.
+  Iniciativa cerrada.
 
 ## Decisiones registradas
 
@@ -262,3 +278,8 @@ expediente, copiloto), no reescritura.
   vencimiento anterior. No se persiste el desglose (es determinista de
   fechas + tasa); UI y PDF comparten el motor. Si el abogado pide otra base
   (p. ej. 365), se cambia en un solo lugar.
+- **2026-06-11 (cutover):** El workflow `dilesa-coda-sync` NO se borra:
+  queda manual-only (`workflow_dispatch`) como vía de rescate para rezagos
+  puntuales de Coda. Cuidado al usarlo post-cutover: el modo daily pisa los
+  campos mapeados de las ventas con `coda_row_id` — confirmar antes que
+  nadie haya editado esas ventas en BSOP, o lo editado se pierde.

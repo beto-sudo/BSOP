@@ -1,8 +1,12 @@
 # Runbook — DILESA Coda → BSOP sync
 
-> Cron diario que refresca el schema `dilesa` desde Coda. Mantiene BSOP
-> actualizado mientras la operación sigue capturándose en Coda durante
-> el período de transición. Idempotente: ventas creadas nativas en BSOP
+> **APAGADO como daily desde 2026-06-11** (cutover de ventas, S6 de
+> `dilesa-ventas-expediente`): BSOP es master y Coda quedó read-only de
+> consulta. Construcción ya se había cortado el 2026-06-09. El workflow
+> queda **solo manual** (workflow_dispatch) para traer rezagos puntuales.
+>
+> Historia: fue el cron diario que refrescó el schema `dilesa` desde Coda
+> durante la transición. Idempotente: ventas creadas nativas en BSOP
 > (sin `coda_row_id`) se preservan; adjuntos se descargan solo si son
 > nuevos.
 
@@ -31,7 +35,8 @@ Antes del primer run hay que cargar 5 secrets en GitHub:
 
 ## Operación normal
 
-- **Horario**: cron `0 9 * * *` UTC = **03:00 CST** todos los días.
+- **Horario**: ya no hay — el `schedule:` se quitó el 2026-06-11 (cutover
+  de ventas). Solo corre manual. (Histórico: `0 9 * * *` UTC = 03:00 CST.)
 - **Email**: recibirás un correo a `$NOTIFY_EMAIL` con asunto:
   - `✓ Sync DILESA Coda→BSOP — <fecha>` si todo OK
   - `✗ Sync DILESA Coda→BSOP FALLÓ — <fecha>` si algún paso truena
@@ -95,14 +100,16 @@ Bug del query `.in()` con > ~200 UUIDs (URL > 8KB → Cloudflare 400). Ya está 
 - Verifica que el secret `CODA_API_KEY` no haya expirado (Coda los rota periódicamente).
 - Verifica que el branch esté en `main` (cron solo corre en main).
 
-## Apagar temporal el cron
+## Estado del cutover (2026-06-11)
 
-Si necesitas pausar el sync (ej. mantenimiento de Coda):
+El cutover llegó: BSOP = autoritativo, Coda freezeado read-only (accesos de
+escritura retirados al equipo). El `schedule:` se quitó del workflow; el
+último sync daily corrió manualmente ese día con paridad verificada
+(iniciativa `dilesa-ventas-expediente` § S6).
 
-**Opción rápida**: comentar el bloque `schedule:` en `.github/workflows/dilesa-coda-sync.yml`, commit + push.
-
-**Opción más limpia**: desde GH UI → Actions → DILESA Coda Sync → ⋯ → Disable workflow.
-
-## Cuándo deshabilitar para siempre
-
-Cuando llegue el cutover (BSOP = autoritativo, Coda freezeado read-only). Ver iniciativa `dilesa-portafolio-activos` § cutover.
+Si aparece captura vieja en Coda que haya que traer: corre el workflow
+manual (ver "Correr manualmente" arriba) — sigue siendo idempotente y las
+ventas nativas BSOP se preservan. **Cuidado**: el modo daily pisa los campos
+mapeados de ventas con coda_row_id; si en BSOP ya se editaron esas ventas
+post-cutover, lo de BSOP se pierde. Antes de correrlo, confirma que nadie
+haya editado en BSOP las ventas que vienen de Coda.

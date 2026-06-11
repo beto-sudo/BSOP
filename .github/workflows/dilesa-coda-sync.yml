@@ -1,21 +1,22 @@
 name: DILESA Coda Sync
 
-# Refresh nocturno del schema dilesa desde Coda. Desde el 2026-06-09 el
-# daily corre SOLO ventas + expediente: construcción se cortó del sync
-# (cutover de obra a BSOP — los supervisores ya no palomean en Coda).
+# Sync Coda → BSOP del schema dilesa. APAGADO como daily desde el
+# 2026-06-11: cutover de ventas completado (BSOP es master; Coda quedó
+# read-only para consulta). Antes ya se había cortado construcción
+# (2026-06-09, cutover de obra). Queda SOLO como workflow manual para
+# traer rezagos puntuales de Coda si llegara a aparecer captura vieja.
 # Manda email con resumen vía Resend (siempre — éxito o fallo).
 #
-# Corridas manuales: input `construccion` re-incluye los 6 scripts de
-# construcción (rezagos puntuales); input `full` corre todo (portafolio +
-# construcción + ventas + expediente).
+# Corridas manuales: sin inputs corre ventas + expediente + puente CxC;
+# input `construccion` re-incluye los 6 scripts de construcción; input
+# `full` corre todo (portafolio + construcción + ventas + expediente).
 #
 # Idempotente: las ventas creadas nativas en BSOP (sin coda_row_id) se
 # preservan. Los adjuntos de expediente solo se descargan/suben si son
 # nuevos (dedup por metadata->>'coda_source_url').
 #
 # Se ejecuta:
-#   - Manualmente desde la pestaña Actions (workflow_dispatch)
-#   - Automáticamente cada día a las 09:00 UTC (= 03:00 CST sin DST)
+#   - SOLO manualmente desde la pestaña Actions (workflow_dispatch)
 #
 # Secrets requeridos (Settings → Secrets and variables → Actions):
 #   - CODA_API_KEY                       — coda.io API token
@@ -38,8 +39,8 @@ on:
         description: 'Refresh completo (portafolio + construcción + ventas + expediente)'
         type: boolean
         default: false
-  schedule:
-    - cron: '0 9 * * *'
+  # schedule: apagado 2026-06-11 — cutover de ventas (S6 dilesa-ventas-expediente).
+  # El daily corría '0 9 * * *' (03:00 CST). BSOP es master; Coda read-only.
 
 concurrency:
   group: dilesa-coda-sync
