@@ -1170,11 +1170,15 @@ function DetailInner() {
               label="Aviso de Privacidad"
             />
             <PdfDownloadLink ventaId={venta.id} tipo="ficu" label="FICU" />
-            <PdfDownloadLink
-              ventaId={venta.id}
-              tipo="promesa-compraventa"
-              label="Promesa de Compraventa"
-            />
+            {/* La promesa se imprime para firmarse en F3 — solo desde que la
+                unidad quedó asignada (F2 autorizada). */}
+            {(venta.fase_posicion ?? 0) >= 2 ? (
+              <PdfDownloadLink
+                ventaId={venta.id}
+                tipo="promesa-compraventa"
+                label="Promesa de Compraventa"
+              />
+            ) : null}
             {venta.valuador_id ? (
               <PdfDownloadLink
                 ventaId={venta.id}
@@ -1189,7 +1193,9 @@ function DetailInner() {
                 label="Solicitud de Dictaminación"
               />
             ) : null}
-            {venta.unidad_id ? (
+            {/* La póliza se entrega ya con el crédito validado — desde que la
+                Validación Patronal (F9) quedó cerrada. */}
+            {venta.unidad_id && (venta.fase_posicion ?? 0) >= 9 ? (
               <PdfDownloadLink
                 ventaId={venta.id}
                 tipo="poliza-garantia"

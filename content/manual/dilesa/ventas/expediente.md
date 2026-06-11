@@ -85,6 +85,12 @@ queda registrada en la Bitácora. Avísale a tu gerente.
 Es un documento que esa fase espera y todavía no se sube. Al subirlo (en la
 pantalla de captura de la fase) el chip se vuelve clickeable.
 
+**No veo el botón para imprimir la Promesa de Compraventa (o la Póliza).**
+Los botones de impresión aparecen cuando la venta llega a la fase que les
+toca: la **Promesa de Compraventa** desde que la unidad queda **Asignada**
+(fase 2), la **Póliza de Garantía** desde la **Validación Patronal** (fase 9),
+y los checklists de entrega desde la Escritura (fase 11).
+
 ## Si algo no cuadra
 
 Si el saldo de la cuadratura no baja con un depósito que sí se hizo, revisa
