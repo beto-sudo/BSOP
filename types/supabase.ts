@@ -2622,6 +2622,8 @@ export type Database = {
       }
       obra_estimaciones: {
         Row: {
+          autorizada_at: string | null
+          autorizada_por: string | null
           cancelada_at: string | null
           cancelada_por: string | null
           contrato_id: string
@@ -2631,6 +2633,7 @@ export type Database = {
           empresa_id: string
           es_anticipo: boolean
           es_finiquito: boolean
+          estado: string
           etiqueta: string
           factura_ref: string | null
           fecha: string | null
@@ -2641,12 +2644,15 @@ export type Database = {
           motivo_cancelacion: string | null
           nota_pago: string | null
           orden: number
+          pagada_at: string | null
           retencion: number
           source_ref: string | null
           subtotal: number | null
           updated_at: string
         }
         Insert: {
+          autorizada_at?: string | null
+          autorizada_por?: string | null
           cancelada_at?: string | null
           cancelada_por?: string | null
           contrato_id: string
@@ -2656,6 +2662,7 @@ export type Database = {
           empresa_id: string
           es_anticipo?: boolean
           es_finiquito?: boolean
+          estado?: string
           etiqueta: string
           factura_ref?: string | null
           fecha?: string | null
@@ -2666,12 +2673,15 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
+          pagada_at?: string | null
           retencion?: number
           source_ref?: string | null
           subtotal?: number | null
           updated_at?: string
         }
         Update: {
+          autorizada_at?: string | null
+          autorizada_por?: string | null
           cancelada_at?: string | null
           cancelada_por?: string | null
           contrato_id?: string
@@ -2681,6 +2691,7 @@ export type Database = {
           empresa_id?: string
           es_anticipo?: boolean
           es_finiquito?: boolean
+          estado?: string
           etiqueta?: string
           factura_ref?: string | null
           fecha?: string | null
@@ -2691,6 +2702,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_pago?: string | null
           orden?: number
+          pagada_at?: string | null
           retencion?: number
           source_ref?: string | null
           subtotal?: number | null
@@ -5268,6 +5280,10 @@ export type Database = {
         Args: { p_tarea_id: string }
         Returns: boolean
       }
+      obra_estimacion_autorizar: {
+        Args: { p_estimacion_id: string }
+        Returns: undefined
+      }
       obra_estimacion_cancelar: {
         Args: { p_estimacion_id: string; p_motivo: string }
         Returns: undefined
@@ -6782,6 +6798,7 @@ export type Database = {
           metodo_pago: string | null
           monto_total: number
           notas: string | null
+          obra_estimacion_id: string | null
           pagado_at: string | null
           pagado_por: string | null
           programado_por: string | null
@@ -6803,6 +6820,7 @@ export type Database = {
           metodo_pago?: string | null
           monto_total: number
           notas?: string | null
+          obra_estimacion_id?: string | null
           pagado_at?: string | null
           pagado_por?: string | null
           programado_por?: string | null
@@ -6824,6 +6842,7 @@ export type Database = {
           metodo_pago?: string | null
           monto_total?: number
           notas?: string | null
+          obra_estimacion_id?: string | null
           pagado_at?: string | null
           pagado_por?: string | null
           programado_por?: string | null
@@ -7509,6 +7528,7 @@ export type Database = {
           cancelada_at: string | null
           cancelada_por: string | null
           condiciones_pago_dias: number | null
+          contrato_id: string | null
           created_at: string
           emisor_nombre: string | null
           emisor_rfc: string | null
@@ -7548,6 +7568,7 @@ export type Database = {
           cancelada_at?: string | null
           cancelada_por?: string | null
           condiciones_pago_dias?: number | null
+          contrato_id?: string | null
           created_at?: string
           emisor_nombre?: string | null
           emisor_rfc?: string | null
@@ -7587,6 +7608,7 @@ export type Database = {
           cancelada_at?: string | null
           cancelada_por?: string | null
           condiciones_pago_dias?: number | null
+          contrato_id?: string | null
           created_at?: string
           emisor_nombre?: string | null
           emisor_rfc?: string | null
@@ -10989,10 +11011,30 @@ export type Database = {
         Args: { p_condiciones_pago_dias?: number; p_estimacion_id: string }
         Returns: string
       }
+      cxp_factura_total_contrato: {
+        Args: {
+          p_condiciones_pago_dias?: number
+          p_contrato_id: string
+          p_factura_ref?: string
+          p_fecha_emision?: string
+          p_total: number
+        }
+        Returns: string
+      }
       cxp_pago_aprobar: { Args: { p_pago_id: string }; Returns: undefined }
       cxp_pago_cancelar: {
         Args: { p_motivo?: string; p_pago_id: string }
         Returns: undefined
+      }
+      cxp_pago_desde_estimacion: {
+        Args: {
+          p_cuenta_bancaria_id?: string
+          p_estimacion_id: string
+          p_fecha_programada?: string
+          p_metodo_pago?: string
+          p_referencia?: string
+        }
+        Returns: string
       }
       cxp_pago_marcar_pagado: {
         Args: {
