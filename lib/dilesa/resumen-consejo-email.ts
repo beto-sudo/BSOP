@@ -594,7 +594,14 @@ export async function fetchResumenConsejoData(
  */
 export async function sendResumenEmail(
   resendKey: string,
-  payload: { html: string; subject: string; from: string; recipients: string[] }
+  payload: {
+    html: string;
+    subject: string;
+    from: string;
+    recipients: string[];
+    cc?: string[];
+    bcc?: string[];
+  }
 ): Promise<{ ok: boolean; id?: string; error?: unknown }> {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -605,6 +612,8 @@ export async function sendResumenEmail(
     body: JSON.stringify({
       from: payload.from,
       to: payload.recipients,
+      cc: payload.cc && payload.cc.length > 0 ? payload.cc : undefined,
+      bcc: payload.bcc && payload.bcc.length > 0 ? payload.bcc : undefined,
       subject: payload.subject,
       html: payload.html,
     }),

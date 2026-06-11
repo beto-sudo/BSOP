@@ -882,7 +882,7 @@ function EmailModal({
           </ModalField>
           <p className="text-[11px] text-[var(--text)]/55">
             Se envía con el PDF de la estimación adjunto + texto pidiendo que emita la factura por
-            el monto neto y la envíe a pagos@dilesa.mx. Puedes re-enviar las veces que necesites.
+            el monto neto y la envíe a facturas@dilesa.mx. Puedes re-enviar las veces que necesites.
           </p>
         </div>
 
