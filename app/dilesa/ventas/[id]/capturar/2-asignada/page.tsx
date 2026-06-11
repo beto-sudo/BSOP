@@ -22,8 +22,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -32,6 +31,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
+import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 
 const ROLES_REQUERIDOS = [
   'solicitud_asignacion',
@@ -267,12 +267,13 @@ function CapturarFase2Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <Link
-          href={`/dilesa/ventas/${ventaId}`}
-          className="inline-flex items-center gap-1 text-sm text-[var(--text)]/60 hover:text-[var(--text)]"
-        >
-          <ArrowLeft className="h-4 w-4" /> Volver al detalle
-        </Link>
+        <CapturarFaseHeader
+          ventaId={ventaId}
+          clienteNombre={null}
+          identificacionInventario={null}
+          faseposicion={2}
+          faseNombre="Asignada"
+        />
         <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
           {error ?? 'Venta no encontrada.'}
         </p>
@@ -282,21 +283,17 @@ function CapturarFase2Body() {
 
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
-      <Link
-        href={`/dilesa/ventas/${ventaId}`}
-        className="inline-flex items-center gap-1 text-sm text-[var(--text)]/60 hover:text-[var(--text)]"
-      >
-        <ArrowLeft className="h-4 w-4" /> Volver al detalle
-      </Link>
-
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-          Autorizar asignación
-        </h1>
-        <p className="mt-1 text-sm text-[var(--text)]/60">
-          Fase 2 — revisar expediente completo y autorizar la asignación de la unidad.
-        </p>
-      </header>
+      {/* Header compartido: monta la cabecera del expediente (cliente con
+          CURP/INE, vivienda, comercial y mini-cuadratura) — el contexto que
+          el autorizador necesita para revisar antes de asignar. */}
+      <CapturarFaseHeader
+        ventaId={ventaId}
+        clienteNombre={null}
+        identificacionInventario={null}
+        faseposicion={2}
+        faseNombre="Asignada"
+        descripcion="Revisa el expediente completo y los datos de la operación, y autoriza la asignación de la unidad."
+      />
 
       {/* Bloqueo: ya está en Fase ≥ 2 */}
       {venta.fase_posicion !== 1 ? (
