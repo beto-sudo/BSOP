@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón baseline + órdenes de cambio es replicable a las otras empresas cuando tengan presupuesto por partidas)
 **Schemas afectados:** `erp` (nuevas `presupuesto_baselines`, `presupuesto_baseline_partidas`, `presupuesto_cambios`; trigger guard + RPCs sobre `presupuesto_partidas`; escribe `core.audit_log`), `core.modulos` (sin slugs nuevos — reusa `dilesa.proyectos.gasto`), UI en `app/dilesa/proyectos/[id]/gasto` y componentes de Costeo
 **Estado:** in_progress
-**Próximo hito:** Aplicar migración `20260610212116` a prod (OK de Beto) + Sprint 2 — UI de baseline y órdenes de cambio
+**Próximo hito:** Sprint 2 — UI de baseline y órdenes de cambio
 **Dueño:** Beto
 **Creada:** 2026-06-10
-**Última actualización:** 2026-06-10 (S1 a PR)
+**Última actualización:** 2026-06-10 (S1 en prod, #798)
 
 ## Problema
 
@@ -183,6 +183,14 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
   rechaza UPDATE directo post-baseline salvo `set_config` de las RPCs.
 
 ## Bitácora
+
+- **2026-06-10 — S1 mergeado (#798) + migración `20260610212116` aplicada a
+  prod y verificada.** Objetos confirmados (3 tablas, 2 triggers, 5
+  funciones, vista); guard probado en vivo (edición pre-baseline pasa;
+  orden de cambio sin baseline rechazada con el mensaje del guard);
+  historial de migraciones alineado a la versión del archivo. SCHEMA_REF +
+  types regenerados en el mismo PR. Cero cambio operativo hasta autorizar
+  el primer baseline.
 
 - **2026-06-10 — Sprint 1 (gobierno duro del monto) a PR.** Migración
   `20260610212116_erp_presupuesto_baseline_cambios.sql` (NO aplicada a

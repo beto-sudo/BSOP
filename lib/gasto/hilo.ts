@@ -18,7 +18,14 @@
  * documento (3-4 rondas, carga lazy en el drawer — nunca en listados).
  */
 
-export type HiloDocTipo = 'requisicion' | 'cotizacion' | 'oc' | 'contrato' | 'factura' | 'pago';
+export type HiloDocTipo =
+  | 'requisicion'
+  | 'cotizacion'
+  | 'oc'
+  | 'contrato'
+  | 'estimacion'
+  | 'factura'
+  | 'pago';
 
 export type HiloDoc = { tipo: HiloDocTipo; id: string };
 
@@ -93,6 +100,9 @@ export type EstimReg = {
   id: string;
   etiqueta: string | null;
   monto_total: number;
+  /** Ciclo D2/D4 (dilesa-contratos-estimaciones): borrador no es devengo. */
+  estado: string | null;
+  contrato_id: string | null;
   cancelada_at: string | null;
 };
 export type FacturaReg = {
@@ -150,6 +160,10 @@ export function hrefDoc(empresa: string, tipo: HiloDocTipo, id: string): string 
       case 'oc':
         return `/dilesa/compras?focus=${id}`;
       case 'contrato':
+        return `/dilesa/construccion/contratos/${id}`;
+      // La estimación vive dentro del detalle de su contrato (no tiene
+      // página propia): el id de la ref ES el contrato_id.
+      case 'estimacion':
         return `/dilesa/construccion/contratos/${id}`;
     }
   }
@@ -272,17 +286,39 @@ export function buildHiloPasos(registros: HiloRegistros, actual: HiloDoc | null)
     });
 
     // — Estimada —
+    // El devengo son las estimaciones AUTORIZADAS (D4); los borradores se
+    // muestran aparte ("sin autorizar"). estado === null (registros previos
+    // al ciclo) cuenta como devengo — back-compat.
     const estimsVivas = vivos(estims);
+    const devengo = estimsVivas.filter((e) => e.estado !== 'borrador');
+    const borradores = estimsVivas.length - devengo.length;
+    const devengado = sum(devengo.map((e) => e.monto_total));
+    const contratadoVivo = sum(contratosVivos.map((c) => c.valor_total));
     pasos.push({
       key: 'estimada',
       label: 'Estimada',
       esActual: false,
-      estado: estimsVivas.length === 0 ? 'pendiente' : 'parcial',
-      refs: [],
+      estado:
+        estimsVivas.length === 0
+          ? 'pendiente'
+          : devengo.length > 0 && contratadoVivo > 0 && devengado >= contratadoVivo
+            ? 'hecho'
+            : 'parcial',
+      refs: estimsVivas
+        .filter((e) => e.contrato_id)
+        .map((e) => ({
+          tipo: 'estimacion' as const,
+          id: e.contrato_id as string,
+          codigo: e.etiqueta ?? 'Est.',
+        })),
       detalle:
-        estimsVivas.length > 0
-          ? `${estimsVivas.length} · ${fmtMonto(sum(estimsVivas.map((e) => e.monto_total)))}`
-          : null,
+        devengo.length > 0
+          ? `${devengo.length} · ${fmtMonto(devengado)}${
+              borradores > 0 ? ` · ${borradores} sin autorizar` : ''
+            }`
+          : estimsVivas.length > 0
+            ? `${borradores} sin autorizar`
+            : null,
     });
   } else if (sabor === 'materiales') {
     // — Ordenada (siempre visible en materiales: si no hay OC, es lo que sigue) —
@@ -382,9 +418,9 @@ const COT_COLS = 'id, codigo, estado, cancelada_at, requisicion_id';
 const OC_COLS =
   'id, codigo, estado, cancelada_at, requisicion_id, cotizacion_id, ordenes_compra_detalle(cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real)';
 const CONTRATO_COLS = 'id, codigo, valor_total, cancelada_at, cotizacion_id';
-const ESTIM_COLS = 'id, etiqueta, monto_total, cancelada_at, contrato_id';
+const ESTIM_COLS = 'id, etiqueta, monto_total, estado, cancelada_at, contrato_id';
 const FACT_COLS =
-  'id, uuid_sat, estado_cxp, total, saldo, cancelada_at, orden_compra_id, obra_estimacion_id';
+  'id, uuid_sat, estado_cxp, total, saldo, cancelada_at, orden_compra_id, obra_estimacion_id, contrato_id';
 const PAGO_COLS = 'id, estado, monto_total, fecha_pago';
 
 type OcRaw = {
@@ -423,7 +459,11 @@ function mapOc(o: OcRaw): OcReg & { requisicion_id: string | null; cotizacion_id
   };
 }
 
-type FactRaw = FacturaReg & { orden_compra_id: string | null; obra_estimacion_id: string | null };
+type FactRaw = FacturaReg & {
+  orden_compra_id: string | null;
+  obra_estimacion_id: string | null;
+  contrato_id: string | null;
+};
 
 function mapFactura(f: {
   id: string;
@@ -434,6 +474,7 @@ function mapFactura(f: {
   cancelada_at: string | null;
   orden_compra_id: string | null;
   obra_estimacion_id: string | null;
+  contrato_id: string | null;
 }): FactRaw {
   return {
     id: f.id,
@@ -444,7 +485,15 @@ function mapFactura(f: {
     cancelada_at: f.cancelada_at,
     orden_compra_id: f.orden_compra_id,
     obra_estimacion_id: f.obra_estimacion_id,
+    contrato_id: f.contrato_id,
   };
+}
+
+/** Merge de facturas de varias fuentes sin duplicar (por id). */
+function dedupFacturas(...grupos: FactRaw[][]): FactRaw[] {
+  const m = new Map<string, FactRaw>();
+  for (const g of grupos) for (const f of g) m.set(f.id, f);
+  return [...m.values()];
 }
 
 const uniq = (xs: (string | null | undefined)[]): string[] => [
@@ -498,17 +547,17 @@ export async function fetchHiloRegistros(sb: Sb, doc: HiloDoc): Promise<HiloRegi
     return (r.data ?? []) as (ContratoReg & { cotizacion_id: string | null })[];
   }
   async function fetchEstimsBy(col: 'id' | 'contrato_id', ids: string[]) {
-    if (!ids.length) return [] as (EstimReg & { contrato_id: string })[];
+    if (!ids.length) return [] as EstimReg[];
     const r = await dilesa()
       .from('obra_estimaciones')
       .select(ESTIM_COLS)
       .in(col, ids)
       .is('deleted_at', null);
     if (r.error) fail(r.error);
-    return (r.data ?? []) as (EstimReg & { contrato_id: string })[];
+    return (r.data ?? []) as EstimReg[];
   }
   async function fetchFacturasBy(
-    col: 'id' | 'orden_compra_id' | 'obra_estimacion_id',
+    col: 'id' | 'orden_compra_id' | 'obra_estimacion_id' | 'contrato_id',
     ids: string[]
   ) {
     if (!ids.length) return [] as FactRaw[];
@@ -596,7 +645,7 @@ export async function fetchHiloRegistros(sb: Sb, doc: HiloDoc): Promise<HiloRegi
       contratos.map((c) => c.id)
     );
     out.estimaciones = estims;
-    const [factOc, factEstim] = await Promise.all([
+    const [factOc, factEstim, factContrato] = await Promise.all([
       fetchFacturasBy(
         'orden_compra_id',
         ocs.map((o) => o.id)
@@ -605,29 +654,41 @@ export async function fetchHiloRegistros(sb: Sb, doc: HiloDoc): Promise<HiloRegi
         'obra_estimacion_id',
         estims.map((e) => e.id)
       ),
+      // Factura TOTAL del contrato (D5) — y las por-estimación heredan
+      // contrato_id, de ahí el dedup.
+      fetchFacturasBy(
+        'contrato_id',
+        contratos.map((c) => c.id)
+      ),
     ]);
-    await closeFromFacturas([...factOc, ...factEstim]);
+    await closeFromFacturas(dedupFacturas(factOc, factEstim, factContrato));
     return out;
   }
 
   if (doc.tipo === 'factura') {
     const facturas = await fetchFacturasBy('id', [doc.id]);
     const f = facturas[0];
-    const [ocs, estims] = await Promise.all([
+    const [ocs, estimsPropias] = await Promise.all([
       fetchOcsBy('id', uniq([f?.orden_compra_id])),
       fetchEstimsBy('id', uniq([f?.obra_estimacion_id])),
       fetchPagosDeFacturas(f ? [f.id] : []),
     ]);
     out.facturas = facturas;
     out.ocs = ocs;
-    out.estimaciones = estims;
     const oc = ocs[0];
     await Promise.all([
       fetchReqs(uniq([oc?.requisicion_id])),
       fetchCots(uniq([oc?.cotizacion_id])),
       (async () => {
-        const contratos = await fetchContratosBy('id', uniq(estims.map((e) => e.contrato_id)));
+        // Contrato vía la estimación de origen O directo (factura TOTAL, D5).
+        const contratoIds = uniq([...estimsPropias.map((e) => e.contrato_id), f?.contrato_id]);
+        const contratos = await fetchContratosBy('id', contratoIds);
         out.contratos = contratos;
+        // Desde la factura total se ve el devengo completo del contrato.
+        out.estimaciones =
+          f?.contrato_id && !f?.obra_estimacion_id
+            ? await fetchEstimsBy('contrato_id', [f.contrato_id])
+            : estimsPropias;
       })(),
     ]);
     return out;
