@@ -7,7 +7,7 @@
 **Próximo hito:** Verificación final de Beto + S6 (cutover Coda de ventas: paridad final, apagar daily ventas/expediente, cortar accesos de captura) → cierre de la iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (pipeline 17/17 completo: F16 conformidad + F17 + copiloto + scope Vendedor)
+**Última actualización:** 2026-06-11 (pipeline 17/17 + flag problema ZCU exenta 6% Fovissste)
 
 ## Problema
 
@@ -211,6 +211,13 @@ expediente, copiloto), no reescritura.
 - **2026-06-11 (scope Vendedor):** Verificación de Beto destapó que el
   aislamiento por vendedor NO existía; implementado en capa app (#812):
   rol Vendedor puro ve solo sus ventas/clientes y no abre detalles ajenos.
+- **2026-06-11 (problema ZCU):** Flag `dilesa.unidades.problema_zcu` (espejo
+  de la columna "Problema ZCU" del Inventario Coda); 35 casas LDLE
+  (M12/M20/M21) marcadas en prod. `fn_calcular_precio_venta` deja de sumar
+  el costo adicional del crédito (Fovissste +6%) en esas casas y devuelve
+  `zcu_exento`; UI de captura y detalle lo señalan. Mapeo agregado al import
+  FULL de inventario (#816). Quedan 5 ventas activas capturadas con el 6%
+  adentro (4 Fovissste + 1 Infonavit/Fovissste) — Beto decide si se corrigen.
 
 ## Decisiones registradas
 
@@ -236,3 +243,8 @@ expediente, copiloto), no reescritura.
 - **2026-06-10:** El extractor notarial es genérico: con cartas de
   FOVISSSTE/banca extrae lo que el documento traiga y lo ausente se captura
   manual — no bloquea créditos no-Infonavit.
+- **2026-06-11:** Casas con problema ZCU no trasladan al precio el costo
+  adicional del tipo de crédito (FOVISSSTE no financia ese sobreprecio). El
+  flag vive en la unidad, no en la venta; la fuente de marcado sigue siendo
+  Coda Inventario (botón "Registra Problema ZCU") mientras el módulo viva
+  ahí. Ventas ya capturadas no se recalculan automáticamente.
