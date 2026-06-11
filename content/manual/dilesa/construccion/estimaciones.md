@@ -1,15 +1,20 @@
 ---
-titulo: 'Construcción — Estimaciones'
+titulo: 'Construcción — Estimaciones (destajos semanales de vivienda)'
 modulo: dilesa.construccion.estimaciones
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-10'
 ---
 
 ## ¿Qué es y para qué sirve?
 
-Son las **estimaciones de pago a contratistas**: cada una agrupa las tareas
+Son los **destajos semanales de vivienda**: cada estimación agrupa las tareas
 terminadas de un periodo, aplica la retención y queda lista para pagar. El ciclo
 típico es **cierre el miércoles → pago el jueves**.
+
+> **No confundir** con las **estimaciones de contrato de obra** (urbanización,
+> cabecera, tareas menores), que miden el avance de un contrato y las autoriza
+> Dirección. Esas viven en **Contratos → sub-vista "Obra de proyecto"** y
+> tienen su propia guía: _Contratos de obra y sus estimaciones_.
 
 ## Cómo llegar
 
