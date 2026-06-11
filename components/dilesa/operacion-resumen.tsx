@@ -23,7 +23,7 @@ const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
 
 export type OperacionResumenProps = {
-  cliente: { nombre: string; contacto: string | null; curp: string | null };
+  cliente: { nombre: string; contacto: string | null; curp: string | null; ine: string | null };
   vivienda: {
     proyecto: string | null;
     mzLote: string | null;
@@ -63,6 +63,7 @@ export function OperacionResumen({
           <p className="text-sm font-semibold text-[var(--text)]">{cliente.nombre}</p>
           {cliente.contacto ? <Linea>{cliente.contacto}</Linea> : null}
           {cliente.curp ? <Linea>CURP: {cliente.curp}</Linea> : null}
+          {cliente.ine ? <Linea>INE: {cliente.ine}</Linea> : null}
         </Bloque>
 
         <Bloque titulo="Vivienda">

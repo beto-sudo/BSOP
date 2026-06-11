@@ -65,6 +65,8 @@ type VentaRow = {
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
   fecha_firma_programada: string | null;
+  /** INE capturado en el KYC de la venta (fallback si la persona no lo trae). */
+  ine_numero: string | null;
 };
 
 export function useVentaResumen(ventaId: string | null): VentaResumenState {
@@ -84,7 +86,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, fecha_firma_programada'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, fecha_firma_programada, ine_numero'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -112,7 +114,9 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         sb
           .schema('erp')
           .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno, telefono, email, curp')
+          .select(
+            'nombre, apellido_paterno, apellido_materno, telefono, email, curp, numero_credencial_ine'
+          )
           .eq('id', venta.persona_id)
           .maybeSingle(),
         venta.unidad_id
@@ -214,6 +218,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         telefono: string | null;
         email: string | null;
         curp: string | null;
+        numero_credencial_ine: string | null;
       } | null;
       const proyectoNombre = (prjRes.data?.nombre as string | null) ?? null;
       const prototipoNombre = (prodRes.data?.nombre as string | null) ?? null;
@@ -279,6 +284,9 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
             nombre: clienteNombre,
             contacto: [persona?.telefono, persona?.email].filter(Boolean).join(' · ') || null,
             curp: persona?.curp ?? null,
+            // INE de la persona; fallback al capturado en el KYC de la venta
+            // (las migradas de Coda suelen traerlo solo ahí).
+            ine: persona?.numero_credencial_ine ?? venta.ine_numero ?? null,
           },
           vivienda: {
             proyecto: proyectoNombre,

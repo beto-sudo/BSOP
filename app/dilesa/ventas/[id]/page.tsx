@@ -1093,6 +1093,8 @@ function DetailInner() {
           nombre: clienteNombre || '(sin nombre)',
           contacto: [persona?.telefono, persona?.email].filter(Boolean).join(' · ') || null,
           curp: persona?.curp ?? null,
+          // INE de la persona; fallback al del KYC de la venta (migradas Coda).
+          ine: persona?.numero_credencial_ine ?? venta.ine_numero ?? null,
         }}
         vivienda={{
           proyecto: proyectoNombre,

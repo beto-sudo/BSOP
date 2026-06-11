@@ -72,6 +72,9 @@ type PersonaExistente = {
   apellido_paterno: string | null;
   apellido_materno: string | null;
   curp: string | null;
+  numero_credencial_ine: string | null;
+  telefono: string | null;
+  email: string | null;
 };
 
 type CalculoPrecio = {
@@ -250,7 +253,9 @@ function NuevaSolicitudForm() {
       sb
         .schema('erp')
         .from('personas')
-        .select('id, nombre, apellido_paterno, apellido_materno, curp')
+        .select(
+          'id, nombre, apellido_paterno, apellido_materno, curp, numero_credencial_ine, telefono, email'
+        )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .eq('tipo', 'cliente')
         .is('deleted_at', null)
@@ -766,9 +771,22 @@ function NuevaSolicitudForm() {
                       .filter(Boolean)
                       .join(' ') || '(sin nombre)'}
                   </div>
+                  {[personaSeleccionadaInfo.telefono, personaSeleccionadaInfo.email].filter(Boolean)
+                    .length > 0 ? (
+                    <div className="text-xs text-muted-foreground">
+                      {[personaSeleccionadaInfo.telefono, personaSeleccionadaInfo.email]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  ) : null}
                   {personaSeleccionadaInfo.curp ? (
                     <div className="font-mono text-xs text-muted-foreground">
-                      {personaSeleccionadaInfo.curp}
+                      CURP: {personaSeleccionadaInfo.curp}
+                    </div>
+                  ) : null}
+                  {personaSeleccionadaInfo.numero_credencial_ine ? (
+                    <div className="font-mono text-xs text-muted-foreground">
+                      INE: {personaSeleccionadaInfo.numero_credencial_ine}
                     </div>
                   ) : null}
                 </div>
