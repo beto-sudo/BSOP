@@ -60,6 +60,7 @@ import { CosteoConceptoForm } from '@/components/dilesa/costeo-concepto-form';
 import {
   BaselineBanner,
   CambiosPendientesPanel,
+  PresupuestoTimeline,
   SolicitarCambioCard,
 } from '@/components/dilesa/presupuesto-cambios';
 import { PresupuestoHistorialDrawer } from '@/components/dilesa/presupuesto-historial-drawer';
@@ -507,7 +508,7 @@ export function CosteoModule({
       (sb.schema('erp') as any)
         .from('presupuesto_cambios')
         .select(
-          'id, proyecto_id, partida_id, tipo, monto_delta, motivo_categoria, motivo, estado, solicitado_por, solicitado_at, resuelto_por, resuelto_at, motivo_rechazo, monto_aprobado_antes, monto_aprobado_despues'
+          'id, proyecto_id, partida_id, tipo, monto_delta, motivo_categoria, motivo, estado, solicitado_por, solicitado_at, resuelto_por, resuelto_at, motivo_rechazo, cancelada_por, cancelada_at, monto_aprobado_antes, monto_aprobado_despues'
         )
         .eq('empresa_id', empresaId)
         .order('solicitado_at', { ascending: true }),
@@ -1000,6 +1001,14 @@ export function CosteoModule({
           puedeAutorizar={puedeAutorizarDireccion}
           puedeEscribir={puedeEscribir}
           onResolved={() => void cargar()}
+        />
+      ) : null}
+
+      {proyectoSeleccionado ? (
+        <PresupuestoTimeline
+          baseline={baselineActual}
+          ordenes={ordenesProyecto}
+          partidaLabelById={partidaLabelById}
         />
       ) : null}
 

@@ -21,6 +21,7 @@ import { useMemo, useState } from 'react';
 import {
   CheckCircle2,
   FileText,
+  History,
   Loader2,
   Lock,
   ShieldCheck,
@@ -37,12 +38,15 @@ import { formatCurrency } from '@/lib/format';
 import {
   CATEGORIA_LABELS,
   CATEGORIAS,
+  buildTimelinePresupuesto,
   deltaFirmado,
   type BaselineInfo,
   type OrdenCambio,
   type OrdenCambioCategoria,
   type OrdenCambioTipo,
+  type TimelineEventoTipo,
 } from '@/lib/presupuesto/ordenes-cambio';
+import { useUsuarioNombres } from '@/components/dilesa/presupuesto-historial-drawer';
 import {
   autorizarBaseline,
   cancelarCambio,
@@ -536,6 +540,99 @@ export function CambiosPendientesPanel({
         description="La orden queda cancelada sin afectar el presupuesto."
         confirmLabel="Retirar"
       />
+    </div>
+  );
+}
+
+// ─── Timeline del presupuesto (actividad del gobierno) ───────────────────────
+
+const TIMELINE_LABEL: Record<TimelineEventoTipo, string> = {
+  baseline: 'Presupuesto inicial autorizado',
+  orden_solicitada: 'Cambio solicitado',
+  orden_autorizada: 'Cambio autorizado',
+  orden_rechazada: 'Cambio rechazado',
+  orden_cancelada: 'Solicitud retirada',
+};
+
+const TIMELINE_ICON: Record<TimelineEventoTipo, React.ReactNode> = {
+  baseline: <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />,
+  orden_solicitada: <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />,
+  orden_autorizada: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
+  orden_rechazada: <XCircle className="h-3.5 w-3.5 text-red-500" />,
+  orden_cancelada: <XCircle className="h-3.5 w-3.5 text-[var(--text)]/40" />,
+};
+
+/**
+ * Cronología del gobierno presupuestal del proyecto: el baseline + cada
+ * orden (solicitada → autorizada/rechazada/retirada), con quién y cuándo.
+ * Colapsada por default; datos ya cargados por el CosteoModule (cero
+ * queries extra salvo la resolución de nombres).
+ */
+export function PresupuestoTimeline({
+  baseline,
+  ordenes,
+  partidaLabelById,
+}: {
+  baseline: BaselineInfo | null;
+  ordenes: readonly OrdenCambio[];
+  partidaLabelById: ReadonlyMap<string, string>;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const eventos = useMemo(() => buildTimelinePresupuesto(baseline, ordenes), [baseline, ordenes]);
+  const nombres = useUsuarioNombres(eventos.map((e) => e.actorId));
+
+  if (eventos.length === 0) return null;
+  const quien = (id: string | null) => (id ? (nombres.get(id) ?? '—') : '—');
+
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--card)]">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
+      >
+        <History className="h-4 w-4 text-[var(--text)]/50" />
+        <span className="text-sm font-medium text-[var(--text)]">
+          Actividad del presupuesto ({eventos.length})
+        </span>
+        <span className="ml-auto text-xs text-[var(--text)]/50">
+          {abierto ? 'Ocultar' : 'Mostrar'}
+        </span>
+      </button>
+      {abierto ? (
+        <ul className="divide-y divide-[var(--border)]/40 border-t border-[var(--border)]">
+          {eventos.map((e) => (
+            <li key={e.key} className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
+              {TIMELINE_ICON[e.tipo]}
+              <span className="font-medium text-[var(--text)]">{TIMELINE_LABEL[e.tipo]}</span>
+              {e.partidaId ? (
+                <span className="text-[var(--text)]/70">
+                  {partidaLabelById.get(e.partidaId) ?? 'Partida'}
+                </span>
+              ) : null}
+              {e.delta != null ? (
+                <span
+                  className={`tabular-nums ${e.delta < 0 ? 'text-amber-600' : 'text-[var(--text)]/80'}`}
+                >
+                  {e.delta > 0 ? '+' : ''}
+                  {formatCurrency(e.delta)}
+                </span>
+              ) : null}
+              {e.monto != null ? (
+                <span className="tabular-nums text-[var(--text)]/80">
+                  {formatCurrency(e.monto)}
+                </span>
+              ) : null}
+              {e.detalle ? (
+                <span className="text-xs text-[var(--text)]/50">— {e.detalle}</span>
+              ) : null}
+              <span className="ml-auto text-xs text-[var(--text)]/50">
+                {fmtFecha(e.fecha)} · {quien(e.actorId)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
