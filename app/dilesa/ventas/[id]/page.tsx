@@ -172,6 +172,7 @@ type DesgloseCalculo = {
   pct_esquina_aplicado: number;
   valor_venta_futuro: number;
   costo_credito_adicional: number;
+  zcu_exento?: boolean;
   productos_adicionales: number;
   precio_venta_total: number;
   apoyo_infonavit: number;
@@ -1231,7 +1232,9 @@ function DetailInner() {
                     },
                     { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
                     {
-                      label: 'Costo crédito adicional',
+                      label: calculo.zcu_exento
+                        ? 'Costo crédito adicional (exento — problema ZCU)'
+                        : 'Costo crédito adicional',
                       value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
                     },
                     {

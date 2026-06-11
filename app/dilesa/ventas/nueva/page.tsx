@@ -45,6 +45,7 @@ type UnidadDisponible = {
   area_m2: number | null;
   es_esquina: boolean | null;
   tiene_frente_verde: boolean | null;
+  problema_zcu: boolean;
   proyecto_id: string;
   producto_id: string | null;
   proyecto_nombre: string;
@@ -81,6 +82,7 @@ type CalculoPrecio = {
   pct_esquina_aplicado: number;
   valor_venta_futuro: number;
   costo_credito_adicional: number;
+  zcu_exento?: boolean;
   productos_adicionales: number;
   precio_venta_total: number;
   apoyo_infonavit: number;
@@ -212,7 +214,7 @@ function NuevaSolicitudForm() {
         .schema('dilesa')
         .from('unidades')
         .select(
-          'id, identificador, area_m2, es_esquina, tiene_frente_verde, proyecto_id, producto_id, estado'
+          'id, identificador, area_m2, es_esquina, tiene_frente_verde, problema_zcu, proyecto_id, producto_id, estado'
         )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .is('deleted_at', null)
@@ -273,6 +275,7 @@ function NuevaSolicitudForm() {
       area_m2: u.area_m2 as number | null,
       es_esquina: u.es_esquina as boolean | null,
       tiene_frente_verde: u.tiene_frente_verde as boolean | null,
+      problema_zcu: Boolean(u.problema_zcu),
       proyecto_id: u.proyecto_id as string,
       producto_id: u.producto_id as string | null,
       proyecto_nombre: prjMap.get(u.proyecto_id as string) ?? '—',
@@ -908,6 +911,7 @@ function NuevaSolicitudForm() {
                   {u.area_m2 ? ` · ${u.area_m2}m²` : ''}
                   {u.es_esquina ? ' · esquina' : ''}
                   {u.tiene_frente_verde ? ' · frente verde' : ''}
+                  {u.problema_zcu ? ' · problema ZCU' : ''}
                 </option>
               ))}
             </select>
@@ -994,7 +998,14 @@ function NuevaSolicitudForm() {
               value={money(calculo.valor_esquina)}
             />
             <Row label="Venta futuro" value={money(calculo.valor_venta_futuro)} />
-            <Row label="Costo crédito adicional" value={money(calculo.costo_credito_adicional)} />
+            <Row
+              label={
+                calculo.zcu_exento
+                  ? 'Costo crédito adicional (exento — problema ZCU)'
+                  : 'Costo crédito adicional'
+              }
+              value={money(calculo.costo_credito_adicional)}
+            />
             <Row label="Productos adicionales" value={money(calculo.productos_adicionales ?? 0)} />
             <Row label="Precio de venta" value={money(calculo.precio_venta_total)} highlight />
             <Row label="Apoyo Infonavit" value={`− ${money(calculo.apoyo_infonavit)}`} />
