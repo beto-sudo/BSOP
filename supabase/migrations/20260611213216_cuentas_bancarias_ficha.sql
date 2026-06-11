@@ -19,7 +19,11 @@ BEGIN;
 
 -- ── 1+2. Columnas de ficha ───────────────────────────────────────────────────
 
+-- `tipo` ya existe con CHECK ('cheques','ahorro','inversion','credito') —
+-- es la clase operativa de la cuenta. El nombre comercial del producto
+-- bancario ("Maestra Pyme", "Líder PYME") va en la columna nueva `producto`.
 ALTER TABLE erp.cuentas_bancarias
+  ADD COLUMN IF NOT EXISTS producto       text,
   ADD COLUMN IF NOT EXISTS numero_cliente text,
   ADD COLUMN IF NOT EXISTS contrato       text,
   ADD COLUMN IF NOT EXISTS sucursal       text,
@@ -41,7 +45,8 @@ ALTER TABLE erp.cuentas_bancarias
 -- Scoped a DILESA por empresa (JOIN, robusto a Preview sin datos).
 
 UPDATE erp.cuentas_bancarias cb
-SET tipo           = 'Maestra Pyme',
+SET tipo           = 'cheques',
+    producto       = 'Maestra Pyme',
     numero_cuenta  = '0141502492',
     clabe          = '012068001415024927',
     numero_cliente = '49331625',
@@ -56,7 +61,8 @@ WHERE cb.empresa_id = e.id AND e.nombre ILIKE '%dilesa%'
   AND cb.nombre = 'BBVA Bancomer';
 
 UPDATE erp.cuentas_bancarias cb
-SET titular    = 'Desarrollo Inmobiliario Los Encinos SA de CV',
+SET tipo       = 'cheques',
+    titular    = 'Desarrollo Inmobiliario Los Encinos SA de CV',
     moneda     = 'USD',
     notas      = 'Ficha pendiente: falta estado de cuenta (número, CLABE, cliente).',
     updated_at = now()
@@ -65,16 +71,18 @@ WHERE cb.empresa_id = e.id AND e.nombre ILIKE '%dilesa%'
   AND cb.nombre = 'BBVA Bancomer Dólares';
 
 UPDATE erp.cuentas_bancarias cb
-SET titular    = 'Desarrollo Inmobiliario Los Encinos SA de CV',
+SET tipo       = 'inversion',
+    titular    = 'Desarrollo Inmobiliario Los Encinos SA de CV',
     moneda     = 'MXN',
-    notas      = 'Ficha pendiente: falta estado de cuenta (contrato, cliente).',
+    notas      = 'Casa de bolsa. Ficha pendiente: falta estado de cuenta (contrato, cliente).',
     updated_at = now()
 FROM core.empresas e
 WHERE cb.empresa_id = e.id AND e.nombre ILIKE '%dilesa%'
   AND cb.nombre = 'Casa de Bolsa Finamex';
 
 UPDATE erp.cuentas_bancarias cb
-SET tipo           = 'Persona moral + divisas',
+SET tipo           = 'inversion',
+    producto       = 'Persona moral + divisas',
     clabe          = '112075000037310071',
     numero_cliente = '4975587',
     contrato       = '3731007',
@@ -92,9 +100,9 @@ WHERE cb.empresa_id = e.id AND e.nombre ILIKE '%dilesa%'
 -- ── 4. Alta de Afirme ────────────────────────────────────────────────────────
 
 INSERT INTO erp.cuentas_bancarias
-  (empresa_id, nombre, banco, tipo, numero_cuenta, clabe, numero_cliente,
+  (empresa_id, nombre, banco, tipo, producto, numero_cuenta, clabe, numero_cliente,
    sucursal, telefono, titular, moneda, notas, activo)
-SELECT e.id, 'Afirme', 'Banca Afirme', 'Líder PYME', '011391019454',
+SELECT e.id, 'Afirme', 'Banca Afirme', 'cheques', 'Líder PYME', '011391019454',
        '062075113910194542', '6560119',
        'Piedras Negras (Blvd E. Mendoza Berrueto 2612)', '81-8318-3990',
        'Desarrollo Inmobiliario Los Encinos SA de CV', 'MXN',

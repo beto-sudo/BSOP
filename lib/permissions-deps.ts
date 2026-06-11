@@ -83,6 +83,8 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.proveedores': [],
   'dilesa.ruv': [],
   'dilesa.saldos-bancos': [],
+  'dilesa.saldos-bancos.saldos': [],
+  'dilesa.saldos-bancos.estados': [],
   'rdb.admin.documentos': [],
   'rdb.admin.juntas': [],
   'rdb.cxp.facturas': [],

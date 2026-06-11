@@ -28,6 +28,7 @@ export type CuentaSaldoRow = {
  */
 export type CuentaFicha = {
   tipo: string | null;
+  producto: string | null;
   numeroCuenta: string | null;
   clabe: string | null;
   numeroCliente: string | null;

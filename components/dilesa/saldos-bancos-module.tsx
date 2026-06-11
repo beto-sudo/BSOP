@@ -79,7 +79,7 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
         .schema('erp')
         .from('cuentas_bancarias')
         .select(
-          'id, nombre, banco, moneda, tipo, numero_cuenta, clabe, numero_cliente, contrato, sucursal, telefono, contacto, titular, notas'
+          'id, nombre, banco, moneda, tipo, producto, numero_cuenta, clabe, numero_cliente, contrato, sucursal, telefono, contacto, titular, notas'
         )
         .eq('empresa_id', empresaId)
         .eq('activo', true)
@@ -118,6 +118,7 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
         capturadoAt: s?.capturado_at ?? null,
         ficha: {
           tipo: c.tipo,
+          producto: c.producto,
           numeroCuenta: c.numero_cuenta,
           clabe: c.clabe,
           numeroCliente: c.numero_cliente,

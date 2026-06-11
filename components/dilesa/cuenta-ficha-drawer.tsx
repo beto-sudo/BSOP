@@ -94,6 +94,7 @@ export function CuentaFichaDrawer({ cuenta, open, onOpenChange }: CuentaFichaDra
             <div className="flex items-center gap-2">
               <Badge tone={cuenta.moneda === 'USD' ? 'info' : 'neutral'}>{cuenta.moneda}</Badge>
               {f.tipo ? <Badge tone="neutral">{f.tipo}</Badge> : null}
+              {f.producto ? <Badge tone="info">{f.producto}</Badge> : null}
             </div>
 
             <DetailDrawerSection title="Identificadores">

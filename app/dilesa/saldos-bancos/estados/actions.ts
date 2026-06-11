@@ -9,6 +9,7 @@ import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { checksumDiff, periodoDia1, TOLERANCIA } from '@/components/dilesa/estados-cuenta-utils';
+import type { Json } from '@/types/supabase';
 import type { ActionResult, GuardarEstadoCuentaInput } from './types';
 
 function parseMonto(v: string | undefined, campo: string): number | { error: string } {
@@ -104,7 +105,9 @@ export async function guardarEstadoCuenta(input: GuardarEstadoCuentaInput): Prom
     num_cargos: parseConteo(input.numCargos),
     comisiones: input.comisiones?.trim() ? Number(input.comisiones) : null,
     archivo_path: archivoPath && archivoPath.length > 0 ? archivoPath : null,
-    extraccion: input.extraccion ?? null,
+    // El payload viene de la extracción IA (objeto plano serializable) — el
+    // tipo de cable es `unknown` pero el contenido siempre es JSON válido.
+    extraccion: (input.extraccion ?? null) as Json,
     notas: notas && notas.length > 0 ? notas : null,
     capturado_por: user.id,
     updated_at: new Date().toISOString(),
