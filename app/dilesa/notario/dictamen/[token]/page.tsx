@@ -8,6 +8,7 @@
 import Image from 'next/image';
 import { verifyDictamenToken, type VerifyResult } from '@/lib/dilesa/dictamen-token';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { getNotaria } from '@/lib/dilesa/notarios';
 import { DictamenUploadForm } from './form';
 
 export const dynamic = 'force-dynamic';
@@ -172,50 +173,41 @@ async function loadContexto(ventaId: string, notarioId: string): Promise<Context
     .maybeSingle();
   if (!v || v.notario_id !== notarioId) return null;
 
-  const [
-    { data: persona },
-    { data: notario },
-    { data: unidad },
-    { data: usuario },
-    { data: fases },
-  ] = await Promise.all([
-    admin
-      .schema('erp')
-      .from('personas')
-      .select('nombre, apellido_paterno, apellido_materno')
-      .eq('id', v.persona_id)
-      .maybeSingle(),
-    admin
-      .schema('erp')
-      .from('personas')
-      .select('nombre, apellido_paterno, apellido_materno')
-      .eq('id', notarioId)
-      .maybeSingle(),
-    v.unidad_id
-      ? admin
-          .schema('dilesa')
-          .from('unidades')
-          .select(
-            'identificador, proyecto_id, producto_id, manzana, numero_lote, calle, numero_oficial, area_m2, m2_construccion'
-          )
-          .eq('id', v.unidad_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    v.vendedor_usuario_id
-      ? admin
-          .schema('core')
-          .from('usuarios')
-          .select('first_name, last_name, email')
-          .eq('id', v.vendedor_usuario_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    admin
-      .schema('dilesa')
-      .from('venta_fases')
-      .select('posicion')
-      .eq('venta_id', ventaId)
-      .is('deleted_at', null),
-  ]);
+  const [{ data: persona }, notaria, { data: unidad }, { data: usuario }, { data: fases }] =
+    await Promise.all([
+      admin
+        .schema('erp')
+        .from('personas')
+        .select('nombre, apellido_paterno, apellido_materno')
+        .eq('id', v.persona_id)
+        .maybeSingle(),
+      // Notaría desde el catálogo de proveedores (categoria='notaria').
+      getNotaria(admin, notarioId),
+      v.unidad_id
+        ? admin
+            .schema('dilesa')
+            .from('unidades')
+            .select(
+              'identificador, proyecto_id, producto_id, manzana, numero_lote, calle, numero_oficial, area_m2, m2_construccion'
+            )
+            .eq('id', v.unidad_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      v.vendedor_usuario_id
+        ? admin
+            .schema('core')
+            .from('usuarios')
+            .select('first_name, last_name, email')
+            .eq('id', v.vendedor_usuario_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      admin
+        .schema('dilesa')
+        .from('venta_fases')
+        .select('posicion')
+        .eq('venta_id', ventaId)
+        .is('deleted_at', null),
+    ]);
 
   let proyectoNombre = '';
   let prototipoSufijo: string | null = null;
@@ -242,11 +234,7 @@ async function loadContexto(ventaId: string, notarioId: string): Promise<Context
     [persona?.nombre, persona?.apellido_paterno, persona?.apellido_materno]
       .filter(Boolean)
       .join(' ') || '(sin nombre)';
-  const notarioNombre =
-    [notario?.nombre, notario?.apellido_paterno, notario?.apellido_materno]
-      .filter(Boolean)
-      .join(' ')
-      .trim() || '(sin nombre)';
+  const notarioNombre = notaria?.nombre ?? '(sin nombre)';
   const vendedorNombre =
     [usuario?.first_name, usuario?.last_name].filter(Boolean).join(' ').trim() ||
     (v.vendedor as string | null) ||

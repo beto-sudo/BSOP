@@ -280,6 +280,21 @@ expediente, copiloto), no reescritura.
   captura seguían mostrando solo cliente + identificador. F11 muestra además
   fecha de firma + notario de F10. De paso `mzLote`/`domicilio` ahora se
   pueblan (el expediente los pasaba null).
+- **2026-06-11 (post-cierre — notarías centralizadas en Proveedores):** Beto
+  detectó el catálogo doble: ventas usaba `erp.personas` tipo `notario` (21
+  registros, 10 sin email) mientras los documentos legales ya usaban
+  `erp.proveedores` categoría `notaria` (17, los mismos notarios). Fusión de
+  datos: contactos complementados al canónico (López Elizondo, Hugo
+  González), typo NOEILA corregido, alta de Marisa Jáuregui como proveedor,
+  registro de prueba + 2 duplicados vacíos desactivados. Migración
+  `20260611205253`: `ventas.notario_id` FK personas→proveedores (remap
+  genérico; la única fila poblada era una prueba → NULL). Helper único
+  `lib/dilesa/notarios.ts` (`listNotarias`/`getNotaria`) alimenta selector
+  F7, F10, emails de dictamen y escrituración (que ahora imprime "NOTARÍA
+  NÚMERO" desde `proveedores.codigo`), PDF de solicitud y magic link del
+  notario. La edición de contacto vive en el módulo Proveedores. Pendiente
+  operativo: desactivar las 18 personas-notario legacy tras el deploy y
+  capturar email de las 8 notarías que siguen sin correo.
 
 ## Decisiones registradas
 

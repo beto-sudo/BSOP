@@ -40,6 +40,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
+import { getNotaria } from '@/lib/dilesa/notarios';
 
 type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
@@ -179,14 +180,8 @@ function CapturarFase10Body() {
           .select('posicion')
           .eq('venta_id', v.id)
           .is('deleted_at', null),
-        v.notario_id
-          ? sb
-              .schema('erp')
-              .from('personas')
-              .select('nombre, apellido_paterno, apellido_materno')
-              .eq('id', v.notario_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
+        // Notaría desde el catálogo de proveedores (categoria='notaria').
+        v.notario_id ? getNotaria(sb, v.notario_id) : Promise.resolve(null),
         sb
           .schema('erp')
           .from('cxc_pagos')
@@ -222,12 +217,9 @@ function CapturarFase10Body() {
           prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
         );
       }
-      if (nRes.data) {
+      if (nRes) {
         setNotarioNombre(
-          [nRes.data.nombre, nRes.data.apellido_paterno, nRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || null
+          nRes.numeroNotaria ? `Notaría ${nRes.numeroNotaria} — ${nRes.nombre}` : nRes.nombre
         );
       }
       const deps = (dRes.data ?? []) as unknown as Deposito[];

@@ -26,6 +26,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { FASES_PIPELINE } from '@/lib/dilesa/captura/marcar-fase';
 import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
+import { getNotaria } from '@/lib/dilesa/notarios';
 import type { OperacionResumenProps } from '@/components/dilesa/operacion-resumen';
 
 /** Datos extra de fases previas, útiles como contexto de captura (F11+). */
@@ -149,14 +150,8 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
               .eq('id', venta.vendedor_usuario_id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
-        venta.notario_id
-          ? sb
-              .schema('erp')
-              .from('personas')
-              .select('nombre, apellido_paterno, apellido_materno')
-              .eq('id', venta.notario_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+        // Notaría desde el catálogo de proveedores (categoria='notaria').
+        venta.notario_id ? getNotaria(sb, venta.notario_id) : Promise.resolve(null),
       ]);
       if (!activo) return;
 
@@ -262,16 +257,9 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           .filter(Boolean)
           .join(' ')
           .trim() || venta.vendedor;
-      const notarioPersona = notRes.data as {
-        nombre: string | null;
-        apellido_paterno: string | null;
-        apellido_materno: string | null;
-      } | null;
-      const notarioNombre = notarioPersona
-        ? [notarioPersona.nombre, notarioPersona.apellido_paterno, notarioPersona.apellido_materno]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || venta.notario
+      // Fallback a venta.notario (texto legacy de Coda) si no hay FK.
+      const notarioNombre = notRes
+        ? (notRes.numeroNotaria ? `Notaría ${notRes.numeroNotaria} — ` : '') + notRes.nombre
         : venta.notario;
 
       const mzLote =

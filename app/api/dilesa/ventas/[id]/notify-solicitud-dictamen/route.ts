@@ -24,6 +24,7 @@ import {
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 import { signDictamenToken } from '@/lib/dilesa/dictamen-token';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
+import { getNotaria } from '@/lib/dilesa/notarios';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,41 +84,36 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ ok: false, error: 'Admin client no disponible' }, { status: 500 });
   }
 
-  const [{ data: persona }, { data: usuario }, { data: unidad }, { data: notario }] =
-    await Promise.all([
-      admin
-        .schema('erp')
-        .from('personas')
-        .select('nombre, apellido_paterno, apellido_materno, email, telefono, curp')
-        .eq('id', venta.persona_id)
-        .maybeSingle(),
-      venta.vendedor_usuario_id
-        ? admin
-            .schema('core')
-            .from('usuarios')
-            .select('first_name, last_name, email')
-            .eq('id', venta.vendedor_usuario_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      venta.unidad_id
-        ? admin
-            .schema('dilesa')
-            .from('unidades')
-            .select(
-              'identificador, proyecto_id, manzana, numero_lote, calle, numero_oficial, producto_id, area_m2, m2_construccion'
-            )
-            .eq('id', venta.unidad_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      admin
-        .schema('erp')
-        .from('personas')
-        .select('nombre, apellido_paterno, apellido_materno, email')
-        .eq('id', venta.notario_id)
-        .maybeSingle(),
-    ]);
+  const [{ data: persona }, { data: usuario }, { data: unidad }, notaria] = await Promise.all([
+    admin
+      .schema('erp')
+      .from('personas')
+      .select('nombre, apellido_paterno, apellido_materno, email, telefono, curp')
+      .eq('id', venta.persona_id)
+      .maybeSingle(),
+    venta.vendedor_usuario_id
+      ? admin
+          .schema('core')
+          .from('usuarios')
+          .select('first_name, last_name, email')
+          .eq('id', venta.vendedor_usuario_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    venta.unidad_id
+      ? admin
+          .schema('dilesa')
+          .from('unidades')
+          .select(
+            'identificador, proyecto_id, manzana, numero_lote, calle, numero_oficial, producto_id, area_m2, m2_construccion'
+          )
+          .eq('id', venta.unidad_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Notaría desde el catálogo de proveedores (categoria='notaria').
+    getNotaria(admin, venta.notario_id),
+  ]);
 
-  if (!notario?.email) {
+  if (!notaria?.email) {
     return NextResponse.json(
       {
         ok: false,
@@ -154,11 +150,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       .filter(Boolean)
       .join(' ') || '(sin nombre)';
 
-  const notarioNombreCompleto =
-    [notario.nombre, notario.apellido_paterno, notario.apellido_materno]
-      .filter(Boolean)
-      .join(' ')
-      .trim() || '(notario sin nombre)';
+  const notarioNombreCompleto = notaria.nombre;
 
   const vendedorNombre =
     [usuario?.first_name, usuario?.last_name].filter(Boolean).join(' ').trim() ||
@@ -197,7 +189,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     ventaId: venta.id,
     empresaId: venta.empresa_id,
     uploadUrl,
-    notarioEmail: notario.email as string,
+    notarioEmail: notaria.email,
     notarioNombre: notarioNombreCompleto,
     clienteNombre,
     clienteCurp: persona?.curp ?? null,
