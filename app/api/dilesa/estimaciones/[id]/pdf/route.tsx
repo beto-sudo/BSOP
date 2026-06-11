@@ -297,7 +297,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const def = await getDefinitionBySlug(sb, 'dilesa_estimacion');
 
   // Defaults hardcoded como fallback fail-open.
-  let fromAddress = 'DILESA Facturas <facturas@bsop.io>';
+  let fromAddress = 'DILESA Facturas <noreply@bsop.io>';
   let replyTo: string | null = 'facturas@dilesa.mx';
   let toList = [to];
   let ccList: string[] = [];
