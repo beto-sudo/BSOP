@@ -5,6 +5,7 @@ import { DesktopOnlyNotice } from '@/components/responsive';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getLocalDayBoundsUtc } from '@/lib/timezone';
+import { UNIDAD_DEFAULT, unidadOptions } from '@/lib/unidades';
 import {
   guardarRequisicion,
   actualizarRequisicion,
@@ -605,7 +606,7 @@ function NewRequestSheet({
         producto_id: item.producto_id,
         descripcion: (item.producto || item.descripcion).trim(),
         cantidad: Math.max(parseFloat(item.cantidad) || 1, 0),
-        unidad: item.unidad.trim() || 'pza',
+        unidad: item.unidad.trim() || UNIDAD_DEFAULT,
         notas: item.descripcion.trim() || null,
       }));
 
@@ -864,12 +865,12 @@ function NewRequestSheet({
                       <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Unidad
                       </label>
-                      <Input
+                      <Combobox
                         value={item.unidad}
-                        onChange={(event) =>
-                          onDraftItemChange(item.id, 'unidad', event.target.value)
-                        }
-                        placeholder="pza, caja, kg..."
+                        onChange={(v) => onDraftItemChange(item.id, 'unidad', v)}
+                        options={unidadOptions(item.unidad)}
+                        placeholder="Unidad..."
+                        aria-label="Unidad"
                       />
                     </div>
 

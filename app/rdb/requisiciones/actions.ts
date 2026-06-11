@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
+import { UNIDAD_DEFAULT } from '@/lib/unidades';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -78,7 +79,7 @@ export async function guardarRequisicion(
         producto_id: item.producto_id ?? null,
         descripcion: item.descripcion?.trim() || '',
         cantidad: Number(item.cantidad ?? 0),
-        unidad: item.unidad?.trim() || 'pza',
+        unidad: item.unidad?.trim() || UNIDAD_DEFAULT,
         notas: item.notas?.trim() || null,
       }))
       .filter((item) => item.descripcion.length > 0);
@@ -141,7 +142,7 @@ export async function actualizarRequisicion(
       producto_id: item.producto_id ?? null,
       descripcion: item.descripcion?.trim() || '',
       cantidad: Number(item.cantidad ?? 0),
-      unidad: item.unidad?.trim() || 'pza',
+      unidad: item.unidad?.trim() || UNIDAD_DEFAULT,
       notas: item.notas?.trim() || null,
     }))
     .filter((item) => item.descripcion.length > 0);
