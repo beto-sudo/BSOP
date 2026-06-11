@@ -8,6 +8,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { upsertReceta } from '@/app/rdb/productos/actions';
 import type { InsumoDisponible } from '@/lib/productos/recetas';
+import { UNIDAD_DEFAULT, unidadOptions } from '@/lib/unidades';
 
 export type RecetaEditorRow = {
   insumo_id: string;
@@ -77,7 +78,7 @@ export function RecetasEditor({
         insumo_id: ins.id,
         insumo_nombre: ins.nombre,
         cantidad: 1,
-        unidad: ins.unidad ?? '',
+        unidad: ins.unidad || UNIDAD_DEFAULT,
       },
     ]);
     setInsumoToAdd('');
@@ -165,14 +166,14 @@ export function RecetasEditor({
                 aria-label={`Cantidad de ${row.insumo_nombre}`}
                 disabled={saving}
               />
-              <Input
+              <Combobox
                 value={row.unidad}
-                onChange={(e) =>
-                  setRows((rs) =>
-                    rs.map((r, i) => (i === idx ? { ...r, unidad: e.target.value } : r))
-                  )
+                onChange={(v) =>
+                  setRows((rs) => rs.map((r, i) => (i === idx ? { ...r, unidad: v } : r)))
                 }
-                className="w-20"
+                options={unidadOptions(row.unidad)}
+                className="w-32"
+                size="sm"
                 aria-label={`Unidad de ${row.insumo_nombre}`}
                 disabled={saving}
               />

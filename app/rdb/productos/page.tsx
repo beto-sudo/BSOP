@@ -15,6 +15,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { RefreshCw, Search, Settings2, Save, X, BarChart3 } from 'lucide-react';
 import { upsertReceta, updateCategoria } from './actions';
+import { UNIDAD_DEFAULT, unidadOptions } from '@/lib/unidades';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -237,6 +238,7 @@ export default function ProductosPage() {
 
   // Form state (edit drawer)
   const [formTipo, setFormTipo] = useState('producto');
+  const [formUnidad, setFormUnidad] = useState(UNIDAD_DEFAULT);
   const [formCategoriaId, setFormCategoriaId] = useState<string>('');
   const [formInventariable, setFormInventariable] = useState(false);
 
@@ -251,6 +253,7 @@ export default function ProductosPage() {
   const [newNombre, setNewNombre] = useState('');
   const [newPrecio, setNewPrecio] = useState('0');
   const [newTipo, setNewTipo] = useState('producto');
+  const [newUnidad, setNewUnidad] = useState(UNIDAD_DEFAULT);
   const [newCategoriaId, setNewCategoriaId] = useState('');
   const [newInventariable, setNewInventariable] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -382,6 +385,7 @@ export default function ProductosPage() {
   const openDrawer = (p: Producto) => {
     setSelectedProducto(p);
     setFormTipo(p.tipo || 'producto');
+    setFormUnidad(p.unidad || UNIDAD_DEFAULT);
     setFormCategoriaId(p.categoria_id ?? '');
     setFormInventariable(p.inventariable ?? true);
     setDrawerOpen(true);
@@ -397,6 +401,7 @@ export default function ProductosPage() {
         .from('productos')
         .update({
           tipo: formTipo.trim() || 'producto',
+          unidad: formUnidad || UNIDAD_DEFAULT,
           inventariable: formInventariable,
           updated_at: new Date().toISOString(),
         })
@@ -452,6 +457,7 @@ export default function ProductosPage() {
           empresa_id: RDB_EMPRESA_ID,
           nombre: newNombre.trim(),
           tipo: newTipo.trim() || 'producto',
+          unidad: newUnidad || UNIDAD_DEFAULT,
           inventariable: newInventariable,
           categoria_id: newCategoriaId || null,
           activo: true,
@@ -474,6 +480,7 @@ export default function ProductosPage() {
       setNewNombre('');
       setNewPrecio('0');
       setNewTipo('producto');
+      setNewUnidad(UNIDAD_DEFAULT);
       setNewCategoriaId('');
       setNewInventariable(true);
       void fetchProductos();
@@ -757,6 +764,17 @@ export default function ProductosPage() {
                     />
                   </div>
 
+                  {/* Unidad */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">Unidad</label>
+                    <Combobox
+                      value={formUnidad || UNIDAD_DEFAULT}
+                      onChange={(v) => setFormUnidad(v || UNIDAD_DEFAULT)}
+                      options={unidadOptions(formUnidad)}
+                      placeholder="Seleccionar unidad..."
+                    />
+                  </div>
+
                   {/* Categoría */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Categoría</label>
@@ -916,6 +934,16 @@ export default function ProductosPage() {
                       { value: 'refaccion', label: 'Refacción' },
                     ]}
                     placeholder="Seleccionar tipo..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Unidad</label>
+                  <Combobox
+                    value={newUnidad || UNIDAD_DEFAULT}
+                    onChange={(v) => setNewUnidad(v || UNIDAD_DEFAULT)}
+                    options={unidadOptions()}
+                    placeholder="Seleccionar unidad..."
                   />
                 </div>
 
