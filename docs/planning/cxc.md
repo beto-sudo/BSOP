@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Aplicar (OK de Beto) la reversión de LIQ-HIST en ventas en flujo — migración `20260611182924` lista sin aplicar (31 ventas / 44 pagos / $10.49M con escritura ≥ mar-2026 que el bucket por fase liquidó pese a seguir cobrando). Luego: limpieza de ~$2.0M en saldos a favor (185 ventas) + Sprint 4 (recordatorios) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
+**Próximo hito:** Limpieza de ~$2.0M en saldos a favor (185 ventas, depósitos Infonavit/Fovissste capturados ≥ precio — requiere regla + OK de Beto). Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Reversión LIQ-HIST de ventas en flujo aplicada y verificada 2026-06-11
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-11 (falso positivo de la liquidación histórica detectado y reversión preparada; captura de recibo de caja cerrada en UI)
+**Última actualización:** 2026-06-11 (reversión LIQ-HIST aplicada a prod: 44 pagos / 31 ventas / $10.49M reabiertos como cartera viva; aging en 101 ventas / $91.1M)
 
 ## Problema
 
@@ -300,6 +300,21 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-11 — Reversión LIQ-HIST APLICADA a prod y verificada
+
+Beto confirmó el criterio en chat (_"la saldada de los créditos era solo
+lo que no registrábamos en Coda... todo esto reciente no hay que saldar
+nada"_) y eligió el corte ≥ 2026-03-01. La migración `20260611182924` se
+aplicó vía `db push` el 2026-06-11 ~13:05 CST tras mergear el PR #831:
+44 pagos LIQ-HIST revertidos en 31 ventas ($10,485,164.71), 44
+aplicaciones borradas. **Verificación independiente post-aplicación:** 0
+LIQ-HIST vivos en ventas con escritura ≥ mar-2026, 0 aplicaciones
+huérfanas, aging reabierto a 101 ventas / $91.1M (antes 69 / $79.7M).
+Spot-check Josue D. Cruz Valverde: enganche `parcial` con saldo $1,622
+(el adeudo real que Coda muestra como "Saldo Cliente") y disposición de
+crédito liquidada solo con pagos reales. Los LIQ-HIST de ventas viejas
+(pre-mar-2026) quedan intactos, como se aprobó.
 
 ### 2026-06-11 — Falso positivo del LIQ-HIST + captura de recibo de caja
 
