@@ -4766,6 +4766,7 @@ export type Database = {
           notario: string | null
           notario_id: string | null
           notas: string | null
+          notif_escrituracion_at: string | null
           notif_hold_4h_at: string | null
           notif_hold_creado_at: string | null
           notif_hold_expirada_at: string | null
@@ -4852,6 +4853,7 @@ export type Database = {
           notario?: string | null
           notario_id?: string | null
           notas?: string | null
+          notif_escrituracion_at?: string | null
           notif_hold_4h_at?: string | null
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null
@@ -4938,6 +4940,7 @@ export type Database = {
           notario?: string | null
           notario_id?: string | null
           notas?: string | null
+          notif_escrituracion_at?: string | null
           notif_hold_4h_at?: string | null
           notif_hold_creado_at?: string | null
           notif_hold_expirada_at?: string | null

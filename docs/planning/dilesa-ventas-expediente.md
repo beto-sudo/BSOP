@@ -257,6 +257,19 @@ expediente, copiloto), no reescritura.
   notas); el editor de cuadratura quita el input y muestra el tope auto con
   alerta si los 4 buckets lo exceden. Legacy Coda (264 activas) cae al valor
   capturado allá. Migración aplicada a prod.
+- **2026-06-11 (post-cierre — correo de escrituración F11):** Réplica
+  mejorada del correo de Coda "📜 Escrituración" al cerrar la fase: cliente
+  (TO) + vendedor (CC) + `escrituras@dilesa.mx` (extra editable en el
+  catálogo de notificaciones, slug `dilesa_escrituracion`, kill switch +
+  log). Mejoras vs Coda: número de escritura, notaría desde catálogo
+  (`notario_id` → `erp.personas`), branding de empresa, reply-to
+  `admin@dilesa.mx`, redacción corregida y sin links internos. Disparo
+  automático fire-and-forget en la captura + botón "Correo de escrituración"
+  en el expediente (reenviar / enviarse prueba) que cubre ventas escrituradas
+  antes del feature. Idempotencia `notif_escrituracion_at` (migración
+  `20260611190612` aplicada). Template aprobado por Beto con prueba real
+  (venta Limas M3-L16-LDLE-ISC). Ventas migradas de Coda sin `notario_id` ni
+  vendedor-usuario omiten esas partes del correo con gracia.
 
 ## Decisiones registradas
 
