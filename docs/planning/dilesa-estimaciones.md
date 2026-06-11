@@ -195,8 +195,8 @@ Sub-slugs:
 - API route `/api/dilesa/estimaciones/[id]/pdf` → returns PDF stream
 - Botón "Aprobar y enviar al contratista" en detalle estado=borrador →
   cambia estado a `aprobada` + envía email Resend con PDF adjunto +
-  template de email "favor de prepare factura por $X y enviar a
-  pagos@dilesa.mx".
+  template de email "favor de preparar factura por $X y enviar a
+  facturas@dilesa.mx".
 - Botón "Registrar factura recibida" en estado=aprobada → captura URL/folio.
 - Botón "Marcar como pagada" en estado=facturada → captura referencia
   bancaria + fecha + transiciona a `pagada` → dispara el lock en cascada.
@@ -268,6 +268,10 @@ Sub-slugs:
 - **2026-05-25** — Sprint 6 mergeado (PR #530): cutover del sync —
   5 scripts construcción + estimaciones incrementales al cron daily,
   email con columnas Antes/Después/Δ y columna Coda con flag de paridad.
+- **2026-06-11** — Fix post-cierre: el modal de envío decía "envíe la
+  factura a pagos@dilesa.mx" — ese grupo no existe en Workspace; el
+  canónico (decisión Beto) es `facturas@dilesa.mx`, que ya usaban el PDF
+  y el reply-to. Texto de UI y specs de este doc alineados.
 - **2026-05-25** — Iniciativa cerrada. Próximo: cutover operativo
   (sábado 31-may pausar Coda, lunes 2-jun staff usa BSOP).
 
@@ -283,7 +287,9 @@ Sub-slugs:
 - **R3**: Estimaciones con tareas de obras de varios proyectos —
   validar que el desglose por obra (con su proyecto) sea legible.
 - **R4**: Email Resend — pendiente confirmar template de remitente
-  (¿pagos@dilesa.mx?) y dominio verificado.
+  (¿pagos@dilesa.mx?) y dominio verificado. _Resuelto 2026-06-11: el
+  buzón para facturas de contratistas es `facturas@dilesa.mx` (grupo
+  Workspace existente); `pagos@dilesa.mx` nunca existió._
 
 ## Métricas de éxito
 

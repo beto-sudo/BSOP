@@ -16,7 +16,7 @@ import {
   SolicitudCotizacionPDF,
   type SolicitudCotizacionData,
 } from '@/lib/dilesa/pdf/solicitud-cotizacion';
-import { getDefinitionBySlug, writeNotificationLog } from '@/lib/notifications';
+import { getDefinitionBySlug, renderSubject, writeNotificationLog } from '@/lib/notifications';
 
 const MESES_ES = [
   'Enero',
@@ -216,7 +216,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const buf = await renderToBuffer(<SolicitudCotizacionPDF data={data} />);
   const base64 = buf.toString('base64');
-  const subject = `Solicitud de cotización ${data.folio} — DILESA`;
+  const subject = renderSubject(
+    def?.subject_template ?? 'Solicitud de cotización {folio} — DILESA',
+    {
+      folio: data.folio,
+    }
+  );
 
   const html = `
 <div style="font-family: -apple-system, sans-serif; color: #222; max-width: 600px;">

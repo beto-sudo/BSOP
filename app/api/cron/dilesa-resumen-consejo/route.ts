@@ -12,8 +12,10 @@
  *   - Envío a las 20:00 hora de Matamoros, de lunes a sábado.
  *   - **Domingo NO se envía** (guard sobre el día, TZ real).
  *   - Destino: RESUMEN_CONSEJO_TEST_TO si está definida (modo prueba, subject con
- *     [PRUEBA]); en su defecto, consejo@dilesa.mx (producción). Sin candado extra
- *     — igual que el cron de tareas, siempre envía (TEST_TO es la única palanca).
+ *     [PRUEBA]); en su defecto, los destinatarios del catálogo
+ *     `core.notification_definitions` slug `dilesa_resumen_consejo` (ahí vive
+ *     consejo@dilesa.mx como `always`, editable runtime + kill switch `activo`).
+ *     FAIL-OPEN: sin definición usa los fallbacks hardcodeados.
  *   - El bloque de Saldos Bancos solo aparece cuando hay saldos capturados
  *     (iniciativa tesoreria → erp.v_cuenta_saldo_actual).
  *
@@ -30,12 +32,22 @@ import {
   relojMatamoros,
   HORA_ENVIO_LOCAL,
 } from '@/lib/dilesa/resumen-consejo-email';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 export const maxDuration = 120;
 
 const DILESA_EMPRESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
-const CONSEJO_EMAIL = 'consejo@dilesa.mx';
-const FROM = 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>';
+const RESUMEN_SLUG = 'dilesa_resumen_consejo';
+
+/** Fallbacks si el catálogo no responde (FAIL-OPEN, patrón escrituración). */
+const CONSEJO_EMAIL_FALLBACK = 'consejo@dilesa.mx';
+const FROM_FALLBACK = 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>';
+const SUBJECT_FALLBACK = 'Resumen Diario Operación Dilesa 🏘️ {fecha}';
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim();
@@ -75,6 +87,21 @@ export async function GET(req: NextRequest) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Catálogo de notificaciones (fail-open: sin definición usa fallbacks).
+  const def = await getDefinitionBySlug(supabase, RESUMEN_SLUG, DILESA_EMPRESA_ID);
+  if (def && !def.activo) {
+    await writeNotificationLog(supabase, {
+      definitionId: def.id,
+      empresaId: DILESA_EMPRESA_ID,
+      status: 'skipped',
+      recipients: { to: [] },
+      subject: `${RESUMEN_SLUG} — kill switch`,
+    });
+    const skip = { status: 'skipped', reason: 'kill_switch' };
+    console.log('[dilesa-resumen-consejo]', JSON.stringify(skip));
+    return NextResponse.json(skip);
+  }
+
   // Branding (header del correo) desde core.empresas.
   const { data: empresa } = await supabase
     .schema('core')
@@ -91,17 +118,45 @@ export async function GET(req: NextRequest) {
   });
 
   // Destino: RESUMEN_CONSEJO_TEST_TO definida → modo prueba (subject [PRUEBA], NO
-  // toca al Consejo); en su defecto, el Consejo real. Sin candado extra — igual
-  // que el cron de tareas, el correo siempre se envía.
+  // toca al Consejo, sin cc/bcc); en su defecto, los destinatarios del catálogo
+  // (o el fallback). Sin candado extra — el correo siempre se envía.
   const testTo = process.env.RESUMEN_CONSEJO_TEST_TO?.trim();
-  const recipients = testTo ? [testTo] : [CONSEJO_EMAIL];
-  const subject = `Resumen Diario Operación Dilesa 🏘️ ${fechaTitulo}${testTo ? ' [PRUEBA]' : ''}`;
+  const extras = def
+    ? splitRecipientsExtra(def.recipients_extra)
+    : { to: [CONSEJO_EMAIL_FALLBACK], cc: [], bcc: [] };
+  // Una definición sin `always` dejaría el correo sin destino — fallback.
+  const baseTo = extras.to.length > 0 ? extras.to : [CONSEJO_EMAIL_FALLBACK];
+  const recipients = testTo ? [testTo] : baseTo;
+  const cc = testTo ? [] : extras.cc;
+  const bcc = testTo ? [] : extras.bcc;
+
+  const fromAddress = def
+    ? def.from_name
+      ? `${def.from_name} <${def.from_email}>`
+      : def.from_email
+    : FROM_FALLBACK;
+  const subjectBase = renderSubject(def?.subject_template ?? SUBJECT_FALLBACK, {
+    fecha: fechaTitulo,
+  });
+  const subject = `${subjectBase}${testTo ? ' [PRUEBA]' : ''}`;
 
   const res = await sendResumenEmail(resendKey, {
     html,
     subject,
-    from: FROM,
+    from: fromAddress,
     recipients,
+    cc,
+    bcc,
+  });
+
+  await writeNotificationLog(supabase, {
+    definitionId: def?.id ?? null,
+    empresaId: DILESA_EMPRESA_ID,
+    status: res.ok ? 'sent' : 'failed',
+    recipients: { to: recipients, cc, bcc },
+    subject,
+    resendId: res.id ?? null,
+    errorMessage: res.ok ? null : String(res.error ?? 'unknown'),
   });
 
   const summary = {
