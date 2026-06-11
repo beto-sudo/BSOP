@@ -1,8 +1,8 @@
 ---
 titulo: 'Compras — Requisiciones'
 modulo: dilesa.compras.requisiciones
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-11'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -24,13 +24,16 @@ comprar**.
 ## La tabla
 
 Cada renglón: **Folio**, **Solicitante**, **Estado**, **Orden** (la OC ligada si
-ya se generó), **Líneas**, **Estimado** y **Fecha**.
+ya se generó), **Líneas**, **Estimado** y **Fecha**. **Haz clic en un renglón**
+para abrir el detalle: ahí ves el hilo del gasto, las líneas y **los botones de
+acción** (autorizar, generar orden, pedir cotizaciones, cancelar).
 
 ## Cómo funciona (paso a paso)
 
 1. **Nueva requisición** → eliges si es de **proyecto** (cada línea con su
    partida) o **gasto suelto** (solo descripción), y capturas las líneas.
-2. Desde el menú del renglón, **Marcar autorizada**.
+2. Haz clic en la requisición y, en el detalle, **Marcar autorizada** (la misma
+   acción vive en el menú ⋯ del renglón, como atajo).
 3. **Generar orden de compra** → crea la OC heredando las líneas y su partida (así
    la orden sí compromete el presupuesto). La OC nace en Borrador.
 

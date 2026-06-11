@@ -1,8 +1,8 @@
 ---
 titulo: 'Compras — Órdenes de compra'
 modulo: dilesa.compras.ordenes
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-11'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -28,7 +28,9 @@ de lo que has amarrado).
 ## La tabla
 
 Cada renglón: **Folio**, **Proveedor**, **Estado**, **Líneas** (cuántas trae),
-**Total** y **Fecha**.
+**Total** y **Fecha**. **Haz clic en un renglón** para abrir el detalle: el hilo
+del gasto, las líneas y **los botones de acción** (editar borrador, marcar
+enviada, cerrar, cancelar).
 
 ## Cómo crear una orden (paso a paso)
 
@@ -36,8 +38,8 @@ Cada renglón: **Folio**, **Proveedor**, **Estado**, **Líneas** (cuántas trae)
 2. **Nueva orden** → eliges proveedor y agregas **líneas**: cada una con su
    **partida** del presupuesto, descripción, cantidad, unidad y precio.
 3. **Crear orden (borrador)** — queda en Borrador (todavía no compromete nada).
-4. Desde el menú del renglón, **Marcar enviada** → ahí sí compromete el monto
-   contra las partidas.
+4. Haz clic en la orden y, en el detalle, **Marcar enviada** → ahí sí compromete
+   el monto contra las partidas (la misma acción vive en el menú ⋯ del renglón).
 5. Cuando ya no falta nada por recibir, **Cerrar orden**. Si te equivocaste,
    **Cancelar** (con motivo) la anula y libera el presupuesto.
 
