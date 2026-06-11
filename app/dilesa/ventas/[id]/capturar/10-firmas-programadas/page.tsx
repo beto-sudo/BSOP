@@ -9,9 +9,12 @@
  * referencia de cobertura.
  *
  * PR2 — Crédito directo: si crédito institución + depósitos < precio, DILESA
- * puede financiar el saldo. Se configura el monto + plan de pagos + interés
- * moratorio (TIIE 28d + spread) y se genera el Pagaré PDF para imprimir,
- * firmar y subir.
+ * puede financiar el saldo. Se configura el monto + plan de pagos + tasas y
+ * se genera el Pagaré PDF para imprimir, firmar y subir.
+ *
+ * Tasas (regla Beto 2026-06-11): interés ORDINARIO = TIIE 28d + spread
+ * (mínimo 4 puntos); interés MORATORIO = 3× el ordinario. Ambos se derivan
+ * aquí y se persisten como snapshot pactado de la venta.
  *
  * Captura:
  *   - `fecha_firma_programada` + `hora_firma_programada`
@@ -53,7 +56,7 @@ type VentaCtx = {
   monto_credito_directo: number | null;
   cd_plan_pagos: PlanPagoJson[] | null;
   cd_tiie28_pct: number | null;
-  cd_spread_moratorio_pct: number | null;
+  cd_spread_ordinario_pct: number | null;
   cd_interes_ordinario_pct: number | null;
   cd_fecha_suscripcion: string | null;
   cd_aval_nombre: string | null;
@@ -111,7 +114,6 @@ function CapturarFase10Body() {
   const [fechaSuscripcion, setFechaSuscripcion] = useState<string>(hoy());
   const [tiie, setTiie] = useState<string>('');
   const [spread, setSpread] = useState<string>('4');
-  const [ordinario, setOrdinario] = useState<string>('0');
   const [avalNombre, setAvalNombre] = useState<string>('');
   const [avalDomicilio, setAvalDomicilio] = useState<string>('');
   const [cdGuardado, setCdGuardado] = useState<boolean>(false);
@@ -135,7 +137,7 @@ function CapturarFase10Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_moratorio_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -256,8 +258,7 @@ function CapturarFase10Body() {
         setCdGuardado(false);
       }
       if (v.cd_tiie28_pct != null) setTiie(String(v.cd_tiie28_pct));
-      if (v.cd_spread_moratorio_pct != null) setSpread(String(v.cd_spread_moratorio_pct));
-      if (v.cd_interes_ordinario_pct != null) setOrdinario(String(v.cd_interes_ordinario_pct));
+      if (v.cd_spread_ordinario_pct != null) setSpread(String(v.cd_spread_ordinario_pct));
       if (v.cd_fecha_suscripcion) setFechaSuscripcion(v.cd_fecha_suscripcion);
       if (v.cd_aval_nombre) setAvalNombre(v.cd_aval_nombre);
       if (v.cd_aval_domicilio) setAvalDomicilio(v.cd_aval_domicilio);
@@ -289,8 +290,12 @@ function CapturarFase10Body() {
   const montoCDNum = Number(montoCD) || 0;
   const planCuadra = Math.abs(sumaPlan - montoCDNum) < 0.01 && montoCDNum > 0;
 
-  // Desglose de interés ordinario (mismo motor que el PDF del pagaré).
-  const ordinarioPct = Number(ordinario) || 0;
+  // Tasas derivadas (regla 2026-06-11): ordinario = TIIE + spread (mín. 4);
+  // moratorio = 3× ordinario. Se persisten como snapshot al guardar.
+  const tiieNum = Number(tiie) || 0;
+  const spreadNum = Number(spread) || 0;
+  const ordinarioPct = tiieNum > 0 ? Math.round((tiieNum + spreadNum) * 100) / 100 : 0;
+  const moratorioPct = ordinarioPct > 0 ? Math.round(ordinarioPct * 3 * 100) / 100 : 0;
   const desglose = useMemo(() => {
     if (ordinarioPct <= 0) return null;
     const filas = planPagos.filter((r) => r.fecha && Number(r.monto) > 0);
@@ -343,6 +348,22 @@ function CapturarFase10Body() {
       });
       return;
     }
+    if (!(tiieNum > 0)) {
+      toast.add({
+        title: 'Falta la TIIE',
+        description: 'Captura la TIIE a 28 días vigente — el interés ordinario es TIIE + spread.',
+        type: 'error',
+      });
+      return;
+    }
+    if (spreadNum < 4) {
+      toast.add({
+        title: 'Spread fuera de regla',
+        description: 'El spread del interés ordinario es mínimo 4 puntos sobre la TIIE.',
+        type: 'error',
+      });
+      return;
+    }
     if (!planCuadra) {
       toast.add({
         title: 'El plan no cuadra',
@@ -363,9 +384,10 @@ function CapturarFase10Body() {
       .update({
         monto_credito_directo: Math.round(montoCDNum * 100) / 100,
         cd_plan_pagos: planJson,
-        cd_tiie28_pct: tiie === '' ? null : Number(tiie),
-        cd_spread_moratorio_pct: spread === '' ? null : Number(spread),
-        cd_interes_ordinario_pct: ordinario === '' ? null : Number(ordinario),
+        cd_tiie28_pct: tiieNum,
+        cd_spread_ordinario_pct: spreadNum,
+        cd_interes_ordinario_pct: ordinarioPct,
+        cd_interes_moratorio_pct: moratorioPct,
         cd_fecha_suscripcion: fechaSuscripcion || null,
         cd_aval_nombre: avalNombre.trim() || null,
         cd_aval_domicilio: avalDomicilio.trim() || null,
@@ -391,13 +413,14 @@ function CapturarFase10Body() {
     avalNombre,
     fechaSuscripcion,
     montoCDNum,
-    ordinario,
+    moratorioPct,
+    ordinarioPct,
     planCuadra,
     planPagos,
     sb,
-    spread,
+    spreadNum,
     sumaPlan,
-    tiie,
+    tiieNum,
     toast,
     venta,
   ]);
@@ -776,9 +799,9 @@ function CapturarFase10Body() {
                 ) : null}
               </div>
 
-              {/* Intereses */}
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label="TIIE 28d (%)">
+              {/* Tasas: ordinario = TIIE + spread (mín. 4); moratorio = 3× ordinario */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="TIIE 28d (%) *">
                   <Input
                     type="number"
                     step="0.01"
@@ -791,39 +814,38 @@ function CapturarFase10Body() {
                   />
                   <Hint>Tasa vigente a la suscripción</Hint>
                 </Field>
-                <Field label="Spread moratorio (%)">
+                <Field label="Spread ordinario (puntos) *">
                   <Input
                     type="number"
                     step="0.01"
-                    min="0"
+                    min="4"
                     value={spread}
                     onChange={(e) => {
                       setSpread(e.target.value);
                       touchCD();
                     }}
                   />
-                  <Hint>Mínimo 4, editable a más</Hint>
-                </Field>
-                <Field label="Interés ordinario (%)">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={ordinario}
-                    onChange={(e) => {
-                      setOrdinario(e.target.value);
-                      touchCD();
-                    }}
-                  />
-                  <Hint>Default 0</Hint>
+                  <Hint>Mínimo 4 sobre la TIIE, editable a más</Hint>
                 </Field>
               </div>
-              {tiie !== '' ? (
-                <p className="mt-1 text-[11px] text-[var(--text)]/60">
-                  Moratorio total ≈ {(Number(tiie) + (Number(spread) || 0)).toFixed(2)}% anual (TIIE
-                  + spread).
+              {ordinarioPct > 0 ? (
+                <p className="mt-2 rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2 text-[11px] text-[var(--text)]/70">
+                  Interés ordinario: TIIE {tiieNum.toFixed(2)}% + {spreadNum.toFixed(2)} puntos ={' '}
+                  <span className="font-semibold">{ordinarioPct.toFixed(2)}% anual</span> · Interés
+                  moratorio (3× ordinario):{' '}
+                  <span className="font-semibold">{moratorioPct.toFixed(2)}% anual</span>
+                  {spreadNum < 4 ? (
+                    <span className="ml-1 text-amber-700 dark:text-amber-300">
+                      — el spread mínimo es 4
+                    </span>
+                  ) : null}
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+                  Captura la TIIE para derivar el interés ordinario (TIIE + spread) y el moratorio
+                  (3× ordinario).
+                </p>
+              )}
 
               {/* Aval */}
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">

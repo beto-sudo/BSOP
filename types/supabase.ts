@@ -4709,9 +4709,10 @@ export type Database = {
           cd_aval_domicilio: string | null
           cd_aval_nombre: string | null
           cd_fecha_suscripcion: string | null
+          cd_interes_moratorio_pct: number | null
           cd_interes_ordinario_pct: number | null
           cd_plan_pagos: Json
-          cd_spread_moratorio_pct: number | null
+          cd_spread_ordinario_pct: number | null
           cd_tiie28_pct: number | null
           coda_row_id: string | null
           comision_gerencia: number | null
@@ -4793,9 +4794,10 @@ export type Database = {
           cd_aval_domicilio?: string | null
           cd_aval_nombre?: string | null
           cd_fecha_suscripcion?: string | null
+          cd_interes_moratorio_pct?: number | null
           cd_interes_ordinario_pct?: number | null
           cd_plan_pagos?: Json
-          cd_spread_moratorio_pct?: number | null
+          cd_spread_ordinario_pct?: number | null
           cd_tiie28_pct?: number | null
           coda_row_id?: string | null
           comision_gerencia?: number | null
@@ -4877,9 +4879,10 @@ export type Database = {
           cd_aval_domicilio?: string | null
           cd_aval_nombre?: string | null
           cd_fecha_suscripcion?: string | null
+          cd_interes_moratorio_pct?: number | null
           cd_interes_ordinario_pct?: number | null
           cd_plan_pagos?: Json
-          cd_spread_moratorio_pct?: number | null
+          cd_spread_ordinario_pct?: number | null
           cd_tiie28_pct?: number | null
           coda_row_id?: string | null
           comision_gerencia?: number | null
