@@ -53,6 +53,10 @@ import {
 } from '@/components/dilesa/cuadratura-ajustes';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
 import { camposCapturadosPorFase } from '@/lib/dilesa/captura/campos-capturados';
+import { FASE_ROLES, ROL_LABEL, rolesOpcionales } from '@/lib/dilesa/captura/fase-roles';
+import { evaluarCierre } from '@/lib/dilesa/copiloto-cierre';
+import { CopilotoCierre } from '@/components/dilesa/copiloto-cierre';
+import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { EstadoCuentaPrintable } from '@/components/dilesa/estado-cuenta-printable';
 import { ReciboCajaPrintable } from '@/components/dilesa/recibo-caja-printable';
 import { useTriggerPrint } from '@/components/print';
@@ -223,30 +227,6 @@ const ESTADO_LABEL: Record<string, string> = {
   desasignada: 'Desasignada',
 };
 
-const ROL_LABEL: Record<string, string> = {
-  factura: 'Factura',
-  aprobacion_credito: 'Aprobación de crédito',
-  constancia_credito_titular: 'Constancia de crédito (titular)',
-  constancia_credito_cotitular: 'Constancia de crédito (co-titular)',
-  aviso_pld: 'Aviso PLD',
-  avaluo_comercial: 'Avalúo comercial',
-  contrato_promesa: 'Contrato promesa de compraventa',
-  solicitud_asignacion: 'Solicitud de asignación',
-  recibos_caja: 'Recibos de caja',
-  expediente_digital: 'Expediente digital',
-  ficu: 'FICU',
-  aviso_privacidad: 'Aviso de privacidad',
-  carta_instruccion_notarial: 'Carta instrucción notarial',
-  checklist_entrega: 'Checklist de entrega',
-  checklist_pre_entrega: 'Checklist pre-entrega',
-  validacion_patronal: 'Validación patronal',
-  nota_credito: 'Nota de crédito',
-  pagare: 'Pagaré',
-  imagen_detonacion: 'Imagen de detonación',
-  recibo_caja: 'Recibo de caja',
-  comprobante_deposito: 'Comprobante de depósito',
-};
-
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN',
@@ -259,28 +239,6 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
  * concluirla. La UI muestra los cargados como chips clickeables y los
  * faltantes como chips outline gris.
  */
-const FASE_ROLES: Record<string, string[]> = {
-  'Solicitud de Asignación': ['solicitud_asignacion'],
-  Asignada: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'],
-  Formalizada: ['contrato_promesa'],
-  'Solicitud de Avalúo': [],
-  'Avalúo Cerrado': ['avaluo_comercial'],
-  // Beto: las Constancias de Crédito (titular + co-titular) van en Inscrita
-  // (el banco las entrega al inscribir el crédito). La Carta de instrucción
-  // notarial queda en Dictaminada (sale después con el dictamen jurídico).
-  Inscrita: ['constancia_credito_titular', 'constancia_credito_cotitular'],
-  'Solicitud de Dictaminación': ['aprobacion_credito'],
-  Dictaminada: ['carta_instruccion_notarial', 'condiciones_financieras'],
-  'Validación Patronal': ['validacion_patronal'],
-  'Firmas Programadas': [],
-  Escriturada: ['pagare'],
-  Detonada: ['imagen_detonacion'],
-  Facturada: ['factura', 'nota_credito', 'aviso_pld'],
-  'Preparada para Entrega': ['checklist_pre_entrega'],
-  Entregada: ['checklist_entrega'],
-  'Conformidad del Cliente': [],
-  'Operación Terminada': [],
-};
 
 /**
  * Slugs de captura disponibles — mapea posición de fase → slug de la
@@ -304,7 +262,7 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   14: '14-preparada-entrega',
   15: '15-entregada',
   16: '16-conformidad',
-  // 17 → próximo PR (cierre con copiloto, S4+S5 dilesa-ventas-expediente)
+  17: '17-operacion-terminada',
 };
 
 /**
@@ -384,6 +342,8 @@ function DetailInner() {
     'operacion'
   );
   const { permissions } = usePermissions();
+  // Scope del rol Vendedor: solo sus propias ventas (pedido de Beto).
+  const scopeVendedor = useScopeVendedorDilesa();
   const [cuadInputs, setCuadInputs] = useState<CuadraturaInputsStr>({
     descuentoPrecio: '',
     descuentoEquipamiento: '',
@@ -848,6 +808,32 @@ function DetailInner() {
     [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit, comprobantesPorAbono]
   );
 
+  // Copiloto de cierre (S4): qué falta para Operación Terminada.
+  const copiloto = useMemo(() => {
+    const opcionales = venta
+      ? rolesOpcionales({
+          monto_credito_cotitular: venta.monto_credito_cotitular,
+          monto_credito_directo: venta.monto_credito_directo,
+          monto_nota_credito: venta.monto_nota_credito,
+          tipo_credito: venta.tipo_credito,
+        })
+      : new Set<string>();
+    const docsFaltantes = pipelineRows.flatMap((r) =>
+      r.faltantes
+        .filter((rol) => !opcionales.has(rol))
+        .map((rol) => ({ fase: r.nombre, rol, label: ROL_LABEL[rol] ?? rol }))
+    );
+    return evaluarCierre(
+      {
+        fases: pipelineRows.map((r) => ({ pos: r.pos, nombre: r.nombre, alcanzada: r.alcanzada })),
+        docsFaltantes,
+        saldoCliente: cuadratura.saldoCliente,
+        cubierta: venta?.valor_escrituracion == null ? null : cuadratura.cubierta,
+      },
+      (n) => moneyFmt.format(n)
+    );
+  }, [venta, pipelineRows, cuadratura]);
+
   if (loading) {
     return (
       <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -865,6 +851,23 @@ function DetailInner() {
         <BackLink />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
+        </div>
+      </div>
+    );
+  }
+
+  // Vendedor scoped: no puede abrir ventas de otros asesores.
+  if (
+    !scopeVendedor.loading &&
+    scopeVendedor.soloVendedor &&
+    venta.vendedor_usuario_id !== scopeVendedor.userId
+  ) {
+    return (
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <BackLink />
+        <div className="rounded-lg border border-amber-400/40 bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          Esta operación pertenece a otro asesor. Tu acceso está limitado a tus propios clientes y
+          ventas.
         </div>
       </div>
     );
@@ -1121,6 +1124,12 @@ function DetailInner() {
 
       {tab === 'operacion' ? (
         <div className="space-y-6">
+          <CopilotoCierre
+            resultado={copiloto}
+            ventaId={venta.id}
+            fase17Cerrada={pipelineRows.find((r) => r.pos === 17)?.alcanzada === true}
+            fecha17={pipelineRows.find((r) => r.pos === 17)?.fecha ?? null}
+          />
           <div className="flex flex-wrap gap-2">
             <PdfDownloadLink
               ventaId={venta.id}
