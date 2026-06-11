@@ -307,7 +307,7 @@ expediente, copiloto), no reescritura.
   histórico, `unidad_id` ya era correcto); la #62 es el registro de prueba
   "ADALBERTO SANTOS PRUEBA" — excluido, sigue desasignada. La regla quedó
   corregida también en `import_dilesa_ventas.ts` por si se usa el sync
-  manual de rescate.
+  manual de rescate (#842).
 
 ## Decisiones registradas
 
