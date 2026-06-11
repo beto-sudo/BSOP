@@ -62,6 +62,7 @@ import type {
   UsuarioEmpresa,
 } from './actions';
 import { nestModulosByHub, shortChildName } from './modulos-tree';
+import { requisitosFaltantes } from '@/lib/permissions-deps';
 import {
   createEmpresa,
   updateEmpresa,
@@ -69,6 +70,7 @@ import {
   updateRolRecord,
   deleteRolRecord,
   upsertPermisoRol,
+  upsertPermisosRolBatch,
   createUsuarioCore,
   updateUsuarioNombre,
   setUsuarioEmpresaAcceso,
@@ -296,6 +298,48 @@ export function AccesoClient({
         await upsertPermisoRol(rolId, m.id, on, on);
       }
     });
+  }
+
+  /**
+   * Toggle de un permiso CON sus requisitos de navegación (accesos-intuitivos
+   * S1): al activar lectura o escritura, los slugs que `MODULE_DEPS` declara
+   * como requisito se activan en LECTURA (la escritura nunca se otorga
+   * implícita) y se avisa qué se agregó y por qué. Apagar no arrastra nada.
+   */
+  function setPermisoConRequisitos(
+    rol: RolRecord,
+    mod: Modulo,
+    lectura: boolean,
+    escritura: boolean
+  ) {
+    const items = [{ modulo_id: mod.id, acceso_lectura: lectura, acceso_escritura: escritura }];
+    let aviso: string | null = null;
+    if (lectura || escritura) {
+      const modulosEmpresa = modulosParaEmpresa(modulos, rol.empresa_id);
+      const conLectura = new Set(
+        modulosEmpresa.filter((m) => getPermisoRol(rol.id, m.id)?.acceso_lectura).map((m) => m.slug)
+      );
+      const requeridos = requisitosFaltantes(mod.slug, conLectura)
+        .map((slug) => modulosEmpresa.find((m) => m.slug === slug))
+        .filter((m): m is Modulo => Boolean(m) && m!.id !== mod.id);
+      for (const req of requeridos) {
+        items.push({
+          modulo_id: req.id,
+          acceso_lectura: true,
+          acceso_escritura: getPermisoRol(rol.id, req.id)?.acceso_escritura ?? false,
+        });
+      }
+      if (requeridos.length > 0) {
+        aviso = `Se activó también (lectura): ${requeridos
+          .map((m) => m.nombre)
+          .join(', ')} — ${mod.nombre} lo requiere para llegar ahí.`;
+      }
+    }
+    const msg = aviso;
+    run(
+      () => upsertPermisosRolBatch(rol.id, items),
+      msg ? () => setToast({ kind: 'success', msg }) : undefined
+    );
   }
 
   function getUserEmpresas(userId: string): UsuarioEmpresa[] {
@@ -618,32 +662,53 @@ export function AccesoClient({
                               const renderRow = (mod: Modulo, dentroDe?: Modulo) => {
                                 const perm = getPermisoRol(selectedRol.id, mod.id);
                                 const esHub = !dentroDe && hijos.length > 0;
+                                // Naming de negocio (accesos-intuitivos S1): la
+                                // descripción dice qué abre el permiso; el slug
+                                // técnico queda como tooltip.
+                                const descripcion = mod.descripcion?.trim() || null;
                                 return (
                                   <TableRow
                                     key={mod.id}
                                     className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
                                   >
-                                    <TableCell className="text-sm dark:text-white/80 text-[var(--text)]/80">
+                                    <TableCell
+                                      title={mod.slug}
+                                      className="text-sm dark:text-white/80 text-[var(--text)]/80"
+                                    >
                                       {dentroDe ? (
-                                        <span className="flex items-center gap-2 pl-6">
+                                        <span className="flex items-start gap-2 pl-6">
                                           <span
                                             aria-hidden
                                             className="text-xs dark:text-white/25 text-[var(--text)]/25"
                                           >
                                             └
                                           </span>
-                                          {shortChildName(mod, dentroDe)}
+                                          <span>
+                                            {shortChildName(mod, dentroDe)}
+                                            {descripcion ? (
+                                              <span className="block text-[11px] leading-snug dark:text-white/40 text-[var(--text-subtle)]">
+                                                {descripcion}
+                                              </span>
+                                            ) : null}
+                                          </span>
                                         </span>
                                       ) : esHub ? (
                                         <span className="flex items-center justify-between gap-3">
-                                          <span className="flex items-center gap-2">
-                                            {mod.nombre}
-                                            <span
-                                              title="Hub con pestañas: aparece en el menú si este módulo o cualquier sub-módulo tiene Lectura. Cada sub-módulo gobierna su pestaña."
-                                              className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide dark:text-white/45 text-[var(--text-subtle)]"
-                                            >
-                                              Hub
+                                          <span>
+                                            <span className="flex items-center gap-2">
+                                              {mod.nombre}
+                                              <span
+                                                title="Hub con pestañas: aparece en el menú si este módulo o cualquier sub-módulo tiene Lectura. Cada sub-módulo gobierna su pestaña."
+                                                className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide dark:text-white/45 text-[var(--text-subtle)]"
+                                              >
+                                                Hub
+                                              </span>
                                             </span>
+                                            {descripcion ? (
+                                              <span className="block text-[11px] leading-snug dark:text-white/40 text-[var(--text-subtle)]">
+                                                {descripcion}
+                                              </span>
+                                            ) : null}
                                           </span>
                                           <span className="flex shrink-0 items-center gap-1.5 text-[11px]">
                                             <button
@@ -680,7 +745,14 @@ export function AccesoClient({
                                           </span>
                                         </span>
                                       ) : (
-                                        mod.nombre
+                                        <span>
+                                          {mod.nombre}
+                                          {descripcion ? (
+                                            <span className="block text-[11px] leading-snug dark:text-white/40 text-[var(--text-subtle)]">
+                                              {descripcion}
+                                            </span>
+                                          ) : null}
+                                        </span>
                                       )}
                                     </TableCell>
                                     <TableCell className="text-center">
@@ -689,13 +761,11 @@ export function AccesoClient({
                                         disabled={isPending}
                                         checked={perm?.acceso_lectura ?? false}
                                         onChange={(e) => {
-                                          run(() =>
-                                            upsertPermisoRol(
-                                              selectedRol.id,
-                                              mod.id,
-                                              e.target.checked,
-                                              perm?.acceso_escritura ?? false
-                                            )
+                                          setPermisoConRequisitos(
+                                            selectedRol,
+                                            mod,
+                                            e.target.checked,
+                                            perm?.acceso_escritura ?? false
                                           );
                                         }}
                                         className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
@@ -707,13 +777,11 @@ export function AccesoClient({
                                         disabled={isPending}
                                         checked={perm?.acceso_escritura ?? false}
                                         onChange={(e) => {
-                                          run(() =>
-                                            upsertPermisoRol(
-                                              selectedRol.id,
-                                              mod.id,
-                                              perm?.acceso_lectura ?? false,
-                                              e.target.checked
-                                            )
+                                          setPermisoConRequisitos(
+                                            selectedRol,
+                                            mod,
+                                            perm?.acceso_lectura ?? false,
+                                            e.target.checked
                                           );
                                         }}
                                         className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"

@@ -13,7 +13,14 @@ import type { Modulo } from './actions';
 let counter = 0;
 function mod(slug: string, nombre: string): Modulo {
   counter += 1;
-  return { id: `m-${counter}`, slug, nombre, empresa_id: 'e-1', seccion: 'operaciones' };
+  return {
+    id: `m-${counter}`,
+    slug,
+    nombre,
+    descripcion: null,
+    empresa_id: 'e-1',
+    seccion: 'operaciones',
+  };
 }
 
 describe('nestModulosByHub', () => {
