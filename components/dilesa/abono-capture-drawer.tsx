@@ -84,11 +84,13 @@ export function AbonoCaptureDrawer({
 }: AbonoCaptureDrawerProps) {
   const toast = useToast();
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [recibo, setRecibo] = useState<File | null>(null);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
 
   const reset = () => {
     form.reset(defaults);
     setComprobante(null);
+    setRecibo(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -119,26 +121,30 @@ export function AbonoCaptureDrawer({
       return;
     }
 
-    // Sube el comprobante ligado al abono recién creado (deferred upload,
+    // Sube los adjuntos ligados al abono recién creado (deferred upload,
     // ADR-022): el abono ya existe, así que tenemos su id como entidadId.
-    if (comprobante && typeof pagoId === 'string') {
-      const path = buildAdjuntoPath({
-        empresa: 'dilesa',
-        entidad: 'cxc_pagos',
-        entidadId: pagoId,
-        filename: comprobante.name,
-      });
-      const { error: upErr } = await sb.storage.from('adjuntos').upload(path, comprobante, {
-        contentType: comprobante.type || 'application/octet-stream',
-        upsert: false,
-      });
-      if (upErr) {
-        toast.add({
-          title: 'Abono registrado, pero el comprobante no se subió',
-          description: getSupabaseErrorMessage(upErr, 'Reintenta adjuntar el comprobante.'),
-          type: 'error',
+    // Roles espejo del módulo Coda "Depositos Clientes": el comprobante del
+    // depósito lo trae ventas; el recibo de caja / factura lo emite CxC.
+    if (typeof pagoId === 'string') {
+      const subirAdjunto = async (file: File, rol: string, etiqueta: string) => {
+        const path = buildAdjuntoPath({
+          empresa: 'dilesa',
+          entidad: 'cxc_pagos',
+          entidadId: pagoId,
+          filename: file.name,
         });
-      } else {
+        const { error: upErr } = await sb.storage.from('adjuntos').upload(path, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        });
+        if (upErr) {
+          toast.add({
+            title: `Abono registrado, pero ${etiqueta} no se subió`,
+            description: getSupabaseErrorMessage(upErr, 'Reintenta adjuntarlo desde el abono.'),
+            type: 'error',
+          });
+          return;
+        }
         await sb
           .schema('erp')
           .from('adjuntos')
@@ -146,12 +152,15 @@ export function AbonoCaptureDrawer({
             empresa_id: empresaId,
             entidad_tipo: 'cxc_pago',
             entidad_id: pagoId,
-            rol: 'comprobante',
-            nombre: comprobante.name,
+            rol,
+            nombre: file.name,
             url: path,
-            tipo_mime: comprobante.type || null,
+            tipo_mime: file.type || null,
           });
-      }
+      };
+
+      if (comprobante) await subirAdjunto(comprobante, 'comprobante_deposito', 'el comprobante');
+      if (recibo) await subirAdjunto(recibo, 'recibo_caja', 'el recibo de caja');
     }
 
     toast.add({ title: 'Abono registrado', type: 'success' });
@@ -264,10 +273,23 @@ export function AbonoCaptureDrawer({
           <div>
             <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">Comprobante</span>
             <WizardFileSlot
-              role="comprobante"
-              label="Comprobante del pago"
+              role="comprobante_deposito"
+              label="Comprobante del depósito"
               file={comprobante}
               onChange={setComprobante}
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+            />
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
+              Recibo de caja / factura
+            </span>
+            <WizardFileSlot
+              role="recibo_caja"
+              label="Recibo de caja o factura (opcional)"
+              file={recibo}
+              onChange={setRecibo}
               accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
             />
           </div>

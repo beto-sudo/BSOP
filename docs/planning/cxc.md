@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Limpieza de ~$2.0M en saldos a favor (185 ventas, depósitos Infonavit/Fovissste capturados ≥ precio — requiere regla + OK de Beto). Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Liquidación histórica de $721.7M aplicada y verificada 2026-06-10
+**Próximo hito:** Aplicar (OK de Beto) la reversión de LIQ-HIST en ventas en flujo — migración `20260611182924` lista sin aplicar (31 ventas / 44 pagos / $10.49M con escritura ≥ mar-2026 que el bucket por fase liquidó pese a seguir cobrando). Luego: limpieza de ~$2.0M en saldos a favor (185 ventas) + Sprint 4 (recordatorios) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-11 (abono de institución en Cobranza detona la venta — trigger CxC→F12, un solo registro cierra dinero y proceso)
+**Última actualización:** 2026-06-11 (falso positivo de la liquidación histórica detectado y reversión preparada; captura de recibo de caja cerrada en UI)
 
 ## Problema
 
@@ -211,6 +211,39 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Decisiones registradas
 
+### 2026-06-11 — El bucket "cerrada" por fase tiene falso positivo en ventas recientes; reversión acotada por fecha de escritura
+
+Beto detectó un abono fantasma de $1,622 (12-may) en la venta de Josue
+Daniel Cruz Valverde (M10-L23-LDLE-ISC, fase Detonada, escritura
+2026-05-12): era el LIQ-HIST de la liquidación histórica. Causa: el
+bucket clasificó "cerrada = ya cobrada en la realidad" por fase
+(`Escriturada/Detonada/Facturada/...`) sin piso de fecha hacia el
+presente, pero las ventas con escritura reciente siguen cobrando — el
+pago institucional llega semanas después de escriturar (en esta misma
+venta el Infonavit real entró el 1-jun) y los residuos de cliente se
+cobran al final. Regla de corrección: revertir LIQ-HIST donde
+`fecha_escritura >= 2026-03-01` y monto > 0 (31 ventas / 44 pagos /
+$10,485,164.71, de los cuales $9.86M son escrituras may–jun con pago
+institucional sintético que tapaba cobranza Infonavit en tránsito).
+Migración `20260611182924_cxc_revert_liq_hist_ventas_en_flujo.sql`
+data-only, self-verificante e idempotente — **se aplica solo con OK
+explícito de Beto** (cambio financiero).
+
+### 2026-06-11 — Captura del recibo de caja: paridad con las 2 columnas de Coda
+
+El import de Coda sí trajo las dos columnas de "Depositos Clientes"
+(`Comprobante Deposito` → adjunto rol `comprobante_deposito`, 753 filas;
+`PDF Recibo de Caja` → rol `recibo_caja`, 747 filas) colgadas del
+`cxc_pago`, y el estado de cuenta las muestra; pero la captura nativa
+solo subía un archivo con rol `comprobante` (rol sin datos en prod) y no
+había forma de adjuntar el recibo/factura DESPUÉS del registro — que es
+el flujo real de CxC. Como la cuadratura deriva "Valor Facturado" de
+`tieneRecibo` (rol `recibo_caja`), los abonos nativos jamás sumaban.
+Cierre: slot opcional "Recibo de caja / factura" en
+`<AbonoCaptureDrawer>` + el rol del comprobante alineado a
+`comprobante_deposito` + botón "Subir recibo" por fila de abono en el
+estado de cuenta del detalle de venta.
+
 ### 2026-06-10 — Beto aprueba la liquidación histórica de los 3 buckets
 
 Tras revisar el CSV de 948 ventas (`cxc_saldos_revision_2026-06-10.csv`),
@@ -267,6 +300,18 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-11 — Falso positivo del LIQ-HIST + captura de recibo de caja
+
+Diagnóstico de los 2 reportes de Beto sobre la venta M10-L23-LDLE-ISC
+(ver Decisiones registradas de hoy). Entregado: (1) migración de
+reversión `20260611182924` lista **sin aplicar** (la dispara Beto);
+(2) slot "Recibo de caja / factura" en el drawer de captura (compartido
+detalle-venta + cobranza) + botón "Subir recibo" por fila de abono sin
+recibo en el estado de cuenta, con rol `recibo_caja` (alimenta el Valor
+Facturado de la cuadratura); rol del comprobante de captura alineado a
+`comprobante_deposito` (espejo del import Coda; el rol `comprobante`
+tenía 0 filas en prod).
 
 ### 2026-06-11 — Abono de institución detona la venta (CxC → pipeline F12)
 
