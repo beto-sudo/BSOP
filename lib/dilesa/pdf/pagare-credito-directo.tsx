@@ -19,7 +19,12 @@ import { HeaderBand, FooterBand, Watermark } from './header-footer';
 export type PagareParcialidad = {
   num: number;
   fechaTexto: string;
+  /** Abono a capital. */
   montoFmt: string;
+  /** Interés ordinario del periodo — solo cuando la tasa es > 0. */
+  interesFmt?: string;
+  /** Capital + interés — solo cuando la tasa es > 0. */
+  pagoFmt?: string;
 };
 
 export type PagareCreditoDirectoData = {
@@ -41,6 +46,10 @@ export type PagareCreditoDirectoData = {
   montoTotalFmt: string;
   montoTotalLetra: string;
   parcialidades: PagareParcialidad[];
+  /** Totales del plan — interés/pago presentes solo con tasa ordinaria > 0. */
+  totalCapitalFmt: string;
+  totalInteresFmt?: string;
+  totalPagarFmt?: string;
   // Intereses
   interesOrdinarioPct: number | null;
   tiie28Pct: number | null;
@@ -95,6 +104,22 @@ const local = StyleSheet.create({
   tdNum: { width: '15%', padding: 3, fontSize: 8.5 },
   tdFecha: { width: '45%', padding: 3, fontSize: 8.5 },
   tdMonto: { width: '40%', padding: 3, fontSize: 8.5, textAlign: 'right' },
+  // Variante con interés desglosado (5 columnas).
+  thNumI: { width: '8%', padding: 3, fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
+  thFechaI: { width: '32%', padding: 3, fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
+  thImpI: {
+    width: '20%',
+    padding: 3,
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    textAlign: 'right',
+  },
+  tdNumI: { width: '8%', padding: 3, fontSize: 8.5 },
+  tdFechaI: { width: '32%', padding: 3, fontSize: 8.5 },
+  tdImpI: { width: '20%', padding: 3, fontSize: 8.5, textAlign: 'right' },
+  trTotal: { flexDirection: 'row', backgroundColor: colors.bgSoft },
+  tdTotalLabel: { padding: 3, fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
+  tdTotalMonto: { padding: 3, fontSize: 8.5, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
   clausula: { fontSize: 8.3, lineHeight: 1.35, marginBottom: 5, textAlign: 'justify' },
   firmaWrap: { marginTop: 30, flexDirection: 'row', justifyContent: 'space-between' },
   firmaCol: { width: '46%', alignItems: 'center' },
@@ -147,26 +172,66 @@ export function PagareCreditoDirectoPDF({ data }: { data: PagareCreditoDirectoDa
           {data.parcialidades.length === 1 ? 'exhibición' : 'parcialidades'}, en las fechas y por
           los importes siguientes, siendo el lugar de pago el domicilio del beneficiario:
         </Text>
-        <View style={local.table}>
-          <View style={local.trHead}>
-            <Text style={local.thNum}>No.</Text>
-            <Text style={local.thFecha}>Fecha de vencimiento</Text>
-            <Text style={local.thMonto}>Importe</Text>
-          </View>
-          {data.parcialidades.map((p) => (
-            <View style={local.tr} key={p.num}>
-              <Text style={local.tdNum}>{p.num}</Text>
-              <Text style={local.tdFecha}>{p.fechaTexto}</Text>
-              <Text style={local.tdMonto}>{p.montoFmt}</Text>
+        {tieneOrdinario ? (
+          <View style={local.table}>
+            <View style={local.trHead}>
+              <Text style={local.thNumI}>No.</Text>
+              <Text style={local.thFechaI}>Fecha de vencimiento</Text>
+              <Text style={local.thImpI}>Capital</Text>
+              <Text style={local.thImpI}>Interés ordinario</Text>
+              <Text style={local.thImpI}>Pago total</Text>
             </View>
-          ))}
-        </View>
+            {data.parcialidades.map((p) => (
+              <View style={local.tr} key={p.num}>
+                <Text style={local.tdNumI}>{p.num}</Text>
+                <Text style={local.tdFechaI}>{p.fechaTexto}</Text>
+                <Text style={local.tdImpI}>{p.montoFmt}</Text>
+                <Text style={local.tdImpI}>{p.interesFmt ?? '—'}</Text>
+                <Text style={local.tdImpI}>{p.pagoFmt ?? p.montoFmt}</Text>
+              </View>
+            ))}
+            <View style={local.trTotal}>
+              <Text style={[local.tdTotalLabel, { width: '40%' }]}>TOTAL</Text>
+              <Text style={[local.tdTotalMonto, { width: '20%' }]}>{data.totalCapitalFmt}</Text>
+              <Text style={[local.tdTotalMonto, { width: '20%' }]}>
+                {data.totalInteresFmt ?? '—'}
+              </Text>
+              <Text style={[local.tdTotalMonto, { width: '20%' }]}>
+                {data.totalPagarFmt ?? data.totalCapitalFmt}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={local.table}>
+            <View style={local.trHead}>
+              <Text style={local.thNum}>No.</Text>
+              <Text style={local.thFecha}>Fecha de vencimiento</Text>
+              <Text style={local.thMonto}>Importe</Text>
+            </View>
+            {data.parcialidades.map((p) => (
+              <View style={local.tr} key={p.num}>
+                <Text style={local.tdNum}>{p.num}</Text>
+                <Text style={local.tdFecha}>{p.fechaTexto}</Text>
+                <Text style={local.tdMonto}>{p.montoFmt}</Text>
+              </View>
+            ))}
+            <View style={local.trTotal}>
+              <Text style={[local.tdTotalLabel, { width: '60%' }]}>TOTAL</Text>
+              <Text style={[local.tdTotalMonto, { width: '40%' }]}>{data.totalCapitalFmt}</Text>
+            </View>
+          </View>
+        )}
 
         {tieneOrdinario ? (
           <Text style={local.clausula}>
             <Text style={local.bold}>INTERÉS ORDINARIO. </Text>La suerte principal generará un
-            interés ordinario a razón del {data.interesOrdinarioPct}% anual, pagadero junto con cada
-            parcialidad.
+            interés ordinario a razón del {data.interesOrdinarioPct}% anual, calculado sobre saldos
+            insolutos sobre la base de un año comercial de 360 días, pagadero junto con cada
+            parcialidad conforme al desglose de la tabla anterior
+            {data.totalInteresFmt && data.totalPagarFmt
+              ? `; los intereses ordinarios del plan ascienden a ${data.totalInteresFmt}, para un total a pagar de ${data.totalPagarFmt}`
+              : ''}
+            .
           </Text>
         ) : null}
 

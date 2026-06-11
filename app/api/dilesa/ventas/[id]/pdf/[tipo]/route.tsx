@@ -39,6 +39,7 @@ import {
   PagareCreditoDirectoPDF,
   type PagareCreditoDirectoData,
 } from '@/lib/dilesa/pdf/pagare-credito-directo';
+import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
@@ -499,16 +500,31 @@ export async function GET(
       [emp?.domicilio_municipio, emp?.domicilio_estado].filter(Boolean).join(', ') ||
       'Piedras Negras, Coahuila';
 
-    const parcialidades = (Array.isArray(cd.cd_plan_pagos) ? cd.cd_plan_pagos : []).map((p, i) => ({
-      num: Number(p?.num ?? i + 1),
-      fechaTexto: fmtFechaLarga(p?.fecha ?? null),
-      montoFmt: money2.format(Number(p?.monto ?? 0)),
-    }));
-
     const tiie = cd.cd_tiie28_pct != null ? Number(cd.cd_tiie28_pct) : null;
     const spread = cd.cd_spread_moratorio_pct != null ? Number(cd.cd_spread_moratorio_pct) : 4;
     const tasaMoratoria = tiie != null ? Math.round((tiie + spread) * 100) / 100 : null;
     const fechaSuscripcion = cd.cd_fecha_suscripcion ?? new Date().toISOString().slice(0, 10);
+
+    // Desglose de interés ordinario por parcialidad (mismo motor que la
+    // preview de la fase 10 — lib/dilesa/pagare-interes.ts).
+    const ordinarioPct =
+      cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : 0;
+    const desglose = desglosarPagare(
+      (Array.isArray(cd.cd_plan_pagos) ? cd.cd_plan_pagos : []).map((p) => ({
+        fecha: p?.fecha ?? '',
+        monto: Number(p?.monto ?? 0),
+      })),
+      ordinarioPct,
+      fechaSuscripcion
+    );
+    const parcialidades = desglose.parcialidades.map((p) => ({
+      num: p.num,
+      fechaTexto: fmtFechaLarga(p.fecha || null),
+      montoFmt: money2.format(p.capital),
+      ...(ordinarioPct > 0
+        ? { interesFmt: money2.format(p.interes), pagoFmt: money2.format(p.pago) }
+        : {}),
+    }));
 
     const data: PagareCreditoDirectoData = {
       folio: `PG-${identificacionInventario || id}`,
@@ -525,6 +541,13 @@ export async function GET(
       montoTotalFmt: money2.format(montoTotal),
       montoTotalLetra: formatMontoEnLetras(montoTotal),
       parcialidades,
+      totalCapitalFmt: money2.format(desglose.totalCapital),
+      ...(ordinarioPct > 0
+        ? {
+            totalInteresFmt: money2.format(desglose.totalInteres),
+            totalPagarFmt: money2.format(desglose.totalPagar),
+          }
+        : {}),
       interesOrdinarioPct:
         cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : null,
       tiie28Pct: tiie,

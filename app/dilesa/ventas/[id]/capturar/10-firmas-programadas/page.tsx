@@ -36,6 +36,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 
 type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
@@ -287,6 +288,19 @@ function CapturarFase10Body() {
   );
   const montoCDNum = Number(montoCD) || 0;
   const planCuadra = Math.abs(sumaPlan - montoCDNum) < 0.01 && montoCDNum > 0;
+
+  // Desglose de interés ordinario (mismo motor que el PDF del pagaré).
+  const ordinarioPct = Number(ordinario) || 0;
+  const desglose = useMemo(() => {
+    if (ordinarioPct <= 0) return null;
+    const filas = planPagos.filter((r) => r.fecha && Number(r.monto) > 0);
+    if (filas.length === 0) return null;
+    return desglosarPagare(
+      filas.map((r) => ({ fecha: r.fecha, monto: Number(r.monto) })),
+      ordinarioPct,
+      fechaSuscripcion || null
+    );
+  }, [planPagos, ordinarioPct, fechaSuscripcion]);
 
   // Cualquier edición del crédito directo invalida el "guardado" (hay que
   // re-guardar antes de generar el pagaré con datos frescos).
@@ -713,9 +727,53 @@ function CapturarFase10Body() {
                       : 'text-amber-700 dark:text-amber-300'
                   }`}
                 >
-                  Suma del plan: {money(sumaPlan)} / {money(montoCDNum)}{' '}
-                  {planCuadra ? '✓ cuadra' : '— debe igualar el monto del crédito'}
+                  Suma del plan (capital): {money(sumaPlan)} / {money(montoCDNum)}{' '}
+                  {planCuadra
+                    ? '✓ cuadra'
+                    : '— debe igualar el monto del crédito; el interés ordinario se calcula aparte'}
                 </p>
+
+                {desglose ? (
+                  <div className="mt-3 overflow-hidden rounded-md border border-[var(--border)]">
+                    <div className="border-b border-[var(--border)] bg-[var(--bg)]/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text)]/60">
+                      Desglose con interés ordinario ({ordinarioPct}% anual, saldos insolutos, año
+                      de 360 días) — así saldrá en el pagaré
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-[var(--text)]/50">
+                          <th className="px-3 py-1 text-left font-medium">No.</th>
+                          <th className="px-3 py-1 text-left font-medium">Vencimiento</th>
+                          <th className="px-3 py-1 text-right font-medium">Capital</th>
+                          <th className="px-3 py-1 text-right font-medium">Interés</th>
+                          <th className="px-3 py-1 text-right font-medium">Pago total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {desglose.parcialidades.map((p) => (
+                          <tr key={p.num} className="border-t border-[var(--border)]/60">
+                            <td className="px-3 py-1">{p.num}</td>
+                            <td className="px-3 py-1">
+                              {p.fecha}
+                              <span className="ml-1 text-[var(--text)]/40">({p.dias} días)</span>
+                            </td>
+                            <td className="px-3 py-1 text-right">{money(p.capital)}</td>
+                            <td className="px-3 py-1 text-right">{money(p.interes)}</td>
+                            <td className="px-3 py-1 text-right font-medium">{money(p.pago)}</td>
+                          </tr>
+                        ))}
+                        <tr className="border-t border-[var(--border)] bg-[var(--bg)]/40 font-semibold">
+                          <td className="px-3 py-1.5" colSpan={2}>
+                            Total
+                          </td>
+                          <td className="px-3 py-1.5 text-right">{money(desglose.totalCapital)}</td>
+                          <td className="px-3 py-1.5 text-right">{money(desglose.totalInteres)}</td>
+                          <td className="px-3 py-1.5 text-right">{money(desglose.totalPagar)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
 
               {/* Intereses */}
