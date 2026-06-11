@@ -4479,6 +4479,75 @@ export type Database = {
           },
         ]
       }
+      venta_encuestas: {
+        Row: {
+          calif_proceso: number | null
+          calif_vivienda: number | null
+          canal: string | null
+          comentario: string | null
+          created_at: string
+          empresa_id: string
+          estado: string
+          id: string
+          intentos: number
+          nps: number | null
+          programada_para: string
+          respondida_at: string | null
+          ultimo_envio_at: string | null
+          updated_at: string
+          venta_id: string
+        }
+        Insert: {
+          calif_proceso?: number | null
+          calif_vivienda?: number | null
+          canal?: string | null
+          comentario?: string | null
+          created_at?: string
+          empresa_id: string
+          estado?: string
+          id?: string
+          intentos?: number
+          nps?: number | null
+          programada_para: string
+          respondida_at?: string | null
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          venta_id: string
+        }
+        Update: {
+          calif_proceso?: number | null
+          calif_vivienda?: number | null
+          canal?: string | null
+          comentario?: string | null
+          created_at?: string
+          empresa_id?: string
+          estado?: string
+          id?: string
+          intentos?: number
+          nps?: number | null
+          programada_para?: string
+          respondida_at?: string | null
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venta_fase_catalogo: {
         Row: {
           created_at: string
@@ -11067,6 +11136,10 @@ export type Database = {
       }
       fn_cerrar_captura_levantamiento: {
         Args: { p_levantamiento_id: string }
+        Returns: undefined
+      }
+      fn_cxp_recalc_factura: {
+        Args: { p_factura_id: string }
         Returns: undefined
       }
       fn_es_direccion: { Args: { p_empresa_id: string }; Returns: boolean }
