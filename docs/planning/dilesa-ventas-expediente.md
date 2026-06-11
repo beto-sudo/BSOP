@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón de "workspace de operación" es replicable a las otras empresas)
 **Schemas afectados:** principalmente UI (Next.js App Router); `dilesa` (posible vista `v_venta_cuadratura` + columnas/slugs de fases 14-17), `core.modulos` (sub-slugs RBAC de 14-17). Reusa lo existente: `dilesa.ventas`, `dilesa.venta_fases`, `erp.adjuntos`, `erp.cxc_pagos`/`cxc_cargos`
 **Estado:** in_progress
-**Próximo hito:** Definir y construir Fases 16-17 (Comisión Pagada + Operación Terminada — Beto define campos). Luego S4 (copiloto de cierre) y S6 (cutover Coda de ventas)
+**Próximo hito:** Verificación final de Beto + S6 (cutover Coda de ventas: paridad final, apagar daily ventas/expediente, cortar accesos de captura) → cierre de la iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-10 (2c + F14/F15 + análisis IA notarial en prod)
+**Última actualización:** 2026-06-11 (pipeline 17/17 completo: F16 conformidad + F17 + copiloto + scope Vendedor)
 
 ## Problema
 
@@ -196,6 +196,21 @@ expediente, copiloto), no reescritura.
   en `erp.adjuntos.metadata.analisis_notarial` + expandible "Datos
   capturados" por fase en el pipeline (#799). Validado con el expediente
   real Arizpe Luna: extracción 100% exacta.
+
+- **2026-06-11 (F16):** "Comisión Pagada" → "Conformidad del Cliente" (#808):
+  encuesta posventa automatizada (trigger al cerrar F15 → envío D+2 → 2
+  recordatorios → Atención a Clientes; cron diario `dilesa-encuestas`).
+  Encuesta pública mobile vía magic link (NPS + 2 calificaciones +
+  comentario); responder cierra la fase sola. Migración aplicada (ledger
+  20260611003221). Las comisiones serán pantalla mensual aparte (futura
+  iniciativa).
+- **2026-06-11 (S4 + F17):** Copiloto de cierre en el workspace (#812): 4
+  verificaciones en lenguaje claro (pipeline 1-16, expediente documental con
+  docs condicionales eximidos, cuadratura cubierta, conformidad) + página F17
+  que re-verifica y sella "Operación Terminada". Pipeline 17/17 construido.
+- **2026-06-11 (scope Vendedor):** Verificación de Beto destapó que el
+  aislamiento por vendedor NO existía; implementado en capa app (#812):
+  rol Vendedor puro ve solo sus ventas/clientes y no abre detalles ajenos.
 
 ## Decisiones registradas
 
