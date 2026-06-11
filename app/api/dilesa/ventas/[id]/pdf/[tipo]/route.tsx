@@ -102,7 +102,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -136,6 +136,17 @@ export async function GET(
     [persona?.nombre, persona?.apellido_paterno, persona?.apellido_materno]
       .filter(Boolean)
       .join(' ') || '(sin nombre)';
+
+  // KYC efectivo: el form de captura persiste estos campos en erp.personas,
+  // pero las ventas importadas de Coda los traen per-venta en dilesa.ventas
+  // y nunca poblaron la persona. Gana la fuente con dato (persona primero).
+  // PEP es OR de ambas fuentes: nunca degradar un true.
+  const kycOcupacion = persona?.ocupacion ?? venta.ocupacion ?? null;
+  const kycFormaPago = persona?.forma_pago_kyc ?? venta.forma_pago ?? null;
+  const kycUsoEfectivo = persona?.uso_efectivo_kyc ?? venta.uso_efectivo ?? null;
+  const kycConocimientoDB =
+    persona?.conocimiento_dueno_beneficiario ?? venta.conocimiento_dueno_beneficiario ?? null;
+  const kycEsPep = Boolean(persona?.es_pep || venta.es_pep);
 
   // Vendedor (asesor de ventas) — el form persiste `vendedor_usuario_id`
   // (FK a core.usuarios); el campo legacy `venta.vendedor` (text) puede
@@ -670,7 +681,7 @@ export async function GET(
         curp: persona?.curp ?? null,
         rfc: persona?.rfc ?? null,
         estadoCivil: null, // TODO sprint-7c: capturar estado civil en form
-        profesion: persona?.ocupacion ?? null,
+        profesion: kycOcupacion,
         domicilio: persona?.domicilio ?? null,
         ineNumero: venta.ine_numero ?? null,
       },
@@ -705,15 +716,12 @@ export async function GET(
   }
 
   if (tipo === 'ficu') {
-    // KYC fields viven en erp.personas (Sprint 7c-2). El form de Solicitud
-    // los persiste ahí, no en dilesa.ventas. Leer desde persona evita el
-    // bug de "FICU vacío" cuando los fields de la venta nunca se poblaron.
     const riesgo = evaluarRiesgo({
       tipoPersona: persona?.tipo_persona,
       nacionalidad: persona?.nacionalidad,
-      esPep: persona?.es_pep,
-      formaPago: persona?.forma_pago_kyc,
-      usoEfectivo: persona?.uso_efectivo_kyc,
+      esPep: kycEsPep,
+      formaPago: kycFormaPago,
+      usoEfectivo: kycUsoEfectivo,
     });
     const fechaNac = persona?.fecha_nacimiento
       ? new Date(`${persona.fecha_nacimiento}T12:00:00`).toLocaleDateString('es-MX', {
@@ -742,11 +750,11 @@ export async function GET(
       correo: persona?.email ?? '',
       personalidad: (persona?.tipo_persona ?? 'persona física').toUpperCase(),
       nacionalidad: (persona?.nacionalidad ?? '').toUpperCase(),
-      esPep: !!persona?.es_pep,
-      formaPago: (persona?.forma_pago_kyc ?? '').toUpperCase(),
-      usoEfectivo: (persona?.uso_efectivo_kyc ?? '').toUpperCase(),
-      ocupacion: (persona?.ocupacion ?? '').toUpperCase(),
-      conocimientoDuenoBeneficiario: persona?.conocimiento_dueno_beneficiario ?? '—',
+      esPep: kycEsPep,
+      formaPago: (kycFormaPago ?? '').toUpperCase(),
+      usoEfectivo: (kycUsoEfectivo ?? '').toUpperCase(),
+      ocupacion: (kycOcupacion ?? '').toUpperCase(),
+      conocimientoDuenoBeneficiario: kycConocimientoDB ?? '—',
       criteriosRiesgo: riesgo.criterios,
       scoreTotal: riesgo.scoreTotal,
       clasificacionRiesgo: riesgo.clasificacion,
