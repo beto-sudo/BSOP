@@ -1,5 +1,10 @@
 import { type ReactNode } from 'react';
-import { ModulePage, ModuleHeader, RoutedModuleTabs } from '@/components/module-page';
+import {
+  HubAccessRedirect,
+  ModulePage,
+  ModuleHeader,
+  RoutedModuleTabs,
+} from '@/components/module-page';
 
 /**
  * Layout compartido del módulo Inventario (RDB).
@@ -38,6 +43,7 @@ export default function InventarioLayout({ children }: { children: ReactNode }) 
   return (
     <ModulePage>
       <ModuleHeader title="Inventario" subtitle="Control de stock y movimientos" />
+      <HubAccessRedirect tabs={TABS} />
       <RoutedModuleTabs tabs={TABS} />
       {children}
     </ModulePage>

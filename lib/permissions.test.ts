@@ -2,10 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 
 import {
   ADMIN_ONLY_ROUTES,
+  HUB_PARENT_BY_ROUTE,
   ROUTE_TO_EMPRESA,
   ROUTE_TO_MODULE,
   canAccessEmpresa,
   canAccessModulo,
+  canAccessModuloOrChild,
+  canSeeNavRoute,
   fetchPermissionsForUserId,
   fetchUserPermissions,
   isAdminOnly,
@@ -110,6 +113,89 @@ describe('canAccessModulo', () => {
     });
     expect(canAccessModulo(perms, 'rdb.ventas', 'read')).toBe(false);
     expect(canAccessModulo(perms, 'rdb.ventas', 'write')).toBe(false);
+  });
+});
+
+describe('canAccessModuloOrChild', () => {
+  it('returns true with direct access to the umbrella slug', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.compras', { read: true, write: false }]]),
+    });
+    expect(canAccessModuloOrChild(perms, 'dilesa.compras')).toBe(true);
+  });
+
+  it('returns true when only a sub-slug is readable', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.compras.requisiciones', { read: true, write: true }]]),
+    });
+    expect(canAccessModuloOrChild(perms, 'dilesa.compras')).toBe(true);
+  });
+
+  it('ignores sub-slugs whose flags are false (deny exception)', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.compras.requisiciones', { read: false, write: false }]]),
+    });
+    expect(canAccessModuloOrChild(perms, 'dilesa.compras')).toBe(false);
+  });
+
+  it('does not match sibling modules that merely share a string prefix', () => {
+    const perms = makePerms({
+      // `dilesa.comprasx` no es hijo de `dilesa.compras` — el prefix incluye el punto.
+      modulos: new Map([['dilesa.comprasx', { read: true, write: true }]]),
+    });
+    expect(canAccessModuloOrChild(perms, 'dilesa.compras')).toBe(false);
+  });
+
+  it('checks the write flag in write mode', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.compras.requisiciones', { read: true, write: false }]]),
+    });
+    expect(canAccessModuloOrChild(perms, 'dilesa.compras', 'write')).toBe(false);
+  });
+});
+
+describe('canSeeNavRoute', () => {
+  it('shows routes without a module mapping (empresa-gated)', () => {
+    expect(canSeeNavRoute(makePerms(), '/dilesa/sin-mapeo')).toBe(true);
+  });
+
+  it('shows a flat module entry only with direct access', () => {
+    const conAcceso = makePerms({
+      modulos: new Map([['dilesa.proveedores', { read: true, write: false }]]),
+    });
+    expect(canSeeNavRoute(conAcceso, '/dilesa/proveedores')).toBe(true);
+    expect(canSeeNavRoute(makePerms(), '/dilesa/proveedores')).toBe(false);
+  });
+
+  it('shows a hub entry when only the umbrella parent is readable', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.compras', { read: true, write: true }]]),
+    });
+    expect(canSeeNavRoute(perms, '/dilesa/compras')).toBe(true);
+  });
+
+  it('shows a hub entry with partial sub-slug access (caso Nahum)', () => {
+    // Rol con Requisiciones/Cotizaciones/Recepciones pero SIN el sub-slug del
+    // primer tab (`dilesa.compras.ordenes`, al que mapea la URL default): el
+    // hub debe seguir visible — antes de `canSeeNavRoute` el sidebar lo
+    // ocultaba por completo.
+    const perms = makePerms({
+      modulos: new Map([
+        ['dilesa.compras', { read: true, write: true }],
+        ['dilesa.compras.requisiciones', { read: true, write: true }],
+        ['dilesa.compras.cotizaciones', { read: true, write: true }],
+        ['dilesa.compras.recepciones', { read: true, write: true }],
+      ]),
+    });
+    expect(canAccessModulo(perms, ROUTE_TO_MODULE['/dilesa/compras'])).toBe(false);
+    expect(canSeeNavRoute(perms, '/dilesa/compras')).toBe(true);
+  });
+
+  it('hides a hub entry when nothing in the hub is readable', () => {
+    const perms = makePerms({
+      modulos: new Map([['dilesa.ventas.lista', { read: true, write: false }]]),
+    });
+    expect(canSeeNavRoute(perms, '/dilesa/compras')).toBe(false);
   });
 });
 
@@ -353,6 +439,23 @@ describe('ROUTE_TO_MODULE ↔ core.modulos sync', () => {
     // (a) agregarlo a EXPECTED_DB_MODULE_SLUGS arriba y (b) crear una
     // migración SQL con INSERT en `core.modulos` + backfill de permisos.
     // Ver BSOP/CLAUDE.md → "Reglas DB" → "Liberación de módulo nuevo".
+  });
+
+  it('every hub landing in HUB_PARENT_BY_ROUTE is consistent', () => {
+    for (const [href, parentSlug] of Object.entries(HUB_PARENT_BY_ROUTE)) {
+      // La URL del hub existe en ROUTE_TO_MODULE (es una entrada real de nav).
+      expect(ROUTE_TO_MODULE[href], `${href} falta en ROUTE_TO_MODULE`).toBeTruthy();
+      // El slug mapeado es un sub-slug del padre umbrella declarado.
+      expect(
+        ROUTE_TO_MODULE[href].startsWith(`${parentSlug}.`),
+        `${href}: ${ROUTE_TO_MODULE[href]} no es sub-slug de ${parentSlug}`
+      ).toBe(true);
+      // El padre existe como módulo en DB (mismo contrato que el test de arriba).
+      expect(
+        EXPECTED_DB_MODULE_SLUGS.has(parentSlug),
+        `${parentSlug} falta en EXPECTED_DB_MODULE_SLUGS / core.modulos`
+      ).toBe(true);
+    }
   });
 
   // Nota: no validamos uniqueness de slugs en `ROUTE_TO_MODULE`.

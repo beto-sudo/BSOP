@@ -61,6 +61,7 @@ import type {
   UsuarioCore,
   UsuarioEmpresa,
 } from './actions';
+import { nestModulosByHub, shortChildName } from './modulos-tree';
 import {
   createEmpresa,
   updateEmpresa,
@@ -282,6 +283,19 @@ export function AccesoClient({
 
   function getPermisoRol(rolId: string, moduloId: string): PermisoRol | undefined {
     return permisosRol.find((p) => p.rol_id === rolId && p.modulo_id === moduloId);
+  }
+
+  /**
+   * Acciones de grupo de un hub (fila padre): "Todo" da lectura+escritura al
+   * padre y todos sus sub-módulos; "Nada" los apaga. Secuencial a propósito —
+   * son pocos upserts y `run` ya da un solo toast/transition para el lote.
+   */
+  function setGrupoPermisos(rolId: string, mods: Modulo[], on: boolean) {
+    run(async () => {
+      for (const m of mods) {
+        await upsertPermisoRol(rolId, m.id, on, on);
+      }
+    });
   }
 
   function getUserEmpresas(userId: string): UsuarioEmpresa[] {
@@ -560,7 +574,9 @@ export function AccesoClient({
                       {selectedRol.nombre}
                     </p>
                     <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
-                      Permisos por módulo — haz clic para cambiar
+                      Permisos por módulo — haz clic para cambiar. Un hub aparece en el menú si él o
+                      cualquiera de sus sub-módulos tiene Lectura; cada sub-módulo gobierna su
+                      pestaña.
                     </p>
                   </div>
                   <Table>
@@ -598,53 +614,119 @@ export function AccesoClient({
                                 {grupo.label}
                               </TableCell>
                             </TableRow>
-                            {grupo.modulos.map((mod) => {
-                              const perm = getPermisoRol(selectedRol.id, mod.id);
+                            {nestModulosByHub(grupo.modulos).map(({ modulo: padre, hijos }) => {
+                              const renderRow = (mod: Modulo, dentroDe?: Modulo) => {
+                                const perm = getPermisoRol(selectedRol.id, mod.id);
+                                const esHub = !dentroDe && hijos.length > 0;
+                                return (
+                                  <TableRow
+                                    key={mod.id}
+                                    className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
+                                  >
+                                    <TableCell className="text-sm dark:text-white/80 text-[var(--text)]/80">
+                                      {dentroDe ? (
+                                        <span className="flex items-center gap-2 pl-6">
+                                          <span
+                                            aria-hidden
+                                            className="text-xs dark:text-white/25 text-[var(--text)]/25"
+                                          >
+                                            └
+                                          </span>
+                                          {shortChildName(mod, dentroDe)}
+                                        </span>
+                                      ) : esHub ? (
+                                        <span className="flex items-center justify-between gap-3">
+                                          <span className="flex items-center gap-2">
+                                            {mod.nombre}
+                                            <span
+                                              title="Hub con pestañas: aparece en el menú si este módulo o cualquier sub-módulo tiene Lectura. Cada sub-módulo gobierna su pestaña."
+                                              className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide dark:text-white/45 text-[var(--text-subtle)]"
+                                            >
+                                              Hub
+                                            </span>
+                                          </span>
+                                          <span className="flex shrink-0 items-center gap-1.5 text-[11px]">
+                                            <button
+                                              type="button"
+                                              disabled={isPending}
+                                              onClick={() =>
+                                                setGrupoPermisos(
+                                                  selectedRol.id,
+                                                  [mod, ...hijos],
+                                                  true
+                                                )
+                                              }
+                                              className="text-[var(--accent)] hover:underline disabled:opacity-50"
+                                            >
+                                              Todo
+                                            </button>
+                                            <span className="dark:text-white/20 text-[var(--text)]/20">
+                                              ·
+                                            </span>
+                                            <button
+                                              type="button"
+                                              disabled={isPending}
+                                              onClick={() =>
+                                                setGrupoPermisos(
+                                                  selectedRol.id,
+                                                  [mod, ...hijos],
+                                                  false
+                                                )
+                                              }
+                                              className="text-[var(--accent)] hover:underline disabled:opacity-50"
+                                            >
+                                              Nada
+                                            </button>
+                                          </span>
+                                        </span>
+                                      ) : (
+                                        mod.nombre
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <input
+                                        type="checkbox"
+                                        disabled={isPending}
+                                        checked={perm?.acceso_lectura ?? false}
+                                        onChange={(e) => {
+                                          run(() =>
+                                            upsertPermisoRol(
+                                              selectedRol.id,
+                                              mod.id,
+                                              e.target.checked,
+                                              perm?.acceso_escritura ?? false
+                                            )
+                                          );
+                                        }}
+                                        className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <input
+                                        type="checkbox"
+                                        disabled={isPending}
+                                        checked={perm?.acceso_escritura ?? false}
+                                        onChange={(e) => {
+                                          run(() =>
+                                            upsertPermisoRol(
+                                              selectedRol.id,
+                                              mod.id,
+                                              perm?.acceso_lectura ?? false,
+                                              e.target.checked
+                                            )
+                                          );
+                                        }}
+                                        className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              };
                               return (
-                                <TableRow
-                                  key={mod.id}
-                                  className="border-[var(--border)] dark:hover:bg-white/3 hover:bg-black/2"
-                                >
-                                  <TableCell className="text-sm dark:text-white/80 text-[var(--text)]/80">
-                                    {mod.nombre}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <input
-                                      type="checkbox"
-                                      disabled={isPending}
-                                      checked={perm?.acceso_lectura ?? false}
-                                      onChange={(e) => {
-                                        run(() =>
-                                          upsertPermisoRol(
-                                            selectedRol.id,
-                                            mod.id,
-                                            e.target.checked,
-                                            perm?.acceso_escritura ?? false
-                                          )
-                                        );
-                                      }}
-                                      className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <input
-                                      type="checkbox"
-                                      disabled={isPending}
-                                      checked={perm?.acceso_escritura ?? false}
-                                      onChange={(e) => {
-                                        run(() =>
-                                          upsertPermisoRol(
-                                            selectedRol.id,
-                                            mod.id,
-                                            perm?.acceso_lectura ?? false,
-                                            e.target.checked
-                                          )
-                                        );
-                                      }}
-                                      className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
-                                    />
-                                  </TableCell>
-                                </TableRow>
+                                <Fragment key={padre.id}>
+                                  {renderRow(padre)}
+                                  {hijos.map((hijo) => renderRow(hijo, padre))}
+                                </Fragment>
                               );
                             })}
                           </Fragment>

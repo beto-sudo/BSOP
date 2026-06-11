@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { RoutedModuleTabs } from '@/components/module-page';
+import { HubAccessRedirect, RoutedModuleTabs } from '@/components/module-page';
 import { TeTocaStrip } from '@/components/gasto/te-toca-strip';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
@@ -55,6 +55,7 @@ export default function ComprasLayout({ children }: { children: ReactNode }) {
     <>
       <div className="space-y-3 px-4 pt-4 sm:px-6 sm:pt-6">
         <TeTocaStrip empresaId={DILESA_EMPRESA_ID} empresa="dilesa" />
+        <HubAccessRedirect tabs={TABS} />
         <RoutedModuleTabs tabs={TABS} />
       </div>
       {children}

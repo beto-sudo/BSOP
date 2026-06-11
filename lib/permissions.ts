@@ -158,6 +158,27 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/settings/notificaciones': 'settings.notificaciones',
 };
 
+/**
+ * Landing de hub (URL default con routed tabs, ADR-030) → slug del módulo
+ * padre umbrella. La visibilidad del hub en sidebar/paneles NO la decide el
+ * sub-slug del primer tab (a eso mapea `ROUTE_TO_MODULE`, y así debe seguir:
+ * el manual deriva sus docs de ahí) sino el padre **o cualquier sub-slug**:
+ * un rol con acceso a Requisiciones pero no a Órdenes debe ver el hub Compras.
+ * Consumido por `canSeeNavRoute`. Al liberar un hub nuevo, agregar su entrada
+ * aquí (el test de sync en `permissions.test.ts` lo valida).
+ */
+export const HUB_PARENT_BY_ROUTE: Record<string, string> = {
+  '/dilesa/proyectos': 'dilesa.proyectos',
+  '/dilesa/ventas': 'dilesa.ventas',
+  '/dilesa/cobranza': 'dilesa.cobranza',
+  '/dilesa/cxp': 'dilesa.cxp',
+  '/dilesa/construccion': 'dilesa.construccion',
+  '/dilesa/compras': 'dilesa.compras',
+  '/rdb/cxp': 'rdb.cxp',
+  '/rdb/productos': 'rdb.productos',
+  '/rdb/inventario': 'rdb.inventario',
+};
+
 /** Maps a nav section href to its empresa slug */
 export const ROUTE_TO_EMPRESA: Record<string, string> = {
   '/rdb': 'rdb',
@@ -394,6 +415,44 @@ export function canAccessModulo(
   const access = perms.modulos.get(moduloSlug);
   if (!access) return false;
   return mode === 'read' ? access.read : access.write;
+}
+
+/**
+ * Acceso al módulo o a cualquiera de sus sub-slugs (`<slug>.<tab>`). Solo
+ * tiene sentido para slugs de hub umbrella (ADR-030) — para un módulo plano
+ * el prefix no matchea nada y equivale a `canAccessModulo`.
+ */
+export function canAccessModuloOrChild(
+  perms: UserPermissions,
+  moduloSlug: string,
+  mode: 'read' | 'write' = 'read'
+): boolean {
+  if (canAccessModulo(perms, moduloSlug, mode)) return true;
+  const prefix = `${moduloSlug}.`;
+  for (const [slug, access] of perms.modulos) {
+    if (slug.startsWith(prefix) && (mode === 'read' ? access.read : access.write)) return true;
+  }
+  return false;
+}
+
+/**
+ * ¿Esta entrada de navegación (sidebar / panel de empresa) es visible?
+ *
+ * - Ruta sin módulo mapeado → visible (gobierna el gate de empresa).
+ * - Ruta con módulo → visible con acceso de lectura al módulo mapeado.
+ * - Landing de hub (ADR-030) → visible también con acceso al padre umbrella
+ *   o a CUALQUIER sub-slug del hub. Sin esto, un rol con permisos parciales
+ *   (p. ej. Requisiciones sin Órdenes) pierde la puerta de entrada a todo el
+ *   hub aunque sus tabs le funcionen — el contenido sigue gateado por
+ *   `<RequireAccess>` en cada sub-page (SS5).
+ */
+export function canSeeNavRoute(perms: UserPermissions, href: string): boolean {
+  const moduloSlug = ROUTE_TO_MODULE[href];
+  if (!moduloSlug) return true;
+  if (canAccessModulo(perms, moduloSlug)) return true;
+  const hubParent = HUB_PARENT_BY_ROUTE[href];
+  if (!hubParent) return false;
+  return canAccessModuloOrChild(perms, hubParent);
 }
 
 export function isAdminOnly(pathname: string): boolean {

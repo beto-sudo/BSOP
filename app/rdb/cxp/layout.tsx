@@ -1,5 +1,10 @@
 import { type ReactNode } from 'react';
-import { ModulePage, ModuleHeader, RoutedModuleTabs } from '@/components/module-page';
+import {
+  HubAccessRedirect,
+  ModulePage,
+  ModuleHeader,
+  RoutedModuleTabs,
+} from '@/components/module-page';
 
 /**
  * Layout del módulo Cuentas por Pagar (RDB · CxP). Patrón routed tabs
@@ -51,6 +56,7 @@ export default function CxpLayout({ children }: { children: ReactNode }) {
   return (
     <ModulePage>
       <ModuleHeader title="Cuentas por Pagar" subtitle="Facturas de egreso, saldos y proveedores" />
+      <HubAccessRedirect tabs={TABS} />
       <RoutedModuleTabs tabs={TABS} />
       {children}
     </ModulePage>

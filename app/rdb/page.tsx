@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
-import { canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
+import { canSeeNavRoute } from '@/lib/permissions';
 import Link from 'next/link';
 import {
   ClipboardList,
@@ -176,19 +176,15 @@ export default function RdbPage() {
 
   // Filter cards by the effective user's permissions. When admin is in
   // "Viendo como" preview, this hides modules the impersonated user cannot
-  // access — same logic the sidebar uses (canAccessModulo). Modules without
-  // a route mapping are shown by default.
+  // access — same hub-aware logic the sidebar uses (canSeeNavRoute). Modules
+  // without a route mapping are shown by default.
   const visibleGroups = useMemo(() => {
     if (permissions.loading) return moduleGroups;
     if (permissions.isAdmin) return moduleGroups;
     return moduleGroups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => {
-          const moduloSlug = ROUTE_TO_MODULE[item.href];
-          if (!moduloSlug) return true;
-          return canAccessModulo(permissions, moduloSlug);
-        }),
+        items: group.items.filter((item) => canSeeNavRoute(permissions, item.href)),
       }))
       .filter((group) => group.items.length > 0);
   }, [permissions]);

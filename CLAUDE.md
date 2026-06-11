@@ -231,15 +231,21 @@ la regla anterior:
 
 - **`NAV_ITEMS`**: solo entry del padre. **`ROUTE_TO_MODULE`**: entry por cada
   sub-page (la URL default `/<modulo>` → sub-slug del primer tab).
-  **`EXPECTED_DB_MODULE_SLUGS`**: padre + cada sub-slug. **Migración**: INSERT de
-  cada sub-slug (heredando `seccion`/`empresa_id` del padre) + backfill clonando
-  permisos del padre. Plantilla: `…20260509162620_modulos_subscope_permissions.sql`.
+  **`HUB_PARENT_BY_ROUTE`** (`lib/permissions.ts`): entry URL-landing → slug del
+  padre — la visibilidad en sidebar/paneles la decide `canSeeNavRoute` (padre O
+  cualquier sub-slug accesible), no el sub-slug del primer tab (SS8; test de
+  sync la valida). **`EXPECTED_DB_MODULE_SLUGS`**: padre + cada sub-slug.
+  **Migración**: INSERT de cada sub-slug (heredando `seccion`/`empresa_id` del
+  padre) + backfill clonando permisos del padre. Plantilla:
+  `…20260509162620_modulos_subscope_permissions.sql`.
 - **Código**: TABS del layout con campo `module: '<sub-slug>'` (`<RoutedModuleTabs>`
-  filtra sin permiso); cada sub-page con `<RequireAccess modulo="<sub-slug>">`;
+  filtra sin permiso) + `<HubAccessRedirect tabs={TABS}/>` en el mismo layout
+  (si el landing no es accesible, aterriza en el primer tab que sí — SS8); cada
+  sub-page con `<RequireAccess modulo="<sub-slug>">`;
   si usa `useSearchParams`/`useUrlFilters`, separar el cuerpo a `<XBody/>`
   wrappeado por `<RequireAccess>` (evita el error Next.js 16
   `missing-suspense-with-csr-bailout`). Plantillas: `app/rdb/productos/recetas/page.tsx`,
-  `app/rdb/inventario/page.tsx`. Reglas SS1-SS7 en ADR-030.
+  `app/rdb/inventario/page.tsx`. Reglas SS1-SS8 en ADR-030.
 
 ---
 

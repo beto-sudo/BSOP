@@ -20,7 +20,7 @@ Use case real: usuarios que necesitan ver/configurar solo algunas tabs específi
 - **Padre** (`rdb.inventario`) actúa como **umbrella** — gobierna visibilidad del módulo en sidebar.
 - **Sub-slug** (`rdb.inventario.stock`) gobierna **acceso real al contenido** específico de cada sub-página.
 
-## Reglas SS1-SS7
+## Reglas SS1-SS8
 
 ### SS1 · Sub-slug por tab
 
@@ -43,12 +43,9 @@ Cada URL de sub-página mapea a su sub-slug en `lib/permissions.ts`:
 '/rdb/inventario/levantamientos':  'rdb.inventario.levantamientos',
 ```
 
-**La URL default del módulo (`/<modulo>`) apunta al sub-slug del primer tab.** No al padre. Eso porque:
+**La URL default del módulo (`/<modulo>`) apunta al sub-slug del primer tab.** No al padre. El gate de contenido del landing es el del primer tab, y el manual in-app deriva su doc de este mapa (`resolveHelpSlug`).
 
-- El sidebar usa la URL default del módulo para determinar visibilidad.
-- Si el rol tiene cualquier tab del módulo, hay alguna URL en `ROUTE_TO_MODULE` que mapea a un sub-slug accesible — el módulo aparece en sidebar via esa URL.
-- Si solo tiene el primer tab, la URL default funciona naturalmente.
-- Si solo tiene tabs internas (no la primera), la URL default da AccessDenied pero el sidebar muestra alguna otra URL accesible.
+> ⚠️ **Corrección 2026-06-10 (ver SS8).** La justificación original asumía que "si el rol tiene cualquier tab, el módulo aparece en sidebar vía alguna URL accesible" — falso: el sidebar solo lista la URL **default** de cada hub, así que un rol con tabs internas pero sin el primer tab perdía la puerta de entrada a todo el hub (caso real: Gerente de Proyectos con Requisiciones/Cotizaciones/Recepciones pero sin Órdenes no veía Compras). La visibilidad del sidebar ya NO se decide con este mapa sino con `canSeeNavRoute` (SS8).
 
 ### SS3 · Backfill defensivo al introducir sub-slugs
 
@@ -118,6 +115,17 @@ Plantilla canónica: [`app/rdb/productos/recetas/page.tsx`](../../app/rdb/produc
 
 Cada sub-slug debe agregarse a la lista canónica en [`lib/permissions.test.ts`](../../lib/permissions.test.ts) en el mismo PR que extiende `ROUTE_TO_MODULE`. El test `'every slug in ROUTE_TO_MODULE has an expected DB row'` falla si olvidas — recordatorio explícito de que la migración SQL debe acompañar.
 
+### SS8 · Visibilidad de hub: padre O cualquier sub-slug + aterrizaje accesible
+
+_(Agregada 2026-06-10 — fix del caso "rol con permisos parciales no ve el hub".)_
+
+Dos piezas en el mismo PR al liberar un hub:
+
+1. **`HUB_PARENT_BY_ROUTE`** ([lib/permissions.ts](../../lib/permissions.ts)): entrada `'/<empresa>/<hub>': '<empresa>.<hub>'` (URL landing → slug padre umbrella). El sidebar y los paneles de empresa deciden visibilidad con `canSeeNavRoute(perms, href)`: la entrada del hub se muestra si el usuario lee el sub-slug mapeado, el padre umbrella **o cualquier sub-slug** del hub (`canAccessModuloOrChild`). Un test de sync en `permissions.test.ts` valida que cada entrada sea coherente con `ROUTE_TO_MODULE` y exista en DB.
+2. **`<HubAccessRedirect tabs={TABS} />`** en el `layout.tsx` del hub (junto a `<RoutedModuleTabs>`, mismos TABS): si el usuario está parado en la URL de un tab cuyo sub-slug no puede leer (típico: el landing default), lo redirige al primer tab que sí puede. Sin ningún tab accesible es no-op y el `<RequireAccess>` de la sub-page muestra su AccessDenied (SS5 intacto).
+
+Los gates de contenido NO cambian: `ROUTE_TO_MODULE` y `<RequireAccess>` por sub-page siguen igual — SS8 solo gobierna puerta de entrada (visibilidad) y aterrizaje.
+
 ## Consecuencias
 
 ### Positivas
@@ -135,10 +143,10 @@ Cada sub-slug debe agregarse a la lista canónica en [`lib/permissions.test.ts`]
 
 ### Estados inconsistentes posibles
 
-- **Padre sin hijos (admin quita todos los sub-slugs pero deja padre):** módulo aparece en sidebar (vía URL default), pero al entrar todas las tabs están ocultas y la URL default da AccessDenied. La UI Settings/Roles podría warning-ear esta config (follow-up no urgente).
-- **Hijos sin padre (admin quita padre pero deja sub-slug):** sidebar oculta el módulo (porque la URL default → sub-slug del primer tab inaccesible), pero entrando por URL directa el sub-slug accesible funciona. Estado raro pero coherente: usuarios con bookmark a `/rdb/inventario/movimientos` siguen viéndolo.
+- **Padre sin hijos (admin quita todos los sub-slugs pero deja padre):** módulo aparece en sidebar, pero al entrar todas las tabs están ocultas y la URL default da AccessDenied. La matriz de Settings/Roles agrupa los sub-slugs bajo su hub (con acciones "Todo/Nada") para hacer esta config visible de un vistazo.
+- **Hijos sin padre (admin quita padre pero deja sub-slug):** desde SS8 el hub sigue visible en sidebar (`canSeeNavRoute` considera cualquier sub-slug) y `<HubAccessRedirect>` aterriza en el tab accesible. El padre queda como slug del hub para backfills y agrupación, ya no como única llave de visibilidad.
 
-Ambos estados son creables solo manualmente por admin desde Settings/Roles. La UI debería warning-ear pero por ahora no bloquea — la semántica es coherente.
+Ambos estados son creables solo manualmente por admin desde Settings/Roles; con SS8 ninguno deja al usuario sin puerta de entrada a contenido que sí tiene permitido.
 
 ## Alternativas consideradas
 
