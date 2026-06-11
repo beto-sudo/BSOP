@@ -193,6 +193,20 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-11 — Hotfix cross-sesión (sesión presupuesto-baseline, con OK de
+  Beto): `20260611003056_cxp_fix_saldo_solo_pagos_ejecutados`.** Bug
+  reportado por Beto: al PROGRAMAR un pago las facturas se marcaban
+  "pagada" (el trigger de saldo sumaba aplicaciones sin distinguir estado
+  del pago; caso real 2 facturas $306k con $0 ejecutado). Fix:
+  `fn_cxp_recalc_factura` compartida (solo pagos `estado='pagado'` vivos
+  cuentan), trigger nuevo en `cxp_pagos` (cambio de estado recalcula
+  facturas), `cxp_pago_programar` valida contra comprometido vivo
+  (anti doble-programación), `cxp_pago_aprobar` gana override de admin
+  global (política Beto 2026-06-10: admin nunca se bloquea) y backfill
+  (0 inconsistencias). Nota UI para esta iniciativa: las facturas con
+  pagos programados ahora se ven `por_pagar` con saldo completo —
+  valdría mostrar "comprometido en pagos" en la tabla de facturas.
+
 ### 2026-06-02 — Sprint 4 (UI programación + aprobación de pagos · RDB + DILESA)
 
 Programación y aprobación de pagos a proveedores, componentes compartidos
