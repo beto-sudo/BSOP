@@ -89,7 +89,7 @@ async function buildPdfData(
   const construccionIds = [...new Set(tareas.map((t) => t.construccion_id as string))];
   const terminadaIds = [...new Set(tareas.map((t) => t.tarea_terminada_id as string))];
 
-  const [cRes, ttRes, taCatRes] = await Promise.all([
+  const [cRes, ttRes, taCatRes, clRes] = await Promise.all([
     construccionIds.length
       ? sb
           .schema('dilesa')
@@ -105,6 +105,14 @@ async function buildPdfData(
           .in('id', terminadaIds)
       : Promise.resolve({ data: [], error: null }),
     sb.schema('dilesa').from('tareas_construccion').select('id, nombre'),
+    construccionIds.length
+      ? sb
+          .schema('dilesa')
+          .from('contrato_lotes')
+          .select('construccion_id, contrato_id')
+          .in('construccion_id', construccionIds)
+          .is('deleted_at', null)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const cMap = new Map<string, { codigo: string; unidad_id: string }>();
@@ -143,12 +151,41 @@ async function buildPdfData(
   const tareaCatMap = new Map<string, string>();
   for (const t of taCatRes.data ?? []) tareaCatMap.set(t.id as string, t.nombre as string);
 
+  // Contrato(s) de cada construcción — solo los del contratista de la
+  // estimación, vigentes. El contratista los usa como referencia en su
+  // factura. Hoy cada (construcción, contratista) tiene exactamente 1
+  // contrato; si hubiera obra extra con 2º contrato se listan separados
+  // por coma.
+  const contratoIds = [...new Set((clRes.data ?? []).map((cl) => cl.contrato_id as string))];
+  const { data: ccRows } = contratoIds.length
+    ? await sb
+        .schema('dilesa')
+        .from('contratos_construccion')
+        .select('id, codigo')
+        .in('id', contratoIds)
+        .eq('contratista_id', estim.contratista_id as string)
+        .is('deleted_at', null)
+        .is('cancelada_at', null)
+    : { data: [] };
+  const ccCodigoMap = new Map<string, string>();
+  for (const cc of ccRows ?? []) ccCodigoMap.set(cc.id as string, cc.codigo as string);
+  const contratosPorConstruccion = new Map<string, Set<string>>();
+  for (const cl of clRes.data ?? []) {
+    const codigo = ccCodigoMap.get(cl.contrato_id as string);
+    if (!codigo) continue;
+    const cid = cl.construccion_id as string;
+    const set = contratosPorConstruccion.get(cid) ?? new Set<string>();
+    set.add(codigo);
+    contratosPorConstruccion.set(cid, set);
+  }
+
   // Agrupar por obra.
   const grupos = new Map<
     string,
     {
       unidad: string;
       construccionCodigo: string;
+      contrato: string | null;
       tareas: EstimacionPdfData['obras'][number]['tareas'];
       subtotal: number;
     }
@@ -167,6 +204,7 @@ async function buildPdfData(
     const grupo = grupos.get(cid) ?? {
       unidad: uMap.get(c.unidad_id) ?? '(sin unidad)',
       construccionCodigo: c.codigo,
+      contrato: [...(contratosPorConstruccion.get(cid) ?? [])].join(', ') || null,
       tareas: [],
       subtotal: 0,
     };

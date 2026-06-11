@@ -175,6 +175,8 @@ function DetailInner() {
   const [estTareas, setEstTareas] = useState<EstimTarea[]>([]);
   const [construcciones, setConstrucciones] = useState<Map<string, Construccion>>(new Map());
   const [unidadIds, setUnidadIds] = useState<Map<string, string>>(new Map());
+  // construccion_id → código(s) de contrato del contratista (referencia de factura)
+  const [contratosObra, setContratosObra] = useState<Map<string, string>>(new Map());
   const [terminadas, setTerminadas] = useState<Map<string, TareaTerminada>>(new Map());
   const [plantillas, setPlantillas] = useState<Map<string, Plantilla>>(new Map());
   const [tareasCat, setTareasCat] = useState<Map<string, Tarea>>(new Map());
@@ -447,7 +449,7 @@ function DetailInner() {
         return;
       }
 
-      const [cRes, ttRes, taRes] = await Promise.all([
+      const [cRes, ttRes, taRes, clRes] = await Promise.all([
         sb
           .schema('dilesa')
           .from('construccion')
@@ -459,6 +461,12 @@ function DetailInner() {
           .select('id, plantilla_tarea_id, fecha_terminada')
           .in('id', tareaTerminadaIds),
         sb.schema('dilesa').from('tareas_construccion').select('id, nombre'),
+        sb
+          .schema('dilesa')
+          .from('contrato_lotes')
+          .select('construccion_id, contrato_id')
+          .in('construccion_id', construccionIds)
+          .is('deleted_at', null),
       ]);
       if (!activo) return;
 
@@ -481,6 +489,34 @@ function DetailInner() {
       const tMap = new Map<string, Tarea>();
       for (const t of taRes.data ?? []) tMap.set(t.id as string, { id: t.id, nombre: t.nombre });
       setTareasCat(tMap);
+
+      // Contrato(s) de cada construcción — solo los del contratista de la
+      // estimación, vigentes. Es la referencia que el contratista pone en
+      // su factura (mismo dato que imprime el PDF).
+      const contratoIds = [...new Set((clRes.data ?? []).map((cl) => cl.contrato_id as string))];
+      if (contratoIds.length > 0) {
+        const { data: ccRows } = await sb
+          .schema('dilesa')
+          .from('contratos_construccion')
+          .select('id, codigo')
+          .in('id', contratoIds)
+          .eq('contratista_id', estimRow.contratista_id)
+          .is('deleted_at', null)
+          .is('cancelada_at', null);
+        if (!activo) return;
+        const ccCodigo = new Map<string, string>();
+        for (const cc of ccRows ?? []) ccCodigo.set(cc.id as string, cc.codigo as string);
+        const porObra = new Map<string, Set<string>>();
+        for (const cl of clRes.data ?? []) {
+          const codigo = ccCodigo.get(cl.contrato_id as string);
+          if (!codigo) continue;
+          const cid = cl.construccion_id as string;
+          const set = porObra.get(cid) ?? new Set<string>();
+          set.add(codigo);
+          porObra.set(cid, set);
+        }
+        setContratosObra(new Map([...porObra.entries()].map(([k, v]) => [k, [...v].join(', ')])));
+      }
 
       // Plantillas → tareas (mapping plantilla_id → tarea_id)
       if (plantillaIds.size > 0) {
@@ -544,12 +580,13 @@ function DetailInner() {
           construccion_id,
           construccion_codigo: c?.codigo ?? '—',
           unidad_identificador: identificador,
+          contrato_codigo: contratosObra.get(construccion_id) ?? null,
           items: items.sort((a, b) => a.nombre.localeCompare(b.nombre)),
           subtotal,
         };
       })
       .sort((a, b) => a.unidad_identificador.localeCompare(b.unidad_identificador));
-  }, [estTareas, terminadas, plantillas, tareasCat, construcciones, unidadIds]);
+  }, [estTareas, terminadas, plantillas, tareasCat, construcciones, unidadIds, contratosObra]);
 
   if (loading) {
     return (
@@ -1090,6 +1127,7 @@ function ObraBlock({
     construccion_id: string;
     construccion_codigo: string;
     unidad_identificador: string;
+    contrato_codigo: string | null;
     items: Array<{ nombre: string; fecha: string | null; monto: number }>;
     subtotal: number;
   };
@@ -1112,6 +1150,11 @@ function ObraBlock({
           {grupo.unidad_identificador}
         </Link>
         <span className="text-xs text-[var(--text)]/50">{grupo.construccion_codigo}</span>
+        {grupo.contrato_codigo ? (
+          <span className="rounded bg-[var(--bg)]/60 px-1.5 py-0.5 text-[11px] text-[var(--text)]/60">
+            {grupo.contrato_codigo}
+          </span>
+        ) : null}
         <span className="ml-auto text-xs tabular-nums text-[var(--text)]/60">
           {grupo.items.length} tarea{grupo.items.length === 1 ? '' : 's'}
         </span>
