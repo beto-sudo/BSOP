@@ -16,7 +16,12 @@ import {
 } from 'lucide-react';
 import { useLocale } from '@/lib/i18n';
 import { usePermissions } from '@/components/providers';
-import { canAccessEmpresa, canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
+import {
+  canAccessEmpresa,
+  canAccessModulo,
+  canSeeNavRoute,
+  ROUTE_TO_MODULE,
+} from '@/lib/permissions';
 import {
   NAV_ITEMS,
   NAV_TO_EMPRESA,
@@ -89,12 +94,10 @@ export function Sidebar({
     if (permissions.isAdmin) {
       byPermissions = NAV_ITEMS;
     } else {
-      const filterChild = (child: NavChild) => {
-        const moduloSlug = ROUTE_TO_MODULE[child.href];
-        // If no modulo mapping, show if empresa is accessible.
-        if (!moduloSlug) return true;
-        return canAccessModulo(permissions, moduloSlug);
-      };
+      // Visibilidad por módulo con conciencia de hubs (ADR-030): la entrada
+      // de un hub se muestra si el usuario alcanza el padre umbrella o
+      // cualquiera de sus sub-slugs, no solo el del primer tab.
+      const filterChild = (child: NavChild) => canSeeNavRoute(permissions, child.href);
 
       byPermissions = NAV_ITEMS.reduce<NavItem[]>((acc, item) => {
         // Overview is always visible to authenticated users.

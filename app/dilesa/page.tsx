@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { usePermissions } from '@/components/providers';
-import { canAccessModulo, ROUTE_TO_MODULE } from '@/lib/permissions';
+import { canSeeNavRoute } from '@/lib/permissions';
 import { NAV_ITEMS } from '@/components/app-shell/nav-config';
 
 type ModulePresentation = { icon: LucideIcon; color: string };
@@ -81,12 +81,7 @@ export default function DilesaPage() {
     return DILESA_SECTIONS.map((section) => ({
       title: section.label,
       items: section.children
-        .filter((child) => {
-          if (showAll) return true;
-          const moduloSlug = ROUTE_TO_MODULE[child.href];
-          if (!moduloSlug) return true;
-          return canAccessModulo(permissions, moduloSlug);
-        })
+        .filter((child) => showAll || canSeeNavRoute(permissions, child.href))
         .map((child) => ({
           label: child.label,
           href: child.href,

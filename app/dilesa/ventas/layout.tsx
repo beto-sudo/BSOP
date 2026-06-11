@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { RoutedModuleTabs } from '@/components/module-page';
+import { HubAccessRedirect, RoutedModuleTabs } from '@/components/module-page';
 
 /**
  * Layout compartido del hub Ventas (DILESA).
@@ -98,6 +98,7 @@ export default function VentasLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <HubAccessRedirect tabs={TABS} />
       {showTabs ? (
         <div className="px-4 pt-4 sm:px-6 sm:pt-6">
           <RoutedModuleTabs tabs={TABS} />

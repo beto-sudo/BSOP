@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { RoutedModuleTabs } from '@/components/module-page';
+import { HubAccessRedirect, RoutedModuleTabs } from '@/components/module-page';
 
 /**
  * Layout compartido del hub Construcción (DILESA).
@@ -64,6 +64,7 @@ const TABS = [
 export default function ConstruccionLayout({ children }: { children: ReactNode }) {
   return (
     <>
+      <HubAccessRedirect tabs={TABS} />
       <div className="px-4 pt-4 sm:px-6 sm:pt-6">
         <RoutedModuleTabs tabs={TABS} />
       </div>

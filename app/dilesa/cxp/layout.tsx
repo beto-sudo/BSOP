@@ -1,5 +1,10 @@
 import { type ReactNode } from 'react';
-import { ModulePage, ModuleHeader, RoutedModuleTabs } from '@/components/module-page';
+import {
+  HubAccessRedirect,
+  ModulePage,
+  ModuleHeader,
+  RoutedModuleTabs,
+} from '@/components/module-page';
 import { TeTocaStrip } from '@/components/gasto/te-toca-strip';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
@@ -56,6 +61,7 @@ export default function CxpLayout({ children }: { children: ReactNode }) {
       <div className="px-4 pt-3 sm:px-6">
         <TeTocaStrip empresaId={DILESA_EMPRESA_ID} empresa="dilesa" />
       </div>
+      <HubAccessRedirect tabs={TABS} />
       <RoutedModuleTabs tabs={TABS} />
       {children}
     </ModulePage>

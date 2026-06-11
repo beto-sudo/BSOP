@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { RoutedModuleTabs } from '@/components/module-page';
+import { HubAccessRedirect, RoutedModuleTabs } from '@/components/module-page';
 
 /**
  * Layout compartido del módulo Productos (RDB).
@@ -35,6 +35,7 @@ const TABS = [
 export default function ProductosLayout({ children }: { children: ReactNode }) {
   return (
     <>
+      <HubAccessRedirect tabs={TABS} />
       <div className="px-4 pt-4 sm:px-6 sm:pt-6">
         <RoutedModuleTabs tabs={TABS} />
       </div>
