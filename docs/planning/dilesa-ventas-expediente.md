@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (S6: cutover ejecutado — último sync, paridad 14,186/14,186 fases + 1438/1438 ventas, fix merge venta_fases, daily apagado)
+**Última actualización:** 2026-06-11 (S6: cutover ejecutado — último sync, paridad 14,186/14,186 fases + 1438/1438 ventas, fix merge venta_fases, daily apagado. Pagaré: desglose de intereses + tasas TIIE+4 / moratorio 3×)
 
 ## Problema
 
@@ -225,6 +225,14 @@ expediente, copiloto), no reescritura.
   comercial 360, redondeo por fila) + tests; el PDF ahora desglosa Capital /
   Interés / Pago total por parcialidad con fila TOTAL, y la fase 10 muestra
   preview en vivo del mismo motor antes de generar.
+- **2026-06-11 (modelo de tasas del pagaré):** Segunda corrección de Beto: el
+  modelo estaba volteado (el spread alimentaba el moratorio y el ordinario
+  era libre con default 0). Migración `20260611042746` aplicada a prod:
+  rename `cd_spread_moratorio_pct`→`cd_spread_ordinario_pct` + CHECK ≥ 4,
+  columna `cd_interes_moratorio_pct`, backfill de la única venta nativa con
+  TIIE (ordinario 13.6%, moratorio 40.8%). Fase 10 deriva y muestra ambas
+  tasas (inputs: TIIE requerida + spread mín. 4); el PDF imprime la
+  composición TIIE+spread en la cláusula ordinaria y el moratorio pactado.
 - **2026-06-11 (S6 — cutover de ventas, cierre):** Cutoff ejecutado. Beto
   creó los usuarios del equipo (5 con rol Vendedor + Edgar en Gerencia
   Ventas), asignó perfiles, mandó invitaciones y retiró la escritura en
@@ -278,6 +286,14 @@ expediente, copiloto), no reescritura.
   vencimiento anterior. No se persiste el desglose (es determinista de
   fechas + tasa); UI y PDF comparten el motor. Si el abogado pide otra base
   (p. ej. 365), se cambia en un solo lugar.
+- **2026-06-11:** Tasas del crédito directo (regla de Beto): interés
+  ordinario SIEMPRE = TIIE 28d + spread mínimo de 4 puntos (CHECK en DB);
+  interés moratorio = 3× la ordinaria. Ambas se persisten como snapshot
+  pactado al guardar (la TIIE cambia, el pagaré conserva la tasa del día de
+  suscripción). Contexto legal investigado: no existe tope numérico fijo
+  para moratorios pactados en pagarés mercantiles; el límite es la doctrina
+  anti-usura SCJN (referente práctico ~37% — 3× con TIIE+4 ≈ 31.8% queda
+  debajo; con spreads altos puede excederlo y es decisión por venta).
 - **2026-06-11 (cutover):** El workflow `dilesa-coda-sync` NO se borra:
   queda manual-only (`workflow_dispatch`) como vía de rescate para rezagos
   puntuales de Coda. Cuidado al usarlo post-cutover: el modo daily pisa los

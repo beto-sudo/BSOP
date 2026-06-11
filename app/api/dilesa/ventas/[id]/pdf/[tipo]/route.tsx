@@ -433,7 +433,7 @@ export async function GET(
       .schema('dilesa')
       .from('ventas')
       .select(
-        'monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_moratorio_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+        'monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_interes_moratorio_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
       )
       .eq('id', id)
       .maybeSingle();
@@ -441,8 +441,9 @@ export async function GET(
       monto_credito_directo: number | null;
       cd_plan_pagos: Array<{ num?: number; fecha?: string; monto?: number }> | null;
       cd_tiie28_pct: number | null;
-      cd_spread_moratorio_pct: number | null;
+      cd_spread_ordinario_pct: number | null;
       cd_interes_ordinario_pct: number | null;
+      cd_interes_moratorio_pct: number | null;
       cd_fecha_suscripcion: string | null;
       cd_aval_nombre: string | null;
       cd_aval_domicilio: string | null;
@@ -500,15 +501,24 @@ export async function GET(
       [emp?.domicilio_municipio, emp?.domicilio_estado].filter(Boolean).join(', ') ||
       'Piedras Negras, Coahuila';
 
+    // Tasas (regla 2026-06-11): ordinario = TIIE + spread (snapshot en
+    // cd_interes_ordinario_pct); moratorio = 3× ordinario (snapshot en
+    // cd_interes_moratorio_pct, con fallback derivado para filas previas).
     const tiie = cd.cd_tiie28_pct != null ? Number(cd.cd_tiie28_pct) : null;
-    const spread = cd.cd_spread_moratorio_pct != null ? Number(cd.cd_spread_moratorio_pct) : 4;
-    const tasaMoratoria = tiie != null ? Math.round((tiie + spread) * 100) / 100 : null;
+    const spread = cd.cd_spread_ordinario_pct != null ? Number(cd.cd_spread_ordinario_pct) : 4;
+    const ordinarioSnapshot =
+      cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : 0;
+    const tasaMoratoria =
+      cd.cd_interes_moratorio_pct != null
+        ? Number(cd.cd_interes_moratorio_pct)
+        : ordinarioSnapshot > 0
+          ? Math.round(ordinarioSnapshot * 3 * 100) / 100
+          : null;
     const fechaSuscripcion = cd.cd_fecha_suscripcion ?? new Date().toISOString().slice(0, 10);
 
     // Desglose de interés ordinario por parcialidad (mismo motor que la
     // preview de la fase 10 — lib/dilesa/pagare-interes.ts).
-    const ordinarioPct =
-      cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : 0;
+    const ordinarioPct = ordinarioSnapshot;
     const desglose = desglosarPagare(
       (Array.isArray(cd.cd_plan_pagos) ? cd.cd_plan_pagos : []).map((p) => ({
         fecha: p?.fecha ?? '',
@@ -548,10 +558,9 @@ export async function GET(
             totalPagarFmt: money2.format(desglose.totalPagar),
           }
         : {}),
-      interesOrdinarioPct:
-        cd.cd_interes_ordinario_pct != null ? Number(cd.cd_interes_ordinario_pct) : null,
+      interesOrdinarioPct: ordinarioPct > 0 ? ordinarioPct : null,
       tiie28Pct: tiie,
-      spreadMoratorioPct: spread,
+      spreadOrdinarioPct: spread,
       tasaMoratoriaPct: tasaMoratoria,
       avalNombre: cd.cd_aval_nombre ?? null,
       avalDomicilio: cd.cd_aval_domicilio ?? null,
