@@ -598,8 +598,10 @@ Próximo: Fase 2 = UI de captura (`components/compras/cotizaciones-module.tsx` +
 - **2026-06-10** — **Tab "Costo materiales" (post-cierre, puente CONTPAQ).** Auditoría
   pre-cutoff del sync Coda→BSOP de `construccion.costo_materiales`
   (`scripts/check_dilesa_costo_materiales_sync.ts`, read-only): 1,310 OK / 0 mismatch /
-  **50 faltantes** (capturadas en Coda post-backfill, ~$9.1M, todas LDLE) → pendiente
-  re-correr `backfill_dilesa_costo_materiales.ts` (write a prod, espera OK de Beto). Para capturar el costo
+  **50 faltantes** (capturadas en Coda post-backfill, ~$9.1M, todas LDLE) → con OK de Beto
+  se re-corrió `backfill_dilesa_costo_materiales.ts` (50 actualizadas) + recálculo de
+  `costo_materiales_referencia` (14 prototipos); re-auditoría: 1,360/1,360 OK, 0
+  faltantes, 0 terminadas sin costo — cutoff del grid seguro. Para capturar el costo
   final de materiales de viviendas que se van terminando ya sin Coda (mientras el control
   de materiales sigue en CONTPAQ y no exista su módulo en BSOP): 5to tab del hub
   `/dilesa/compras/costo-materiales` (sub-slug `dilesa.compras.costo_materiales`,
