@@ -2,15 +2,20 @@
 
 /**
  * Editor de las entradas de cuadratura (pestaña Cuadratura del Expediente de
- * Operación). Captura/ajusta los 4 buckets de descuento y el tope de descuento
- * autorizado — el saldo y los derivados recomputan en vivo (el padre re-calcula
- * con `lib/dilesa/cuadratura.ts`).
+ * Operación). Captura/ajusta los 4 buckets de descuento — el saldo y los
+ * derivados recomputan en vivo (el padre re-calcula con
+ * `lib/dilesa/cuadratura.ts`).
  *
- * El apoyo Infonavit NO se captura: se deriva automáticamente del catálogo
- * `dilesa.tipos_credito` según el tipo de crédito de la venta (misma fuente que
- * usa el RPC `fn_calcular_precio_venta`). Aquí solo se muestra read-only.
+ * Derivados (read-only, no se capturan):
+ * - Apoyo Infonavit — del catálogo `dilesa.tipos_credito` según el tipo de
+ *   crédito de la venta (misma fuente que el RPC `fn_calcular_precio_venta`).
+ * - Descuento Máximo Autorizado — el monto de la promoción/bono elegido en la
+ *   Solicitud de Asignación (`promociones.monto` vía `ventas.promocion_id`).
+ *   Son bonos flexibles: el cliente los reparte entre los 4 buckets; si la
+ *   suma excede el tope, se alerta (regla Beto 2026-06-11). Ventas legacy de
+ *   Coda sin promo caen al `descuento_maximo_autorizado` capturado allá.
  *
- * Iniciativa `dilesa-ventas-expediente` (Sprint 2b).
+ * Iniciativa `dilesa-ventas-expediente` (Sprint 2b; tope derivado post-cierre).
  */
 
 import { useState } from 'react';
@@ -26,7 +31,6 @@ export type CuadraturaInputsStr = {
   descuentoEquipamiento: string;
   descuentoGastosEscr: string;
   descuentoNotaCredito: string;
-  descuentoMaximo: string;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -43,6 +47,8 @@ export function CuadraturaAjustes({
   canWrite,
   apoyoInfonavit,
   tipoCredito,
+  descuentoMaximo,
+  descuentoMaximoFuente,
 }: {
   ventaId: string;
   values: CuadraturaInputsStr;
@@ -52,6 +58,10 @@ export function CuadraturaAjustes({
   apoyoInfonavit: number;
   /** Nombre del tipo de crédito, para etiquetar de dónde sale el apoyo. */
   tipoCredito: string | null;
+  /** Tope de descuento derivado de la promoción de la solicitud (auto, read-only). */
+  descuentoMaximo: number;
+  /** Nombre de la promoción (o "legacy Coda"); null = sin promo ni captura legacy. */
+  descuentoMaximoFuente: string | null;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
@@ -73,8 +83,9 @@ export function CuadraturaAjustes({
         descuento_equipamiento: numOrNull(values.descuentoEquipamiento),
         descuento_gastos_escrituracion: numOrNull(values.descuentoGastosEscr),
         descuento_nota_credito: numOrNull(values.descuentoNotaCredito),
-        descuento_maximo_autorizado: numOrNull(values.descuentoMaximo),
-        // El total se mantiene en sync con la suma de los buckets.
+        // El total se mantiene en sync con la suma de los buckets. El tope
+        // (descuento_maximo_autorizado) ya no se captura: se deriva de la
+        // promoción de la solicitud (solo queda poblado en legacy Coda).
         descuento_total: descTotal,
       })
       .eq('id', ventaId);
@@ -144,16 +155,21 @@ export function CuadraturaAjustes({
             disabled={!canWrite}
           />
         </Campo>
-        <Campo label="Descuento máximo autorizado">
-          <NumInput
-            value={values.descuentoMaximo}
-            onChange={(v) => onPatch({ descuentoMaximo: v })}
-            disabled={!canWrite}
-          />
-        </Campo>
       </div>
 
       <div className="mt-3 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+          Descuento máximo autorizado · auto
+        </span>
+        <span className="text-xs font-semibold tabular-nums text-[var(--text)]/85">
+          {moneyFmt.format(descuentoMaximo)}
+          <span className="ml-1.5 font-normal text-[var(--text)]/50">
+            {descuentoMaximoFuente ? `· ${descuentoMaximoFuente}` : '· sin promoción aplicada'}
+          </span>
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
           Apoyo Infonavit · auto
         </span>
@@ -165,10 +181,20 @@ export function CuadraturaAjustes({
         </span>
       </div>
 
-      <p className="mt-2 text-[11px] text-[var(--text)]/55">
+      <p
+        className={`mt-2 text-[11px] ${
+          descTotal > descuentoMaximo
+            ? 'font-medium text-red-600 dark:text-red-400'
+            : 'text-[var(--text)]/55'
+        }`}
+      >
         Descuento otorgado total:{' '}
-        <span className="font-semibold">{moneyFmt.format(descTotal)}</span> (suma de los 4 buckets).
-        El apoyo Infonavit se toma del catálogo de tipos de crédito, no se captura.
+        <span className="font-semibold">{moneyFmt.format(descTotal)}</span> (suma de los 4 buckets)
+        {descTotal > descuentoMaximo
+          ? ` — EXCEDE el máximo autorizado ${moneyFmt.format(descuentoMaximo)}`
+          : ` de un máximo autorizado de ${moneyFmt.format(descuentoMaximo)}`}
+        . El tope viene de la promoción elegida en la solicitud; el apoyo Infonavit, del catálogo de
+        tipos de crédito — ninguno se captura.
       </p>
     </section>
   );

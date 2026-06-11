@@ -113,6 +113,7 @@ type Venta = {
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
   descuento_maximo_autorizado: number | null;
+  promocion_id: string | null;
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
@@ -350,11 +351,14 @@ function DetailInner() {
     descuentoEquipamiento: '',
     descuentoGastosEscr: '',
     descuentoNotaCredito: '',
-    descuentoMaximo: '',
   });
   // Apoyo Infonavit derivado del catálogo `dilesa.tipos_credito` según el tipo
   // de crédito de la venta (auto, no se captura). Misma fuente que el RPC.
   const [apoyoInfonavit, setApoyoInfonavit] = useState(0);
+  // Promoción elegida en la solicitud — su monto es el Descuento Máximo
+  // Autorizado (auto, no se captura). Ventas legacy de Coda no tienen promo:
+  // se cae al descuento_maximo_autorizado capturado allá.
+  const [promo, setPromo] = useState<{ nombre: string; monto: number } | null>(null);
   const [venta, setVenta] = useState<Venta | null>(null);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -416,8 +420,23 @@ function DetailInner() {
         descuentoEquipamiento: numStr(ventaRow.descuento_equipamiento),
         descuentoGastosEscr: numStr(ventaRow.descuento_gastos_escrituracion),
         descuentoNotaCredito: numStr(ventaRow.descuento_nota_credito),
-        descuentoMaximo: numStr(ventaRow.descuento_maximo_autorizado),
       });
+
+      // Promoción de la solicitud → Descuento Máximo Autorizado (derivado).
+      if (ventaRow.promocion_id) {
+        const { data: promoRow } = await sb
+          .schema('dilesa')
+          .from('promociones')
+          .select('nombre, monto')
+          .eq('id', ventaRow.promocion_id)
+          .maybeSingle();
+        if (!activo) return;
+        setPromo(
+          promoRow ? { nombre: promoRow.nombre as string, monto: Number(promoRow.monto) } : null
+        );
+      } else {
+        setPromo(null);
+      }
 
       // Resolver el tipo de crédito → id + apoyo Infonavit del catálogo
       // `dilesa.tipos_credito`. El apoyo se deriva (no se captura) y el id se
@@ -1042,6 +1061,14 @@ function DetailInner() {
             onPatch={(patch) => setCuadInputs((prev) => ({ ...prev, ...patch }))}
             apoyoInfonavit={apoyoInfonavit}
             tipoCredito={venta.tipo_credito}
+            descuentoMaximo={promo ? promo.monto : Number(venta.descuento_maximo_autorizado ?? 0)}
+            descuentoMaximoFuente={
+              promo
+                ? promo.nombre
+                : venta.descuento_maximo_autorizado != null
+                  ? 'legacy Coda'
+                  : null
+            }
             canWrite={
               permissions.isAdmin ||
               permissions.modulos.get('dilesa.ventas.fase13_facturada')?.write === true
