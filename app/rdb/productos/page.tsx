@@ -372,7 +372,7 @@ export default function ProductosPage() {
       }
       if (ins.data) {
         setInsumosDisponibles(
-          ins.data.map((i) => ({ id: i.id, nombre: i.nombre, unidad: i.unidad ?? 'pieza' }))
+          ins.data.map((i) => ({ id: i.id, nombre: i.nombre, unidad: i.unidad || UNIDAD_DEFAULT }))
         );
       }
       setRecetaLoading(false);
@@ -827,7 +827,18 @@ export default function ProductosPage() {
                             className="w-24 text-right"
                             aria-label={`Cantidad de ${row.insumo_nombre}`}
                           />
-                          <div className="w-16 text-xs text-muted-foreground">{row.unidad}</div>
+                          <Combobox
+                            value={row.unidad}
+                            onChange={(v) =>
+                              setRecetaRows((rows) =>
+                                rows.map((r, i) => (i === idx ? { ...r, unidad: v } : r))
+                              )
+                            }
+                            options={unidadOptions(row.unidad)}
+                            className="w-32"
+                            size="sm"
+                            aria-label={`Unidad de ${row.insumo_nombre}`}
+                          />
                           <Button
                             variant="ghost"
                             size="icon"
