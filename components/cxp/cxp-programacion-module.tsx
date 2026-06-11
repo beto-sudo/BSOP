@@ -6,11 +6,17 @@
  * Lista las facturas de egreso con saldo abierto (`erp.facturas`,
  * `flujo='egreso'`, `saldo > 0`, `estado_cxp IN ('por_pagar','parcial')`)
  * ordenadas por lo que vence primero (`fecha_pago_programada` ||
- * `fecha_vencimiento`), marcando las vencidas. El usuario selecciona varias
- * y, al confirmar, se **agrupa por proveedor** y se llama
- * `erp.cxp_pago_programar` UNA vez por proveedor (con sus facturas y el
- * saldo de cada una). Permite elegir cuenta bancaria, método de pago y
- * fecha programada (comunes al lote).
+ * `fecha_vencimiento`), marcando las vencidas. Desde el hotfix 2026-06-11
+ * el saldo solo refleja dinero EJECUTADO (pagos `estado='pagado'`), así que
+ * aquí se resta además lo COMPROMETIDO vivo en pagos `programado`/`aprobado`
+ * (`pendientesDeProgramar`): una factura con pago programado cubriendo todo
+ * su saldo sale de la lista en lugar de quedarse "donde mismo" y reventar la
+ * validación anti-sobre-programación al reintentar.
+ *
+ * El usuario selecciona varias y, al confirmar, se **agrupa por proveedor**
+ * y se llama `erp.cxp_pago_programar` UNA vez por proveedor (con sus
+ * facturas y el monto por programar de cada una). Permite elegir cuenta
+ * bancaria, método de pago y fecha programada (comunes al lote).
  *
  * No inventa lógica financiera: la RPC valida saldo por factura, empresa y
  * estado. Esta UI solo arma el JSONB de aplicaciones y muestra una
@@ -76,6 +82,10 @@ type FacturaPendiente = {
   fecha_vencimiento: string | null;
   total: number | null;
   saldo: number;
+  /** Σ aplicaciones en pagos vivos `programado`/`aprobado` (aún sin ejecutar). */
+  comprometido: number;
+  /** saldo − comprometido: lo único que esta pantalla puede programar. */
+  porProgramar: number;
 };
 
 type CuentaBancaria = { id: string; nombre: string; banco: string | null };
@@ -119,6 +129,34 @@ function proveedorLabel(f: FacturaPendiente): string {
 /** Clave de agrupación por proveedor (id si existe, si no RFC, si no nombre). */
 function proveedorKey(f: FacturaPendiente): string {
   return f.proveedor_id ?? f.emisor_rfc ?? f.emisor_nombre ?? '(sin proveedor)';
+}
+
+export type AplicacionViva = { factura_id: string; monto_aplicado: number | null };
+
+/**
+ * Resta del saldo lo comprometido en pagos vivos sin ejecutar y deja solo
+ * las facturas con algo por programar. Los pagos `pagado` NO se suman aquí:
+ * el trigger de saldo ya los descuenta de `monto_pagado` y contarlos dos
+ * veces escondería facturas con saldo real.
+ */
+export function pendientesDeProgramar<T extends { id: string; saldo: number }>(
+  facturas: T[],
+  aplicacionesVivas: AplicacionViva[]
+): Array<T & { comprometido: number; porProgramar: number }> {
+  const comprometidoPorFactura = new Map<string, number>();
+  for (const a of aplicacionesVivas) {
+    comprometidoPorFactura.set(
+      a.factura_id,
+      (comprometidoPorFactura.get(a.factura_id) ?? 0) + Number(a.monto_aplicado ?? 0)
+    );
+  }
+  return facturas
+    .map((f) => {
+      const comprometido = comprometidoPorFactura.get(f.id) ?? 0;
+      const porProgramar = Math.round((f.saldo - comprometido) * 100) / 100;
+      return { ...f, comprometido, porProgramar };
+    })
+    .filter((f) => f.porProgramar > 0);
 }
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
@@ -177,11 +215,27 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
         .in('estado_cxp', ['por_pagar', 'parcial']);
       if (qErr) throw qErr;
 
-      type Raw = Omit<FacturaPendiente, 'proveedor_nombre' | 'saldo'> & {
+      type Raw = Omit<
+        FacturaPendiente,
+        'proveedor_nombre' | 'saldo' | 'comprometido' | 'porProgramar'
+      > & {
         saldo: number | null;
         estado_cxp: string;
       };
       const rows = (data ?? []) as Raw[];
+
+      // Comprometido vivo sin ejecutar: aplicaciones de pagos programado/
+      // aprobado (los `pagado` ya bajaron el saldo vía trigger). Filtrado por
+      // empresa_id — no por factura_id — para no rebasar el límite de URL.
+      const { data: aplicaciones, error: aErr } = await sb
+        .schema('erp')
+        .from('cxp_pago_aplicaciones')
+        .select('factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)')
+        .eq('empresa_id', empresaId)
+        .in('pago.estado', ['programado', 'aprobado'])
+        .is('pago.deleted_at', null);
+      if (aErr) throw aErr;
+      const aplicacionesVivas = (aplicaciones ?? []) as unknown as AplicacionViva[];
 
       // Nombres de proveedor (erp.personas) para filas con proveedor_id sin
       // emisor_nombre. Chunk defensivo a 150 por límite de URL.
@@ -204,17 +258,20 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
         }
       }
 
-      const mapped: FacturaPendiente[] = rows.map((r) => ({
-        id: r.id,
-        proveedor_id: r.proveedor_id,
-        emisor_nombre: r.emisor_nombre,
-        emisor_rfc: r.emisor_rfc,
-        proveedor_nombre: r.proveedor_id ? (nombrePorPersona.get(r.proveedor_id) ?? null) : null,
-        fecha_pago_programada: r.fecha_pago_programada,
-        fecha_vencimiento: r.fecha_vencimiento,
-        total: r.total,
-        saldo: Number(r.saldo ?? 0),
-      }));
+      const mapped: FacturaPendiente[] = pendientesDeProgramar(
+        rows.map((r) => ({
+          id: r.id,
+          proveedor_id: r.proveedor_id,
+          emisor_nombre: r.emisor_nombre,
+          emisor_rfc: r.emisor_rfc,
+          proveedor_nombre: r.proveedor_id ? (nombrePorPersona.get(r.proveedor_id) ?? null) : null,
+          fecha_pago_programada: r.fecha_pago_programada,
+          fecha_vencimiento: r.fecha_vencimiento,
+          total: r.total,
+          saldo: Number(r.saldo ?? 0),
+        })),
+        aplicacionesVivas
+      );
 
       // Orden: lo que vence primero. Las sin fecha al final.
       mapped.sort((a, b) => {
@@ -260,7 +317,7 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
     [facturas, selectedIds]
   );
   const selectedTotal = useMemo(
-    () => selectedFacturas.reduce((acc, f) => acc + f.saldo, 0),
+    () => selectedFacturas.reduce((acc, f) => acc + f.porProgramar, 0),
     [selectedFacturas]
   );
 
@@ -279,7 +336,7 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
         total: 0,
       };
       g.facturas.push(f);
-      g.total += f.saldo;
+      g.total += f.porProgramar;
       byProv.set(key, g);
     }
     return [...byProv.values()];
@@ -316,7 +373,7 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
           count={
             loading
               ? 'Cargando…'
-              : `${filtered.length} por pagar${selectedIds.size > 0 ? ` · ${selectedIds.size} seleccionada${selectedIds.size !== 1 ? 's' : ''}` : ''}`
+              : `${filtered.length} por programar${selectedIds.size > 0 ? ` · ${selectedIds.size} seleccionada${selectedIds.size !== 1 ? 's' : ''}` : ''}`
           }
           actions={
             <Button
@@ -365,8 +422,8 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {activeCount > 0
-                  ? 'Limpia los filtros para ver todas las facturas con saldo.'
-                  : 'No hay facturas de egreso con saldo pendiente.'}
+                  ? 'Limpia los filtros para ver todas las facturas con monto por programar.'
+                  : 'No hay facturas de egreso con monto pendiente de programar; lo ya programado vive en Pagos.'}
               </p>
             </div>
           ) : (
@@ -387,7 +444,7 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
                     <th className="py-2 pr-2 font-medium">Vence</th>
                     <th className="py-2 pr-2 font-medium">Estado</th>
                     <th className="py-2 pr-2 text-right font-medium">Total</th>
-                    <th className="py-2 pl-2 pr-3 text-right font-medium">Saldo</th>
+                    <th className="py-2 pl-2 pr-3 text-right font-medium">Por programar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -432,8 +489,15 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
                         <td className="py-2 pr-2 text-right tabular-nums text-muted-foreground">
                           {formatCurrency(f.total)}
                         </td>
-                        <td className="py-2 pl-2 pr-3 text-right font-semibold tabular-nums text-amber-600">
-                          {formatCurrency(f.saldo)}
+                        <td className="py-2 pl-2 pr-3 text-right">
+                          <div className="font-semibold tabular-nums text-amber-600">
+                            {formatCurrency(f.porProgramar)}
+                          </div>
+                          {f.comprometido > 0 && (
+                            <div className="text-xs tabular-nums text-muted-foreground">
+                              {formatCurrency(f.comprometido)} ya en pagos
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -472,7 +536,10 @@ export function CxpProgramacionModule({ empresaId, empresa }: CxpProgramacionMod
             if (programados > 0) {
               feedback.success(
                 `${programados} pago${programados !== 1 ? 's' : ''} programado${programados !== 1 ? 's' : ''}`,
-                { description: 'Quedan en estado «programado» pendientes de aprobación.' }
+                {
+                  description:
+                    'Las facturas salen de esta lista; revisa y aprueba en la pestaña Pagos.',
+                }
               );
               setSelectedIds(new Set());
               void fetchFacturas();
@@ -546,7 +613,7 @@ function ProgramarDialog({
     // Un cxp_pago por proveedor. Secuencial para reportar fallas por grupo
     // sin abortar el lote — el saldo lo valida la RPC factura por factura.
     for (const g of grupos) {
-      const aplicaciones = g.facturas.map((f) => ({ factura_id: f.id, monto: f.saldo }));
+      const aplicaciones = g.facturas.map((f) => ({ factura_id: f.id, monto: f.porProgramar }));
       const { error } = await sb.schema('erp').rpc('cxp_pago_programar', {
         p_empresa_id: empresaId,
         p_proveedor_id: g.proveedorId as string,
