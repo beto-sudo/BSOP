@@ -278,7 +278,7 @@ const FASE_ROLES: Record<string, string[]> = {
   Facturada: ['factura', 'nota_credito', 'aviso_pld'],
   'Preparada para Entrega': ['checklist_pre_entrega'],
   Entregada: ['checklist_entrega'],
-  'Comisión Pagada': [],
+  'Conformidad del Cliente': [],
   'Operación Terminada': [],
 };
 
@@ -303,7 +303,8 @@ const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
   13: '13-facturada',
   14: '14-preparada-entrega',
   15: '15-entregada',
-  // 16–17 → próximos PRs (S5 dilesa-ventas-expediente)
+  16: '16-conformidad',
+  // 17 → próximo PR (cierre con copiloto, S4+S5 dilesa-ventas-expediente)
 };
 
 /**
@@ -332,7 +333,7 @@ const FASES_ORDEN: Array<{ pos: number; nombre: string }> = [
   { pos: 13, nombre: 'Facturada' },
   { pos: 14, nombre: 'Preparada para Entrega' },
   { pos: 15, nombre: 'Entregada' },
-  { pos: 16, nombre: 'Comisión Pagada' },
+  { pos: 16, nombre: 'Conformidad del Cliente' },
   { pos: 17, nombre: 'Operación Terminada' },
 ];
 
@@ -760,10 +761,13 @@ function DetailInner() {
   // (chip outline gris). Es el "lugar donde se avanza fase por fase
   // subiendo el soporte" — la vista que se va a evolucionar.
   const pipelineRows = useMemo(() => {
-    const fasesByName = new Map(fases.map((f) => [f.fase, f]));
+    // Match por POSICIÓN (no por nombre): los renombres de fase (ej. pos 16
+    // "Comisión Pagada" → "Conformidad del Cliente") no rompen el timeline de
+    // ventas históricas cuyo texto en venta_fases conserva el nombre viejo.
+    const fasesByPos = new Map(fases.map((f) => [f.posicion, f]));
     const posicionesAlcanzadas = new Set(fases.map((f) => f.posicion));
     return FASES_ORDEN.map(({ pos, nombre }) => {
-      const f = fasesByName.get(nombre);
+      const f = fasesByPos.get(pos);
       const roles = FASE_ROLES[nombre] ?? [];
       const cargados = roles.flatMap((r) =>
         (adjuntosPorRolMap.get(r) ?? []).map((a) => ({ ...a, rol: r }))

@@ -294,7 +294,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.ventas.fase13_facturada',
   'dilesa.ventas.fase14_preparada_entrega',
   'dilesa.ventas.fase15_entregada',
-  'dilesa.ventas.fase16_comision_pagada',
+  'dilesa.ventas.fase16_conformidad',
   'dilesa.ventas.fase17_operacion_terminada',
 
   // RDB

@@ -60,6 +60,8 @@ const FASES: Array<{ col: string; fase: string; pos: number }> = [
   { col: 'F📅Facturada', fase: 'Facturada', pos: 13 },
   { col: 'F📅Preparada para Entrega', fase: 'Preparada para Entrega', pos: 14 },
   { col: 'F📅Entregada', fase: 'Entregada', pos: 15 },
+  // Histórico: en Coda la pos 16 era 'Comisión Pagada' (1 venta la usó en 2024).
+  // En BSOP la pos 16 es 'Conformidad del Cliente'; la fila vieja se conserva tal cual.
   { col: 'F📅Comision Pagada', fase: 'Comisión Pagada', pos: 16 },
   { col: 'F📅Operacion Terminada', fase: 'Operación Terminada', pos: 17 },
 ];
