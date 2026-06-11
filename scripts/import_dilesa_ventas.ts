@@ -416,8 +416,14 @@ async function main() {
     });
   }
 
-  // ── venta_fases: UPSERT por (venta_id, fase) ────────────────────────────────
-  // Existing unique constraint `venta_fases_uk` permite hacerlo sin DELETE.
+  // ── venta_fases: merge manual (sin ON CONFLICT) ─────────────────────────────
+  // `venta_fases_uk` dejó de ser UNIQUE constraint y pasó a partial unique
+  // index `WHERE deleted_at IS NULL` (migración 20260608004732, para poder
+  // regresar+re-cerrar una fase). PostgREST no puede apuntar ON CONFLICT a
+  // un índice parcial, así que el upsert anterior fallaba completo. El merge
+  // se hace en memoria contra las filas activas: INSERT de las que faltan,
+  // UPDATE de fecha donde Coda difiere. Las fases sin pareja en Coda
+  // (nativas BSOP, p.ej. 14-17) y las soft-deleted no se tocan.
   const fasesInserts: Array<Record<string, unknown>> = [];
   for (const r of registros) {
     const vid = codaRowIdToVentaId.get(r.codaRowId);
@@ -426,15 +432,53 @@ async function main() {
       fasesInserts.push({ empresa_id: empresaId, venta_id: vid, ...f });
     }
   }
+
+  // Fases activas existentes de la empresa — paginado (PostgREST capea ~1000/req).
+  const fasesExistentes = new Map<string, { id: string; fecha: string | null }>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb
+      .schema('dilesa')
+      .from('venta_fases')
+      .select('id, venta_id, fase, fecha')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .range(from, from + 999);
+    if (error) throw new Error(`SELECT venta_fases: ${error.message}`);
+    for (const row of data ?? []) {
+      fasesExistentes.set(`${row.venta_id}|${row.fase}`, {
+        id: row.id as string,
+        fecha: (row.fecha as string | null) ?? null,
+      });
+    }
+    if ((data?.length ?? 0) < 1000) break;
+  }
+
+  const fasesNuevas: Array<Record<string, unknown>> = [];
+  const fasesCambiadas: Array<{ id: string; fecha: string }> = [];
+  for (const f of fasesInserts) {
+    const ex = fasesExistentes.get(`${f.venta_id}|${f.fase}`);
+    if (!ex) fasesNuevas.push(f);
+    else if (ex.fecha !== (f.fecha as string)) {
+      fasesCambiadas.push({ id: ex.id, fecha: f.fecha as string });
+    }
+  }
+
   let okF = 0;
-  for (let i = 0; i < fasesInserts.length; i += 500) {
-    const chunk = fasesInserts.slice(i, i + 500);
+  for (let i = 0; i < fasesNuevas.length; i += 500) {
+    const chunk = fasesNuevas.slice(i, i + 500);
+    const { error } = await sb.schema('dilesa').from('venta_fases').insert(chunk);
+    if (error) console.error(`✗ chunk venta_fases INSERT [${i}): ${error.message}`);
+    else okF += chunk.length;
+  }
+  let updF = 0;
+  for (const u of fasesCambiadas) {
     const { error } = await sb
       .schema('dilesa')
       .from('venta_fases')
-      .upsert(chunk, { onConflict: 'venta_id,fase' });
-    if (error) console.error(`✗ chunk venta_fases [${i}): ${error.message}`);
-    else okF += chunk.length;
+      .update({ fecha: u.fecha })
+      .eq('id', u.id);
+    if (error) console.error(`✗ venta_fases UPDATE ${u.id}: ${error.message}`);
+    else updF++;
   }
 
   // ── venta_pagos: UPSERT por (empresa_id, coda_row_id) ───────────────────────
@@ -469,7 +513,8 @@ async function main() {
   }
 
   console.log(
-    `\n✔ UPSERT ${okV}/${registros.length} ventas, ${okF} fases (UPSERT por venta_id+fase), ` +
+    `\n✔ UPSERT ${okV}/${registros.length} ventas, fases: ${okF} nuevas + ${updF} fechas actualizadas ` +
+      `(${fasesInserts.length} en Coda, merge manual), ` +
       `${okP} pagos${pagosHuerfanos ? ` (${pagosHuerfanos} depósitos sin venta — omitidos)` : ''}.`
   );
 }

@@ -1,11 +1,14 @@
 /**
  * run-dilesa-sync.ts
  *
- * Wrapper del cron de refresh nocturno: orquesta los 5 scripts de import
- * de Coda → BSOP en serie, captura stats pre/post (counts por tabla),
- * y manda email con resumen via Resend (siempre — éxito o fallo).
+ * Wrapper del sync Coda → BSOP: orquesta los scripts de import en serie,
+ * captura stats pre/post (counts por tabla), y manda email con resumen
+ * via Resend (siempre — éxito o fallo).
  *
- * Diseñado para correr en GitHub Actions diario a las 3am CST. Ver
+ * Corrió como cron nocturno (3am CST) hasta el cutover: construcción se
+ * cortó el 2026-06-09 y ventas/expediente el 2026-06-11 (S6 de
+ * dilesa-ventas-expediente — BSOP master, Coda read-only). Hoy solo se
+ * ejecuta manual vía workflow_dispatch para rezagos puntuales. Ver
  * `.github/workflows/dilesa-coda-sync.yml` y `docs/runbooks/dilesa-coda-sync.md`.
  *
  * Idempotencia:

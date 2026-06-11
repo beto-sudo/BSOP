@@ -3,11 +3,11 @@
 **Slug:** `dilesa-ventas-expediente`
 **Empresas:** DILESA (golden; el patrón de "workspace de operación" es replicable a las otras empresas)
 **Schemas afectados:** principalmente UI (Next.js App Router); `dilesa` (posible vista `v_venta_cuadratura` + columnas/slugs de fases 14-17), `core.modulos` (sub-slugs RBAC de 14-17). Reusa lo existente: `dilesa.ventas`, `dilesa.venta_fases`, `erp.adjuntos`, `erp.cxc_pagos`/`cxc_cargos`
-**Estado:** in_progress
-**Próximo hito:** Verificación final de Beto + S6 (cutover Coda de ventas: paridad final, apagar daily ventas/expediente, cortar accesos de captura) → cierre de la iniciativa
+**Estado:** done
+**Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (pagaré: desglose de intereses + modelo de tasas TIIE+4 / moratorio 3×)
+**Última actualización:** 2026-06-11 (S6: cutover ejecutado — último sync, paridad 14,186/14,186 fases + 1438/1438 ventas, fix merge venta_fases, daily apagado. Pagaré: desglose de intereses + tasas TIIE+4 / moratorio 3×)
 
 ## Problema
 
@@ -233,6 +233,22 @@ expediente, copiloto), no reescritura.
   TIIE (ordinario 13.6%, moratorio 40.8%). Fase 10 deriva y muestra ambas
   tasas (inputs: TIIE requerida + spread mín. 4); el PDF imprime la
   composición TIIE+spread en la cláusula ordinaria y el moratorio pactado.
+- **2026-06-11 (S6 — cutover de ventas, cierre):** Cutoff ejecutado. Beto
+  creó los usuarios del equipo (5 con rol Vendedor + Edgar en Gerencia
+  Ventas), asignó perfiles, mandó invitaciones y retiró la escritura en
+  Coda (queda solo consulta). Último sync manual corrido (run GH 27322758419) y **paridad certificada**: ventas 1438/1438, pagos 1126
+  (+9 depósitos huérfanos conocidos sin venta), fases 14,186/14,186
+  (re-run del import reporta 0 nuevas + 0 cambiadas, 0 duplicadas),
+  expediente 8/8 adjuntos, puente CxC OK. De paso se destapó y reparó que
+  los syncs del 8-10 jun NO actualizaban `venta_fases`: la migración
+  `20260608004732` convirtió `venta_fases_uk` en partial unique index
+  (`WHERE deleted_at IS NULL`) y el `ON CONFLICT` de PostgREST no matchea
+  índices parciales — los 29 chunks fallaban en silencio (el wrapper lo
+  trataba como no-fatal). `import_dilesa_ventas.ts` ahora hace merge manual
+  (SELECT activas → diff → INSERT/UPDATE); las 52 fases del gap se
+  recuperaron. Daily apagado (el `schedule:` salió del workflow; queda
+  `workflow_dispatch` manual como vía de rescate), runbook actualizado.
+  Iniciativa cerrada.
 
 ## Decisiones registradas
 
@@ -278,3 +294,13 @@ expediente, copiloto), no reescritura.
   para moratorios pactados en pagarés mercantiles; el límite es la doctrina
   anti-usura SCJN (referente práctico ~37% — 3× con TIIE+4 ≈ 31.8% queda
   debajo; con spreads altos puede excederlo y es decisión por venta).
+- **2026-06-11 (cutover):** El workflow `dilesa-coda-sync` NO se borra:
+  queda manual-only (`workflow_dispatch`) como vía de rescate para rezagos
+  puntuales de Coda. Cuidado al usarlo post-cutover: el modo daily pisa los
+  campos mapeados de las ventas con `coda_row_id` — confirmar antes que
+  nadie haya editado esas ventas en BSOP, o lo editado se pierde.
+- **2026-06-11 (ZCU — confirmación de Beto):** Las 5 ventas activas
+  capturadas con el 6% Fovissste adentro (M12-L28, M12-L33, M21-L28,
+  M21-L33, M20-L28) **no se corrigen**: la exención ZCU se autorizó hoy y
+  aplica solo a asignaciones nuevas; lo capturado antes queda como estaba.
+  Cierra el pendiente abierto en el PR #816.
