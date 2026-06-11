@@ -1,10 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Mismo data-sync pattern que el resto de páginas de detalle (cf.
- * app/rdb/inventario/levantamientos/[id]/page.tsx).
- */
-
 /**
  * Detalle completo de una venta DILESA — 5 secciones:
  *   1. Datos del cliente (`erp.personas`, cross-schema).
@@ -24,7 +19,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -32,6 +27,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Paperclip,
   Pencil,
   Plus,
   Printer,
@@ -42,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
+import { buildAdjuntoPath } from '@/lib/storage/path';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 import { AbonoCaptureDrawer } from '@/components/dilesa/abono-capture-drawer';
@@ -383,6 +380,11 @@ function DetailInner() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [estadoCuentaOpen, setEstadoCuentaOpen] = useState(false);
   const [reciboAbono, setReciboAbono] = useState<Abono | null>(null);
+  // Upload post-captura del recibo de caja / factura sobre un abono ya
+  // registrado (flujo CxC: el recibo se emite después del depósito).
+  const reciboFileInputRef = useRef<HTMLInputElement | null>(null);
+  const reciboUploadAbonoIdRef = useRef<string | null>(null);
+  const [subiendoReciboId, setSubiendoReciboId] = useState<string | null>(null);
   const toast = useToast();
   const triggerPrint = useTriggerPrint();
 
@@ -702,6 +704,63 @@ function DetailInner() {
     }
     toast.add({ title: 'Plan de pagos generado', type: 'success' });
     setRefreshKey((k) => k + 1);
+  };
+
+  // Sube el recibo de caja / factura al abono elegido (rol='recibo_caja',
+  // mismo rol del import de Coda). Alimenta `tieneRecibo` en la cuadratura
+  // (Valor Facturado, paridad Coda).
+  const handleReciboFileChange = async (file: File | null) => {
+    const abonoId = reciboUploadAbonoIdRef.current;
+    reciboUploadAbonoIdRef.current = null;
+    if (reciboFileInputRef.current) reciboFileInputRef.current.value = '';
+    if (!file || !abonoId || !venta) return;
+
+    setSubiendoReciboId(abonoId);
+    try {
+      const sb = createSupabaseBrowserClient();
+      const path = buildAdjuntoPath({
+        empresa: 'dilesa',
+        entidad: 'cxc_pagos',
+        entidadId: abonoId,
+        filename: file.name,
+      });
+      const { error: upErr } = await sb.storage.from('adjuntos').upload(path, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
+      if (upErr) {
+        toast.add({
+          title: 'No se pudo subir el recibo',
+          description: getSupabaseErrorMessage(upErr, 'Reintenta la carga.'),
+          type: 'error',
+        });
+        return;
+      }
+      const { error: insErr } = await sb
+        .schema('erp')
+        .from('adjuntos')
+        .insert({
+          empresa_id: venta.empresa_id,
+          entidad_tipo: 'cxc_pago',
+          entidad_id: abonoId,
+          rol: 'recibo_caja',
+          nombre: file.name,
+          url: path,
+          tipo_mime: file.type || null,
+        });
+      if (insErr) {
+        toast.add({
+          title: 'El archivo subió pero no se ligó al abono',
+          description: getSupabaseErrorMessage(insErr, 'Reintenta la carga.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({ title: 'Recibo de caja adjuntado', type: 'success' });
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setSubiendoReciboId(null);
+    }
   };
 
   const clienteNombre = useMemo(() => {
@@ -1573,6 +1632,9 @@ function DetailInner() {
                         {abonos.map((a) => {
                           const aplicado = aplicadoPorAbono.get(a.id) ?? 0;
                           const favor = a.monto_total - aplicado;
+                          const tieneReciboCaja = (comprobantesPorAbono.get(a.id) ?? []).some(
+                            (adj) => adj.rol === 'recibo_caja'
+                          );
                           return (
                             <tr key={a.id} className="border-b border-[var(--border)]/40">
                               <td className="py-1.5 pr-2">{fmtFecha(a.fecha) ?? '—'}</td>
@@ -1605,20 +1667,44 @@ function DetailInner() {
                                 </div>
                               </td>
                               <td className="py-1.5 pl-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => setReciboAbono(a)}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
-                                  title="Imprimir recibo de caja"
-                                >
-                                  <Printer className="h-3 w-3" /> Recibo
-                                </button>
+                                <div className="inline-flex items-center gap-1">
+                                  {!tieneReciboCaja ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        reciboUploadAbonoIdRef.current = a.id;
+                                        reciboFileInputRef.current?.click();
+                                      }}
+                                      disabled={subiendoReciboId === a.id}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)] disabled:opacity-50"
+                                      title="Adjuntar recibo de caja / factura (CxC)"
+                                    >
+                                      <Paperclip className="h-3 w-3" />
+                                      {subiendoReciboId === a.id ? 'Subiendo...' : 'Subir recibo'}
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => setReciboAbono(a)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] hover:bg-[var(--panel)]"
+                                    title="Imprimir recibo de caja"
+                                  >
+                                    <Printer className="h-3 w-3" /> Recibo
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
+                    <input
+                      ref={reciboFileInputRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                      className="hidden"
+                      onChange={(e) => void handleReciboFileChange(e.target.files?.[0] ?? null)}
+                    />
                   </div>
                 ) : null}
               </div>
