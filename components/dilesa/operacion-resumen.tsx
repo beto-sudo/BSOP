@@ -109,6 +109,7 @@ export function OperacionResumen({
           <Cifra label="Crédito directo" value={money(cuadratura.montoCreditoDirecto)} />
           <Cifra label="Depósitos directos" value={money(cuadratura.depositosDirectoCliente)} />
           <Cifra label="Disponible" value={money(cuadratura.montoDisponible)} strong />
+          <Cifra label="Cheque notaría (calc.)" value={money(cuadratura.chequeNotariaCalculado)} />
           <div className="ml-auto">
             <Cifra
               label={cuadratura.cubierta ? 'Saldo' : 'Saldo pendiente'}
