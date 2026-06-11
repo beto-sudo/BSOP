@@ -2,21 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChefHat, Pencil, RefreshCw, Search } from 'lucide-react';
+import { ChefHat, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
 
 import { RequireAccess } from '@/components/require-access';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { ActiveFiltersChip, DataTable, type Column } from '@/components/module-page';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import {
   fetchInsumosDisponibles,
+  fetchProductosVendibles,
   fetchRecetas,
   type InsumoDisponible,
+  type ProductoVendible,
   type Receta,
 } from '@/lib/productos/recetas';
 import { RecetasEditor } from '@/components/productos/recetas-editor';
@@ -46,6 +49,7 @@ export default function ProductosRecetasPage() {
 function ProductosRecetasBody() {
   const [recetas, setRecetas] = useState<Receta[]>([]);
   const [insumosDisponibles, setInsumosDisponibles] = useState<InsumoDisponible[]>([]);
+  const [productosVendibles, setProductosVendibles] = useState<ProductoVendible[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,17 +64,23 @@ function ProductosRecetasBody() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(false);
 
+  // Alta de receta desde cero
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createProductoId, setCreateProductoId] = useState('');
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const [recetasData, insumosData] = await Promise.all([
+      const [recetasData, insumosData, vendiblesData] = await Promise.all([
         fetchRecetas(supabase, RDB_EMPRESA_ID),
         fetchInsumosDisponibles(supabase, RDB_EMPRESA_ID),
+        fetchProductosVendibles(supabase),
       ]);
       setRecetas(recetasData);
       setInsumosDisponibles(insumosData);
+      setProductosVendibles(vendiblesData);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar recetas');
     } finally {
@@ -96,11 +106,27 @@ function ProductosRecetasBody() {
     if (!drawerOpen) setEditing(false);
   }, [drawerOpen]);
 
+  // Reset selección de producto al cerrar el drawer de alta.
+  useEffect(() => {
+    if (!createOpen) setCreateProductoId('');
+  }, [createOpen]);
+
   // `selected` es derivado para que tras un save (que muta `recetas`) se
   // refleje en el drawer sin reabrirlo.
   const selected = useMemo<Receta | null>(
     () => (selectedId ? (recetas.find((r) => r.producto_venta_id === selectedId) ?? null) : null),
     [selectedId, recetas]
+  );
+
+  // Candidatos para receta nueva: productos del catálogo que aún no tienen una.
+  const candidatos = useMemo(() => {
+    const conReceta = new Set(recetas.map((r) => r.producto_venta_id));
+    return productosVendibles.filter((p) => !conReceta.has(p.id));
+  }, [productosVendibles, recetas]);
+
+  const createProducto = useMemo(
+    () => candidatos.find((p) => p.id === createProductoId) ?? null,
+    [candidatos, createProductoId]
   );
 
   const filtered = useMemo(() => {
@@ -197,6 +223,11 @@ function ProductosRecetasBody() {
     setEditing(false);
   }, [fetchData]);
 
+  const handleCreateSaved = useCallback(async () => {
+    await fetchData();
+    setCreateOpen(false);
+  }, [fetchData]);
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -205,9 +236,14 @@ function ProductosRecetasBody() {
           de venta. El costo del insumo viene del último costo registrado; insumos sin costo
           conocido dejan la receta sin costo total.
         </p>
-        <Button variant="outline" size="sm" onClick={() => void fetchData()}>
-          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refrescar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Nueva receta
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void fetchData()}>
+            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refrescar
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -300,6 +336,50 @@ function ProductosRecetasBody() {
               <InsumosSection receta={selected} onEdit={() => setEditing(true)} />
             )
           ) : null}
+        </DetailDrawerContent>
+      </DetailDrawer>
+
+      <DetailDrawer
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Nueva receta"
+        description="Elige el producto y arma su receta de insumos desde cero."
+        size="lg"
+      >
+        <DetailDrawerContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Producto</label>
+              <Combobox
+                value={createProductoId}
+                onChange={setCreateProductoId}
+                options={candidatos.map((p) => ({
+                  value: p.id,
+                  label: p.nombre,
+                  sub: p.categoria_nombre ?? undefined,
+                }))}
+                placeholder="Buscar producto sin receta…"
+                aria-label="Producto para la receta nueva"
+              />
+              <p className="text-muted-foreground text-xs">
+                Solo aparecen productos que aún no tienen receta; si ya tiene una, edítala desde la
+                tabla.
+              </p>
+            </div>
+
+            {createProducto ? (
+              <RecetasEditor
+                key={createProducto.id}
+                productoVentaId={createProducto.id}
+                productoVentaNombre={createProducto.nombre}
+                insumosDisponibles={insumosDisponibles}
+                initialRows={[]}
+                headerLabel="Armar receta"
+                onSaved={() => void handleCreateSaved()}
+                onCancel={() => setCreateOpen(false)}
+              />
+            ) : null}
+          </div>
         </DetailDrawerContent>
       </DetailDrawer>
     </div>
