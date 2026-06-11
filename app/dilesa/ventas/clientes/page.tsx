@@ -29,6 +29,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { RefreshCw, Search, Users } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -89,20 +90,29 @@ function VentasClientesBody() {
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
 
+  // Rol Vendedor: scoped a SUS clientes (los de sus propias ventas).
+  const scopeVendedor = useScopeVendedorDilesa();
+
   const cargar = useCallback(async () => {
+    if (scopeVendedor.loading) return;
     setLoading(true);
     setError(null);
     const sb = createSupabaseBrowserClient();
 
+    let ventasQuery = sb
+      .schema('dilesa')
+      .from('ventas')
+      .select(
+        'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, valor_escrituracion, valor_comercial, created_at'
+      )
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .is('deleted_at', null);
+    if (scopeVendedor.soloVendedor && scopeVendedor.userId) {
+      ventasQuery = ventasQuery.eq('vendedor_usuario_id', scopeVendedor.userId);
+    }
+
     const [ventasRes, unidadesRes, prjRes, personasRes] = await Promise.all([
-      sb
-        .schema('dilesa')
-        .from('ventas')
-        .select(
-          'id, persona_id, unidad_id, estado, fase_actual, fase_posicion, precio_asignacion, valor_escrituracion, valor_comercial, created_at'
-        )
-        .eq('empresa_id', DILESA_EMPRESA_ID)
-        .is('deleted_at', null),
+      ventasQuery,
       sb
         .schema('dilesa')
         .from('unidades')
@@ -190,7 +200,7 @@ function VentasClientesBody() {
     rows.sort((a, b) => a.nombre.localeCompare(b.nombre));
     setClientes(rows);
     setLoading(false);
-  }, []);
+  }, [scopeVendedor]);
 
   useEffect(() => {
     void cargar();

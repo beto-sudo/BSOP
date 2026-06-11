@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
@@ -157,15 +158,21 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   );
 
   // Fetch puro: regresa data o mensaje de error, NO toca state.
+  // Rol Vendedor: scoped a sus propias ventas (pedido de Beto).
+  const scopeVendedor = useScopeVendedorDilesa();
+
   const fetchVentas = useCallback(async (): Promise<{
     data?: VentaListaRow[];
     error?: string;
   }> => {
     const sb = createSupabaseBrowserClient();
+    // Mientras el scope del usuario resuelve, no mostramos nada (evita el
+    // flash de "todas las ventas" para un vendedor scoped).
+    if (scopeVendedor.loading) return { data: [] };
     // Sin embeds para evitar quirks de PostgREST cuando el nombre de la
     // tabla embebida existe en otros schemas (proyectos también en `erp`).
     // 4 queries: ventas + unidades + proyectos + personas (cross-schema).
-    const { data: rawVentas, error: vErr } = await sb
+    let ventasQuery = sb
       .schema('dilesa')
       .from('ventas')
       .select(
@@ -173,6 +180,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null);
+    if (scopeVendedor.soloVendedor && scopeVendedor.userId) {
+      ventasQuery = ventasQuery.eq('vendedor_usuario_id', scopeVendedor.userId);
+    }
+    const { data: rawVentas, error: vErr } = await ventasQuery;
     if (vErr) {
       return { error: getSupabaseErrorMessage(vErr, 'No se pudieron cargar las ventas.') };
     }
@@ -282,7 +293,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         };
       }),
     };
-  }, [empresaId]);
+  }, [empresaId, scopeVendedor]);
 
   // Botón refrescar: setState síncrono OK en event handler.
   const cargar = useCallback(async () => {
