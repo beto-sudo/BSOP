@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón baseline + órdenes de cambio es replicable a las otras empresas cuando tengan presupuesto por partidas)
 **Schemas afectados:** `erp` (nuevas `presupuesto_baselines`, `presupuesto_baseline_partidas`, `presupuesto_cambios`; trigger guard + RPCs sobre `presupuesto_partidas`; escribe `core.audit_log`), `core.modulos` (sin slugs nuevos — reusa `dilesa.proyectos.gasto`), UI en `app/dilesa/proyectos/[id]/gasto` y componentes de Costeo
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — UI de baseline y órdenes de cambio
+**Próximo hito:** Revisión del Vercel Preview de S2 por Beto (PR sin auto-merge) + Sprint 3 — expediente (adjuntos en partida, timeline, baseline retroactivo, manual)
 **Dueño:** Beto
 **Creada:** 2026-06-10
-**Última actualización:** 2026-06-10 (S1 en prod, #798)
+**Última actualización:** 2026-06-10 (S2 a PR)
 
 ## Problema
 
@@ -192,6 +192,24 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
   cambio, historial, FAQ; slug 1:1 con `dilesa.proyectos.gasto`) +
   cross-link desde "El viaje de una compra". Pendiente de S3: adjuntos en
   partida, timeline en tab Gasto, baseline retroactivo con Beto.
+- **2026-06-10 — Sprint 2 (UI de baseline y órdenes de cambio) a PR.**
+  Tab Gasto: `<BaselineBanner>` (autorizar presupuesto inicial con notas,
+  gate Dirección, aviso de preliminares; post-baseline muestra
+  total/fecha/candado), columnas Original | Cambios | Vigente (partida +
+  subtotales etapa/capítulo via `groupCosteo` extendido),
+  `<CambiosPendientesPanel>` (Dirección autoriza/rechaza con motivo
+  obligatorio; solicitante retira; soporte adjunto visible ANTES de
+  autorizar), `<SolicitarCambioCard>` (tipo/monto/categoría/motivo +
+  fase 2 de adjuntos `presupuesto_cambios`; preview del vigente
+  resultante), `<PresupuestoHistorialDrawer>` (original + órdenes con
+  quién/cuándo/soporte — reconstruye la historia del monto), iconos
+  por fila (historial + solicitar cambio). Form de partida: con baseline,
+  vigente disabled con link a orden (edición) y partida nueva nace en $0
+  (alta); `presupuesto_aprobado` no viaja en el payload. `<TeTocaStrip>`
+  gana chip de Dirección "cambios de presupuesto por autorizar" (href al
+  tab Gasto del proyecto). Server actions con `checkDireccionEmpresa` +
+  RPCs de S1. Lib `lib/presupuesto/ordenes-cambio.ts` (helpers puros,
+  5 tests). UI visible → PR SIN auto-merge para revisión del preview.
 
 - **2026-06-10 — S1 mergeado (#798) + migración `20260610212116` aplicada a
   prod y verificada.** Objetos confirmados (3 tablas, 2 triggers, 5

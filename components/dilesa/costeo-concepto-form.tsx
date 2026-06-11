@@ -56,6 +56,8 @@ export function CosteoConceptoForm({
   rows,
   editRow,
   defaultProyectoId,
+  baselineActivo = false,
+  onSolicitarCambio,
   onClose,
   onSaved,
   onDelete,
@@ -72,6 +74,14 @@ export function CosteoConceptoForm({
   rows: readonly CosteoRow[];
   /** null = alta; row = edición (form pre-llenado). */
   editRow: CosteoRow | null;
+  /**
+   * Gobierno presupuestal (iniciativa dilesa-presupuesto-baseline): el
+   * proyecto tiene baseline → `presupuesto_aprobado` queda bloqueado a
+   * edición directa (el trigger de DB lo rechaza); el cambio va por orden.
+   */
+  baselineActivo?: boolean;
+  /** Abre el flujo de orden de cambio para la partida en edición. */
+  onSolicitarCambio?: () => void;
   onClose: () => void;
   onSaved: () => void;
   /**
@@ -132,17 +142,22 @@ export function CosteoConceptoForm({
     const proveedorPersonaId = proveedorSel && proveedorSel !== PROV_OTRO ? proveedorSel : null;
     const proveedorTextoFinal = proveedorSel === PROV_OTRO ? proveedorTexto.trim() || null : null;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       etapa: etapa.trim() || null,
       concepto_texto: concepto.trim(),
       concepto_id: conceptoId || null,
       presupuesto_previo: toNum(presupuestoPrevio),
-      presupuesto_aprobado: toNum(presupuestoActual),
       gasto_real_total: toNum(gastoReal),
       proveedor_persona_id: proveedorPersonaId,
       proveedor_texto: proveedorTextoFinal,
       fecha_compromiso: fecha || null,
     };
+    // Con baseline, `presupuesto_aprobado` no viaja: en edición está
+    // bloqueado (cambia solo por orden autorizada — el trigger de DB lo
+    // rechazaría) y en alta la partida nace en $0.
+    if (!baselineActivo) {
+      payload.presupuesto_aprobado = toNum(presupuestoActual);
+    }
 
     // Modelo canónico erp.presupuesto_partidas (ADR-040). Aún no está en
     // types/supabase.ts (se difiere al workflow db-types) → cast `as any`,
@@ -289,15 +304,36 @@ export function CosteoConceptoForm({
             />
           </Field>
         ) : null}
-        <Field label={isEdit ? 'Presupuesto actualizado (c/IVA)' : 'Presupuesto (c/IVA)'}>
-          <Input
-            type="number"
-            step="0.01"
-            value={presupuestoActual}
-            onChange={(e) => setPresupuestoActual(e.target.value)}
-            placeholder="0.00"
-          />
-        </Field>
+        {baselineActivo && !isEdit ? null : (
+          <Field
+            label={
+              isEdit
+                ? baselineActivo
+                  ? 'Presupuesto vigente (gobernado)'
+                  : 'Presupuesto actualizado (c/IVA)'
+                : 'Presupuesto (c/IVA)'
+            }
+          >
+            <Input
+              type="number"
+              step="0.01"
+              value={presupuestoActual}
+              onChange={(e) => setPresupuestoActual(e.target.value)}
+              placeholder="0.00"
+              disabled={baselineActivo}
+            />
+            {baselineActivo && isEdit ? (
+              <button
+                type="button"
+                onClick={onSolicitarCambio}
+                className="mt-1 text-xs font-medium text-[var(--accent)] hover:underline disabled:opacity-50"
+                disabled={!onSolicitarCambio}
+              >
+                Solicitar cambio de presupuesto…
+              </button>
+            ) : null}
+          </Field>
+        )}
         {isEdit ? (
           <Field label="Gasto real (c/IVA)">
             <Input
@@ -316,9 +352,13 @@ export function CosteoConceptoForm({
         ) : null}
       </div>
       <p className="mt-2 text-[11px] text-[var(--text)]/50">
-        {isEdit
-          ? 'La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado). Montos con IVA incluido.'
-          : 'La clasificación agrupa la partida por el catálogo de conceptos. El gasto (comprometido, ejercido, pagado) llega solo desde las órdenes, recepciones y facturas ligadas a la partida. Monto con IVA incluido.'}
+        {baselineActivo
+          ? isEdit
+            ? 'El proyecto tiene presupuesto inicial autorizado: el monto vigente solo se modifica con una orden de cambio autorizada por Dirección. Los demás campos (clasificación, proveedor, fechas) siguen editables.'
+            : 'El proyecto tiene presupuesto inicial autorizado: la partida nueva nace en $0 y su presupuesto se asigna con una orden de cambio aditiva (con motivo y soporte documental).'
+          : isEdit
+            ? 'La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado). Montos con IVA incluido.'
+            : 'La clasificación agrupa la partida por el catálogo de conceptos. El gasto (comprometido, ejercido, pagado) llega solo desde las órdenes, recepciones y facturas ligadas a la partida. Monto con IVA incluido.'}
       </p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <div>
