@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Limpieza de datos históricos: ~$722M en saldos abiertos de ventas ya cerradas sin abonos capturados (radiografía 2026-06-10 en bitácora; Coda empezó a registrar pagos el 2024-01-30) + ~$2.0M en saldos a favor (185 ventas) — ambos requieren regla + OK de Beto. Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Sprints 1-3 + impresión ya en prod
+**Próximo hito:** Aplicar a prod la migración `20260611032126_cxc_liquidacion_historica_saldos` (regla aprobada por Beto 2026-06-10; bloqueada para ejecución autónoma, la dispara Beto) + verificar aging. Pendientes posteriores: ~$2.0M en saldos a favor (185 ventas), Sprint 4 (recordatorios) + Sprint 5 (retiro de Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-10 (radiografía de saldos abiertos históricos — 948 ventas con $801M abiertos, 4 buckets de limpieza propuestos)
+**Última actualización:** 2026-06-10 (liquidación histórica aprobada y migración lista; aplicación a prod pendiente de Beto)
 
 ## Problema
 
@@ -211,6 +211,18 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Decisiones registradas
 
+### 2026-06-10 — Beto aprueba la liquidación histórica de los 3 buckets
+
+Tras revisar el CSV de 948 ventas (`cxc_saldos_revision_2026-06-10.csv`),
+Beto decidió en chat: _"Hay que borrar los 3 bloques y dejar solo lo que
+está en proceso"_. Regla ejecutable: desasignadas (53) → cancelar cargos;
+cerradas pre-Coda (646) y era-Coda (180) → abono sintético `LIQ-HIST` por
+fuente con fecha = `fecha_escritura` (sentinela 2023-12-31 si NULL), sin
+movimiento bancario; en_proceso (69) → intacto. Sobre las desasignadas se
+verificó antes que ninguna unidad tiene otra venta activa (ni directa ni
+por lote duplicado) — el adeudo no es transferible; son clientes caídos o
+reubicados cuya fase "Entregada" venía heredada del lote en Coda.
+
 ### 2026-06-01 — Cierre de preguntas finas (pre-Sprint 1)
 
 - **Enganche = N parcialidades con fecha** (no monto único abonable
@@ -255,6 +267,21 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-10 — Migración de liquidación histórica creada (aplicación a prod pendiente)
+
+Con la regla aprobada (ver Decisiones registradas), se creó la migración
+`20260611032126_cxc_liquidacion_historica_saldos.sql` (data-only):
+cancela los cargos de desasignadas + inserta abonos `LIQ-HIST` aplicados
+1:1 a los cargos abiertos de pre/era-Coda. **Self-verificante** (aborta con
+rollback si los buckets no cuadran con 646/180/53 ventas y sus montos, o si
+el estado final ≠ 69 ventas / \$79,722,814), **idempotente** (marcador
+`referencia='LIQ-HIST'`) y no-op en Preview vacío. Dry-run de `db push`
+verificado limpio (solo esta migración pendiente). **La aplicación a prod
+quedó en manos de Beto**: el classifier del harness bloqueó (correctamente)
+que CC ejecutara por sí solo una migración financiera de \$721.7M; tras
+aplicarse, verificar que el aging quede solo con la cartera en proceso y
+asentarlo aquí.
 
 ### 2026-06-10 — Radiografía de saldos abiertos históricos (read-only, sin tocar datos)
 
