@@ -442,6 +442,18 @@ export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
         empresa={empresa}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        onAprobar={(p) => {
+          setDrawerOpen(false);
+          setAprobarPago(p);
+        }}
+        onMarcarPagado={(p) => {
+          setDrawerOpen(false);
+          setPagarPago(p);
+        }}
+        onCancelar={(p) => {
+          setDrawerOpen(false);
+          setCancelarPago(p);
+        }}
       />
 
       {/* Aprobar — confirmación (el RPC valida Dirección). */}
@@ -502,11 +514,17 @@ function PagoDrawer({
   empresa,
   open,
   onClose,
+  onAprobar,
+  onMarcarPagado,
+  onCancelar,
 }: {
   pago: Pago | null;
   empresa: EmpresaSlug;
   open: boolean;
   onClose: () => void;
+  onAprobar: (pago: Pago) => void;
+  onMarcarPagado: (pago: Pago) => void;
+  onCancelar: (pago: Pago) => void;
 }) {
   const [aplicaciones, setAplicaciones] = useState<FacturaAplicada[]>([]);
   const [loading, setLoading] = useState(false);
@@ -559,6 +577,16 @@ function PagoDrawer({
 
   const b = pago ? estadoBadge(pago.estado) : null;
 
+  // Set completo de acciones del documento en el footer (ADR-044) — los mismos
+  // gates por estado que los botones de la fila; el RPC valida el rol al final.
+  const puedeCancelar =
+    !!pago &&
+    pago.estado !== 'pagado' &&
+    pago.estado !== 'cancelado' &&
+    pago.estado !== 'rechazado';
+  const conAcciones =
+    !!pago && (pago.estado === 'programado' || pago.estado === 'aprobado' || puedeCancelar);
+
   return (
     <DetailDrawer
       open={open}
@@ -571,6 +599,34 @@ function PagoDrawer({
           <Badge variant={b.variant} className={b.className}>
             {b.label}
           </Badge>
+        ) : null
+      }
+      footer={
+        conAcciones ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {pago.estado === 'programado' ? (
+              <Button variant="outline" className="gap-1.5" onClick={() => onAprobar(pago)}>
+                <CheckCircle2 className="h-4 w-4" />
+                Aprobar
+              </Button>
+            ) : null}
+            {pago.estado === 'aprobado' ? (
+              <Button className="gap-1.5" onClick={() => onMarcarPagado(pago)}>
+                <Wallet className="h-4 w-4" />
+                Marcar pagado
+              </Button>
+            ) : null}
+            {puedeCancelar ? (
+              <Button
+                variant="ghost"
+                className="ml-auto gap-1.5 text-muted-foreground hover:text-destructive"
+                onClick={() => onCancelar(pago)}
+              >
+                <XCircle className="h-4 w-4" />
+                Cancelar
+              </Button>
+            ) : null}
+          </div>
         ) : null
       }
     >

@@ -315,17 +315,18 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 
 ### Layout y navegación
 
-| Tema                                | ADR                                                                                     | Patrón canónico                                                 |
-| ----------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Sidebar y secciones                 | [ADR-014](../adr/014_sidebar_taxonomia.md)                                              | `NAV_ITEMS` agrupado por sección, filtrado por permisos         |
-| Sub-módulos como routed tabs        | [ADR-005](../adr/005_module_with_submodules_routed_tabs.md)                             | `app/<modulo>/{sub1,sub2}/page.tsx` con `layout.tsx` compartido |
-| Module page anatomy                 | [supabase/adr/004](../../supabase/adr/004_module_page_layout_convention.md)             | `<ModulePage>` slots o estructura libre con primitivos          |
-| Module states (empty/loading/error) | [ADR-006](../adr/006_module_states.md)                                                  | `<EmptyState>` / `<TableSkeleton>` / `<ErrorBanner>`            |
-| Filters URL-sync                    | [ADR-007](../adr/007_filters_url_sync.md)                                               | `useUrlFilters` + `<ActiveFiltersChip>`                         |
-| Detail page anatomy                 | [ADR-009](../adr/009_detail_page.md)                                                    | `<DetailPage>` + `<DetailHeader>` + `<DetailContent>` (D1-D5)   |
-| Detail drawer                       | [ADR-018](../adr/018_drawer_anatomy.md), [ADR-026](../adr/026_drawer_anatomy_polish.md) | `<DetailDrawer size="sm/md/lg/xl">` (DD1-DD11)                  |
-| Data tables                         | [ADR-010](../adr/010_data_table.md)                                                     | `<DataTable>` sobre @tanstack/react-table (DT1-DT8)             |
-| Module-level KPI strips             | [ADR-034](../adr/034_module_kpi_strips.md)                                              | `<ModuleKpiStrip>` deriva client-side del dataset (KPI1-KPI7)   |
+| Tema                                | ADR                                                                                     | Patrón canónico                                                         |
+| ----------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Sidebar y secciones                 | [ADR-014](../adr/014_sidebar_taxonomia.md)                                              | `NAV_ITEMS` agrupado por sección, filtrado por permisos                 |
+| Sub-módulos como routed tabs        | [ADR-005](../adr/005_module_with_submodules_routed_tabs.md)                             | `app/<modulo>/{sub1,sub2}/page.tsx` con `layout.tsx` compartido         |
+| Module page anatomy                 | [supabase/adr/004](../../supabase/adr/004_module_page_layout_convention.md)             | `<ModulePage>` slots o estructura libre con primitivos                  |
+| Module states (empty/loading/error) | [ADR-006](../adr/006_module_states.md)                                                  | `<EmptyState>` / `<TableSkeleton>` / `<ErrorBanner>`                    |
+| Filters URL-sync                    | [ADR-007](../adr/007_filters_url_sync.md)                                               | `useUrlFilters` + `<ActiveFiltersChip>`                                 |
+| Detail page anatomy                 | [ADR-009](../adr/009_detail_page.md)                                                    | `<DetailPage>` + `<DetailHeader>` + `<DetailContent>` (D1-D5)           |
+| Detail drawer                       | [ADR-018](../adr/018_drawer_anatomy.md), [ADR-026](../adr/026_drawer_anatomy_polish.md) | `<DetailDrawer size="sm/md/lg/xl">` (DD1-DD11)                          |
+| Acciones completas en el detalle    | [ADR-044](../adr/044_detalle_con_set_completo_de_acciones.md)                           | footer del drawer/página con todas las acciones del documento (DA1-DA4) |
+| Data tables                         | [ADR-010](../adr/010_data_table.md)                                                     | `<DataTable>` sobre @tanstack/react-table (DT1-DT8)                     |
+| Module-level KPI strips             | [ADR-034](../adr/034_module_kpi_strips.md)                                              | `<ModuleKpiStrip>` deriva client-side del dataset (KPI1-KPI7)           |
 
 ### Forms y captura
 
