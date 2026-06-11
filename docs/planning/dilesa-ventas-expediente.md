@@ -270,6 +270,16 @@ expediente, copiloto), no reescritura.
   `20260611190612` aplicada). Template aprobado por Beto con prueba real
   (venta Limas M3-L16-LDLE-ISC). Ventas migradas de Coda sin `notario_id` ni
   vendedor-usuario omiten esas partes del correo con gracia.
+- **2026-06-11 (post-cierre — captura con contexto):** `<CapturarFaseHeader>`
+  monta la cabecera del expediente (`<OperacionResumen>`:
+  cliente/vivienda/comercial/mini-cuadratura) en las 17 pantallas de captura
+  vía hook nuevo `lib/dilesa/use-venta-resumen.ts` (motor único de
+  cuadratura, mismos insumos que el expediente; respeta scope vendedor;
+  fail-soft). Cierra el residuo del bullet #1 del problema ("captura a
+  ciegas"): el workspace dio contexto al detalle, pero los formularios de
+  captura seguían mostrando solo cliente + identificador. F11 muestra además
+  fecha de firma + notario de F10. De paso `mzLote`/`domicilio` ahora se
+  pueblan (el expediente los pasaba null).
 
 ## Decisiones registradas
 
