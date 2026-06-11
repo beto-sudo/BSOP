@@ -9,6 +9,10 @@
  *   - La transacción → dilesa.ventas (liga persona ↔ unidad).
  *   - El pipeline    → dilesa.venta_fases (una fila por fase alcanzada).
  *   - Los depósitos  → dilesa.venta_pagos (de la tabla Depositos Clientes).
+ *   - Al final sincroniza dilesa.unidades.estado con las ventas activas
+ *     (asignada/escriturada/entregada según fase; libera a 'terminada' las
+ *     asignadas sin venta activa) — sin esto el Inventario muestra como
+ *     disponibles unidades vendidas (bug M20-L34-LDLE, 2026-06-11).
  *
  * El expediente digital (PDFs) NO se importa aquí — es Fase 4.5.
  * Mapeo: docs/planning/dilesa-portafolio-mapeo-coda.md § 6.
@@ -516,10 +520,80 @@ async function main() {
     else okP += chunk.length;
   }
 
+  // ── unidades.estado: sincronizar con las ventas activas ─────────────────────
+  // El import de inventario congeló el estado de cada unidad al día del
+  // snapshot (2026-05-22); las asignaciones/desasignaciones posteriores en
+  // Coda no se reflejaban y el Inventario (filtra estado IN
+  // ('en_construccion','terminada')) ofrecía como disponibles unidades con
+  // venta activa encima — 16 casos detectados el 2026-06-11 (M20-L34-LDLE).
+  // Misma semántica que el flujo nativo (asignar → 'asignada', desasignar →
+  // 'terminada') + los hitos del mapEstado del import de inventario
+  // (fase ≥11 Escriturada → 'escriturada', ≥15 Entregada → 'entregada').
+  // Solo promueve — nunca degrada un estado de venta ya alcanzado — y no
+  // toca planeada/lote_urbanizado (preventa: la fase de obra sigue mandando).
+  const RANGO_ESTADO: Record<string, number> = { asignada: 1, escriturada: 2, entregada: 3 };
+  const estadoPorFase = (pos: number): string =>
+    pos >= 15 ? 'entregada' : pos >= 11 ? 'escriturada' : 'asignada';
+
+  // Fase máxima de las ventas activas por unidad — todas las ventas de la
+  // empresa (también las nativas BSOP), no solo las recién importadas.
+  const { data: ventasActivas, error: vaErr } = await sb
+    .schema('dilesa')
+    .from('ventas')
+    .select('unidad_id, fase_posicion')
+    .eq('empresa_id', empresaId)
+    .eq('estado', 'activa')
+    .is('deleted_at', null)
+    .not('unidad_id', 'is', null);
+  if (vaErr) throw new Error(`SELECT ventas activas: ${vaErr.message}`);
+  const faseMaxPorUnidad = new Map<string, number>();
+  for (const v of ventasActivas ?? []) {
+    const uid = v.unidad_id as string;
+    const pos = (v.fase_posicion as number | null) ?? 0;
+    faseMaxPorUnidad.set(uid, Math.max(faseMaxPorUnidad.get(uid) ?? 0, pos));
+  }
+
+  const { data: unidadesEstado, error: ueErr } = await sb
+    .schema('dilesa')
+    .from('unidades')
+    .select('id, identificador, estado')
+    .eq('empresa_id', empresaId)
+    .is('deleted_at', null);
+  if (ueErr) throw new Error(`SELECT unidades para sync: ${ueErr.message}`);
+
+  let okU = 0;
+  for (const u of unidadesEstado ?? []) {
+    const actual = u.estado as string;
+    const faseMax = faseMaxPorUnidad.get(u.id as string);
+    let target: string | null = null;
+    if (faseMax !== undefined) {
+      const objetivo = estadoPorFase(faseMax);
+      const promovible =
+        actual === 'en_construccion' ||
+        actual === 'terminada' ||
+        (RANGO_ESTADO[actual] ?? 99) < RANGO_ESTADO[objetivo];
+      if (promovible) target = objetivo;
+    } else if (actual === 'asignada') {
+      // Sin venta activa: liberar de vuelta al inventario (mismo destino que
+      // la desasignación nativa). escriturada/entregada no se revierten —
+      // son hechos consumados que Dirección maneja manual si hiciera falta.
+      target = 'terminada';
+    }
+    if (!target || target === actual) continue;
+    const { error } = await sb
+      .schema('dilesa')
+      .from('unidades')
+      .update({ estado: target })
+      .eq('id', u.id);
+    if (error) console.error(`✗ unidad ${u.identificador} → ${target}: ${error.message}`);
+    else okU++;
+  }
+
   console.log(
     `\n✔ UPSERT ${okV}/${registros.length} ventas, fases: ${okF} nuevas + ${updF} fechas actualizadas ` +
       `(${fasesInserts.length} en Coda, merge manual), ` +
-      `${okP} pagos${pagosHuerfanos ? ` (${pagosHuerfanos} depósitos sin venta — omitidos)` : ''}.`
+      `${okP} pagos${pagosHuerfanos ? ` (${pagosHuerfanos} depósitos sin venta — omitidos)` : ''}, ` +
+      `${okU} unidades con estado sincronizado.`
   );
 }
 

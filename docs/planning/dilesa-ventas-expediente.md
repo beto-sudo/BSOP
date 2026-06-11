@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (hotfix post-cutover: 61 ventas falsas-desasignadas reactivadas tras cruce Coda↔BSOP; regla de desasignación corregida en el import)
+**Última actualización:** 2026-06-11 (hotfix post-cutover #2: unidades.estado re-sincronizado con ventas activas — 17 unidades corregidas en prod, sync agregado al import de rescate)
 
 ## Problema
 
@@ -308,6 +308,19 @@ expediente, copiloto), no reescritura.
   "ADALBERTO SANTOS PRUEBA" — excluido, sigue desasignada. La regla quedó
   corregida también en `import_dilesa_ventas.ts` por si se usa el sync
   manual de rescate (#842).
+- **2026-06-11 (hotfix unidades.estado desincronizado):** Beto reportó que
+  M20-L34-LDLE aparecía en Inventario disponible estando vendida (venta de
+  Victor Manuel Luna, Escriturada). Causa: el import de inventario congeló
+  `unidades.estado` al snapshot del 2026-05-22 y el sync de ventas nunca lo
+  actualizaba — solo el flujo nativo de BSOP lo hace, y las ventas nacidas
+  en Coda no pasan por él. Backfill aplicado en prod con confirmación de
+  Beto: 16 unidades con venta activa que aparecían disponibles → `asignada`
+  (13) / `escriturada` (3, fase ≥11), y el caso espejo M2-L8-LDLE
+  (`asignada` con su única venta desasignada — cliente desperfilado) →
+  `terminada` (de vuelta al inventario). Verificación post-fix: 0
+  inconsistencias en ambas direcciones. `import_dilesa_ventas.ts` ahora
+  sincroniza `unidades.estado` al final de cada corrida (promueve por fase,
+  libera asignadas sin venta activa, nunca degrada escriturada/entregada).
 
 ## Decisiones registradas
 
@@ -369,3 +382,11 @@ expediente, copiloto), no reescritura.
   la reutilización de filas en Coda). Desasignada de verdad ⇔ ya sin
   `Inventario`. El `motivo_desasignacion` se conserva en ventas reactivadas
   como histórico de la reubicación.
+- **2026-06-11 (unidades.estado se deriva de las ventas activas):** Para el
+  ciclo comercial, `dilesa.unidades.estado` es derivado: venta activa fase
+  <11 → `asignada`, ≥11 → `escriturada`, ≥15 → `entregada`; sin venta activa
+  y `asignada` → se libera a `terminada`. Solo se promueve, nunca se degrada
+  (escriturada/entregada son hechos consumados); `planeada`/`lote_urbanizado`
+  no se tocan (en preventa manda la fase de obra). Vive en el flujo nativo
+  (asignar/desasignar/expirar) y en el sync de rescate
+  `import_dilesa_ventas.ts`.
