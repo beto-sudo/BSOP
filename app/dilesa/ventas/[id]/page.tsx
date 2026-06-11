@@ -150,6 +150,7 @@ type Persona = {
   email: string | null;
   telefono: string | null;
   curp: string | null;
+  numero_credencial_ine: string | null;
   rfc: string | null;
   nss: string | null;
   fecha_nacimiento: string | null;
@@ -472,7 +473,7 @@ function DetailInner() {
           .schema('erp')
           .from('personas')
           .select(
-            'nombre, apellido_paterno, apellido_materno, email, telefono, curp, rfc, nss, fecha_nacimiento, nacionalidad, tipo_persona, estado_civil, domicilio'
+            'nombre, apellido_paterno, apellido_materno, email, telefono, curp, numero_credencial_ine, rfc, nss, fecha_nacimiento, nacionalidad, tipo_persona, estado_civil, domicilio'
           )
           .eq('id', ventaRow.persona_id)
           .maybeSingle(),
@@ -1073,6 +1074,8 @@ function DetailInner() {
           nombre: clienteNombre || '(sin nombre)',
           contacto: [persona?.telefono, persona?.email].filter(Boolean).join(' · ') || null,
           curp: persona?.curp ?? null,
+          // INE de la persona; fallback al del KYC de la venta (migradas Coda).
+          ine: persona?.numero_credencial_ine ?? venta.ine_numero ?? null,
         }}
         vivienda={{
           proyecto: proyectoNombre,
