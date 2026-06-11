@@ -1,16 +1,24 @@
 'use client';
 
 /**
- * Captura Fase 12 — Detonada (Sprint 7j).
+ * Captura Fase 12 — Detonada (Sprint 7j) — RESPALDO MANUAL.
  *
  * "Detonar" el crédito = la institución libera el recurso y DILESA recibe el
- * depósito. Se registra la fecha (y el monto recibido) y se sube el
- * comprobante del depósito.
+ * depósito. Desde el 2026-06-11 el camino normal es AUTOMÁTICO: Contabilidad
+ * registra el abono de la institución en Cobranza y el trigger
+ * `dilesa.fn_detonar_venta_desde_cxc` (migración 20260611174917) cierra esta
+ * fase solo — un registro, un lugar, y el dinero queda en CxC (diseño de
+ * Beto). Esta pantalla queda como fallback (mismo patrón que F8 manual vs
+ * magic link del notario).
  *
- * Captura:
+ * Captura (fallback):
  *   - `fecha_detonacion` → fecha del depósito (default hoy)
  *   - `monto_detonado` → monto recibido (opcional, cuadratura)
  *   - Doc requerido: rol `imagen_detonacion` (comprobante del depósito).
+ *
+ * OJO: cerrar por aquí NO registra el abono en Cobranza — si se usa el
+ * fallback, el depósito se registra aparte en CxC (el trigger en ese caso
+ * solo completa monto/fecha si quedaron vacíos).
  *
  * Enforcement: Fase 11 (Escriturada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase12_detonada` (Contabilidad + Gerencia Ventas +

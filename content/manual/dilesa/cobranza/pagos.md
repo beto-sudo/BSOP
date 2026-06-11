@@ -30,6 +30,12 @@ aplica solo a los **cargos abiertos** de esa venta.
 - **Institución** — el dinero viene de **INFONAVIT / FOVISSSTE / banco** (la
   disposición del crédito).
 
+> **Efecto en ventas:** al registrar un abono de **Institución** aplicado a
+> una venta que está **Escriturada**, la venta avanza sola a la fase
+> **Detonada** — con la fecha del depósito, el registro en su bitácora y el
+> comprobante copiado a su expediente. Un solo registro cierra el ciclo del
+> dinero y el del proceso.
+
 Es una etiqueta para la cobranza; no cambia cómo se aplica el abono.
 
 ## Preguntas frecuentes
