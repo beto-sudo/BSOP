@@ -5300,6 +5300,10 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_construccion_capturar_costo_materiales: {
+        Args: { p_construccion_id: string; p_costo: number }
+        Returns: undefined
+      }
       fn_es_vendedor_restringido: { Args: never; Returns: boolean }
       fn_estimaciones_backfill_incremental: {
         Args: never

@@ -245,13 +245,12 @@ export function CostoMaterialesModule({ empresaId }: { empresaId: string }) {
     async (row: Row, costo: number) => {
       setSavingId(row.id);
       const sb = createSupabaseBrowserClient();
-      // RPC nueva — types/supabase.ts se regenera post-migración; mismo
-      // cast que usa recepciones-module con oc_recibir_linea_partida.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('dilesa') as any).rpc(
-        'fn_construccion_capturar_costo_materiales',
-        { p_construccion_id: row.id, p_costo: costo }
-      );
+      const { error: e } = await sb
+        .schema('dilesa')
+        .rpc('fn_construccion_capturar_costo_materiales', {
+          p_construccion_id: row.id,
+          p_costo: costo,
+        });
       setSavingId(null);
       if (e) {
         toast.add({
