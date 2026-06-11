@@ -56,8 +56,11 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // del primer tab (`.pagos`). ADR-030 SS2.
   '/dilesa/cobranza': 'dilesa.cobranza.pagos',
   '/dilesa/cobranza/aging': 'dilesa.cobranza.aging',
-  // Saldos Bancos — módulo plano de Tesorería (iniciativa `tesoreria`).
-  '/dilesa/saldos-bancos': 'dilesa.saldos-bancos',
+  // Saldos Bancos — hub con 2 tabs (iniciativa `conciliacion-bancaria` v0,
+  // ADR-030). El padre `dilesa.saldos-bancos` queda como umbrella; la URL
+  // default mapea al sub-slug del primer tab (`.saldos`).
+  '/dilesa/saldos-bancos': 'dilesa.saldos-bancos.saldos',
+  '/dilesa/saldos-bancos/estados': 'dilesa.saldos-bancos.estados',
   // RUV (Registro Único de Vivienda · INFONAVIT) — módulo plano. Iniciativa
   // `dilesa-ruv`. Capa de oferta + checklist de documentos encima de
   // dilesa.construccion (que ya tiene CUV + hitos del trámite por vivienda).
@@ -178,6 +181,7 @@ export const HUB_PARENT_BY_ROUTE: Record<string, string> = {
   '/dilesa/cxp': 'dilesa.cxp',
   '/dilesa/construccion': 'dilesa.construccion',
   '/dilesa/compras': 'dilesa.compras',
+  '/dilesa/saldos-bancos': 'dilesa.saldos-bancos',
   '/rdb/cxp': 'rdb.cxp',
   '/rdb/productos': 'rdb.productos',
   '/rdb/inventario': 'rdb.inventario',

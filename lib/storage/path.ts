@@ -44,7 +44,8 @@ export type AdjuntoEntidad =
   | 'cotizaciones'
   | 'frentes'
   | 'presupuesto_cambios'
-  | 'presupuesto_partidas';
+  | 'presupuesto_partidas'
+  | 'estados_cuenta';
 
 export type BuildAdjuntoPathOpts = {
   empresa: EmpresaSlug;

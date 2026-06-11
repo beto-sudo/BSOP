@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Landmark, Plus, RefreshCw, Wallet } from 'lucide-react';
+import { IdCard, Plus, RefreshCw, Wallet } from 'lucide-react';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SaldoCaptureDrawer } from '@/components/dilesa/saldo-capture-drawer';
+import { CuentaFichaDrawer } from '@/components/dilesa/cuenta-ficha-drawer';
 import {
   type CuentaSaldoRow,
   computeAntiguedadDias,
@@ -63,6 +64,7 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | string | null>(null);
   const [capturaCuenta, setCapturaCuenta] = useState<CuentaSaldoRow | null>(null);
+  const [fichaCuenta, setFichaCuenta] = useState<CuentaSaldoRow | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -76,7 +78,9 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
       sb
         .schema('erp')
         .from('cuentas_bancarias')
-        .select('id, nombre, banco, moneda_id')
+        .select(
+          'id, nombre, banco, moneda, tipo, numero_cuenta, clabe, numero_cliente, contrato, sucursal, telefono, contacto, titular, notas'
+        )
         .eq('empresa_id', empresaId)
         .eq('activo', true)
         .order('nombre', { ascending: true }),
@@ -108,10 +112,22 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
         cuentaId: c.id,
         nombre: c.nombre,
         banco: c.banco,
-        moneda: monedaDeCuenta(c.nombre, c.banco),
+        moneda: monedaDeCuenta(c.nombre, c.banco, c.moneda),
         saldo: s?.saldo ?? null,
         fechaSaldo: s?.fecha_saldo ?? null,
         capturadoAt: s?.capturado_at ?? null,
+        ficha: {
+          tipo: c.tipo,
+          numeroCuenta: c.numero_cuenta,
+          clabe: c.clabe,
+          numeroCliente: c.numero_cliente,
+          contrato: c.contrato,
+          sucursal: c.sucursal,
+          telefono: c.telefono,
+          contacto: c.contacto,
+          titular: c.titular,
+          notas: c.notas,
+        },
       };
     });
 
@@ -233,16 +249,28 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
       align: 'right',
       render: (r) => (
         <DataTable.InteractiveCell>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setCapturaCuenta(r)}
-            className="gap-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Capturar saldo
-          </Button>
+          <div className="flex items-center justify-end gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFichaCuenta(r)}
+              className="gap-1.5"
+            >
+              <IdCard className="h-3.5 w-3.5" />
+              Ficha
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCapturaCuenta(r)}
+              className="gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Capturar saldo
+            </Button>
+          </div>
         </DataTable.InteractiveCell>
       ),
     },
@@ -250,28 +278,17 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
 
   return (
     <div className="space-y-6 p-6">
-      <header className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
-          <Landmark className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-            Saldos Bancos
-          </h1>
-          <p className="text-sm text-[var(--text)]/60">
-            Saldo actual de cada cuenta bancaria de DILESA. Captura un snapshot fechado por cuenta;
-            el historial alimenta el correo diario al Consejo.
-          </p>
-        </div>
+      {/* El título del módulo vive en el layout (ModuleHeader + tabs, ADR-030). */}
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={() => void cargar()}
-          className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+          className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </button>
-      </header>
+      </div>
 
       <ModuleKpiStrip stats={kpis} cols={4} />
 
@@ -297,6 +314,14 @@ export function SaldosBancosModule({ empresaId = DILESA_EMPRESA_ID }: { empresaI
           if (!o) setCapturaCuenta(null);
         }}
         onDone={() => void cargar()}
+      />
+
+      <CuentaFichaDrawer
+        cuenta={fichaCuenta}
+        open={fichaCuenta != null}
+        onOpenChange={(o) => {
+          if (!o) setFichaCuenta(null);
+        }}
       />
     </div>
   );

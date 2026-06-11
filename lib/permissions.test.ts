@@ -311,8 +311,12 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.cxp.pagos',
   'dilesa.cxp.aging',
   'dilesa.cxp.proveedores',
-  // Saldos Bancos — módulo plano de Tesorería (iniciativa `tesoreria`).
+  // Saldos Bancos — umbrella + 2 sub-slugs por tab (iniciativa
+  // `conciliacion-bancaria` v0, ADR-030). Migración
+  // 20260611213221_modulos_saldos_bancos_subslugs.sql.
   'dilesa.saldos-bancos',
+  'dilesa.saldos-bancos.saldos',
+  'dilesa.saldos-bancos.estados',
   // RUV (Registro Único de Vivienda) — módulo plano (iniciativa `dilesa-ruv`,
   // Sprint 1). Migración 20260608214309_dilesa_ruv_modulo.sql.
   'dilesa.ruv',
