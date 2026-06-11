@@ -3,16 +3,21 @@
 /**
  * ContratosModule — lista de contratos de construcción DILESA.
  *
- * Iniciativa dilesa-construccion · Sprint tabs+protos. Tab "Contratos" del
- * hub Construcción. Lista filtrable de los contratos en
- * `dilesa.contratos_construccion`: código, fecha, contratista (lookup
- * cross-schema vía erp.personas), proyecto (lookup dilesa.proyectos),
- * valor total, # lotes asignados (count en `contrato_lotes`).
+ * Iniciativa dilesa-construccion · Sprint tabs+protos; sub-vistas por tipo
+ * de dilesa-contratos-estimaciones · Sprint 2. Tab "Contratos" del hub
+ * Construcción, dividido en dos vistas (los dos sistemas son distintos y
+ * estaban revueltos):
+ *
+ *   - **Vivienda**: contratos de MO por lotes (destajos semanales,
+ *     ADR-033) — columnas código/contratista/lotes/valor MO.
+ *   - **Obra de proyecto**: urbanización / obra de cabecera / tarea menor
+ *     (ADR-038) — columnas con badge de tipo, contratado, devengado
+ *     (Σ estimaciones autorizadas, D4) y por devengar; KPIs propios.
  *
  * Click en fila → /dilesa/construccion/contratos/[id] con la ficha
- * completa: datos generales, lotes asignados con avance, KPIs MO.
+ * completa.
  *
- * Carga cross-schema con 4 queries paralelas + lookups Map (mismo patrón
+ * Carga cross-schema con queries paralelas + lookups Map (mismo patrón
  * que construccion-module / contratistas-module — evita embeds de
  * PostgREST cuando la tabla embebida vive en > 1 schema y permite
  * filtros sobre los nombres derivados sin hits adicionales).
@@ -34,9 +39,10 @@ import {
   isInDateRange,
   type DateRange,
 } from '@/components/filters/date-range-filter';
-import { FileText, Plus, RefreshCw, Search } from 'lucide-react';
+import { FileText, HardHat, Plus, RefreshCw, Search, Wrench } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import { TIPO_CONTRATO_LABEL } from '@/lib/dilesa/contratos-estado-cuenta';
 
 export type ContratoRow = {
   id: string;
@@ -45,6 +51,8 @@ export type ContratoRow = {
   contratista_id: string;
   proyecto_id: string | null;
   valor_total: number;
+  /** vivienda | urbanizacion | obra_cabecera | tarea_menor (ADR-038). */
+  tipo: string;
   /** Cancelado (p2p-cancelaciones): badge en la lista; excluido de KPI/comprometido. */
   cancelada_at: string | null;
   /** Computed: nombre del contratista (erp.personas). */
@@ -54,7 +62,15 @@ export type ContratoRow = {
   proyectoNombre: string;
   /** Computed: count de contrato_lotes (no soft-deleted). */
   lotesCount: number;
+  /** Computed: Σ estimaciones autorizadas+pagadas (devengo, D4). Solo obra. */
+  devengado: number;
 };
+
+export type VistaContratos = 'vivienda' | 'obra';
+
+export function esContratoObra(c: Pick<ContratoRow, 'tipo'>): boolean {
+  return c.tipo !== 'vivienda';
+}
 
 /**
  * KPIs reactivos a filtros — ADR-034. Pivote vs curaduría: "% consumido
@@ -103,6 +119,43 @@ export function deriveKpis(rows: readonly ContratoRow[]): readonly ModuleKpi[] {
   ];
 }
 
+/**
+ * KPIs de la vista Obra de proyecto (dilesa-contratos-estimaciones S2):
+ * el pulso financiero del portafolio de contratos de obra. Los cancelados
+ * cuentan en "Contratos" (visibles con badge) pero NO suman dinero —
+ * espejo del comprometido de v_partida_control (ADR-042).
+ */
+export function deriveKpisObra(rows: readonly ContratoRow[]): readonly ModuleKpi[] {
+  const activos = rows.filter((r) => !r.cancelada_at);
+  const contratado = activos.reduce((acc, r) => acc + (r.valor_total ?? 0), 0);
+  const devengado = activos.reduce((acc, r) => acc + (r.devengado ?? 0), 0);
+  const avancePct = contratado > 0 ? (devengado / contratado) * 100 : null;
+
+  return [
+    { key: 'total', label: 'Contratos', value: rows.length },
+    {
+      key: 'contratado',
+      label: 'Contratado',
+      value: activos.length === 0 ? '—' : formatCurrency(contratado, { compact: true }),
+    },
+    {
+      key: 'devengado',
+      label: 'Devengado (Σ est. autorizadas)',
+      value: activos.length === 0 ? '—' : formatCurrency(devengado, { compact: true }),
+    },
+    {
+      key: 'por_devengar',
+      label: 'Por devengar',
+      value: activos.length === 0 ? '—' : formatCurrency(contratado - devengado, { compact: true }),
+    },
+    {
+      key: 'avance',
+      label: 'Avance financiero',
+      value: avancePct == null ? '—' : `${avancePct.toFixed(0)}%`,
+    },
+  ];
+}
+
 export function ContratosModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
   const { permissions } = usePermissions();
@@ -112,6 +165,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
   const [contratos, setContratos] = useState<ContratoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [vista, setVista] = useState<VistaContratos>('vivienda');
   const [search, setSearch] = useState('');
   const [contratistaFiltro, setContratistaFiltro] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
@@ -123,47 +177,58 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
   }> => {
     const sb = createSupabaseBrowserClient();
 
-    // 4 queries paralelas: contratos + contrato_lotes (para count) +
-    // personas (contratistas) + proyectos (+ satélite de abrev en aparte
-    // para no inflar el cross-join).
-    const [contratosRes, lotesRes, personasRes, proyectosRes, datosRes] = await Promise.all([
-      sb
-        .schema('dilesa')
-        .from('contratos_construccion')
-        .select(
-          'id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total, cancelada_at'
-        )
-        .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
-      sb
-        .schema('dilesa')
-        .from('contrato_lotes')
-        .select('contrato_id')
-        .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
-      sb
-        .schema('erp')
-        .from('personas')
-        .select('id, nombre, apellido_paterno, apellido_materno')
-        .eq('empresa_id', empresaId)
-        .eq('tipo', 'contratista'),
-      sb
-        .schema('dilesa')
-        .from('proyectos')
-        .select('id, nombre')
-        .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
-      sb
-        .schema('dilesa')
-        .from('contratistas_datos')
-        .select('persona_id, abreviacion')
-        .eq('empresa_id', empresaId)
-        .is('deleted_at', null),
-    ]);
+    // Queries paralelas: contratos + contrato_lotes (count vivienda) +
+    // estimaciones (devengado obra) + personas (contratistas) + proyectos
+    // (+ satélite de abrev en aparte para no inflar el cross-join).
+    const [contratosRes, lotesRes, estimacionesRes, personasRes, proyectosRes, datosRes] =
+      await Promise.all([
+        sb
+          .schema('dilesa')
+          .from('contratos_construccion')
+          .select(
+            'id, codigo, fecha_contrato, contratista_id, proyecto_id, valor_total, tipo, cancelada_at'
+          )
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+        sb
+          .schema('dilesa')
+          .from('contrato_lotes')
+          .select('contrato_id')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+        // Devengado por contrato (D4) = Σ estimaciones autorizadas+pagadas.
+        // `estado` (S1) aún no está en types — se regeneran al aplicar.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb.schema('dilesa') as any)
+          .from('obra_estimaciones')
+          .select('contrato_id, monto_total, estado')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null)
+          .in('estado', ['autorizada', 'pagada']),
+        sb
+          .schema('erp')
+          .from('personas')
+          .select('id, nombre, apellido_paterno, apellido_materno')
+          .eq('empresa_id', empresaId)
+          .eq('tipo', 'contratista'),
+        sb
+          .schema('dilesa')
+          .from('proyectos')
+          .select('id, nombre')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+        sb
+          .schema('dilesa')
+          .from('contratistas_datos')
+          .select('persona_id, abreviacion')
+          .eq('empresa_id', empresaId)
+          .is('deleted_at', null),
+      ]);
 
     const firstErr =
       contratosRes.error ??
       lotesRes.error ??
+      estimacionesRes.error ??
       personasRes.error ??
       proyectosRes.error ??
       datosRes.error;
@@ -189,6 +254,16 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
       lotesByContrato.set(cid, (lotesByContrato.get(cid) ?? 0) + 1);
     }
 
+    const devengadoByContrato = new Map<string, number>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const e of (estimacionesRes.data ?? []) as any[]) {
+      const cid = e.contrato_id as string;
+      devengadoByContrato.set(
+        cid,
+        (devengadoByContrato.get(cid) ?? 0) + Number(e.monto_total ?? 0)
+      );
+    }
+
     const rows: ContratoRow[] = (contratosRes.data ?? []).map((c) => {
       const cid = c.contratista_id as string;
       const pid = c.proyecto_id as string | null;
@@ -200,10 +275,12 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
         contratista_id: cid,
         proyecto_id: pid,
         valor_total: Number(c.valor_total ?? 0),
+        tipo: (c.tipo as string) ?? 'vivienda',
         contratistaNombre: personaMap.get(cid) ?? '(sin contratista)',
         contratistaAbreviacion: abrevMap.get(cid) ?? null,
         proyectoNombre: pid ? (proyectoMap.get(pid) ?? '') : '',
         lotesCount: lotesByContrato.get(c.id as string) ?? 0,
+        devengado: devengadoByContrato.get(c.id as string) ?? 0,
       };
     });
 
@@ -245,9 +322,18 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
     [contratos]
   );
 
+  const conteoVistas = useMemo(
+    () => ({
+      vivienda: contratos.filter((c) => !esContratoObra(c)).length,
+      obra: contratos.filter(esContratoObra).length,
+    }),
+    [contratos]
+  );
+
   const filtrados = useMemo(() => {
     const q = search.trim().toLowerCase();
     return contratos.filter((c) => {
+      if (vista === 'obra' ? !esContratoObra(c) : esContratoObra(c)) return false;
       if (contratistaFiltro && c.contratistaNombre !== contratistaFiltro) return false;
       if (proyectoFiltro && c.proyectoNombre !== proyectoFiltro) return false;
       if (!isInDateRange(c.fecha_contrato, rangoFecha)) return false;
@@ -260,55 +346,91 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
       }
       return true;
     });
-  }, [contratos, search, contratistaFiltro, proyectoFiltro, rangoFecha]);
+  }, [contratos, vista, search, contratistaFiltro, proyectoFiltro, rangoFecha]);
 
-  const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
+  const kpis = useMemo(
+    () => (vista === 'obra' ? deriveKpisObra(filtrados) : deriveKpis(filtrados)),
+    [vista, filtrados]
+  );
 
-  const columns: Column<ContratoRow>[] = [
-    {
-      key: 'codigo',
-      label: 'Código',
-      type: 'custom',
-      accessor: (c) => c.codigo,
-      sticky: true,
-      width: 'min-w-[240px]',
-      render: (c) =>
-        c.cancelada_at ? (
-          <span className="flex items-center gap-1.5">
-            <span className="text-[var(--text)]/60 line-through">{c.codigo}</span>
-            <span className="rounded bg-destructive/10 px-1 text-[10px] text-destructive">
-              cancelado
-            </span>
+  const colCodigo: Column<ContratoRow> = {
+    key: 'codigo',
+    label: 'Código',
+    type: 'custom',
+    accessor: (c) => c.codigo,
+    sticky: true,
+    width: 'min-w-[240px]',
+    render: (c) =>
+      c.cancelada_at ? (
+        <span className="flex items-center gap-1.5">
+          <span className="text-[var(--text)]/60 line-through">{c.codigo}</span>
+          <span className="rounded bg-destructive/10 px-1 text-[10px] text-destructive">
+            cancelado
           </span>
-        ) : (
-          c.codigo
-        ),
-    },
+        </span>
+      ) : (
+        c.codigo
+      ),
+  };
+  const colContratista: Column<ContratoRow> = {
+    key: 'contratistaNombre',
+    label: 'Contratista',
+    type: 'custom',
+    accessor: (c) => c.contratistaNombre,
+    render: (c) =>
+      c.contratistaAbreviacion ? (
+        <span title={c.contratistaNombre}>
+          <span className="font-medium">{c.contratistaAbreviacion}</span>
+          <span className="ml-1 text-[var(--text)]/40">·</span>
+          <span className="ml-1 text-[var(--text)]/60">{c.contratistaNombre}</span>
+        </span>
+      ) : (
+        c.contratistaNombre
+      ),
+  };
+  const colProyecto: Column<ContratoRow> = {
+    key: 'proyectoNombre',
+    label: 'Proyecto',
+    type: 'text',
+    render: (c) => c.proyectoNombre || '—',
+  };
+
+  const columnsVivienda: Column<ContratoRow>[] = [
+    colCodigo,
     { key: 'fecha_contrato', label: 'Fecha', type: 'date' },
-    {
-      key: 'contratistaNombre',
-      label: 'Contratista',
-      type: 'custom',
-      accessor: (c) => c.contratistaNombre,
-      render: (c) =>
-        c.contratistaAbreviacion ? (
-          <span title={c.contratistaNombre}>
-            <span className="font-medium">{c.contratistaAbreviacion}</span>
-            <span className="ml-1 text-[var(--text)]/40">·</span>
-            <span className="ml-1 text-[var(--text)]/60">{c.contratistaNombre}</span>
-          </span>
-        ) : (
-          c.contratistaNombre
-        ),
-    },
-    {
-      key: 'proyectoNombre',
-      label: 'Proyecto',
-      type: 'text',
-      render: (c) => c.proyectoNombre || '—',
-    },
+    colContratista,
+    colProyecto,
     { key: 'lotesCount', label: 'Lotes', type: 'number' },
     { key: 'valor_total', label: 'Valor MO', type: 'currency' },
+  ];
+
+  const columnsObra: Column<ContratoRow>[] = [
+    colCodigo,
+    { key: 'fecha_contrato', label: 'Fecha', type: 'date' },
+    colContratista,
+    colProyecto,
+    {
+      key: 'tipo',
+      label: 'Tipo',
+      type: 'custom',
+      accessor: (c) => TIPO_CONTRATO_LABEL[c.tipo] ?? c.tipo,
+      render: (c) => (
+        <span className="inline-block rounded bg-[var(--text)]/5 px-1.5 py-0.5 text-[11px] text-[var(--text)]/70">
+          {TIPO_CONTRATO_LABEL[c.tipo] ?? c.tipo}
+        </span>
+      ),
+    },
+    { key: 'valor_total', label: 'Contratado', type: 'currency' },
+    { key: 'devengado', label: 'Devengado', type: 'currency' },
+    {
+      key: 'por_devengar',
+      label: 'Por devengar',
+      type: 'custom',
+      accessor: (c) => c.valor_total - c.devengado,
+      render: (c) => (
+        <span className="tabular-nums">{formatCurrency(c.valor_total - c.devengado)}</span>
+      ),
+    },
   ];
 
   const onRowClick = (c: ContratoRow) => {
@@ -324,11 +446,33 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Contratos</h1>
           <p className="text-sm text-[var(--text)]/60">
-            Contratos de construcción con contratistas. Cada uno cubre 1+ lotes con su precio MO/m²
-            y arranca obras en una sola operación.
+            {vista === 'vivienda'
+              ? 'Contratos de MO por lotes. Cada uno cubre 1+ lotes con su precio MO/m² y arranca obras en una sola operación; se pagan por destajos semanales.'
+              : 'Contratos de obra del proyecto (urbanización, cabecera, tareas menores). Su avance se devenga con estimaciones autorizadas por Dirección.'}
           </p>
         </div>
       </header>
+
+      {/* Sub-vistas por tipo (dilesa-contratos-estimaciones S2): vivienda y
+          obra de proyecto son sistemas distintos (destajos vs estimaciones). */}
+      <div
+        role="tablist"
+        aria-label="Tipo de contrato"
+        className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--card)] p-0.5"
+      >
+        <VistaTab
+          activa={vista === 'vivienda'}
+          onClick={() => setVista('vivienda')}
+          icon={<HardHat className="h-3.5 w-3.5" />}
+          label={`Vivienda (${conteoVistas.vivienda})`}
+        />
+        <VistaTab
+          activa={vista === 'obra'}
+          onClick={() => setVista('obra')}
+          icon={<Wrench className="h-3.5 w-3.5" />}
+          label={`Obra de proyecto (${conteoVistas.obra})`}
+        />
+      </div>
 
       <ModuleKpiStrip stats={kpis} cols={5} />
 
@@ -383,7 +527,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
         <span className="ml-auto text-sm text-[var(--text)]/60">
           {filtrados.length} de {contratos.length} contratos
         </span>
-        {puedeCrear ? (
+        {puedeCrear && vista === 'vivienda' ? (
           <Link
             href="/dilesa/construccion/contratos/nuevo"
             className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
@@ -392,10 +536,10 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
             Nuevo contrato + arranques
           </Link>
         ) : null}
-        {puedeCrear ? (
+        {puedeCrear && vista === 'obra' ? (
           <Link
             href="/dilesa/construccion/contratos/nuevo-obra"
-            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm font-medium text-[var(--text)]/80 hover:text-[var(--text)]"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" />
             Nuevo contrato de obra
@@ -405,7 +549,7 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
 
       <DataTable
         data={filtrados}
-        columns={columns}
+        columns={vista === 'obra' ? columnsObra : columnsVivienda}
         rowKey="id"
         loading={loading}
         error={error}
@@ -418,5 +562,34 @@ export function ContratosModule({ empresaId }: { empresaId: string }) {
         maxHeight="calc(100vh - 280px)"
       />
     </div>
+  );
+}
+
+function VistaTab({
+  activa,
+  onClick,
+  icon,
+  label,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={activa}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+        activa
+          ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+          : 'text-[var(--text)]/60 hover:text-[var(--text)]'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

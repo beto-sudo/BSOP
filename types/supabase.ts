@@ -11138,6 +11138,10 @@ export type Database = {
         Args: { p_levantamiento_id: string }
         Returns: undefined
       }
+      fn_cxp_recalc_factura: {
+        Args: { p_factura_id: string }
+        Returns: undefined
+      }
       fn_es_direccion: { Args: { p_empresa_id: string }; Returns: boolean }
       fn_firmar_levantamiento: {
         Args: {

@@ -27,6 +27,8 @@ export type EstimacionPdfData = {
   obras: Array<{
     unidad: string;
     construccionCodigo: string;
+    /** Código(s) del contrato de obra al que pertenece la vivienda — referencia para la factura. */
+    contrato: string | null;
     tareas: Array<{ nombre: string; fechaTerminada: string; monto: number }>;
     subtotal: number;
   }>;
@@ -47,6 +49,9 @@ export function EstimacionPDF({ data }: { data: EstimacionPdfData }) {
   const contratistaDisplay = data.contratista.abreviacion
     ? `${data.contratista.abreviacion} · ${data.contratista.nombre}`
     : data.contratista.nombre;
+  const contratosUnicos = [
+    ...new Set(data.obras.flatMap((o) => (o.contrato ? o.contrato.split(', ') : []))),
+  ];
 
   return (
     <Document title={`Estimación ${data.codigo}`}>
@@ -77,6 +82,12 @@ export function EstimacionPDF({ data }: { data: EstimacionPdfData }) {
               <Text style={obraHeaderCodigo}>{obra.construccionCodigo}</Text>
               <Text style={obraHeaderSubtotal}>{m(obra.subtotal)}</Text>
             </View>
+            {obra.contrato ? (
+              <View style={obraContratoRow}>
+                <Text style={obraContratoLabel}>Contrato</Text>
+                <Text style={obraContratoValue}>{obra.contrato}</Text>
+              </View>
+            ) : null}
             {/* Filas de tareas */}
             <View style={tablaHeader}>
               <Text style={[tablaCellNombre, tablaHeaderText]}>Tarea</Text>
@@ -121,6 +132,13 @@ export function EstimacionPDF({ data }: { data: EstimacionPdfData }) {
             recibida la factura por correo a facturas@dilesa.mx, se programará el pago para la fecha
             indicada arriba.
           </Text>
+          {contratosUnicos.length ? (
+            <Text style={solicitudTexto}>
+              Favor de referenciar en la factura{' '}
+              {contratosUnicos.length === 1 ? 'el contrato' : 'los contratos'}:{' '}
+              <Text style={solicitudContrato}>{contratosUnicos.join(', ')}</Text>
+            </Text>
+          ) : null}
         </View>
 
         <FooterBand />
@@ -184,6 +202,22 @@ const obraHeaderSubtotal = {
   textAlign: 'right' as const,
   color: '#111',
 };
+// Segunda línea del bloque gris del header: contrato de la vivienda
+// (referencia que el contratista copia a su factura).
+const obraContratoRow = {
+  flexDirection: 'row' as const,
+  backgroundColor: '#f0f0f0',
+  paddingHorizontal: 4,
+  paddingBottom: 4,
+  alignItems: 'center' as const,
+};
+const obraContratoLabel = {
+  fontSize: 7,
+  color: '#666',
+  textTransform: 'uppercase' as const,
+  marginRight: 6,
+};
+const obraContratoValue = { fontSize: 8.5, fontWeight: 'bold' as const, color: '#333' };
 
 const tablaHeader = {
   flexDirection: 'row' as const,
@@ -257,3 +291,4 @@ const solicitudReceptor = {
   color: '#111',
   marginVertical: 2,
 };
+const solicitudContrato = { fontWeight: 'bold' as const, color: '#111' };
