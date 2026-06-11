@@ -47,18 +47,19 @@ responsable — ver la tabla de abajo).
 
 ## ¿Qué fase le toca a quién?
 
-| Etapa          | Fases                              | Quién captura                              |
-| -------------- | ---------------------------------- | ------------------------------------------ |
-| Comercial      | 1 Solicitud                        | **Vendedor**                               |
-| Comercial      | 2 Asignada (autorización)          | Dirección                                  |
-| Comercial      | 3 Formalizada                      | Gerencia Ventas                            |
-| Crédito        | 4-9 (avalúo → validación patronal) | Gerencia Ventas                            |
-| Cierre legal   | 10-12 (firmas → detonada)          | Gerencia Ventas / Dirección / Contabilidad |
-| Administrativo | 13 Facturada                       | Contabilidad                               |
-| Entrega        | 14 Preparada                       | Obra                                       |
-| Entrega        | 15 Entregada                       | **Vendedor** + Atención a Clientes         |
-| Entrega        | 16 Conformidad                     | Se cierra sola (encuesta al cliente)       |
-| Entrega        | 17 Terminada                       | Dirección (el sistema verifica todo)       |
+| Etapa          | Fases                              | Quién captura                                        |
+| -------------- | ---------------------------------- | ---------------------------------------------------- |
+| Comercial      | 1 Solicitud                        | **Vendedor**                                         |
+| Comercial      | 2 Asignada (autorización)          | Dirección                                            |
+| Comercial      | 3 Formalizada                      | Gerencia Ventas                                      |
+| Crédito        | 4-9 (avalúo → validación patronal) | Gerencia Ventas                                      |
+| Cierre legal   | 10-11 (firmas → escriturada)       | Gerencia Ventas / Dirección                          |
+| Cierre legal   | 12 Detonada                        | Se cierra sola (abono de la institución en Cobranza) |
+| Administrativo | 13 Facturada                       | Contabilidad                                         |
+| Entrega        | 14 Preparada                       | Obra                                                 |
+| Entrega        | 15 Entregada                       | **Vendedor** + Atención a Clientes                   |
+| Entrega        | 16 Conformidad                     | Se cierra sola (encuesta al cliente)                 |
+| Entrega        | 17 Terminada                       | Dirección (el sistema verifica todo)                 |
 
 ## El copiloto de cierre
 

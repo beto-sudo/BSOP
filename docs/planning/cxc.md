@@ -7,7 +7,7 @@
 **Próximo hito:** Limpieza de ~$2.0M en saldos a favor (185 ventas, depósitos Infonavit/Fovissste capturados ≥ precio — requiere regla + OK de Beto). Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Liquidación histórica de $721.7M aplicada y verificada 2026-06-10
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-10 (liquidación histórica aplicada a prod y verificada: aging queda solo con cartera en proceso, 69 ventas / $79.7M)
+**Última actualización:** 2026-06-11 (abono de institución en Cobranza detona la venta — trigger CxC→F12, un solo registro cierra dinero y proceso)
 
 ## Problema
 
@@ -267,6 +267,22 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-11 — Abono de institución detona la venta (CxC → pipeline F12)
+
+Diseño de Beto al cuadrar la operación Luna Heredia: el registro del
+depósito de la detonación debe vivir UNA vez, en Cobranza, y la fase 12 del
+pipeline de ventas es consecuencia. Trigger
+`dilesa.fn_detonar_venta_desde_cxc` (migración `20260611174917`, AFTER
+INSERT en `erp.cxc_pago_aplicaciones`): abono `fuente='institucion'`
+aplicado a un cargo de una venta en F11 (Escriturada) → cierra Detonada
+con la fecha del pago + `monto_detonado`/`fecha_detonacion` + copia el
+comprobante del abono al expediente (`rol='imagen_detonacion'`). Fail-open
+(un error degrada a WARNING, nunca bloquea el registro del pago);
+cancelar el pago NO revierte la fase (eso es manual de Dirección). La
+pantalla F12 queda como respaldo manual. Contexto raíz: F12 no registraba
+el abono en CxC, y sin ese abono la cuadratura (Valor Real Venta Dilesa)
+quedaba coja para siempre en ventas nuevas post-cutover.
 
 ### 2026-06-10 — Migración de liquidación histórica creada y APLICADA a prod
 
