@@ -118,6 +118,8 @@ type Proveedor = {
   nombre_comercial: string | null;
   condiciones_pago: string | null;
   categoria: string | null;
+  /** Código interno; para categoría notaría es el número de notaría. */
+  codigo: string | null;
   /**
    * Tasa de IVA principal del proveedor en decimal:
    * 0=exento, 0.08=frontera, 0.16=general. NULL si aún no se captura.
@@ -289,6 +291,11 @@ function ProveedorDetail({
       icon: null,
     },
     {
+      label: proveedor.categoria === 'notaria' ? 'Número de notaría' : 'Código',
+      value: proveedor.codigo,
+      icon: null,
+    },
+    {
       label: 'Tasa de IVA',
       value: proveedor.tasa_iva === null ? null : formatTasaIva(proveedor.tasa_iva),
       icon: null,
@@ -448,6 +455,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
   const [editDomicilio, setEditDomicilio] = useState('');
   const [editCondicionesPago, setEditCondicionesPago] = useState('');
   const [editCategoria, setEditCategoria] = useState('');
+  const [editCodigo, setEditCodigo] = useState('');
   const [editNombreComercial, setEditNombreComercial] = useState('');
   /** "" = sin tasa (NULL), "0" = exento, "0.08" = frontera, "0.16" = general. */
   const [editTasaIva, setEditTasaIva] = useState<'' | '0' | '0.08' | '0.16'>('');
@@ -538,7 +546,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         .schema('erp')
         .from('proveedores')
         .select(
-          `id, persona_id, activo, condiciones_pago, categoria, tasa_iva, created_at, updated_at,
+          `id, persona_id, activo, condiciones_pago, categoria, codigo, tasa_iva, created_at, updated_at,
            personas!persona_id(
              nombre, apellido_paterno, apellido_materno,
              email, telefono, rfc, curp, tipo_persona, domicilio,
@@ -571,6 +579,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
         activo: boolean;
         condiciones_pago: string | null;
         categoria: string | null;
+        codigo: string | null;
         tasa_iva: number | string | null;
         created_at: string | null;
         updated_at: string | null;
@@ -611,6 +620,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
             nombre_comercial: df?.nombre_comercial ?? null,
             condiciones_pago: p.condiciones_pago,
             categoria: p.categoria,
+            codigo: p.codigo,
             tasa_iva:
               p.tasa_iva === null || p.tasa_iva === undefined
                 ? null
@@ -936,6 +946,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
     setEditDomicilio(p.domicilio ?? '');
     setEditCondicionesPago(p.condiciones_pago ?? '');
     setEditCategoria(p.categoria ?? '');
+    setEditCodigo(p.codigo ?? '');
     setEditNombreComercial(p.nombre_comercial ?? '');
     setEditTasaIva(
       p.tasa_iva === 0 ? '0' : p.tasa_iva === 0.08 ? '0.08' : p.tasa_iva === 0.16 ? '0.16' : ''
@@ -980,6 +991,7 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
       const proveedoresPatch = {
         condiciones_pago: editCondicionesPago.trim() || null,
         categoria: editCategoria.trim() || null,
+        codigo: editCodigo.trim() || null,
         tasa_iva: editTasaIva === '' ? null : Number(editTasaIva),
         updated_at: new Date().toISOString(),
       };
@@ -1345,6 +1357,21 @@ export function ProveedoresModule({ empresaId, empresaSlug }: ProveedoresModuleP
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">
+                    {editCategoria === 'notaria' ? 'Número de notaría' : 'Código'}
+                  </label>
+                  <Input
+                    value={editCodigo}
+                    onChange={(e) => setEditCodigo(e.target.value)}
+                    placeholder={editCategoria === 'notaria' ? 'Ej. 25' : 'Código interno'}
+                  />
+                  {editCategoria === 'notaria' ? (
+                    <p className="text-xs text-muted-foreground">
+                      Sale en el selector de la Fase 7 y en el correo de escrituración al cliente.
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <div className="space-y-2">
