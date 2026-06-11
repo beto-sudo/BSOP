@@ -7,7 +7,7 @@
 **Próximo hito:** Verificación final de Beto + S6 (cutover Coda de ventas: paridad final, apagar daily ventas/expediente, cortar accesos de captura) → cierre de la iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (pipeline 17/17 + flag problema ZCU exenta 6% Fovissste)
+**Última actualización:** 2026-06-11 (problema ZCU + desglose de intereses en pagaré de crédito directo)
 
 ## Problema
 
@@ -218,6 +218,13 @@ expediente, copiloto), no reescritura.
   `zcu_exento`; UI de captura y detalle lo señalan. Mapeo agregado al import
   FULL de inventario (#816). Quedan 5 ventas activas capturadas con el 6%
   adentro (4 Fovissste + 1 Infonavit/Fovissste) — Beto decide si se corrigen.
+- **2026-06-11 (pagaré con intereses):** Reporte de Beto en prueba de fase 10:
+  el interés ordinario del crédito directo se capturaba pero nunca se
+  calculaba (solo cláusula de texto) y el pagaré no desglosaba. Motor nuevo
+  `lib/dilesa/pagare-interes.ts` (interés simple sobre saldos insolutos, año
+  comercial 360, redondeo por fila) + tests; el PDF ahora desglosa Capital /
+  Interés / Pago total por parcialidad con fila TOTAL, y la fase 10 muestra
+  preview en vivo del mismo motor antes de generar.
 
 ## Decisiones registradas
 
@@ -248,3 +255,10 @@ expediente, copiloto), no reescritura.
   flag vive en la unidad, no en la venta; la fuente de marcado sigue siendo
   Coda Inventario (botón "Registra Problema ZCU") mientras el módulo viva
   ahí. Ventas ya capturadas no se recalculan automáticamente.
+- **2026-06-11:** El plan de pagos del pagaré captura SOLO capital (la suerte
+  principal — el "Bueno por" del título no cambia); el interés ordinario se
+  deriva en runtime con convención mercantil mexicana: interés simple sobre
+  saldos insolutos, año comercial de 360 días, periodo desde la suscripción /
+  vencimiento anterior. No se persiste el desglose (es determinista de
+  fechas + tasa); UI y PDF comparten el motor. Si el abogado pide otra base
+  (p. ej. 365), se cambia en un solo lugar.
