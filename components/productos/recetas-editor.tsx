@@ -24,6 +24,8 @@ export type RecetasEditorProps = {
   initialRows: RecetaEditorRow[];
   onSaved: () => void;
   onCancel: () => void;
+  /** Encabezado del editor; default "Editar receta" (el alta usa "Armar receta"). */
+  headerLabel?: string;
 };
 
 function rowsAreEqual(a: RecetaEditorRow[], b: RecetaEditorRow[]): boolean {
@@ -56,6 +58,7 @@ export function RecetasEditor({
   initialRows,
   onSaved,
   onCancel,
+  headerLabel = 'Editar receta',
 }: RecetasEditorProps) {
   const [rows, setRows] = React.useState<RecetaEditorRow[]>(() =>
     initialRows.map((r) => ({ ...r }))
@@ -128,7 +131,7 @@ export function RecetasEditor({
   return (
     <div className="space-y-3">
       <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-        Editar receta · {productoVentaNombre}
+        {headerLabel} · {productoVentaNombre}
       </div>
 
       {error ? (

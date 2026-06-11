@@ -175,6 +175,35 @@ export async function fetchInsumosDisponibles(
   }));
 }
 
+// ── Productos vendibles (para alta de receta) ───────────────────────────────
+
+export type ProductoVendible = {
+  id: string;
+  nombre: string;
+  categoria_nombre: string | null;
+};
+
+/**
+ * Catálogo de productos activos de RDB (v_productos_tabla), candidatos a
+ * llevar receta. Consumido por el selector de "Nueva receta"; la página
+ * excluye los que ya tienen receta.
+ */
+export async function fetchProductosVendibles(
+  supabase: SupabaseClient<Database>
+): Promise<ProductoVendible[]> {
+  const { data, error } = await supabase
+    .schema('rdb')
+    .from('v_productos_tabla')
+    .select('id, nombre, categoria_nombre')
+    .order('nombre');
+  if (error) throw error;
+  return (data ?? []).flatMap((p) =>
+    p.id
+      ? [{ id: p.id, nombre: p.nombre ?? 'Sin nombre', categoria_nombre: p.categoria_nombre }]
+      : []
+  );
+}
+
 // ── Auditoría ────────────────────────────────────────────────────────────────
 
 export type AlertSeverity = 'critical' | 'warning';
