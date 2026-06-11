@@ -27,6 +27,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Mail,
   Paperclip,
   Pencil,
   Plus,
@@ -114,6 +115,8 @@ type Venta = {
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
+  // Opcional hasta que la migración 20260611190612 esté aplicada (select('*')).
+  notif_escrituracion_at?: string | null;
   // Fechas/montos por fase (resumen "qué se capturó" del pipeline).
   fecha_solicitud_avaluo: string | null;
   fecha_avaluo_cerrado: string | null;
@@ -1275,6 +1278,15 @@ function DetailInner() {
                 label="Checklist Pre-Entrega"
               />
             ) : null}
+            {/* El correo de escrituración se dispara solo al cerrar F11;
+                este botón cubre reenvíos y ventas escrituradas antes de
+                que existiera la notificación. */}
+            {(venta.fase_posicion ?? 0) >= 11 ? (
+              <EscrituracionEmailButton
+                ventaId={venta.id}
+                lastSentAt={venta.notif_escrituracion_at ?? null}
+              />
+            ) : null}
             {(venta.fase_posicion ?? 0) >= 14 ? (
               <PdfDownloadLink
                 ventaId={venta.id}
@@ -2048,6 +2060,126 @@ function PdfDownloadLink({
       <Download className="h-3.5 w-3.5" />
       {label}
     </a>
+  );
+}
+
+/**
+ * Botón "Correo de escrituración" — reenvío manual del email que se
+ * dispara automáticamente al cerrar F11 (cliente + vendedor +
+ * escrituras@). El diálogo ofrece también mandarse una prueba (solo al
+ * usuario actual) para revisar el contenido antes de tocar al cliente.
+ */
+function EscrituracionEmailButton({
+  ventaId,
+  lastSentAt,
+}: {
+  ventaId: string;
+  lastSentAt: string | null;
+}) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState<'real' | 'test' | null>(null);
+  const [sentAt, setSentAt] = useState<string | null>(lastSentAt);
+
+  // `fmtFecha` del módulo es para dates puros (YYYY-MM-DD); esto es un
+  // timestamptz — formateamos fecha + hora local.
+  const fmtTs = (ts: string): string => {
+    const d = new Date(ts);
+    return isNaN(d.getTime())
+      ? ts
+      : d.toLocaleString('es-MX', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+  };
+
+  async function enviar(test: boolean) {
+    setSubmitting(test ? 'test' : 'real');
+    try {
+      const res = await fetch(`/api/dilesa/ventas/${ventaId}/notify-escrituracion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(test ? { test: true } : { resend: true }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        sentTo?: string[];
+        error?: string;
+      };
+      if (!res.ok || !json.ok) {
+        toast.add({
+          title: 'No se envió el correo',
+          description: json.error ?? `Error HTTP ${res.status}.`,
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({
+        title: test ? 'Prueba enviada a tu correo' : 'Correo de escrituración enviado',
+        description: `Destinatarios: ${(json.sentTo ?? []).join(', ')}`,
+        type: 'success',
+      });
+      if (!test) {
+        setSentAt(new Date().toISOString());
+        setOpen(false);
+      }
+    } catch (e) {
+      toast.add({
+        title: 'No se envió el correo',
+        description: e instanceof Error ? e.message : String(e),
+        type: 'error',
+      });
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+        title={sentAt ? `Último envío: ${fmtTs(sentAt)}` : 'Sin envíos registrados'}
+      >
+        <Mail className="h-3.5 w-3.5" />
+        Correo de escrituración
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Correo de escrituración</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm text-[var(--text)]/80">
+            <p>
+              Envía al <b>cliente</b> los datos de su escrituración (fecha, número y valor de
+              escritura, inmueble y notaría), con copia al <b>vendedor</b> y a{' '}
+              <b>escrituras@dilesa.mx</b>.
+            </p>
+            <p className="text-xs text-[var(--text)]/60">
+              {sentAt
+                ? `Último envío: ${fmtTs(sentAt)}. Volver a enviar manda un correo nuevo a todos los destinatarios.`
+                : 'Esta venta no tiene envíos registrados.'}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting != null}>
+              Cancelar
+            </Button>
+            <Button variant="outline" onClick={() => enviar(true)} disabled={submitting != null}>
+              {submitting === 'test' ? 'Enviando…' : 'Enviarme una prueba'}
+            </Button>
+            <Button onClick={() => enviar(false)} disabled={submitting != null}>
+              {submitting === 'real' ? 'Enviando…' : 'Enviar al cliente'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

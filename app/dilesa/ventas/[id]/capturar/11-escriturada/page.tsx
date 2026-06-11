@@ -240,6 +240,16 @@ function CapturarFase11Body() {
         description: 'Escrituración registrada. Continúa con la siguiente fase desde el detalle.',
         type: 'success',
       });
+
+      // Correo de escrituración al cliente (+ vendedor + escrituras@) —
+      // fire-and-forget, patrón Fase 4: si falla, el botón "Correo de
+      // escrituración" del expediente permite reintentar.
+      void fetch(`/api/dilesa/ventas/${venta.id}/notify-escrituracion`, {
+        method: 'POST',
+      }).catch((err) => {
+        console.warn('[fase11] notify-escrituracion failed:', err);
+      });
+
       router.push(`/dilesa/ventas/${venta.id}`);
     },
     [fechaEscritura, montoCheque, numeroCheque, numeroEscritura, router, sb, toast, venta]
