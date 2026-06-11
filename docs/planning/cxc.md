@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Limpieza de datos: ~$2.0M en saldos a favor (185 ventas DILESA, depósitos Infonavit/Fovissste capturados ≥ precio) — requiere regla + OK de Beto. Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Sprints 1-3 + impresión ya en prod
+**Próximo hito:** Limpieza de datos históricos: ~$722M en saldos abiertos de ventas ya cerradas sin abonos capturados (radiografía 2026-06-10 en bitácora; Coda empezó a registrar pagos el 2024-01-30) + ~$2.0M en saldos a favor (185 ventas) — ambos requieren regla + OK de Beto. Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Sprints 1-3 + impresión ya en prod
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprints 1-3 confirmados en prod; pendiente real = limpieza de saldos a favor + Sprints 4-5)
+**Última actualización:** 2026-06-10 (radiografía de saldos abiertos históricos — 948 ventas con $801M abiertos, 4 buckets de limpieza propuestos)
 
 ## Problema
 
@@ -256,7 +256,42 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Bitácora
 
-### 2026-06-01 — Impresión: estado de cuenta + recibo de caja (ADR-021)
+### 2026-06-10 — Radiografía de saldos abiertos históricos (read-only, sin tocar datos)
+
+Beto detectó en el aging (`/dilesa/cobranza/aging`) clientes viejos con saldos
+enormes en rojo y pidió revisar. Diagnóstico confirmado: **las ventas
+anteriores a la captura en Coda no tienen abonos registrados** — el módulo
+Coda "Depositos Clientes" registró su **primer pago el 2024-01-30**; todo lo
+cobrado antes quedó sin historial, y aun en la era Coda la captura del pago
+institucional fue parcial (862 de 883 ventas con cargo institucional abierto
+tienen CERO abonos de institución).
+
+**Números (erp.cxc_cargos, saldo > 0, no cancelados):** 948 ventas, 1,621
+cargos, **$801.4M de saldo abierto total**, segmentado en 4 buckets:
+
+| Bucket                                                                      | Ventas | Saldo   | Detalle                                                                                                                                                                            |
+| --------------------------------------------------------------------------- | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Desasignadas con cargos vivos                                            | 53     | $45.7M  | El plan de pagos no se canceló al desasignar; incluye la venta de PRUEBA de Beto ($3.2M). Cargos a **cancelar**, no abonar.                                                        |
+| 2. Cerradas pre-Coda (Entregada/Inscrita/etc., escritura NULL o < feb-2024) | 646    | $516.2M | $488.1M institución + $28.1M cliente. Casas entregadas = cobradas en la realidad. Candidato a **liquidación histórica masiva**.                                                    |
+| 3. Cerradas era-Coda (escritura ≥ feb-2024)                                 | 180    | $159.8M | $154.6M institución. Coda ya capturaba pero el pago institucional casi nunca se registró. **Revisar lista con tesorería** antes de liquidar (puede haber cobranza real pendiente). |
+| 4. En proceso (Formalizada → Firmas)                                        | 69     | $79.7M  | Cartera real en pipeline. **No tocar.**                                                                                                                                            |
+
+Hallazgos laterales: (a) los enganches generados por `fn_generar_plan_pagos`
+en el backfill llevan vencimiento 2026 (default) en ventas viejas → el bucket
+"1-30" del aging (~$23-25K por cliente) es ficticio y cae con la limpieza;
+(b) **cero traslape** con el frente de $2.0M de saldos a favor (185 ventas) —
+son poblaciones disjuntas; (c) Coda sí capturaba pagos institución
+($235.9M Infonavit + $29.4M Fovissste + $24.1M Banco en `venta_pagos`) pero
+de forma incompleta.
+
+**Propuesta de regla (pendiente OK de Beto, NO ejecutada):** bucket 1 →
+cancelar cargos vía `cxc_cargo_ajustar`; bucket 2 → abono sintético
+institución/cliente por el saldo del cargo, fecha = `fecha_escritura` (proxy:
+fecha de fase Entregada), referencia `LIQ-HIST` + notas estándar, sin
+movimiento bancario, vía script idempotente con dry-run CSV; bucket 3 →
+CSV de 180 filas para palomeo con tesorería y misma mecánica al OK;
+bucket 4 → intacto. También: revisar el flujo de desasignación para que
+cancele cargos abiertos (gap de proceso, no solo de datos).
 
 Cierra los dos imprimibles que faltaban del CxC. Decisión de Beto: estado
 de cuenta **por venta** (anclado a un lote + su plan), no consolidado por
