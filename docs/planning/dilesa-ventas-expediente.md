@@ -283,3 +283,8 @@ expediente, copiloto), no reescritura.
   puntuales de Coda. Cuidado al usarlo post-cutover: el modo daily pisa los
   campos mapeados de las ventas con `coda_row_id` — confirmar antes que
   nadie haya editado esas ventas en BSOP, o lo editado se pierde.
+- **2026-06-11 (ZCU — confirmación de Beto):** Las 5 ventas activas
+  capturadas con el 6% Fovissste adentro (M12-L28, M12-L33, M21-L28,
+  M21-L33, M20-L28) **no se corrigen**: la exención ZCU se autorizó hoy y
+  aplica solo a asignaciones nuevas; lo capturado antes queda como estaba.
+  Cierra el pendiente abierto en el PR #816.
