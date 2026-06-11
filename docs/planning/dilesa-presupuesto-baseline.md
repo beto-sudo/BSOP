@@ -3,11 +3,11 @@
 **Slug:** `dilesa-presupuesto-baseline`
 **Empresas:** DILESA (golden; el patrón baseline + órdenes de cambio es replicable a las otras empresas cuando tengan presupuesto por partidas)
 **Schemas afectados:** `erp` (nuevas `presupuesto_baselines`, `presupuesto_baseline_partidas`, `presupuesto_cambios`; trigger guard + RPCs sobre `presupuesto_partidas`; escribe `core.audit_log`), `core.modulos` (sin slugs nuevos — reusa `dilesa.proyectos.gasto`), UI en `app/dilesa/proyectos/[id]/gasto` y componentes de Costeo
-**Estado:** in_progress
-**Próximo hito:** Revisión del Vercel Preview de S2 por Beto (PR sin auto-merge) + Sprint 3 — expediente (adjuntos en partida, timeline, baseline retroactivo, manual)
+**Estado:** done
+**Próximo hito:** — (iniciativa completa: S1+S2+S3 en prod, 4 baselines congelados)
 **Dueño:** Beto
 **Creada:** 2026-06-10
-**Última actualización:** 2026-06-10 (S2 a PR)
+**Última actualización:** 2026-06-11 (CERRADA)
 
 ## Problema
 
@@ -184,6 +184,19 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
 
 ## Bitácora
 
+- **2026-06-11 — CERRADA.** Los 3 sprints en prod (S1 #798 gobierno duro ·
+  S2 #803 UI + edición inline · S3 #809/#810 manual + adjuntos en partida +
+  timeline). Carga de presupuestos de urbanización desde Excel a partidas
+  (Delicias $10,737,483.44 exacto · Loma Escondida $2,436,726.90 — Beto
+  decidió excluir +$250k sin rubro y telefonía duplicada del Excel; el
+  desarrollo de Loma Escondida recibió el clon de las 71 partidas de
+  plantilla). Beto congeló 4 baselines: Lomas de los Encinos $73,845,012.61
+  (55 partidas) · Lomas de las Delicias $10,737,483.44 (73) · Loma
+  Escondida $2,436,726.90 (73) · Lomas del Sol $12,186,209.13 (73) — todos
+  con 0 drift en `v_presupuesto_reconciliacion`. El gobierno presupuestal
+  opera en producción: edición bloqueada post-baseline, cambios por orden
+  con motivo + soporte, historial reconstruible.
+
 - **2026-06-10 — S2 mergeado (#803, en prod) + S3/manual a PR.** S2 entregó
   además la edición de partida inline bajo el renglón (feedback de Beto en
   el preview) y 19 tests de las actions (coverage CI). Manual:
@@ -192,6 +205,16 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
   cambio, historial, FAQ; slug 1:1 con `dilesa.proyectos.gasto`) +
   cross-link desde "El viaje de una compra". Pendiente de S3: adjuntos en
   partida, timeline en tab Gasto, baseline retroactivo con Beto.
+- **2026-06-10 — S3 resto (adjuntos en partida + timeline) a PR.**
+  `<FileAttachments entidad="presupuesto_partidas">` en el form de
+  edición (rol "Documentos de la partida" — el soporte del estimado vive
+  con la partida) y visible read-only en el drawer de historial.
+  `<PresupuestoTimeline>` (colapsable) en el tab Gasto: cronología del
+  gobierno — baseline + cada orden (solicitada → autorizada/rechazada/
+  retirada) con quién/cuándo, derivada de `buildTimelinePresupuesto`
+  (helper puro + 3 tests; `OrdenCambio` ganó cancelada_por/at). Cero
+  queries extra (reusa los datos del módulo). Falta solo el baseline
+  retroactivo de Delicias/Ampliación (acto de Beto) para cerrar.
 - **2026-06-10 — Sprint 2 (UI de baseline y órdenes de cambio) a PR.**
   Tab Gasto: `<BaselineBanner>` (autorizar presupuesto inicial con notas,
   gate Dirección, aviso de preliminares; post-baseline muestra

@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildTimelinePresupuesto,
   cambiosNetosPorPartida,
   deltaFirmado,
   mapOrdenCambio,
   ordenesPendientes,
+  type BaselineInfo,
   type OrdenCambio,
 } from './ordenes-cambio';
 
@@ -22,6 +24,8 @@ function orden(partial: Partial<OrdenCambio>): OrdenCambio {
     resueltoPor: null,
     resueltoAt: null,
     motivoRechazo: null,
+    canceladaPor: null,
+    canceladaAt: null,
     montoAntes: null,
     montoDespues: null,
     ...partial,
@@ -63,6 +67,67 @@ describe('ordenesPendientes', () => {
       orden({ id: 'c', estado: 'rechazada' }),
     ]);
     expect(pend.map((o) => o.id)).toEqual(['a']);
+  });
+});
+
+describe('buildTimelinePresupuesto', () => {
+  const baseline: BaselineInfo = {
+    id: 'b1',
+    proyectoId: 'p1',
+    total: 1000,
+    partidasCount: 3,
+    notas: 'junta del 15',
+    autorizadoPor: 'u-dir',
+    autorizadoAt: '2026-06-01T10:00:00Z',
+  };
+
+  it('baseline + solicitud + resolución, cronológico DESC', () => {
+    const eventos = buildTimelinePresupuesto(baseline, [
+      orden({
+        id: 'a',
+        estado: 'autorizada',
+        solicitadoAt: '2026-06-02T10:00:00Z',
+        resueltoAt: '2026-06-03T10:00:00Z',
+        resueltoPor: 'u-dir',
+      }),
+    ]);
+    expect(eventos.map((e) => e.tipo)).toEqual([
+      'orden_autorizada',
+      'orden_solicitada',
+      'baseline',
+    ]);
+    expect(eventos[2]).toMatchObject({ monto: 1000, detalle: 'junta del 15', actorId: 'u-dir' });
+    expect(eventos[0]?.delta).toBe(100);
+  });
+
+  it('rechazada usa motivo de rechazo; cancelada usa cancelada_at', () => {
+    const eventos = buildTimelinePresupuesto(null, [
+      orden({
+        id: 'r',
+        estado: 'rechazada',
+        tipo: 'deductiva',
+        solicitadoAt: '2026-06-02T10:00:00Z',
+        resueltoAt: '2026-06-02T12:00:00Z',
+        motivoRechazo: 'sin soporte',
+      }),
+      orden({
+        id: 'c',
+        estado: 'cancelada',
+        solicitadoAt: '2026-06-01T10:00:00Z',
+        canceladaAt: '2026-06-01T11:00:00Z',
+        canceladaPor: 'u-op',
+      }),
+    ]);
+    const rechazo = eventos.find((e) => e.tipo === 'orden_rechazada');
+    expect(rechazo).toMatchObject({ detalle: 'sin soporte', delta: -100 });
+    const cancel = eventos.find((e) => e.tipo === 'orden_cancelada');
+    expect(cancel).toMatchObject({ actorId: 'u-op', fecha: '2026-06-01T11:00:00Z' });
+    // Solicitada pendiente (sin resolver) no genera evento terminal.
+    expect(eventos).toHaveLength(4);
+  });
+
+  it('sin baseline ni órdenes → vacío', () => {
+    expect(buildTimelinePresupuesto(null, [])).toEqual([]);
   });
 });
 

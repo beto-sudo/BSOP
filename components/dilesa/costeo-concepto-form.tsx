@@ -26,11 +26,12 @@
  */
 
 import { useState } from 'react';
-import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { FileText, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { FileAttachments } from '@/components/file-attachments/file-attachments';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { proyectoOptionLabel, type ProyectoOption } from '@/lib/dilesa/proyectos-selector';
@@ -360,6 +361,29 @@ export function CosteoConceptoForm({
             ? 'La clasificación agrupa y ordena la partida por el catálogo de conceptos. El % de ejecución se calcula como gasto real ÷ presupuesto actualizado (o previo si no hay actualizado). Montos con IVA incluido.'
             : 'La clasificación agrupa la partida por el catálogo de conceptos. El gasto (comprometido, ejercido, pagado) llega solo desde las órdenes, recepciones y facturas ligadas a la partida. Monto con IVA incluido.'}
       </p>
+      {isEdit && editRow ? (
+        <div className="mt-3 rounded border border-dashed border-[var(--border)] bg-[var(--bg)] p-1">
+          <FileAttachments
+            empresaId={empresaId}
+            empresaSlug="dilesa"
+            entidad="presupuesto_partidas"
+            entidadId={editRow.id}
+            roles={[
+              {
+                id: 'soporte',
+                label: 'Documentos de la partida',
+                icon: <FileText className="h-3 w-3" />,
+              },
+            ]}
+            defaultUploadRole="soporte"
+            variant="flat"
+          />
+          <p className="px-1 text-[10px] text-[var(--text)]/50">
+            El soporte del estimado (cotizaciones, notas) vive con la partida; también se ve en su
+            historial.
+          </p>
+        </div>
+      ) : null}
       <div className="mt-3 flex items-center justify-between gap-2">
         <div>
           {isEdit && onDelete ? (
