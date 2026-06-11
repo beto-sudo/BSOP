@@ -4,10 +4,10 @@
 **Empresas:** todas (la pantalla de Accesos es global; los catálogos de módulos son por empresa)
 **Schemas afectados:** `core` (datos: `modulos.nombre/descripcion`; posible `rol_plantillas` en S3). El grueso es UI (`app/settings/acceso`) + un mapa de dependencias en `lib/`.
 **Estado:** in_progress
-**Próximo hito:** S1 — dependencias automáticas entre sub-permisos + naming de negocio en la matriz
+**Próximo hito:** S2 — rol obligatorio al dar acceso usuario↔empresa + saneo de accesos con rol NULL
 **Dueño:** Beto
 **Creada:** 2026-06-11
-**Última actualización:** 2026-06-11 (promovida)
+**Última actualización:** 2026-06-11 (S1 entregado: dependencias automáticas + descripciones en la matriz)
 
 ## Problema
 
@@ -102,6 +102,17 @@ Dar de alta un usuario operativo toma minutos y queda bien a la primera:
   `dilesa.ventas.lista`; "asignar" resultó ser `autorizar`). Los 3 fixes
   puntuales de Nelcy se aplicaron directo en prod ese día (UPDATE rol_id +
   permisos lista/autorizar al rol "Nelcy" DILESA).
+- **2026-06-11 (S1):** `lib/permissions-deps.ts` (mapa sub-slug → requisitos,
+  clausura transitiva) + 9 tests, incluido el test estructural que recorre los
+  page.tsx reales y exige declarar la dependencia de toda página anidada bajo
+  segmento dinámico (detecta "casos Nelcy" futuros en CI). La matriz auto-activa
+  la lectura de los requisitos al otorgar un permiso (toast explica qué y por
+  qué; la escritura nunca se otorga implícita; action batch
+  `upsertPermisosRolBatch`) y ahora muestra la descripción de cada permiso
+  (slug como tooltip). Migración `20260611171917` aplicada a prod: pulidas las
+  5 descripciones confusas de Ventas (lista/autorizar/fase02/F09/F16).
+  Hallazgo: las descripciones YA existían en `core.modulos` — el problema era
+  que la matriz nunca las mostraba; S1c pasó de "poblar todo" a pulir 5.
 
 ## Decisiones registradas
 

@@ -39,6 +39,7 @@ export type Modulo = {
   id: string;
   slug: string;
   nombre: string;
+  descripcion: string | null;
   empresa_id: string;
   seccion: ModuloSeccion;
 };
@@ -232,6 +233,29 @@ export async function upsertPermisoRol(
     .from('permisos_rol')
     .upsert(
       { rol_id, modulo_id, acceso_lectura, acceso_escritura },
+      { onConflict: 'rol_id,modulo_id' }
+    );
+  if (error) throw new Error(error.message);
+  revalidatePath('/settings/acceso');
+}
+
+/**
+ * Upsert de varios permisos del mismo rol en una llamada — usado por la
+ * matriz para activar un permiso JUNTO con sus requisitos de navegación
+ * (`lib/permissions-deps.ts`, iniciativa accesos-intuitivos S1).
+ */
+export async function upsertPermisosRolBatch(
+  rol_id: string,
+  items: Array<{ modulo_id: string; acceso_lectura: boolean; acceso_escritura: boolean }>
+): Promise<void> {
+  await requireAdmin();
+  if (items.length === 0) return;
+  const admin = getSupabaseAdminClient()!;
+  const { error } = await admin
+    .schema('core')
+    .from('permisos_rol')
+    .upsert(
+      items.map((i) => ({ rol_id, ...i })),
       { onConflict: 'rol_id,modulo_id' }
     );
   if (error) throw new Error(error.message);
