@@ -18,19 +18,41 @@ export type CuentaSaldoRow = {
   fechaSaldo: string | null;
   /** Timestamp del último snapshot; null si no hay. */
   capturadoAt: string | null;
+  /** Ficha de la cuenta (iniciativa `conciliacion-bancaria` Fase A). */
+  ficha: CuentaFicha;
 };
 
 /**
- * Infiere la moneda de una cuenta desde su nombre/banco.
- *
- * Las cuentas DILESA se cargaron en Sprint 1 sin `moneda_id` (viene null), así
- * que la única señal disponible es el nombre: "BBVA Bancomer Dólares" → USD.
- * Detección accent/case-insensitive de "dolar"/"dólar"/"usd". Default MXN.
- *
- * Cuando `conciliacion-bancaria` o una captura futura pueble `moneda_id` real,
- * este heurístico se reemplaza por el lookup del catálogo de monedas.
+ * Ficha completa de la cuenta — datos operativos capturados desde los
+ * estados de cuenta (migración `cuentas_bancarias_ficha`).
  */
-export function monedaDeCuenta(nombre: string | null, banco?: string | null): Moneda {
+export type CuentaFicha = {
+  tipo: string | null;
+  producto: string | null;
+  numeroCuenta: string | null;
+  clabe: string | null;
+  numeroCliente: string | null;
+  contrato: string | null;
+  sucursal: string | null;
+  telefono: string | null;
+  contacto: string | null;
+  titular: string | null;
+  notas: string | null;
+};
+
+/**
+ * Resuelve la moneda de una cuenta. La columna `moneda` manda (poblada por la
+ * migración `cuentas_bancarias_ficha`, iniciativa `conciliacion-bancaria`
+ * Fase A); si viene null (cuentas dadas de alta sin ficha), cae al heurístico
+ * por nombre: "BBVA Bancomer Dólares" → USD. Detección accent/case-insensitive
+ * de "dolar"/"dólar"/"usd". Default MXN.
+ */
+export function monedaDeCuenta(
+  nombre: string | null,
+  banco?: string | null,
+  monedaCol?: string | null
+): Moneda {
+  if (monedaCol === 'USD' || monedaCol === 'MXN') return monedaCol;
   const haystack = `${nombre ?? ''} ${banco ?? ''}`
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // quita acentos: "Dólares" → "Dolares"

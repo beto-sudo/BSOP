@@ -6,21 +6,22 @@ import { SaldosBancosModule } from '@/components/dilesa/saldos-bancos-module';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 /**
- * @module Saldos Bancos (DILESA)
+ * @module Saldos Bancos · Saldos (DILESA)
  * @responsive desktop-only
  *
  * Captura manual de saldos bancarios DILESA con historial (iniciativa
  * `tesoreria`, Sprint 3). Una fila por cuenta activa con su último saldo,
- * fecha y antigüedad; captura por cuenta apila un snapshot en
- * `erp.cuenta_saldos`. Fuente de verdad del bloque #1 ("Saldos Bancos") del
- * correo diario al Consejo (`dilesa-resumen-consejo`).
+ * fecha, antigüedad y ficha completa; captura por cuenta apila un snapshot
+ * en `erp.cuenta_saldos`. Fuente de verdad del bloque #1 ("Saldos Bancos")
+ * del correo diario al Consejo (`dilesa-resumen-consejo`).
  *
- * Gate: `dilesa.saldos-bancos` (RBAC liberado en Sprint 2). El módulo no usa
- * `useSearchParams`, así que no requiere Suspense boundary (Next.js 16).
+ * Tab default del módulo (ADR-030, iniciativa `conciliacion-bancaria` v0).
+ * Gate: `dilesa.saldos-bancos.saldos`. El módulo no usa `useSearchParams`,
+ * así que no requiere Suspense boundary (Next.js 16).
  */
 export default function Page() {
   return (
-    <RequireAccess empresa="dilesa" modulo="dilesa.saldos-bancos">
+    <RequireAccess empresa="dilesa" modulo="dilesa.saldos-bancos.saldos">
       <DesktopOnlyNotice module="Saldos Bancos" />
       <div className="hidden sm:block">
         <SaldosBancosModule empresaId={DILESA_EMPRESA_ID} />
