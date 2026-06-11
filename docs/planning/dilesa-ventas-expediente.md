@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón de "workspace de operación" es replicable a las otras empresas)
 **Schemas afectados:** principalmente UI (Next.js App Router); `dilesa` (posible vista `v_venta_cuadratura` + columnas/slugs de fases 14-17), `core.modulos` (sub-slugs RBAC de 14-17). Reusa lo existente: `dilesa.ventas`, `dilesa.venta_fases`, `erp.adjuntos`, `erp.cxc_pagos`/`cxc_cargos`
 **Estado:** in_progress
-**Próximo hito:** Sprint 2c (recibo de caja → Valor Facturado exacto) + S5 (definir y construir Fases 14-17, Beto define campos/docs). Luego S4 (copiloto de cierre) y S6 (cutover Coda de ventas)
+**Próximo hito:** Definir y construir Fases 16-17 (Comisión Pagada + Operación Terminada — Beto define campos). Luego S4 (copiloto de cierre) y S6 (cutover Coda de ventas)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-09 (S0-S2b entregados; corte de construcción del sync nocturno)
+**Última actualización:** 2026-06-10 (2c + F14/F15 + análisis IA notarial en prod)
 
 ## Problema
 
@@ -175,6 +175,27 @@ expediente, copiloto), no reescritura.
   (#782) tras verificar diff 13,942/13,943 tareas y cero palomeos en Coda
   post corte de accesos (2026-06-03). Daily queda solo ventas + expediente
   hasta el cutoff de ventas (S6).
+- **2026-06-10 (2c):** Valor Facturado exacto — `tieneRecibo` derivado de los
+  adjuntos `recibo_caja` por abono (#786). De fondo: el puente
+  venta_pagos→CxC era one-shot y estaba congelado; ahora es paso nocturno
+  (`sync_dilesa_cxc_incremental`), se corrigió el dedup del expediente que
+  generó 1,450 adjuntos duplicados (borrados con OK de Beto) y se re-corrió
+  el backfill (29 pagos + 46 aplicaciones). Pulidos S3: Bitácora con
+  responsable + Documentos agrupados por macro-etapa.
+- **2026-06-10 (S5 parcial):** Fase 14 — Preparada para Entrega (#794):
+  Checklist Pre-Entrega imprimible (43 puntos, prellenado, firmas) + captura
+  del escaneado firmado; gate especial desde Escriturada (11). Fase 15 —
+  Entregada (#795): Checklist de Entrega al cliente (22 conceptos, firma del
+  cliente + Atención a Clientes). RBAC pre-sembrado en ambas (sin migración).
+- **2026-06-10 (análisis IA notarial):** En F8 los PDFs del notario (carta de
+  instrucción + condiciones financieras Anexo B, slot nuevo) se analizan con
+  Claude automáticamente y precargan valor de escrituración, crédito,
+  referencia y gastos, con verificaciones cruzadas (NSS, nombre, domicilio
+  vs unidad, CLABE vs cuentas DILESA, vendedor) (#796). El magic link del
+  notario acepta ambos archivos. Análisis de adjuntos ya cargados persistido
+  en `erp.adjuntos.metadata.analisis_notarial` + expandible "Datos
+  capturados" por fase en el pipeline (#799). Validado con el expediente
+  real Arizpe Luna: extracción 100% exacta.
 
 ## Decisiones registradas
 
@@ -190,3 +211,13 @@ expediente, copiloto), no reescritura.
 - **2026-06-09:** Pre-cutoff, los descuentos se capturan en Coda (el sync
   nocturno pisa los campos mapeados); el editor de BSOP queda listo para
   cuando BSOP sea master (S6).
+- **2026-06-10:** El análisis IA de docs notariales es automático al subir
+  (sin botón) pero NADA se persiste a la venta hasta Guardar; para adjuntos
+  ya cargados la precarga es suave (solo campos vacíos) y el resultado se
+  persiste en el metadata del adjunto (una extracción por documento).
+- **2026-06-10:** La preparación de entrega (F14) arranca desde la escritura
+  (F11) sin esperar Detonada/Facturada (`GATE_PREVIA_OVERRIDE`); la entrega
+  al cliente (F15) sí exige F14 cerrada.
+- **2026-06-10:** El extractor notarial es genérico: con cartas de
+  FOVISSSTE/banca extrae lo que el documento traiga y lo ausente se captura
+  manual — no bloquea créditos no-Infonavit.
