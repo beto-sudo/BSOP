@@ -184,6 +184,15 @@ Que el presupuesto de un proyecto DILESA tenga ciclo de vida gobernado:
 
 ## Bitácora
 
+- **2026-06-10 — S2 mergeado (#803, en prod) + S3/manual a PR.** S2 entregó
+  además la edición de partida inline bajo el renglón (feedback de Beto en
+  el preview) y 19 tests de las actions (coverage CI). Manual:
+  `content/manual/dilesa/proyectos/gasto.md` ("Presupuesto del proyecto:
+  autorizarlo y modificarlo" — formación, autorizar inicial, órdenes de
+  cambio, historial, FAQ; slug 1:1 con `dilesa.proyectos.gasto`) +
+  cross-link desde "El viaje de una compra". Pendiente de S3: adjuntos en
+  partida, timeline en tab Gasto, baseline retroactivo con Beto.
+
 - **2026-06-10 — S1 mergeado (#798) + migración `20260610212116` aplicada a
   prod y verificada.** Objetos confirmados (3 tablas, 2 triggers, 5
   funciones, vista); guard probado en vivo (edición pre-baseline pasa;
