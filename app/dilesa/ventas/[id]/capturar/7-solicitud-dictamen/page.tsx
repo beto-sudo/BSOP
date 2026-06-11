@@ -4,11 +4,12 @@
  * Captura Fase 7 — Solicitud de Dictaminación (Sprint 7f).
  *
  * Cierra la fase de Solicitud de Dictamen: Gerencia Ventas (o Dirección)
- * asigna un notario del catálogo (`erp.personas` con `tipo='notario'`) y
- * dispara el email de solicitud con magic link.
+ * asigna una notaría del catálogo de proveedores (`erp.proveedores` con
+ * `categoria='notaria'`, vía lib/dilesa/notarios) y dispara el email de
+ * solicitud con magic link. El contacto se edita en el módulo Proveedores.
  *
  * Captura:
- *   - `notario_id` → FK a `erp.personas`
+ *   - `notario_id` → FK a `erp.proveedores`
  *   - `fecha_solicitud_dictamen` → fecha del cierre (default hoy)
  *   - Sin doc requerido (el dictamen llega en Fase 8)
  *
@@ -31,6 +32,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import { listNotarias, type Notaria } from '@/lib/dilesa/notarios';
 
 type VentaCtx = {
   id: string;
@@ -38,14 +40,6 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   notario_id: string | null;
-};
-
-type Notario = {
-  id: string;
-  nombre: string;
-  apellido_paterno: string | null;
-  apellido_materno: string | null;
-  email: string | null;
 };
 
 export default function CapturarFase7Page() {
@@ -69,7 +63,7 @@ function CapturarFase7Body() {
   const [fase6Cerrada, setFase6Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [notarios, setNotarios] = useState<Notario[]>([]);
+  const [notarios, setNotarios] = useState<Notaria[]>([]);
   const [notarioId, setNotarioId] = useState<string>('');
   const [fechaSolicitud, setFechaSolicitud] = useState<string>(
     new Date().toISOString().slice(0, 10)
@@ -110,7 +104,7 @@ function CapturarFase7Body() {
       setVenta(v);
       if (v.notario_id) setNotarioId(v.notario_id);
 
-      const [pRes, uRes, fRes, notRes] = await Promise.all([
+      const [pRes, uRes, fRes, notarias] = await Promise.all([
         sb
           .schema('erp')
           .from('personas')
@@ -131,15 +125,7 @@ function CapturarFase7Body() {
           .select('posicion')
           .eq('venta_id', v.id)
           .is('deleted_at', null),
-        sb
-          .schema('erp')
-          .from('personas')
-          .select('id, nombre, apellido_paterno, apellido_materno, email')
-          .eq('empresa_id', v.empresa_id)
-          .eq('tipo', 'notario')
-          .eq('activo', true)
-          .is('deleted_at', null)
-          .order('nombre', { ascending: true }),
+        listNotarias(sb, v.empresa_id),
       ]);
       if (!activo) return;
 
@@ -171,7 +157,7 @@ function CapturarFase7Body() {
       setFase6Cerrada(posiciones.includes(6));
       setYaCerrada(posiciones.includes(7));
 
-      setNotarios((notRes.data ?? []) as Notario[]);
+      setNotarios(notarias);
 
       setLoading(false);
     })();
@@ -223,7 +209,7 @@ function CapturarFase7Body() {
         return;
       }
 
-      const notarioSel = notarios.find((n) => n.id === notarioId);
+      const notarioSel = notarios.find((n) => n.proveedorId === notarioId);
       const tieneEmail = !!notarioSel?.email;
 
       toast.add({
@@ -274,7 +260,7 @@ function CapturarFase7Body() {
     );
   }
 
-  const notarioSeleccionado = notarios.find((n) => n.id === notarioId) ?? null;
+  const notarioSeleccionado = notarios.find((n) => n.proveedorId === notarioId) ?? null;
 
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -331,7 +317,7 @@ function CapturarFase7Body() {
                 >
                   <option value="">— selecciona —</option>
                   {notarios.map((n) => (
-                    <option key={n.id} value={n.id}>
+                    <option key={n.proveedorId} value={n.proveedorId}>
                       {nombreNotario(n)}
                       {!n.email ? ' (falta email)' : ''}
                     </option>
@@ -400,9 +386,8 @@ function CapturarFase7Body() {
   );
 }
 
-function nombreNotario(n: Notario): string {
-  const apellidos = [n.apellido_paterno, n.apellido_materno].filter(Boolean).join(' ').trim();
-  return apellidos ? `${n.nombre} ${apellidos}` : n.nombre;
+function nombreNotario(n: Notaria): string {
+  return n.numeroNotaria ? `Notaría ${n.numeroNotaria} — ${n.nombre}` : n.nombre;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

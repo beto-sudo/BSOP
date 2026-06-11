@@ -38,6 +38,7 @@ import {
   type EscrituracionEmailContext,
 } from '@/lib/dilesa/escrituracion-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
+import { getNotaria } from '@/lib/dilesa/notarios';
 import {
   getDefinitionBySlug,
   renderSubject,
@@ -148,41 +149,34 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ ok: false, error: 'Admin client no disponible' }, { status: 500 });
   }
 
-  const [{ data: persona }, { data: vendedor }, { data: unidad }, { data: notario }] =
-    await Promise.all([
-      admin
-        .schema('erp')
-        .from('personas')
-        .select('nombre, apellido_paterno, apellido_materno, email')
-        .eq('id', venta.persona_id)
-        .maybeSingle(),
-      venta.vendedor_usuario_id
-        ? admin
-            .schema('core')
-            .from('usuarios')
-            .select('first_name, last_name, email')
-            .eq('id', venta.vendedor_usuario_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      venta.unidad_id
-        ? admin
-            .schema('dilesa')
-            .from('unidades')
-            .select(
-              'identificador, proyecto_id, producto_id, calle, numero_oficial, area_m2, m2_construccion'
-            )
-            .eq('id', venta.unidad_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      venta.notario_id
-        ? admin
-            .schema('erp')
-            .from('personas')
-            .select('nombre, apellido_paterno, apellido_materno, telefono, email')
-            .eq('id', venta.notario_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: persona }, { data: vendedor }, { data: unidad }, notaria] = await Promise.all([
+    admin
+      .schema('erp')
+      .from('personas')
+      .select('nombre, apellido_paterno, apellido_materno, email')
+      .eq('id', venta.persona_id)
+      .maybeSingle(),
+    venta.vendedor_usuario_id
+      ? admin
+          .schema('core')
+          .from('usuarios')
+          .select('first_name, last_name, email')
+          .eq('id', venta.vendedor_usuario_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    venta.unidad_id
+      ? admin
+          .schema('dilesa')
+          .from('unidades')
+          .select(
+            'identificador, proyecto_id, producto_id, calle, numero_oficial, area_m2, m2_construccion'
+          )
+          .eq('id', venta.unidad_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Notaría desde el catálogo de proveedores (categoria='notaria').
+    venta.notario_id ? getNotaria(admin, venta.notario_id) : Promise.resolve(null),
+  ]);
 
   let proyectoNombre: string | null = null;
   let prototipoSufijo: string | null = null;
@@ -295,9 +289,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     fechaEscritura: venta.fecha_escritura,
     valorEscrituracion:
       venta.valor_escrituracion != null ? Number(venta.valor_escrituracion) : null,
-    notarioNombre: notario ? nombreCompleto(notario) || null : null,
-    notarioTelefono: (notario?.telefono as string | null) ?? null,
-    notarioEmail: (notario?.email as string | null) ?? null,
+    notariaNumero: notaria?.numeroNotaria ?? null,
+    notarioNombre: notaria?.nombre ?? null,
+    notarioTelefono: notaria?.telefono ?? null,
+    notarioEmail: notaria?.email ?? null,
   };
 
   const res = await sendEscrituracionEmail(emailCtx, delivery);

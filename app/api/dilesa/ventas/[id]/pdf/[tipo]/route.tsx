@@ -43,6 +43,7 @@ import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
+import { getNotaria } from '@/lib/dilesa/notarios';
 
 const TIPOS = [
   'solicitud-asignacion',
@@ -310,17 +311,9 @@ export async function GET(
   if (tipo === 'solicitud-dictamen') {
     let notarioNombre = '(notaría)';
     if (venta.notario_id) {
-      const { data: not } = await sb
-        .schema('erp')
-        .from('personas')
-        .select('nombre, apellido_paterno, apellido_materno')
-        .eq('id', venta.notario_id)
-        .maybeSingle();
-      notarioNombre =
-        [not?.nombre, not?.apellido_paterno, not?.apellido_materno]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || notarioNombre;
+      // Notaría desde el catálogo de proveedores (categoria='notaria').
+      const notaria = await getNotaria(sb, venta.notario_id);
+      notarioNombre = notaria?.nombre || notarioNombre;
     }
     const data: SolicitudDictamenData = {
       fechaTexto,

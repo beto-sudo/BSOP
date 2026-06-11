@@ -46,7 +46,8 @@ export interface EscrituracionEmailContext {
   /** ISO date `YYYY-MM-DD`. */
   fechaEscritura: string;
   valorEscrituracion: number | null;
-  /** Datos de la notaría (notario_id → erp.personas; opcionales). */
+  /** Datos de la notaría (notario_id → erp.proveedores + persona ligada). */
+  notariaNumero: string | null;
   notarioNombre: string | null;
   notarioTelefono: string | null;
   notarioEmail: string | null;
@@ -191,6 +192,7 @@ export function renderEscrituracionHtml(ctx: EscrituracionEmailContext): string 
           branding: b,
           titulo: 'Datos de la notaría',
           filas: [
+            { label: 'NOTARÍA NÚMERO', value: ctx.notariaNumero },
             { label: 'NOTARIO', value: ctx.notarioNombre },
             { label: 'TELÉFONO', value: ctx.notarioTelefono },
             { label: 'EMAIL', value: ctx.notarioEmail },
