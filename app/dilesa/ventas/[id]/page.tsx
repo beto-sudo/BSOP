@@ -151,7 +151,6 @@ type Persona = {
   email: string | null;
   telefono: string | null;
   curp: string | null;
-  numero_credencial_ine: string | null;
   rfc: string | null;
   nss: string | null;
   fecha_nacimiento: string | null;
