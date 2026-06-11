@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; piloto = módulo Ventas). Sistema cross-empresa, pensado para rollout a las 5 empresas.
 **Schemas afectados:** `core.modulos` (slug nuevo `dilesa.manual` + backfill defensivo de permisos). El **contenido vive en el repo** (markdown versionado con git), **no** en la DB.
 **Estado:** in_progress
-**Próximo hito:** Módulo `dilesa.manual` + 28 docs de contenido en prod (migración aplicada, verificado). Próximo: Sprint 2 (export PDF on-demand + buscador en la portada /dilesa/manual) + Sprint 3 (closeout + plantilla replicable a las otras empresas)
+**Próximo hito:** Sprint 2 (export PDF on-demand + buscador en la portada /dilesa/manual) + Sprint 3 (closeout + plantilla replicable a las otras empresas). Cobertura actual: 57 docs, 100% de pantallas DILESA (incluye dinámicas vía normalización + fallback)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprint 0 + contenido (#720/#742/#748) y migración en prod; pendiente real = Sprint 2 PDF+buscador y Sprint 3 closeout)
+**Última actualización:** 2026-06-11 (ayuda contextual en rutas dinámicas + 22 docs nuevos: expediente, 17 fases de captura, RUV, Saldos Bancos, Costo materiales, portada)
 
 ## Problema
 
@@ -181,3 +181,16 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   cada módulo (un explorador por grupo) en lenguaje de usuario. Pendiente:
   revisión de Beto del detalle de negocio, sub-forms de captura (fases), y
   rollout a las otras 4 empresas.
+- **2026-06-11** — **Ayuda contextual en rutas dinámicas + catálogo 100%.**
+  Reporte de Beto post-cutover de ventas: el "?" no mostraba nada al abrir una
+  venta (el Expediente de Operación) — `resolveHelpSlug` hacía match exacto de
+  pathname contra `ROUTE_TO_MODULE`, y ninguna ruta dinámica (`/[id]`)
+  matcheaba. Fix en `lib/manual/help-routes.ts`: normalización de segmentos ID
+  (UUID/numérico/hex → `[id]`) + overrides para pantallas con doc propio
+  (expediente y las 16 capturas de fase) + fallback al primer ancestro mapeado
+  (detalle de proyecto/obra/cliente → doc del hub). 22 docs nuevos:
+  `expediente.md` (el central — zonas, tabla quién-captura-qué, copiloto),
+  `fase01…fase17` (uno por pantalla de captura, redactados del código real de
+  cada page), `ruv.md`, `saldos-bancos.md`, `compras/costo_materiales.md` y
+  `manual.md` (portada). Verificación: 66 pantallas DILESA → doc existente,
+  57 docs servibles por el loader, 0 huecos.
