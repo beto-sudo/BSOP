@@ -4,7 +4,7 @@
 **Empresas:** todas (golden: DILESA)
 **Schemas afectados:** `erp` (`estados_cuenta` nueva, `cuentas_bancarias` ficha, `cuenta_saldos`; v1: `movimientos_bancarios`, `conciliaciones`)
 **Estado:** in_progress
-**Próximo hito:** v0 en prod — tab "Estados de cuenta" en Saldos Bancos (subida de PDF + extracción IA + checks de conciliación mensual) + baseline mayo 2026 cargado; faltan Finamex y BBVA USD de mayo (los pasa Beto)
+**Próximo hito:** PR #838 al verde (auto-merge) + smoke test del flujo de subida con los estados de junio; completar baseline de mayo con Finamex y BBVA USD (los pasa Beto)
 **Dueño:** Beto
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-11 (re-scope: v0 mensual desbloqueada; v1 movimientos sigue esperando CxC/CxP)
@@ -137,3 +137,14 @@ para validar el import de v1.
   Beto ("Adelante con A y B"). Arranca construcción: migraciones
   `cuentas_bancarias_ficha`, `estados_cuenta`,
   `modulos_saldos_bancos_subslugs` + UI.
+- **2026-06-11 (construcción v0 completa)** — PR #838 (auto-merge): Fase
+  A (ficha + alta Afirme + snapshots baseline) y v0 (tabla
+  `erp.estados_cuenta` + tab Estados de cuenta con extracción IA + 3
+  checks). Las 3 migraciones aplicadas a prod con OK explícito de Beto y
+  verificadas (5 cuentas con ficha, 3 snapshots 31-may, sub-slugs con
+  permisos clonados a 8 roles). Ajuste sobre la marcha: `tipo` respetó el
+  CHECK existente (cheques/inversion) y el nombre comercial fue a columna
+  nueva `producto`. Baseline mayo cargado vía
+  `scripts/seed_estados_cuenta_2026_05.ts` (3 PDFs en bucket `adjuntos` +
+  filas con checksum verificado). 18 tests de helpers con las carátulas
+  reales como fixtures.
