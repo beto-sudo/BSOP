@@ -3088,6 +3088,7 @@ export type Database = {
           descripcion: string | null
           empresa_id: string
           id: string
+          monto: number
           nombre: string
           productos_aplicables: string[]
           updated_at: string
@@ -3101,6 +3102,7 @@ export type Database = {
           descripcion?: string | null
           empresa_id: string
           id?: string
+          monto?: number
           nombre: string
           productos_aplicables?: string[]
           updated_at?: string
@@ -3114,6 +3116,7 @@ export type Database = {
           descripcion?: string | null
           empresa_id?: string
           id?: string
+          monto?: number
           nombre?: string
           productos_aplicables?: string[]
           updated_at?: string
@@ -4775,6 +4778,7 @@ export type Database = {
           persona_id: string
           precio_asignacion: number | null
           productos_adicionales: number
+          promocion_id: string | null
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -4860,6 +4864,7 @@ export type Database = {
           persona_id: string
           precio_asignacion?: number | null
           productos_adicionales?: number
+          promocion_id?: string | null
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -4945,6 +4950,7 @@ export type Database = {
           persona_id?: string
           precio_asignacion?: number | null
           productos_adicionales?: number
+          promocion_id?: string | null
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -4958,6 +4964,13 @@ export type Database = {
           vendedor_usuario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ventas_promocion_id_fkey"
+            columns: ["promocion_id"]
+            isOneToOne: false
+            referencedRelation: "promociones"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ventas_unidad_id_fkey"
             columns: ["unidad_id"]

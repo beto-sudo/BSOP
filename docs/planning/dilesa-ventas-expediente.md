@@ -249,6 +249,14 @@ expediente, copiloto), no reescritura.
   recuperaron. Daily apagado (el `schedule:` salió del workflow; queda
   `workflow_dispatch` manual como vía de rescate), runbook actualizado.
   Iniciativa cerrada.
+- **2026-06-11 (post-cierre — descuento máximo desde promoción):** Regla de
+  Beto: el Descuento Máximo Autorizado de la cuadratura ES el valor de la
+  promoción/bono elegido en la Solicitud (bonos flexibles repartibles entre
+  buckets) — derivado, no captura. `promociones.monto` ($15,000 al bono
+  LDLE-ISC) + `ventas.promocion_id` (la solicitud persiste FK, ya no texto en
+  notas); el editor de cuadratura quita el input y muestra el tope auto con
+  alerta si los 4 buckets lo exceden. Legacy Coda (264 activas) cae al valor
+  capturado allá. Migración aplicada a prod.
 
 ## Decisiones registradas
 

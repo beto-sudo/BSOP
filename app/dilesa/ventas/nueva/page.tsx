@@ -62,6 +62,7 @@ type TipoCredito = {
 type Promocion = {
   id: string;
   nombre: string;
+  monto: number;
   productos_aplicables: string[];
 };
 
@@ -242,7 +243,7 @@ function NuevaSolicitudForm() {
       sb
         .schema('dilesa')
         .from('promociones')
-        .select('id, nombre, productos_aplicables')
+        .select('id, nombre, monto, productos_aplicables')
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .eq('activa', true)
         .is('deleted_at', null),
@@ -567,9 +568,9 @@ function NuevaSolicitudForm() {
           productos_adicionales: Number(productosAdicionales) || 0,
           enganche_requerido: calculo?.enganche_1pct ?? null,
           gastos_escrituracion: calculo?.gastos_notariales_6pct ?? null,
-          notas: promocionId
-            ? `Promoción aplicada: ${promociones.find((p) => p.id === promocionId)?.nombre ?? promocionId}`
-            : null,
+          // La promo elegida define el Descuento Máximo Autorizado de la
+          // cuadratura (promociones.monto) — FK, ya no texto en notas.
+          promocion_id: promocionId || null,
         })
         .select('id')
         .single();
@@ -944,6 +945,7 @@ function NuevaSolicitudForm() {
               {promocionesAplicables.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nombre}
+                  {p.monto > 0 ? ` (tope de descuento ${money(p.monto)})` : ''}
                 </option>
               ))}
             </select>
