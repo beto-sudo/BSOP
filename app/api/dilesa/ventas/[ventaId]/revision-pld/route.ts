@@ -14,8 +14,14 @@
  *      (venta, cliente, unidad, escritura F11, avalúo F5, depósitos CxC).
  *   2. Si hay ACUSE DE ENVÍO (rol `acuse_pld`), lo extrae y cruza contra el
  *      informe (RFC, referencia del aviso, plazo) — cierra el ciclo: el
- *      aviso no solo existe, SE PRESENTÓ (decisión Beto 2026-06-12). Sin
- *      acuse, el check `acuse_presente` sale en rojo.
+ *      aviso no solo existe, SE PRESENTÓ. Flujo en dos pasos (decisión Beto
+ *      2026-06-12): primero el informe se revisa y congela en verde, se
+ *      presenta ante el SPPLD, y la corrida con acuse completa el ciclo.
+ *      Una corrida sin acuse NO se penaliza (el gate de cierre exige el
+ *      documento y la vigencia de ambos adjuntos por su cuenta).
+ *      Optimización: si la revisión previa es del MISMO informe y trae su
+ *      extracción, se reusa (no se re-paga la visión del PDF grande); el
+ *      cruce determinista sí se recalcula con el expediente fresco.
  *   3. Persiste la corrida en `dilesa.venta_fase_revisiones` (append-only,
  *      ligada a la versión exacta de AMBOS adjuntos) + `core.audit_log`.
  *   Si la extracción IA falla, la corrida queda `estado='error'` — la
@@ -37,7 +43,6 @@ import { anthropic, ensurePdfFitsForClaude, MODELO_CLAUDE } from '@/lib/document
 import { getNotaria } from '@/lib/dilesa/notarios';
 import { getAdjuntoPath } from '@/lib/adjuntos';
 import {
-  checkAcuseFaltante,
   cruzarAcuseConInforme,
   cruzarPldConExpediente,
   ExtraccionAcuseSchema,
@@ -353,21 +358,40 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   try {
     // 1) Informe de avisos → extracción + cruce contra el expediente.
-    const pdfInforme = await descargarPdf(pld);
-    const { object: informe } = await generateObject({
-      model: anthropic(MODELO_CLAUDE),
-      schema: ExtraccionPldSchema,
-      maxRetries: 2,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: PROMPT_EXTRACCION_PLD },
-            { type: 'file', data: pdfInforme, mediaType: 'application/pdf' },
-          ],
-        },
-      ],
-    });
+    //    Si la última revisión completada es de ESTE mismo informe, su
+    //    extracción se reusa (paso 2 del flujo: solo cambió el acuse).
+    const previa = await ultimaRevision(admin, ventaId);
+    const extraccionPrevia =
+      previa &&
+      previa.estado === 'completada' &&
+      previa.adjunto_id === pld.id &&
+      previa.extraccion &&
+      typeof previa.extraccion === 'object' &&
+      (previa.extraccion as { informe?: unknown }).informe
+        ? ((previa.extraccion as { informe: unknown }).informe as Record<string, unknown>)
+        : null;
+
+    let informe;
+    if (extraccionPrevia) {
+      informe = ExtraccionPldSchema.parse(extraccionPrevia);
+    } else {
+      const pdfInforme = await descargarPdf(pld);
+      const r = await generateObject({
+        model: anthropic(MODELO_CLAUDE),
+        schema: ExtraccionPldSchema,
+        maxRetries: 2,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT_EXTRACCION_PLD },
+              { type: 'file', data: pdfInforme, mediaType: 'application/pdf' },
+            ],
+          },
+        ],
+      });
+      informe = r.object;
+    }
     const checks: RevisionCheck[] = cruzarPldConExpediente(informe, expediente);
 
     // 2) Acuse de envío → cierra el ciclo (sin acuse, rojo explícito).
@@ -390,8 +414,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
       });
       extraccionAcuse = acuseExt;
       checks.push(...cruzarAcuseConInforme(acuseExt, informe, empresaRfc));
-    } else {
-      checks.push(checkAcuseFaltante());
     }
 
     const veredicto = veredictoDe(checks);

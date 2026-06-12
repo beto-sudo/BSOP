@@ -188,7 +188,7 @@ describe('veredictoDe', () => {
 
 // ── Acuse de envío (ciclo completo) ─────────────────────────────────────
 
-import { checkAcuseFaltante, cruzarAcuseConInforme, type ExtraccionAcuse } from './pld-revision';
+import { cruzarAcuseConInforme, separarChecks, type ExtraccionAcuse } from './pld-revision';
 
 function acuse(partial: Partial<ExtraccionAcuse> = {}): ExtraccionAcuse {
   return {
@@ -260,11 +260,33 @@ describe('cruzarAcuseConInforme', () => {
   });
 });
 
-describe('checkAcuseFaltante', () => {
-  it('es un error duro: sin acuse el ciclo no cierra', () => {
-    const c = checkAcuseFaltante();
-    expect(c.ok).toBe(false);
-    expect(c.severidad).toBe('error');
-    expect(veredictoDe([c])).toBe('rojo');
+describe('separarChecks (flujo en dos pasos)', () => {
+  it('separa informe vs acuse por clave y los veredictos parciales son independientes', () => {
+    const informeChecks = cruzarPldConExpediente(extraccion(), expediente());
+    const acuseChecks = cruzarAcuseConInforme(
+      acuse({ rfcSujetoObligado: 'XAXX010101000' }), // acuse de otro RFC → rojo
+      extraccion(),
+      'DIE030904866'
+    );
+    const { informe, acuse: soloAcuse } = separarChecks([...informeChecks, ...acuseChecks]);
+    expect(informe).toHaveLength(informeChecks.length);
+    expect(soloAcuse).toHaveLength(acuseChecks.length);
+    expect(soloAcuse.every((c) => c.clave.startsWith('acuse_'))).toBe(true);
+    // El informe puede estar en advertencias mientras el acuse está en rojo.
+    expect(veredictoDe(informe)).toBe('advertencias');
+    expect(veredictoDe(soloAcuse)).toBe('rojo');
+  });
+});
+
+describe('cruzarAcuseConInforme — acuse de lote (envío masivo histórico)', () => {
+  it('con numeroAvisos > 1 la correspondencia cae a periodo (warning), no exige referencia', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ numeroAvisos: 14, referenciaAviso: 'LOTE-2026-06' }),
+      extraccion(),
+      'DIE030904866'
+    );
+    const c = checks.find((x) => x.clave === 'acuse_referencia');
+    expect(c?.ok).toBe(true);
+    expect(c?.severidad).toBe('warning');
   });
 });

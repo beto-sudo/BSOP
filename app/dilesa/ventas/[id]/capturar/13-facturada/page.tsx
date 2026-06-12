@@ -33,8 +33,12 @@
  *   - El PDF de la factura pasa a opcional (representación visual); el XML
  *     es el documento fiscal.
  *   - Si la NC se sube antes que la factura, su check de relación queda en
- *     warning — re-subir la NC tras la factura lo revalida (S3 agrega la
- *     revisión integral que lo hace solo).
+ *     warning — re-subir la NC tras la factura lo revalida.
+ *
+ * Sprint 4c — ciclo PLD en dos pasos (decisión Beto 2026-06-12): el informe
+ * se revisa contra el expediente; en verde se CONGELA (solo Dirección puede
+ * reemplazarlo) y se habilita presentar el aviso + cargar el acuse; la
+ * revisión con acuse completa el ciclo y solo entonces se prende el cierre.
  *
  * Enforcement: Fase 12 (Detonada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
@@ -81,7 +85,12 @@ import {
   type CfdiResumen,
 } from '@/lib/dilesa/captura/cfdi-validacion';
 import { CfdiParseError, parseCfdiXml } from '@/lib/cxp/cfdi-parser';
-import type { RevisionCheck, VeredictoRevision } from '@/lib/dilesa/captura/pld-revision';
+import {
+  separarChecks,
+  veredictoDe,
+  type RevisionCheck,
+  type VeredictoRevision,
+} from '@/lib/dilesa/captura/pld-revision';
 import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
 import { useEffectiveUser } from '@/components/providers';
 import {
@@ -258,6 +267,29 @@ function CapturarFase13Body() {
     () => leerCfdiMetadata(docs?.nota_credito_xml?.vigente.metadata),
     [docs]
   );
+
+  // ── Flujo PLD en dos pasos (decisión Beto 2026-06-12) ───────────
+  // Paso 1: el informe se revisa contra el expediente; en verde se CONGELA
+  // (solo Dirección puede reemplazarlo) y se habilita presentar + acuse.
+  // Paso 2: el acuse completa el ciclo. El gate server-side es la verdad;
+  // estos derivados solo ordenan la UI.
+  const pasosPld = useMemo(() => {
+    const partes = revision ? separarChecks(revision.checks) : { informe: [], acuse: [] };
+    const informeVigente =
+      !!revision &&
+      revision.estado === 'completada' &&
+      !!docs?.aviso_pld &&
+      revision.adjuntoId === docs.aviso_pld.vigente.id;
+    const veredictoInforme =
+      informeVigente && partes.informe.length > 0 ? veredictoDe(partes.informe) : null;
+    return {
+      checksInforme: partes.informe,
+      checksAcuse: partes.acuse,
+      veredictoInforme,
+      informeVerde: veredictoInforme === 'verde',
+      acuseRevisado: !!revision && revision.adjuntoAcuseId != null && revision.vigente,
+    };
+  }, [revision, docs]);
 
   // ── Cargar contexto ──────────────────────────────────────────────
   useEffect(() => {
@@ -676,17 +708,30 @@ function CapturarFase13Body() {
               </p>
             ) : null}
             <div className="space-y-2">
-              {DOCS_FASE13.map((d) => (
-                <DocSlot
-                  key={d.rol}
-                  slot={d}
-                  estado={docs?.[d.rol]}
-                  cargando={docs == null && !docsError}
-                  subiendo={subiendoRol === d.rol}
-                  deshabilitado={subiendoRol != null && subiendoRol !== d.rol}
-                  onPick={(f) => void onPickDoc(d, f)}
-                />
-              ))}
+              {DOCS_FASE13.map((d) => {
+                // Paso 1 en verde → el PLD se congela (solo Dirección
+                // reemplaza); el acuse se habilita hasta entonces.
+                const bloqueo =
+                  d.rol === 'aviso_pld' && pasosPld.informeVerde && !soyDireccion
+                    ? 'El PLD quedó congelado para presentación — solo Dirección puede reemplazarlo.'
+                    : d.rol === 'acuse_pld' && !pasosPld.informeVerde
+                      ? 'Se habilita cuando la revisión del PLD esté en verde.'
+                      : null;
+                return (
+                  <DocSlot
+                    key={d.rol}
+                    slot={d}
+                    estado={docs?.[d.rol]}
+                    cargando={docs == null && !docsError}
+                    subiendo={subiendoRol === d.rol}
+                    deshabilitado={
+                      bloqueo != null || (subiendoRol != null && subiendoRol !== d.rol)
+                    }
+                    notaBloqueo={bloqueo}
+                    onPick={(f) => void onPickDoc(d, f)}
+                  />
+                );
+              })}
             </div>
           </Section>
 
@@ -711,12 +756,12 @@ function CapturarFase13Body() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {!revision.vigente ? (
+              <div className="space-y-4">
+                {!revision.vigente && !pasosPld.informeVerde ? (
                   <p className="flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    El Aviso PLD o su acuse cambiaron después de esta revisión — re-ejecútala para
-                    que el cierre la tome en cuenta.
+                    El Aviso PLD cambió después de esta revisión — re-ejecútala para que el cierre
+                    la tome en cuenta.
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -744,11 +789,50 @@ function CapturarFase13Body() {
                     re-ejecutarla; si persiste, el cierre requiere autorización de Dirección.
                   </p>
                 ) : (
-                  <ul className="space-y-1">
-                    {revision.checks.map((c) => (
-                      <CheckLinea key={c.clave} check={c} />
-                    ))}
-                  </ul>
+                  <>
+                    {/* Paso 1 — el informe contra el expediente */}
+                    <div>
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                        Paso 1 · Informe del aviso (PLD)
+                      </p>
+                      <ul className="space-y-1">
+                        {pasosPld.checksInforme.map((c) => (
+                          <CheckLinea key={c.clave} check={c} />
+                        ))}
+                      </ul>
+                      {pasosPld.informeVerde ? (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-emerald-400/40 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+                          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          El PLD cumple y quedó congelado — preséntalo en el portal SPPLD y carga
+                          aquí el acuse de envío.
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Paso 2 — la presentación y su acuse */}
+                    <div>
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                        Paso 2 · Presentación y acuse
+                      </p>
+                      {pasosPld.checksAcuse.length > 0 ? (
+                        <ul className="space-y-1">
+                          {pasosPld.checksAcuse.map((c) => (
+                            <CheckLinea key={c.clave} check={c} />
+                          ))}
+                        </ul>
+                      ) : pasosPld.informeVerde ? (
+                        <p className="text-xs text-[var(--text)]/55">
+                          {docs?.acuse_pld
+                            ? 'Acuse cargado — re-ejecuta la revisión para completar el ciclo.'
+                            : 'Pendiente: presenta el aviso y sube el acuse de envío.'}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[var(--text)]/45">
+                          Se habilita cuando el Paso 1 esté en verde.
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -1020,6 +1104,7 @@ function DocSlot({
   cargando,
   subiendo,
   deshabilitado,
+  notaBloqueo,
   onPick,
 }: {
   slot: SlotDef;
@@ -1027,6 +1112,8 @@ function DocSlot({
   cargando: boolean;
   subiendo: boolean;
   deshabilitado: boolean;
+  /** Razón visible del bloqueo (PLD congelado / acuse pendiente del Paso 1). */
+  notaBloqueo?: string | null;
   onPick: (f: File) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
@@ -1107,6 +1194,12 @@ function DocSlot({
                 {esXml ? 'Sin XML en el expediente.' : 'Sin documento en el expediente.'}
               </p>
             )}
+            {notaBloqueo ? (
+              <p className="mt-0.5 flex items-start gap-1 text-xs text-[var(--text)]/50">
+                <Lock className="mt-0.5 h-3 w-3 shrink-0" />
+                {notaBloqueo}
+              </p>
+            ) : null}
           </div>
         </div>
         <label

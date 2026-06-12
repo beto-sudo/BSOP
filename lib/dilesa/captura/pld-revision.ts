@@ -469,8 +469,10 @@ export function cruzarAcuseConInforme(
   }
 
   // Correspondencia acuse ↔ informe: por referencia del aviso si ambos la
-  // traen; si el acuse no la trae, por mes reportado.
-  if (acuse.referenciaAviso && informe.referenciaAviso) {
+  // traen; si el acuse no la trae (o es un acuse de LOTE que ampara varios
+  // avisos, como los del esquema de envío masivo mensual), por mes reportado.
+  const acuseDeLote = acuse.numeroAvisos > 1;
+  if (!acuseDeLote && acuse.referenciaAviso && informe.referenciaAviso) {
     checks.push(
       normalizarTexto(acuse.referenciaAviso) === normalizarTexto(informe.referenciaAviso)
         ? ok('acuse_referencia', 'Acuse corresponde al aviso del informe', 'error')
@@ -481,7 +483,11 @@ export function cruzarAcuseConInforme(
             `El acuse ampara la referencia ${acuse.referenciaAviso}; el informe es la ${informe.referenciaAviso}.`
           )
     );
-  } else if (acuse.mesReportado && informe.mesReportado) {
+  } else if (
+    (acuseDeLote || !acuse.referenciaAviso) &&
+    acuse.mesReportado &&
+    informe.mesReportado
+  ) {
     checks.push(
       acuse.mesReportado === informe.mesReportado
         ? ok('acuse_referencia', 'Acuse corresponde al periodo del informe', 'warning')
@@ -534,12 +540,18 @@ export function cruzarAcuseConInforme(
   return checks;
 }
 
-/** Check duro cuando el expediente no tiene acuse: el ciclo no está cerrado. */
-export function checkAcuseFaltante(): RevisionCheck {
-  return falla(
-    'acuse_presente',
-    'Acuse de envío SPPLD en el expediente',
-    'error',
-    'Falta el acuse de envío del aviso — sin él no se acredita que el aviso se presentó ante Hacienda.'
-  );
+/**
+ * Separa los checks de una revisión por paso del ciclo: los del acuse llevan
+ * clave `acuse_*`; el resto son del informe vs el expediente. La UI y el
+ * gate derivan veredictos parciales de aquí (flujo en dos pasos, decisión
+ * Beto 2026-06-12: revisar el PLD → congelarlo → presentar → acuse).
+ */
+export function separarChecks(checks: RevisionCheck[]): {
+  informe: RevisionCheck[];
+  acuse: RevisionCheck[];
+} {
+  return {
+    informe: checks.filter((c) => !c.clave.startsWith('acuse_')),
+    acuse: checks.filter((c) => c.clave.startsWith('acuse_')),
+  };
 }
