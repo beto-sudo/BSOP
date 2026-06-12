@@ -9,11 +9,19 @@
  *   4. Matchea el emisor con un proveedor (persona por RFC); si no existe, la
  *      factura se crea igual con proveedor nulo y se sugiere el alta del
  *      proveedor (carga inclusiva — "mejor capturar de más", planning cxp).
- *   5. Da de alta la factura vía `erp.cxp_factura_alta` (RPC, dedup defensivo).
+ *   5. Da de alta la factura vía `erp.cxp_factura_alta` (RPC, dedup defensivo;
+ *      recibe `p_usuario_id` para atribuir su audit_log — vía service role
+ *      `auth.uid()` es NULL).
  *   6. Sube el XML a storage (`adjuntos`) + registra `erp.adjuntos` + `xml_url`.
  *
  * Devuelve un resultado por archivo (éxito o error) para no abortar el lote
- * completo por un XML malo.
+ * completo por un XML malo. Status: 200 todo cargado, 207 lote parcial,
+ * 422 ningún archivo pasó (el body es idéntico en los tres casos).
+ *
+ * Audit trail server-side en `core.audit_log` (best-effort): una fila
+ * `cxp_factura_rechazo` por archivo rechazado + una `cxp_facturas_upload_lote`
+ * por lote. Sin esto, "subí facturas y no se guardaron" era indiagnosticable —
+ * los rechazos solo vivían en el modal del cliente.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
@@ -22,6 +30,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { buildAdjuntoPath, type EmpresaSlug } from '@/lib/storage/path';
 import { parseCfdiXml, CfdiParseError } from '@/lib/cxp/cfdi-parser';
+import type { Database } from '@/types/supabase';
 
 const EMPRESA_SLUGS: EmpresaSlug[] = ['dilesa', 'rdb', 'ansa', 'coagan'];
 
@@ -36,6 +45,15 @@ type FacturaResult = {
   /** Si el emisor no matcheó un proveedor existente, se sugiere darlo de alta. */
   proveedorSugerido?: { rfc: string; nombre: string | null } | null;
   error?: string;
+};
+
+type AuditLogInsert = Database['core']['Tables']['audit_log']['Insert'];
+
+// `p_usuario_id` existe desde la migración 20260612161552; types/supabase.ts
+// se regenera cuando se aplique a prod — la intersección cubre el gap y queda
+// redundante (inofensiva) después.
+type CxpFacturaAltaArgs = Database['erp']['Functions']['cxp_factura_alta']['Args'] & {
+  p_usuario_id?: string;
 };
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -115,14 +133,52 @@ export async function POST(req: NextRequest, { params }: Params) {
     .trim();
   const results: FacturaResult[] = [];
 
+  // Rastro server-side de rechazos (se insertan en batch al final, junto con
+  // la fila-resumen del lote).
+  const userAgent = req.headers.get('user-agent');
+  const auditRows: AuditLogInsert[] = [];
+  const addRechazo = (args: {
+    filename: string;
+    motivo: string;
+    uuidSat?: string | null;
+    emisorRfc?: string | null;
+    /** En duplicados, la factura ya existente — el link que faltaba al investigar. */
+    facturaExistenteId?: string | null;
+  }) => {
+    auditRows.push({
+      empresa_id: emp.id,
+      usuario_id: user.id,
+      accion: 'cxp_factura_rechazo',
+      tabla: 'erp.facturas',
+      registro_id: args.facturaExistenteId ?? null,
+      datos_nuevos: {
+        filename: args.filename,
+        motivo: args.motivo,
+        uuid_sat: args.uuidSat ?? null,
+        emisor_rfc: args.emisorRfc ?? null,
+      },
+      user_agent: userAgent,
+    });
+  };
+
   for (const file of files) {
     const r: FacturaResult = { filename: file.name, ok: false };
+    // Lo parseado hasta ahora, para que el rechazo del catch lleve uuid/RFC
+    // aunque el error ocurra después del parse.
+    let parsedForAudit: { uuid: string | null; emisorRfc: string } | null = null;
     try {
       const cfdi = parseCfdiXml(await file.text());
+      parsedForAudit = { uuid: cfdi.uuid, emisorRfc: cfdi.emisorRfc };
 
       // El receptor del CFDI debe ser esta empresa.
       if (empresaRfc && cfdi.receptorRfc !== empresaRfc) {
         r.error = `El CFDI es para el RFC ${cfdi.receptorRfc}, no para ${empresaSlug} (${empresaRfc}).`;
+        addRechazo({
+          filename: file.name,
+          motivo: r.error,
+          uuidSat: cfdi.uuid,
+          emisorRfc: cfdi.emisorRfc,
+        });
         results.push(r);
         continue;
       }
@@ -138,6 +194,13 @@ export async function POST(req: NextRequest, { params }: Params) {
         if (dup) {
           r.uuid = cfdi.uuid;
           r.error = `Ya existe una factura con folio fiscal ${cfdi.uuid}.`;
+          addRechazo({
+            filename: file.name,
+            motivo: r.error,
+            uuidSat: cfdi.uuid,
+            emisorRfc: cfdi.emisorRfc,
+            facturaExistenteId: dup.id,
+          });
           results.push(r);
           continue;
         }
@@ -153,7 +216,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const proveedorId: string | null = prov?.id ?? null;
 
       // Alta de la factura (RPC SECURITY DEFINER).
-      const { data: facturaId, error: rpcErr } = await admin.schema('erp').rpc('cxp_factura_alta', {
+      const rpcArgs: CxpFacturaAltaArgs = {
         // p_proveedor_id es posicionalmente requerido en el SQL pero la
         // columna acepta NULL: el cast permite pasar null cuando el emisor
         // no matchea un proveedor existente (carga inclusiva).
@@ -174,9 +237,19 @@ export async function POST(req: NextRequest, { params }: Params) {
         p_tasa_iva: cfdi.tasaIva ?? undefined,
         p_retencion_iva: cfdi.retencionIva,
         p_retencion_isr: cfdi.retencionIsr,
-      });
+        p_usuario_id: user.id,
+      };
+      const { data: facturaId, error: rpcErr } = await admin
+        .schema('erp')
+        .rpc('cxp_factura_alta', rpcArgs);
       if (rpcErr) {
         r.error = rpcErr.message;
+        addRechazo({
+          filename: file.name,
+          motivo: r.error,
+          uuidSat: cfdi.uuid,
+          emisorRfc: cfdi.emisorRfc,
+        });
         results.push(r);
         continue;
       }
@@ -214,15 +287,46 @@ export async function POST(req: NextRequest, { params }: Params) {
     } catch (e) {
       r.error =
         e instanceof CfdiParseError ? e.message : `Error inesperado: ${(e as Error).message}`;
+      addRechazo({
+        filename: file.name,
+        motivo: r.error,
+        uuidSat: parsedForAudit?.uuid,
+        emisorRfc: parsedForAudit?.emisorRfc,
+      });
     }
     results.push(r);
   }
 
   const exitosos = results.filter((x) => x.ok).length;
-  return NextResponse.json({
-    ok: exitosos > 0,
-    total: results.length,
-    exitosos,
-    results,
+
+  // Fila-resumen del lote + rechazos acumulados, en un solo insert.
+  // Best-effort: un fallo del audit no tumba la respuesta — las facturas
+  // exitosas ya quedaron creadas.
+  auditRows.push({
+    empresa_id: emp.id,
+    usuario_id: user.id,
+    accion: 'cxp_facturas_upload_lote',
+    tabla: 'erp.facturas',
+    datos_nuevos: {
+      total: results.length,
+      exitosos,
+      rechazados: results.length - exitosos,
+    },
+    user_agent: userAgent,
   });
+  const { error: auditErr } = await admin.schema('core').from('audit_log').insert(auditRows);
+  if (auditErr) {
+    console.error('upload-xml: fallo al registrar audit_log:', auditErr.message);
+  }
+
+  const status = exitosos === results.length ? 200 : exitosos > 0 ? 207 : 422;
+  return NextResponse.json(
+    {
+      ok: exitosos > 0,
+      total: results.length,
+      exitosos,
+      results,
+    },
+    { status }
+  );
 }
