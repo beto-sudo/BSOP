@@ -37,6 +37,7 @@ import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
+import { VENTA_ESTADO_CONFIG } from '@/lib/status-tokens';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { buildAdjuntoPath } from '@/lib/storage/path';
@@ -236,15 +237,6 @@ type Adjunto = {
   nombre: string;
   url: string;
   tipo_mime: string | null;
-};
-
-const ESTADO_TONE: Record<string, BadgeTone> = {
-  activa: 'info',
-  desasignada: 'neutral',
-};
-const ESTADO_LABEL: Record<string, string> = {
-  activa: 'Activa',
-  desasignada: 'Desasignada',
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -1092,8 +1084,14 @@ function DetailInner() {
               {venta.fase_actual}
             </Badge>
           ) : null}
-          <Badge tone={ESTADO_TONE[venta.estado] ?? 'neutral'}>
-            {ESTADO_LABEL[venta.estado] ?? venta.estado}
+          <Badge
+            tone={
+              VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.tone ??
+              'neutral'
+            }
+          >
+            {VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ??
+              venta.estado}
           </Badge>
           {venta.tipo_credito ? <Badge tone="neutral">{venta.tipo_credito}</Badge> : null}
         </div>
@@ -2304,7 +2302,11 @@ function MovimientosAdministrativos({
       </div>
     );
   }
-  if (estado !== 'activa') return null;
+  // 'terminada' conserva "Regresar a fase…" como única acción: deshace un
+  // cierre erróneo de la fase 17 (el trigger de DB regresa el estado a
+  // 'activa' al bajar la fase). Desasignar una terminada no procede — para
+  // tocarla hay que regresarla a pipeline primero.
+  if (estado !== 'activa' && estado !== 'terminada') return null;
   const pos = fasePosicion ?? 0;
 
   /**
@@ -2327,9 +2329,11 @@ function MovimientosAdministrativos({
           Regresar a fase…
         </Button>
       ) : null}
-      <Button variant="outline" size="sm" onClick={() => setOpenDesasignar(true)}>
-        Desasignar venta…
-      </Button>
+      {estado === 'activa' ? (
+        <Button variant="outline" size="sm" onClick={() => setOpenDesasignar(true)}>
+          Desasignar venta…
+        </Button>
+      ) : null}
 
       <RegresarFaseDialog
         ventaId={ventaId}

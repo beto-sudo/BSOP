@@ -14,6 +14,29 @@
 
 import type { BadgeTone } from '@/components/ui/badge';
 
+/**
+ * Estados de `dilesa.ventas.estado` (constraint `ventas_estado_check`).
+ * `estado` = ciclo de vida del registro; el avance vive en `fase_actual`/
+ * `fase_posicion` (pipeline de 17 fases). 'terminada' la setea el trigger
+ * `trg_ventas_sync_estado_terminada` cuando la venta alcanza la fase 17.
+ */
+export type VentaEstado = 'activa' | 'terminada' | 'desasignada' | 'expirada';
+
+export const VENTA_ESTADO_CONFIG: Record<VentaEstado, { label: string; tone: BadgeTone }> = {
+  activa: { label: 'Activa', tone: 'info' },
+  terminada: { label: 'Terminada', tone: 'success' },
+  desasignada: { label: 'Desasignada', tone: 'neutral' },
+  expirada: { label: 'Expirada', tone: 'warning' },
+};
+
+/** Orden canónico para dropdowns de filtro. */
+export const VENTA_ESTADOS: readonly VentaEstado[] = [
+  'activa',
+  'terminada',
+  'desasignada',
+  'expirada',
+];
+
 export type JuntaEstado = 'programada' | 'en_curso' | 'completada' | 'cancelada';
 
 export const JUNTA_ESTADO_CONFIG: Record<JuntaEstado, { label: string; tone: BadgeTone }> = {

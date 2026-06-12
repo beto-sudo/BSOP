@@ -19,6 +19,11 @@
  *    Las viejas que necesitan intervención.
  * 5. Avance promedio — `mean(fase_posicion) / max(fase_posicion)` —
  *    consistente con el mismo KPI en el tab Ventas.
+ *
+ * Estos KPIs miden el PIPELINE VIVO: solo estado='activa'. Las 'terminada'
+ * (fase 17 alcanzada — sprint estados-venta) son cierre histórico y quedan
+ * fuera a propósito; antes de ese sprint el histórico Coda contaminaba
+ * "Estancadas" y "Días en pipeline" con ventas concluidas hace años.
  */
 
 import type { ModuleKpi } from '@/components/module-page';

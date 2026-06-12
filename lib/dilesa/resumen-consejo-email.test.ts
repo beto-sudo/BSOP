@@ -185,6 +185,25 @@ describe('armarTuberia', () => {
     expect(rows.find((r) => r.fase === 'Sin fase asignada')).toBeUndefined();
   });
 
+  it('incluye terminadas — la fila "Operación Terminada" conserva el acumulado histórico', () => {
+    const rows = armarTuberia(CAT, [
+      { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 2000 },
+      { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 1000 },
+      { estado: 'expirada', fase_actual: 'Solicitud de Asignación', valor_escrituracion: 500 },
+    ]);
+    expect(rows.find((r) => r.fase === 'Operación Terminada')).toEqual({
+      fase: 'Operación Terminada',
+      clientes: 2,
+      valor: 3000,
+    });
+    // expirada es venta caída: no cuenta en ninguna fila.
+    expect(rows.find((r) => r.fase === 'Solicitud de Asignación')).toEqual({
+      fase: 'Solicitud de Asignación',
+      clientes: 0,
+      valor: 0,
+    });
+  });
+
   it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
     const rows = armarTuberia(CAT, [
       { estado: 'activa', fase_actual: null, valor_escrituracion: null },

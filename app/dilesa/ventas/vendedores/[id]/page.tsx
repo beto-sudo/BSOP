@@ -29,6 +29,7 @@ import { ArrowLeft } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
+import { VENTA_ESTADO_CONFIG } from '@/lib/status-tokens';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -226,8 +227,14 @@ function VendedorDetailBody() {
                           {v.fase_actual}
                         </Badge>
                       ) : null}
-                      <Badge tone={v.estado === 'activa' ? 'info' : 'neutral'}>
-                        {v.estado === 'activa' ? 'Activa' : v.estado}
+                      <Badge
+                        tone={
+                          VENTA_ESTADO_CONFIG[v.estado as keyof typeof VENTA_ESTADO_CONFIG]?.tone ??
+                          'neutral'
+                        }
+                      >
+                        {VENTA_ESTADO_CONFIG[v.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ??
+                          v.estado}
                       </Badge>
                       <span className="tabular-nums text-sm font-medium text-[var(--text)]">
                         {moneyFmt.format(monto)}

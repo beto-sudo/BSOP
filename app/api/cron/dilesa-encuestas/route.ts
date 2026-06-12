@@ -87,8 +87,10 @@ export async function GET(req: Request) {
         .eq('id', enc.venta_id)
         .is('deleted_at', null)
         .maybeSingle();
-      if (!venta || venta.estado !== 'activa') {
+      if (!venta || (venta.estado !== 'activa' && venta.estado !== 'terminada')) {
         // Venta desasignada/borrada después de la entrega: ciclo muerto.
+        // 'terminada' sí encuesta: el ciclo post-entrega (6/12 meses) sigue
+        // vivo mucho después del cierre administrativo de la fase 17.
         await admin
           .schema('dilesa')
           .from('venta_encuestas')
