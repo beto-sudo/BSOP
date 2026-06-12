@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (hotfix post-cutover #2: unidades.estado re-sincronizado con ventas activas — 17 unidades corregidas en prod, sync agregado al import de rescate)
+**Última actualización:** 2026-06-11 (hotfix post-cutover #3: 178 lotes sin prototipo de LDLE reclasificados a lote_urbanizado — el inventario ya solo ofrece casas reales)
 
 ## Problema
 
@@ -321,6 +321,23 @@ expediente, copiloto), no reescritura.
   inconsistencias en ambas direcciones. `import_dilesa_ventas.ts` ahora
   sincroniza `unidades.estado` al final de cada corrida (promueve por fase,
   libera asignadas sin venta activa, nunca degrada escriturada/entregada).
+- **2026-06-11 (hotfix lotes falsos-terminada en LDLE):** Beto reportó lotes
+  sin construir (M20-L1..L18-LDLE) en Inventario como "Terminada". Causa:
+  el `mapEstado` del import de inventario traducía las fases de Coda
+  "Paquete RUV/Extracción/Seguro" a `terminada` — válido para casas
+  construidas, no para lotes que apenas van en el frente RUV (los 117
+  afectados tienen frente_id pero 0 CUVs, sin producto ni obra; manzanas
+  15-18, 20, 23 de LDLE; además inflaban `lotes_construidos` e
+  `inventario_disponible_venta` en v_proyecto_avances). Data-fix aplicado
+  en prod con confirmación de Beto (la urbanización de LDLE está 100%
+  terminada): 117 `terminada` + 61 `planeada`, todos lotes sin prototipo,
+  sin obra y sin venta activa → `lote_urbanizado` (178 movidos).
+  Verificación: 0 lotes sin prototipo en el filtro del inventario; quedan
+  183 unidades en inventario global, todas casas reales. Sin cambio de
+  código: con datos correctos el filtro por estado vuelve a ser válido, y
+  `lote_urbanizado` sigue siendo liberable a portafolio y contando como
+  urbanizado en avances. Queda desambiguada la semántica: `terminada` ya
+  solo significa casa terminada.
 
 ## Decisiones registradas
 
