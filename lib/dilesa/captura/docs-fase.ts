@@ -34,6 +34,11 @@ export type DocFase = {
   subidoPorNombre: string | null;
   /** ISO timestamp (UTC) de `erp.adjuntos.created_at`. */
   subidoAt: string;
+  /**
+   * `erp.adjuntos.metadata` — para los XML CFDI lleva el snapshot del
+   * comprobante + checks de validación (`cfdiAdjuntoMetadata`).
+   */
+  metadata: Record<string, unknown> | null;
 };
 
 export type DocRolEstado = { vigente: DocFase; versiones: number };
@@ -72,6 +77,8 @@ export type SubirDocFaseInput = {
   archivo: File;
   /** Usuario autenticado — queda como `uploaded_by` (autor real del documento). */
   userId: string | null;
+  /** Metadata opcional (ej. snapshot CFDI + checks para los XML). */
+  metadata?: Record<string, unknown>;
 };
 
 export type SubirDocFaseResult = { ok: true } | { ok: false; error: string };
@@ -85,7 +92,7 @@ export async function subirDocFase(
   sb: SupabaseClient,
   input: SubirDocFaseInput
 ): Promise<SubirDocFaseResult> {
-  const { ventaId, rol, archivo, userId } = input;
+  const { ventaId, rol, archivo, userId, metadata } = input;
 
   const path = buildAdjuntoPath({
     empresa: 'dilesa',
@@ -114,6 +121,7 @@ export async function subirDocFase(
       tipo_mime: archivo.type || null,
       tamano_bytes: archivo.size,
       uploaded_by: userId,
+      metadata: metadata ?? null,
     });
   if (insErr) {
     return { ok: false, error: `El archivo subió pero no se registró: ${insErr.message}` };
