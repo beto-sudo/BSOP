@@ -35,10 +35,12 @@
  *   - Si la NC se sube antes que la factura, su check de relación queda en
  *     warning — re-subir la NC tras la factura lo revalida.
  *
- * Sprint 4c — ciclo PLD en dos pasos (decisión Beto 2026-06-12): el informe
- * se revisa contra el expediente; en verde se CONGELA (solo Dirección puede
- * reemplazarlo) y se habilita presentar el aviso + cargar el acuse; la
- * revisión con acuse completa el ciclo y solo entonces se prende el cierre.
+ * Sprint 4c — ciclo PLD en dos pasos (decisión Beto 2026-06-12): factura
+ * (y NC si aplica) van ANTES — el slot del PLD se habilita al tener el XML
+ * de la factura. El informe se revisa contra el expediente; en verde se
+ * CONGELA (solo Dirección puede reemplazarlo) y se habilita presentar el
+ * aviso + cargar el acuse; la revisión con acuse completa el ciclo y solo
+ * entonces se prende el cierre.
  *
  * Enforcement: Fase 12 (Detonada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
@@ -712,11 +714,13 @@ function CapturarFase13Body() {
                 // Paso 1 en verde → el PLD se congela (solo Dirección
                 // reemplaza); el acuse se habilita hasta entonces.
                 const bloqueo =
-                  d.rol === 'aviso_pld' && pasosPld.informeVerde && !soyDireccion
-                    ? 'El PLD quedó congelado para presentación — solo Dirección puede reemplazarlo.'
-                    : d.rol === 'acuse_pld' && !pasosPld.informeVerde
-                      ? 'Se habilita cuando la revisión del PLD esté en verde.'
-                      : null;
+                  d.rol === 'aviso_pld' && !docs?.factura_xml
+                    ? 'Se habilita al cargar el XML de la factura (y la nota de crédito, si aplica).'
+                    : d.rol === 'aviso_pld' && pasosPld.informeVerde && !soyDireccion
+                      ? 'El PLD quedó congelado para presentación — solo Dirección puede reemplazarlo.'
+                      : d.rol === 'acuse_pld' && !pasosPld.informeVerde
+                        ? 'Se habilita cuando la revisión del PLD esté en verde.'
+                        : null;
                 return (
                   <DocSlot
                     key={d.rol}

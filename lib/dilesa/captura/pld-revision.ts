@@ -404,34 +404,43 @@ export function veredictoDe(checks: RevisionCheck[]): VeredictoRevision {
 // ── Acuse de envío SPPLD (cierre del ciclo — decisión Beto 2026-06-12) ──
 
 export const ExtraccionAcuseSchema = z.object({
-  folioAcuse: z.string().describe('Folio o número del acuse de recepción/envío. "" si no aparece.'),
-  rfcSujetoObligado: z
+  folioAcuse: z
     .string()
-    .describe('RFC del sujeto obligado que presentó el aviso. "" si no aparece.'),
+    .describe('FOLIO del acuse (esquina superior, ej. "18825514"). "" si no aparece.'),
+  rfcSujetoObligado: z.string().describe('RFC del sujeto obligado (sección I). "" si no aparece.'),
   fechaPresentacion: z
     .string()
     .describe(
-      'Fecha de presentación/recepción del aviso ante Hacienda en formato YYYY-MM-DD. "" si no aparece.'
+      'FECHA DE ENVÍO de la tabla "Avisos Reportados" en formato YYYY-MM-DD (el PDF la trae DD/MM/YYYY con hora — solo la fecha).'
     ),
-  mesReportado: z
+  estatusEnvio: z
     .string()
-    .describe('Mes reportado en formato YYYYMM si el acuse lo indica. "" si no aparece.'),
+    .describe('ESTATUS DEL ENVÍO de la tabla (ej. "ACEPTADO"). "" si no aparece.'),
+  actividadVulnerable: z
+    .string()
+    .describe(
+      'ACTIVIDAD VULNERABLE REALIZADA de la tabla (ej. "TRANSMISION DE DERECHOS SOBRE BIENES INMUEBLES"). "" si no aparece.'
+    ),
+  tipoEnvio: z.string().describe('TIPO DE ENVÍO de la tabla (ej. "PORTAL"). "" si no aparece.'),
+  numeroAvisos: z.number().describe('NÚMERO DE AVISOS que ampara el acuse. 0 si no aparece.'),
   referenciaAviso: z
     .string()
-    .describe('Referencia del aviso a la que corresponde el acuse. "" si no aparece.'),
-  numeroAvisos: z
-    .number()
-    .describe('Número de avisos que ampara el acuse si lo indica. 0 si no aparece.'),
+    .describe(
+      'Referencia individual del aviso SOLO si el acuse la lista explícitamente (el formato estándar NO la trae). "" si no aparece.'
+    ),
 });
 
 export type ExtraccionAcuse = z.infer<typeof ExtraccionAcuseSchema>;
 
 export const PROMPT_EXTRACCION_ACUSE =
-  `Eres un oficial de cumplimiento PLD (LFPIORPI). El PDF es el ACUSE de envío/recepción de ` +
-  `avisos de actividades vulnerables del portal SPPLD de Hacienda (SAT/UIF) — el comprobante de ` +
-  `que el aviso SÍ se presentó. Extrae los campos exactamente como aparecen.` +
+  `Eres un oficial de cumplimiento PLD (LFPIORPI). El PDF es el ACUSE "Presentación de Avisos" ` +
+  `de la Secretaría de Hacienda (SPPLD) — el comprobante de que los avisos de actividades ` +
+  `vulnerables SE ENVIARON. Estructura típica: FOLIO arriba; sección "I. Sujeto Obligado" (RFC, ` +
+  `denominación); sección "II. Avisos Reportados" con una tabla: ACTIVIDAD VULNERABLE REALIZADA, ` +
+  `TIPO DE ENVÍO, FECHA DE ENVÍO, NÚMERO DE AVISOS y ESTATUS DEL ENVÍO; al pie los sellos ` +
+  `digitales (FIEL/SAT) y la cadena original.` +
   `\n\nReglas:` +
-  `\n- Fechas en formato YYYY-MM-DD (el PDF puede traerlas DD/MM/YYYY).` +
+  `\n- Fechas en formato YYYY-MM-DD (el PDF las trae DD/MM/YYYY, a veces con hora — solo la fecha).` +
   `\n- Campos string ausentes = "" y números ausentes = 0 (NO inventes valores).`;
 
 /**
@@ -446,6 +455,7 @@ export function cruzarAcuseConInforme(
 ): RevisionCheck[] {
   const checks: RevisionCheck[] = [];
 
+  // RFC del sujeto obligado.
   if (acuse.rfcSujetoObligado) {
     checks.push(
       normalizarTexto(acuse.rfcSujetoObligado) === normalizarTexto(empresaRfc)
@@ -468,62 +478,105 @@ export function cruzarAcuseConInforme(
     );
   }
 
-  // Correspondencia acuse ↔ informe: por referencia del aviso si ambos la
-  // traen; si el acuse no la trae (o es un acuse de LOTE que ampara varios
-  // avisos, como los del esquema de envío masivo mensual), por mes reportado.
-  const acuseDeLote = acuse.numeroAvisos > 1;
-  if (!acuseDeLote && acuse.referenciaAviso && informe.referenciaAviso) {
+  // Estatus del envío: el check central del acuse — ACEPTADO o no cuenta.
+  const estatus = normalizarTexto(acuse.estatusEnvio);
+  if (estatus) {
     checks.push(
-      normalizarTexto(acuse.referenciaAviso) === normalizarTexto(informe.referenciaAviso)
-        ? ok('acuse_referencia', 'Acuse corresponde al aviso del informe', 'error')
+      estatus === 'ACEPTADO'
+        ? ok('acuse_estatus', 'Envío ACEPTADO por Hacienda', 'error')
         : falla(
-            'acuse_referencia',
-            'Acuse corresponde al aviso del informe',
+            'acuse_estatus',
+            'Envío ACEPTADO por Hacienda',
             'error',
-            `El acuse ampara la referencia ${acuse.referenciaAviso}; el informe es la ${informe.referenciaAviso}.`
-          )
-    );
-  } else if (
-    (acuseDeLote || !acuse.referenciaAviso) &&
-    acuse.mesReportado &&
-    informe.mesReportado
-  ) {
-    checks.push(
-      acuse.mesReportado === informe.mesReportado
-        ? ok('acuse_referencia', 'Acuse corresponde al periodo del informe', 'warning')
-        : falla(
-            'acuse_referencia',
-            'Acuse corresponde al periodo del informe',
-            'warning',
-            `El acuse es del periodo ${acuse.mesReportado}; el informe reporta ${informe.mesReportado}.`
+            `El acuse reporta estatus "${acuse.estatusEnvio}" — el aviso no quedó aceptado.`
           )
     );
   } else {
     checks.push(
       falla(
-        'acuse_referencia',
-        'Acuse corresponde al aviso del informe',
+        'acuse_estatus',
+        'Envío ACEPTADO por Hacienda',
         'warning',
-        'No se pudo ligar el acuse al informe (sin referencia ni periodo legibles) — verificar manualmente.'
+        'No se pudo leer el estatus del envío — verificar manualmente que diga ACEPTADO.'
       )
     );
   }
 
-  // Plazo LFPIORPI: presentación a más tardar el día 17 del mes siguiente a
-  // la operación (la fecha de operación viene del informe).
-  if (acuse.fechaPresentacion && informe.fechaOperacion) {
+  // Actividad vulnerable: debe ser la misma del informe (inmuebles).
+  const actAcuse = normalizarTexto(acuse.actividadVulnerable);
+  const actInforme = normalizarTexto(informe.tipoOperacion);
+  checks.push(
+    actAcuse && (actAcuse.includes('INMUEBLE') || actAcuse === actInforme)
+      ? ok('acuse_actividad', 'Actividad: transmisión de derechos sobre inmuebles', 'warning')
+      : falla(
+          'acuse_actividad',
+          'Actividad: transmisión de derechos sobre inmuebles',
+          'warning',
+          `El acuse ampara "${acuse.actividadVulnerable || '—'}".`
+        )
+  );
+
+  // Correspondencia acuse ↔ informe. El formato estándar NO trae referencia
+  // individual: si ambos la traen se exige exacta; si no, la FECHA DE ENVÍO
+  // debe caer en la ventana de presentación de la operación del informe
+  // (del día de la operación al día 17 del mes siguiente). Acuse de lote
+  // (numeroAvisos > 1, esquema masivo histórico) queda señalado.
+  const limite = (() => {
     const y = Number(informe.fechaOperacion.slice(0, 4));
     const m = Number(informe.fechaOperacion.slice(5, 7));
-    const limite =
-      y && m ? (m === 12 ? `${y + 1}-01-17` : `${y}-${String(m + 1).padStart(2, '0')}-17`) : '';
+    if (!y || !m) return '';
+    return m === 12 ? `${y + 1}-01-17` : `${y}-${String(m + 1).padStart(2, '0')}-17`;
+  })();
+
+  if (acuse.referenciaAviso && informe.referenciaAviso) {
     checks.push(
-      limite && acuse.fechaPresentacion <= limite
+      normalizarTexto(acuse.referenciaAviso) === normalizarTexto(informe.referenciaAviso)
+        ? ok('acuse_correspondencia', 'Acuse corresponde al aviso del informe', 'error')
+        : falla(
+            'acuse_correspondencia',
+            'Acuse corresponde al aviso del informe',
+            'error',
+            `El acuse ampara la referencia ${acuse.referenciaAviso}; el informe es la ${informe.referenciaAviso}.`
+          )
+    );
+  } else if (acuse.fechaPresentacion && informe.fechaOperacion && limite) {
+    const enVentana =
+      acuse.fechaPresentacion >= informe.fechaOperacion && acuse.fechaPresentacion <= limite;
+    const sufijoLote =
+      acuse.numeroAvisos > 1
+        ? ` El acuse ampara ${acuse.numeroAvisos} avisos (envío de lote).`
+        : '';
+    checks.push(
+      enVentana
+        ? ok('acuse_correspondencia', 'Fecha de envío en la ventana de la operación', 'warning')
+        : falla(
+            'acuse_correspondencia',
+            'Fecha de envío en la ventana de la operación',
+            'warning',
+            `El acuse se envió el ${acuse.fechaPresentacion}; la operación del ${informe.fechaOperacion} debía presentarse entre esa fecha y el ${limite}.${sufijoLote}`
+          )
+    );
+  } else {
+    checks.push(
+      falla(
+        'acuse_correspondencia',
+        'Acuse corresponde al aviso del informe',
+        'warning',
+        'No se pudo ligar el acuse al informe (sin referencia ni fechas legibles) — verificar manualmente.'
+      )
+    );
+  }
+
+  // Plazo LFPIORPI (día 17 del mes siguiente a la operación).
+  if (acuse.fechaPresentacion && limite) {
+    checks.push(
+      acuse.fechaPresentacion <= limite
         ? ok('acuse_plazo', 'Presentado dentro del plazo (día 17 del mes siguiente)', 'warning')
         : falla(
             'acuse_plazo',
             'Presentado dentro del plazo (día 17 del mes siguiente)',
             'warning',
-            `El acuse es del ${acuse.fechaPresentacion}; el plazo para la operación del ${informe.fechaOperacion} vencía el ${limite || '—'}.`
+            `El acuse es del ${acuse.fechaPresentacion}; el plazo para la operación del ${informe.fechaOperacion} vencía el ${limite}.`
           )
     );
   } else {
@@ -532,7 +585,7 @@ export function cruzarAcuseConInforme(
         'acuse_plazo',
         'Presentado dentro del plazo (día 17 del mes siguiente)',
         'warning',
-        'Sin fecha de presentación legible en el acuse — verificar manualmente.'
+        'Sin fecha de envío legible en el acuse — verificar manualmente.'
       )
     );
   }
