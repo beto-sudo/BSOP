@@ -3,7 +3,14 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { loadManualDoc, listManualDocs } from './load';
 
-/** Descubre TODOS los `.md` bajo content/manual como arrays de segmentos. */
+/**
+ * Descubre TODOS los `.md` servibles bajo content/manual como arrays de
+ * segmentos. Espejo del contrato del walker real: ignora `_*` (plantilla) y
+ * nombres fuera de `[a-z0-9_-]+` (p.ej. `README.md`, que es documentación del
+ * patrón, no contenido del manual).
+ */
+const SERVIBLE_RE = /^[a-z0-9_-]+$/;
+
 function allManualSlugs(): string[][] {
   const root = path.join(process.cwd(), 'content', 'manual');
   const out: string[][] = [];
@@ -11,7 +18,8 @@ function allManualSlugs(): string[][] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) walk(path.join(dir, entry.name), [...base, entry.name]);
       else if (entry.name.endsWith('.md') && !entry.name.startsWith('_')) {
-        out.push([...base, entry.name.replace(/\.md$/, '')]);
+        const name = entry.name.replace(/\.md$/, '');
+        if (SERVIBLE_RE.test(name)) out.push([...base, name]);
       }
     }
   };
