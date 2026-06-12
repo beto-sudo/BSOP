@@ -1515,7 +1515,16 @@ function DetailInner() {
                                       <Pencil className="h-2.5 w-2.5" />
                                       Capturar fase
                                     </Link>
-                                  ) : r.alcanzada ? null : (
+                                  ) : r.alcanzada ? (
+                                    <Link
+                                      href={`/dilesa/ventas/${id}/capturar/${r.slugCaptura}`}
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] font-medium text-[var(--text)]/60 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+                                      title="Ver la fase cerrada; algunas permiten corregir datos o reemplazar documentos."
+                                    >
+                                      <Pencil className="h-2.5 w-2.5" />
+                                      Ver / corregir
+                                    </Link>
+                                  ) : (
                                     <span
                                       className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text)]/30"
                                       title={`Falta cerrar la fase ${r.pos - 1} primero.`}
