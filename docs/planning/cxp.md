@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 (pago en efectivo + conciliación contra cortes, engancha cortes-conciliacion) + Sprint 6 (migrar erp.gastos → CxP + rollout COAGAN/ANSA). Sprints 1-4 (schema + ingesta XML CFDI + match OC + UI programación/aprobación de pagos) ya en prod
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-08 (próximo hito afinado tras auditoría — Sprints 1-4 confirmados en prod, #640/#699; pendiente real = Sprints 5-6)
+**Última actualización:** 2026-06-12 (audit trail server-side de rechazos en upload-xml + `p_usuario_id` en `cxp_factura_alta` — migración aplicada a prod con OK de Beto, PR #859)
 
 ## Problema
 
@@ -162,6 +162,27 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 - **CxP empieza por RDB y se diseña genérico.** Lógica de DB + RPCs son multi-empresa desde Sprint 1; UI RDB primero (Sprints 3-5); rollout DILESA/COAGAN/ANSA en Sprint 6. Particularidades por empresa (ANSA volumen, COAGAN AGAPES, DILESA materiales) entran como sub-iniciativas si emergen.
 - **Modo de ejecución pendiente de definir al arrancar Sprint 1.** Beto autorizó modo autónomo en `oc-recepciones`; aplica caso por caso. Para CxP, el primer PR de promoción se entrega y se espera green light explícito antes de Sprint 1.
 
+### 2026-06-12 — Rechazos de ingesta XML auditables + status no-200
+
+- **Los rechazos de carga son eventos de auditoría, no solo UX.** Todo
+  archivo rechazado por upload-xml deja fila en `core.audit_log`
+  (`cxp_factura_rechazo`) + una fila-resumen por lote
+  (`cxp_facturas_upload_lote`). Razón: el modal es efímero; sin rastro
+  server-side, un reporte de un operador días después es indiagnosticable.
+  El insert es best-effort (un fallo de audit no aborta la carga).
+- **El endpoint señaliza el desenlace en el status HTTP**: 200 todo
+  cargado, 207 parcial, 422 ningún archivo pasó. El body no cambia. Razón:
+  los logs de Vercel muestran el status sin abrir el body — un lote
+  fallido se ve a simple vista. Se verificó que el único caller
+  (`UploadXmlDialog`) trata non-2xx con `results` por la rama normal y
+  `onDone(0)` es no-op.
+- **`p_usuario_id` explícito en vez de impersonar al usuario.** El RPC
+  recibe el `user.id` autenticado como parámetro opcional
+  (`COALESCE(p_usuario_id, auth.uid())` en el INSERT de audit) en lugar de
+  crear un client per-request con el JWT del usuario. Razón: cambio mínimo
+  y compatible — los callers SQL existentes no se tocan; el endpoint ya
+  corre con admin client por diseño (SECURITY DEFINER + storage).
+
 ### 2026-06-01 — Re-sincronización como gemela de CxC (ADR-037)
 
 Al promover [`cxc`](cxc.md), Beto pidió diseñar CxC y CxP **juntas como
@@ -193,6 +214,24 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-12 — Audit trail server-side en upload-xml (caso Norberto).**
+  Los rechazos por archivo del endpoint de ingesta XML (duplicado por
+  `uuid_sat`, RFC receptor ajeno, error de parseo, error del RPC) solo se
+  mostraban en el modal del cliente — "subí facturas y no se guardaron"
+  era indiagnosticable server-side (Norberto/Contabilidad DILESA,
+  2026-06-11, hubo que triangular Vercel + audit_log + storage). Ahora el
+  route inserta en `core.audit_log` (best-effort, batch único): una fila
+  `cxp_factura_rechazo` por archivo rechazado (filename, motivo, uuid_sat,
+  emisor_rfc; en duplicados `registro_id` = factura existente) + una
+  `cxp_facturas_upload_lote` por lote (total/exitosos/rechazados), ambas
+  con `usuario_id` y `user_agent`. El RPC `erp.cxp_factura_alta` gana
+  `p_usuario_id` opcional (migración `20260612161552`, DROP+CREATE para no
+  dejar overload) y deja de registrar `usuario_id=NULL` vía service role.
+  Status del endpoint: 200 todo cargado / 207 parcial / 422 ningún archivo
+  pasó (el modal ya manejaba non-2xx con `results`; verificado sin cambios
+  de cliente). Tests del route nuevos (6). Migración aplicada a prod el
+  mismo día con OK verbal de Beto (`supabase db push`, firma verificada
+  sin overload) + `types/supabase.ts` regenerado. PR #859.
 - **2026-06-11 — Hotfix cross-sesión (sesión presupuesto-baseline, con OK de
   Beto): `20260611003056_cxp_fix_saldo_solo_pagos_ejecutados`.** Bug
   reportado por Beto: al PROGRAMAR un pago las facturas se marcaban

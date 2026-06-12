@@ -11275,6 +11275,7 @@ export type Database = {
           p_tasa_iva?: number
           p_total: number
           p_uso_cfdi?: string
+          p_usuario_id?: string
           p_uuid_sat?: string
           p_xml_url?: string
         }
