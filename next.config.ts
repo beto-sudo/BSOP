@@ -70,7 +70,9 @@ const nextConfig: NextConfig = {
     // se lee con `fs` en runtime (route handler de ayuda contextual + portada).
     // Sin esto, Vercel no incluye los `.md` en el bundle de estas rutas.
     '/api/manual/[...slug]': ['content/manual/**'],
+    '/api/manual/search': ['content/manual/**'],
     '/dilesa/manual': ['content/manual/**'],
+    '/dilesa/manual/imprimir': ['content/manual/**'],
   },
   async headers() {
     return [

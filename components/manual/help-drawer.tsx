@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { HelpCircle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page/detail-drawer';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { resolveHelpSlug } from '@/lib/manual/help-routes';
+import { ManualMarkdown } from './manual-markdown';
 
 /**
  * Ayuda contextual del Manual de usuario (iniciativa `manual-usuario`).
@@ -37,57 +36,12 @@ function formatActualizado(iso: string): string {
   return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const markdownComponents: Components = {
-  h1: ({ children }) => (
-    <h1 className="mt-5 mb-2 text-lg font-semibold text-[var(--text)] first:mt-0">{children}</h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="mt-5 mb-2 text-base font-semibold text-[var(--text)] first:mt-0">{children}</h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="mt-4 mb-1.5 text-sm font-semibold text-[var(--text)]">{children}</h3>
-  ),
-  p: ({ children }) => <p className="my-2 leading-relaxed text-[var(--text)]/90">{children}</p>,
-  ul: ({ children }) => <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="my-2 ml-5 list-decimal space-y-1">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed text-[var(--text)]/90">{children}</li>,
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      className="text-blue-600 underline underline-offset-2 dark:text-blue-400"
-      target={href?.startsWith('http') ? '_blank' : undefined}
-      rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-    >
-      {children}
-    </a>
-  ),
-  strong: ({ children }) => (
-    <strong className="font-semibold text-[var(--text)]">{children}</strong>
-  ),
-  em: ({ children }) => <em className="italic">{children}</em>,
-  code: ({ children }) => (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>
-  ),
-  blockquote: ({ children }) => (
-    <blockquote className="my-3 border-l-2 border-[var(--border)] pl-3 text-[var(--text)]/70">
-      {children}
-    </blockquote>
-  ),
-  table: ({ children }) => (
-    <div className="my-3 overflow-x-auto">
-      <table className="w-full border-collapse text-xs">{children}</table>
-    </div>
-  ),
-  th: ({ children }) => (
-    <th className="border border-[var(--border)] px-2 py-1 text-left font-semibold">{children}</th>
-  ),
-  td: ({ children }) => (
-    <td className="border border-[var(--border)] px-2 py-1 align-top">{children}</td>
-  ),
-  hr: () => <hr className="my-4 border-[var(--border)]" />,
-};
-
-function HelpDrawer({
+/**
+ * Drawer de la ayuda contextual. Exportado (además de `<HelpButton>`) para
+ * superficies que abren la ayuda programáticamente — p.ej. los resultados del
+ * buscador de la portada (`<ManualSearch>`).
+ */
+export function HelpDrawer({
   slug,
   open,
   onOpenChange,
@@ -145,11 +99,7 @@ function HelpDrawer({
         ) : state === 'loading' ? (
           <p className="text-sm text-muted-foreground">Cargando ayuda…</p>
         ) : (
-          <div className="text-sm">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {doc!.body}
-            </ReactMarkdown>
-          </div>
+          <ManualMarkdown body={doc!.body} />
         )}
       </DetailDrawerContent>
     </DetailDrawer>
