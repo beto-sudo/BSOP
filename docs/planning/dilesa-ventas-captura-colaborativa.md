@@ -132,6 +132,21 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
+- **2026-06-12 — Estado 'terminada': ciclo de vida ≠ avance de pipeline
+  (sprint estados-venta).** `estado` responde solo "¿viva, cerró bien o
+  cerró mal?" (activa / terminada / desasignada / expirada); el avance vive
+  en `fase_actual`/`fase_posicion`. No se replican fases como estados. La
+  sincronía es un trigger de DB (`trg_ventas_sync_estado_terminada`: fase
+  17 ⇒ terminada, bajar fase ⇒ activa) para que marcarFase, regresarAFase y
+  data-fixes futuros mantengan la invariante sin acordarse. Backfill solo
+  `fase_posicion=17` (~1,093); las ~45 activas sin fase NO se especulan
+  (consistente con el data-fix de 20260612025311) — quedan como pendiente
+  de clasificación operativa. La tubería del correo al consejo y el cron de
+  encuestas tratan 'terminada' como viva (la fila "Operación Terminada"
+  conserva el acumulado; encuestas 6/12m sobreviven el cierre). Cobranza NO
+  bloquea terminadas: con crédito directo se entrega la casa y se sigue
+  cobrando años. Default del filtro en la lista: 'activa' (pipeline vivo).
+
 - **2026-06-12 — Presentación PLD por operación, en dos pasos (S4c).** El
   esquema histórico era revisión manual de Michelle + envío masivo mensual
   (un acuse por lote). Nuevo flujo: la revisión IA sustituye el control
@@ -199,6 +214,17 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint estados-venta entregado (PR #874): estado
+  'terminada' separa pipeline vivo de operaciones concluidas. Migración
+  `20260612215625` (constraint 4 estados + trigger de sincronía
+  fase↔estado + backfill ~1,093 activas en fase 17), `VENTA_ESTADO_CONFIG`
+  canónico en status-tokens (de-duplica 4 mapas inline), filtros nuevos en
+  la lista (estado default 'activa', vendedor, tipo de crédito),
+  regresarAFase acepta terminadas / desasignar las rechaza, tubería del
+  consejo y cron de encuestas tratan terminada como viva. KPIs del tab
+  Fases quedan midiendo solo pipeline vivo. Origen: rebote de Beto sobre
+  estados/filtrado de la tabla de ventas.
 
 - **2026-06-12** — Sprint 4c entregado (PR en revisión): flujo PLD en dos
   pasos en F13 — veredictos separados informe/acuse (separarChecks, sin
