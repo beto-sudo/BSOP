@@ -29,7 +29,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,11 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  DocsFaseSection,
+  useDocsFaseColaborativos,
+  type SlotColaborativo,
+} from '@/components/dilesa/captura/docs-fase-colaborativos';
 
 type VentaCtx = {
   id: string;
@@ -94,8 +99,6 @@ function CapturarFase6Body() {
   const [fechaInscripcion, setFechaInscripcion] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
-  const [archivoTitular, setArchivoTitular] = useState<File | null>(null);
-  const [archivoCotitular, setArchivoCotitular] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -208,6 +211,25 @@ function CapturarFase6Body() {
   const requiereTitular = !sinCredito && montoTitNum > 0;
   const requiereCotitular = montoCoNum > 0;
 
+  // Slots dinámicos: la obligatoriedad sigue a los montos capturados; el
+  // documento subido persiste aunque el monto cambie (queda en expediente).
+  const slotsConstancias = useMemo<SlotColaborativo[]>(
+    () => [
+      {
+        rol: 'constancia_credito_titular',
+        label: 'Constancia Crédito Titular',
+        requerido: requiereTitular,
+      },
+      {
+        rol: 'constancia_credito_cotitular',
+        label: 'Constancia Crédito Co-Titular',
+        requerido: requiereCotitular,
+      },
+    ],
+    [requiereTitular, requiereCotitular]
+  );
+  const docsFase = useDocsFaseColaborativos(ventaId, slotsConstancias);
+
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -215,18 +237,10 @@ function CapturarFase6Body() {
       if (!venta) return;
 
       // Validaciones
-      if (requiereTitular && !archivoTitular) {
+      if (docsFase.faltantes.length > 0) {
         toast.add({
-          title: 'Falta la Constancia del Titular',
-          description: 'Sube el PDF de la constancia del crédito titular.',
-          type: 'error',
-        });
-        return;
-      }
-      if (requiereCotitular && !archivoCotitular) {
-        toast.add({
-          title: 'Falta la Constancia del Co-Titular',
-          description: 'Hay monto de crédito co-titular > 0; sube su constancia.',
+          title: 'Faltan constancias en el expediente',
+          description: `Sube: ${docsFase.faltantes.map((r) => docsFase.labelDe(r)).join(', ')}.`,
           type: 'error',
         });
         return;
@@ -252,10 +266,8 @@ function CapturarFase6Body() {
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
 
+      // Las constancias ya viven en el expediente (subida incremental).
       const docs: DocCaptura[] = [];
-      if (archivoTitular) docs.push({ rol: 'constancia_credito_titular', archivo: archivoTitular });
-      if (archivoCotitular)
-        docs.push({ rol: 'constancia_credito_cotitular', archivo: archivoCotitular });
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
@@ -292,15 +304,12 @@ function CapturarFase6Body() {
       router.push(`/dilesa/ventas/${venta.id}`);
     },
     [
-      archivoTitular,
-      archivoCotitular,
+      docsFase,
       fechaInscripcion,
       montoTitNum,
       montoCoNum,
       creditoTitularRef,
       creditoCotitularRef,
-      requiereTitular,
-      requiereCotitular,
       sinCredito,
       router,
       sb,
@@ -382,26 +391,7 @@ function CapturarFase6Body() {
               body="Esta venta es con recursos propios, no requiere Constancia de Crédito. Al guardar solo se marcará la fase como cerrada."
             />
           ) : (
-            <Section title="Constancias de crédito">
-              <FileSlot
-                label={`Constancia Crédito Titular${requiereTitular ? ' *' : ''}`}
-                archivo={archivoTitular}
-                onChange={setArchivoTitular}
-              />
-              {requiereCotitular || archivoCotitular ? (
-                <div className="mt-3">
-                  <FileSlot
-                    label={`Constancia Crédito Co-Titular${requiereCotitular ? ' *' : ''}`}
-                    archivo={archivoCotitular}
-                    onChange={setArchivoCotitular}
-                  />
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-[var(--text)]/50">
-                  Co-titular sin monto. Si aplica, captura el monto abajo y subirá su slot.
-                </p>
-              )}
-            </Section>
+            <DocsFaseSection state={docsFase} titulo="Constancias de crédito" />
           )}
 
           <Section title="Montos aprobados por el banco">
@@ -513,77 +503,6 @@ function Hint({ children }: { children: React.ReactNode }) {
  * FileSlot estandarizado — mismo patrón que Fases 2, 3, 5 (check + label
  * + botón "Subir PDF"/"Cambiar" + drag-drop sobre toda la tarjeta).
  */
-function FileSlot({
-  label,
-  archivo,
-  onChange,
-}: {
-  label: string;
-  archivo: File | null;
-  onChange: (f: File | null) => void;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const completo = !!archivo;
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        if (!dragOver) setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (!f) return;
-        if (
-          !(
-            f.type === 'application/pdf' ||
-            f.type.startsWith('image/') ||
-            f.name.toLowerCase().endsWith('.pdf')
-          )
-        ) {
-          return;
-        }
-        onChange(f);
-      }}
-      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
-        dragOver
-          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
-          : 'border-[var(--border)]'
-      }`}
-    >
-      <div className="flex flex-1 items-center gap-2 text-sm">
-        {completo ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-        ) : (
-          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
-        )}
-        <span className="font-medium">{label}</span>
-        {archivo ? (
-          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
-          </span>
-        ) : null}
-      </div>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-        <Upload className="h-3.5 w-3.5" />
-        {archivo ? 'Cambiar' : 'Subir PDF'}
-        <input
-          type="file"
-          accept="application/pdf,image/*"
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
-    </div>
-  );
-}
-
 function Banner({
   tone,
   title,

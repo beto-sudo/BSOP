@@ -23,7 +23,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, Printer, Save, Upload, XCircle } from 'lucide-react';
+import { Loader2, Printer, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,15 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  DocsFaseSection,
+  useDocsFaseColaborativos,
+  type SlotColaborativo,
+} from '@/components/dilesa/captura/docs-fase-colaborativos';
+
+const SLOTS_FASE: SlotColaborativo[] = [
+  { rol: 'checklist_pre_entrega', label: 'Checklist de pre-entrega firmado', requerido: true },
+];
 
 type VentaCtx = {
   id: string;
@@ -60,7 +69,7 @@ function CapturarFase14Body() {
   const [fase11Cerrada, setFase11Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
   const [notas, setNotas] = useState<string>('');
 
   const [loading, setLoading] = useState(true);
@@ -162,7 +171,7 @@ function CapturarFase14Body() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
-      if (!archivo) {
+      if (docsFase.faltantes.length > 0) {
         toast.add({
           title: 'Falta el checklist firmado',
           description:
@@ -180,7 +189,7 @@ function CapturarFase14Body() {
         ventaId: venta.id,
         faseNombre: 'Preparada para Entrega',
         faseposicion: 14,
-        docs: [{ rol: 'checklist_pre_entrega', archivo }],
+        docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {},
         notas: notas.trim() || null,
         registradoPor: userId,
@@ -202,7 +211,7 @@ function CapturarFase14Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [archivo, notas, router, sb, toast, venta]
+    [docsFase.faltantes, notas, router, sb, toast, venta]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -289,14 +298,11 @@ function CapturarFase14Body() {
             </div>
           </Section>
 
-          <Section title="2 · Subir el checklist firmado">
-            <FileSlot
-              label="Checklist Pre-Entrega firmado (escaneado) *"
-              archivo={archivo}
-              onChange={setArchivo}
-            />
-            <Hint>Subirlo cierra la fase y lo archiva en el expediente de la operación.</Hint>
-          </Section>
+          <DocsFaseSection state={docsFase} titulo="2 · Subir el checklist firmado" />
+
+          <p className="text-[11px] text-[var(--text)]/50">
+            Subirlo cierra la fase y lo archiva en el expediente de la operación.
+          </p>
 
           <Section title="Notas (opcional)">
             <textarea
@@ -349,77 +355,6 @@ function Hint({ children }: { children: React.ReactNode }) {
 }
 
 /** Mismo slot estandarizado de las fases 2/3/5/9 (check + botón + drag-drop). */
-function FileSlot({
-  label,
-  archivo,
-  onChange,
-}: {
-  label: string;
-  archivo: File | null;
-  onChange: (f: File | null) => void;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const completo = !!archivo;
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        if (!dragOver) setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (!f) return;
-        if (
-          !(
-            f.type === 'application/pdf' ||
-            f.type.startsWith('image/') ||
-            f.name.toLowerCase().endsWith('.pdf')
-          )
-        ) {
-          return;
-        }
-        onChange(f);
-      }}
-      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
-        dragOver
-          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
-          : 'border-[var(--border)]'
-      }`}
-    >
-      <div className="flex flex-1 items-center gap-2 text-sm">
-        {completo ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-        ) : (
-          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
-        )}
-        <span className="font-medium">{label}</span>
-        {archivo ? (
-          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
-          </span>
-        ) : null}
-      </div>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-        <Upload className="h-3.5 w-3.5" />
-        {archivo ? 'Cambiar' : 'Subir PDF'}
-        <input
-          type="file"
-          accept="application/pdf,image/*"
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
-    </div>
-  );
-}
-
 function Banner({
   tone,
   title,
