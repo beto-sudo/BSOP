@@ -4,7 +4,7 @@
 **Empresas:** todas (golden: DILESA)
 **Schemas afectados:** `erp` (`estados_cuenta` nueva, `cuentas_bancarias` ficha, `cuenta_saldos`; v1: `movimientos_bancarios`, `conciliaciones`)
 **Estado:** in_progress
-**Próximo hito:** PR #838 al verde (auto-merge) + smoke test del flujo de subida con los estados de junio; completar baseline de mayo con Finamex y BBVA USD (los pasa Beto)
+**Próximo hito:** smoke test del flujo de subida vía UI con los estados de junio; Finamex pendiente de accesos (cuenta nueva) para cerrar baseline de mayo 5/5
 **Dueño:** Beto
 **Creada:** 2026-06-01
 **Última actualización:** 2026-06-11 (re-scope: v0 mensual desbloqueada; v1 movimientos sigue esperando CxC/CxP)
@@ -148,3 +148,9 @@ para validar el import de v1.
   `scripts/seed_estados_cuenta_2026_05.ts` (3 PDFs en bucket `adjuntos` +
   filas con checksum verificado). 18 tests de helpers con las carátulas
   reales como fixtures.
+- **2026-06-12** — Renombre del módulo a "Bancos" (PR #843, decisión de
+  Beto; URL/slugs intactos). Beto entrega BBVA USD de mayo: cuenta en
+  ceros (sin movimiento), ficha completada (cta 0120889296, CLABE
+  012075001208892964, Maestra Dólares Pyme) + snapshot 31-may $0 +
+  estado con PDF vía seed extendido. **Baseline mayo 4/5** — Finamex
+  pendiente de accesos (cuenta nueva, aún no entregan banca en línea).
