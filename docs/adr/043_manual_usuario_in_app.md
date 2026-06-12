@@ -1,7 +1,7 @@
 # ADR-043 — Manual de usuario in-app (contextual + versionado en git)
 
-**Estado:** Aceptado · Sprint 0 (fundación) en este PR (piloto DILESA · Ventas)
-**Fecha:** 2026-06-07
+**Estado:** Aceptado · Implementado (S0 fundación · S1 contenido DILESA 100% · S2 PDF + buscador)
+**Fecha:** 2026-06-07 (M8: 2026-06-11 · RBAC/D9-D10: 2026-06-12)
 **Iniciativa:** `manual-usuario` (ver [planning](../planning/manual-usuario.md))
 
 ## Contexto
@@ -44,9 +44,15 @@ git**, con export a PDF on-demand (Sprint 2). Reglas canónicas:
   ghostscript-wasm). El loader valida los segmentos contra path traversal.
 - **M4 — Sin entrada de sidebar para la ayuda.** El botón "?" global (M2) es el
   único punto de acceso — no hay sección "Ayuda" en el sidebar. La portada
-  `/dilesa/manual` (índice de docs por versión; módulo RBAC `dilesa.manual`
-  read-only, `lectura=true/escritura=false` a todos los roles) sigue existiendo
-  como página accesible por URL, pero ya no se enlaza desde el sidebar.
+  `/dilesa/manual` (índice + buscador; módulo RBAC `dilesa.manual` read-only,
+  `lectura=true/escritura=false` a todos los roles) se alcanza por el link
+  "Ver manual completo" al pie del drawer del "?" (S2 — antes era URL-only y
+  no descubrible). **El contenido se filtra por permisos** (S2, R3): la
+  portada, el buscador y el endpoint `/api/manual/[...slug]` solo muestran/
+  sirven docs de módulos a los que el usuario tiene lectura
+  (`lib/manual/access.ts` sobre el frontmatter `modulo:`, misma semántica que
+  el sidebar; umbrella vía padre-o-cualquier-sub-slug, SS8) — quien no opera
+  Tesorería o RH no lee cómo funcionan.
 - **M5 — Versionado por módulo y global.** Cada `.md` lleva su `version`
   semántica, la fecha `actualizado` y un changelog `## Cambios` al pie. El
   usuario ve "v1.2 · actualizado 07-jun" en el drawer.
@@ -57,6 +63,26 @@ git**, con export a PDF on-demand (Sprint 2). Reglas canónicas:
 - **M7 — Text-first.** Sin capturas que envejecen; imágenes manuales solo donde
   un flujo no se entienda sin ellas. Claude genera los borradores leyendo el
   código; el dueño del producto revisa en preview.
+- **M8 — PDF = print del browser sobre la vista imprimible, NO react-pdf.**
+  El export on-demand (`/dilesa/manual/imprimir`, completo o `?modulo=<grupo>`)
+  renderiza el mismo markdown con el **mismo `<ManualMarkdown>`** del drawer y
+  el PDF sale del diálogo de impresión (patrón ADR-021: `<PrintLayout
+size="letter">` + `useTriggerPrint()` + page breaks por doc). Razón: "una
+  sola fuente de verdad" (M1) incluye el _renderer_ — un mapper
+  markdown→react-pdf paralelo driftearía con cada elemento nuevo (tablas GFM a
+  mano, fuentes, la gotcha de `gap` en @react-pdf v4.5.x), que es justo el
+  envejecimiento que M6 combate. Trade-off aceptado: "Descargar PDF" pasa por
+  el diálogo de impresión (1 clic extra) en vez de bajar un archivo directo.
+  El renderer compartido vive en `components/manual/manual-markdown.tsx` —
+  cualquier elemento markdown nuevo se agrega AHÍ, nunca en un renderer
+  paralelo. El buscador full-text de la portada (`/api/manual/search`,
+  insensible a acentos) busca sobre el mismo contenido vía
+  `lib/manual/search.ts` (filtrado por permisos, M4). **El export es solo
+  Dirección/admin** (`checkDireccionEmpresa`, gate server-side en la vista y
+  botones ocultos en portada): el manual empaquetado es el blueprint operativo
+  del negocio — en pantalla cada quien consulta su módulo; el documento
+  completo no sale en un clic. Cada PDF lleva marca de confidencialidad con
+  quién lo generó y cuándo (audit trail, decidido con Beto 2026-06-12).
 
 ## Consecuencias
 

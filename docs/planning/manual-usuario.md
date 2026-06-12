@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada; el rollout a RDB/ANSA/COAGAN/Nigropetense se promoverá como iniciativa propia cuando Beto lo decida, con `content/manual/README.md` como receta)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-11 (Sprint 2 PDF + buscador en PR #854; Sprint 3 plantilla replicable + closeout)
+**Última actualización:** 2026-06-12 (hardening en #854: ayuda filtrada por permisos D9 + PDF solo Dirección con marca de confidencialidad D10)
 
 ## Problema
 
@@ -101,6 +101,20 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   en @react-pdf v4.5.x) y driftearía — justo el envejecimiento que M6 combate.
   Trade-off aceptado: guardar el PDF pasa por el diálogo de impresión (1 clic
   extra) en vez de descargar el archivo directo. Registrada como M8 en ADR-043.
+- **D9 — La ayuda se filtra por permisos: cada quien ve solo la de sus
+  módulos** (2026-06-12, feedback de Beto en el preview de S2). El manual
+  describe cómo opera el negocio módulo por módulo; un usuario sin acceso a
+  Tesorería o RH no debe poder leer cómo se manejan. Portada, buscador y
+  endpoint sirven solo docs cuyo `modulo:` (frontmatter) sea legible por el
+  usuario — la misma semántica del sidebar, evaluada server-side
+  (`lib/manual/access.ts`). Cierra el riesgo R3 tal como estaba enunciado.
+- **D10 — Export PDF solo Dirección/admin + marca de confidencialidad**
+  (2026-06-12). En pantalla la consulta es por módulo (D9); el documento
+  completo empaquetado es el blueprint operativo y NO debe salir en un clic
+  ("no quiero el manual rondando por donde sea"). Gate server-side con
+  `checkDireccionEmpresa` (patrón Dirección-o-admin) y cada PDF lleva
+  "Generado por <quién> el <fecha>" en portada y pie — disuasión + audit
+  trail. La capacitación impresa la genera un gerente cuando haga falta.
 
 ## Riesgos
 
@@ -228,3 +242,17 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   Métrica pendiente de observar en operación: que el siguiente PR que toque un
   módulo actualice su `.md` sin recordatorio (M6). El PR #854 (S2) queda en
   preview esperando OK de Beto para mergear.
+- **2026-06-12** — **Hardening de confidencialidad en #854** (feedback de Beto
+  al revisar el preview: "cada quien debe ver la ayuda exclusivamente de los
+  módulos a los que tiene acceso" + "no quiero el manual rondando por donde
+  sea"). (a) **RBAC por doc** (cierra el riesgo R3 que S2 había dejado
+  abierto): portada, buscador y el endpoint `/api/manual/[...slug]` filtran
+  por los módulos legibles del usuario (`lib/manual/access.ts` sobre el
+  frontmatter `modulo:`, misma semántica que el sidebar; umbrella vía
+  `canAccessModuloOrChild`). (b) **PDF solo Dirección/admin**
+  (`checkDireccionEmpresa` server-side + botones ocultos) con **marca de
+  confidencialidad** "generado por quién y cuándo" en portada y pie (audit
+  trail). (c) **Descubribilidad**: link "Ver manual completo" al pie del
+  drawer del "?" (la portada era URL-only; Beto no la encontraba). Decisiones
+  D9 (RBAC por doc) y D10 (export solo Dirección + watermark) registradas;
+  ADR-043 M4/M8 enmendados.
