@@ -118,10 +118,15 @@ beforeEach(() => {
   membershipRow = { usuario_id: 'user-1' };
   ventaRow = { id: VENTA_ID, valor_escrituracion: 899000, fase_posicion: 12 };
   fasesRows = [{ posicion: 12 }];
-  adjuntosRows = [adjunto('factura_xml', 'fx-1', 899000), adjunto('aviso_pld', 'pld-1')];
+  adjuntosRows = [
+    adjunto('factura_xml', 'fx-1', 899000),
+    adjunto('aviso_pld', 'pld-1'),
+    adjunto('acuse_pld', 'acuse-1'),
+  ];
   revisionRow = {
     id: 'rev-1',
     adjunto_id: 'pld-1',
+    adjunto_acuse_id: 'acuse-1',
     estado: 'completada',
     veredicto: 'verde',
   };
@@ -163,11 +168,27 @@ describe('POST /api/dilesa/ventas/[ventaId]/cerrar-fase13', () => {
   });
 
   it('409 si faltan documentos requeridos', async () => {
-    adjuntosRows = [adjunto('aviso_pld', 'pld-1')]; // sin factura_xml
+    adjuntosRows = [adjunto('aviso_pld', 'pld-1'), adjunto('acuse_pld', 'acuse-1')];
     const res = await post();
     expect(res.status).toBe(409);
     const json = (await res.json()) as { error: string };
     expect(json.error).toContain('XML Factura');
+  });
+
+  it('409 si falta el acuse de envío (ciclo incompleto)', async () => {
+    adjuntosRows = [adjunto('factura_xml', 'fx-1', 899000), adjunto('aviso_pld', 'pld-1')];
+    const res = await post();
+    expect(res.status).toBe(409);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toContain('Acuse');
+  });
+
+  it('403 si la revisión no cubre el acuse vigente (se subió después)', async () => {
+    revisionRow = { ...revisionRow!, adjunto_acuse_id: null };
+    const res = await post();
+    expect(res.status).toBe(403);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toContain('cambiaron');
   });
 
   it('403 requiereDireccion si la revisión no está en verde y no hay override', async () => {
@@ -185,7 +206,7 @@ describe('POST /api/dilesa/ventas/[ventaId]/cerrar-fase13', () => {
     const res = await post();
     expect(res.status).toBe(403);
     const json = (await res.json()) as { error: string };
-    expect(json.error).toContain('cambió');
+    expect(json.error).toContain('cambiaron');
   });
 
   it('403 si hay override con motivo pero el caller no es Dirección', async () => {

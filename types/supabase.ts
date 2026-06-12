@@ -4673,6 +4673,7 @@ export type Database = {
       }
       venta_fase_revisiones: {
         Row: {
+          adjunto_acuse_id: string | null
           adjunto_id: string | null
           checks: Json
           created_at: string
@@ -4688,6 +4689,7 @@ export type Database = {
           veredicto: string
         }
         Insert: {
+          adjunto_acuse_id?: string | null
           adjunto_id?: string | null
           checks?: Json
           created_at?: string
@@ -4703,6 +4705,7 @@ export type Database = {
           veredicto: string
         }
         Update: {
+          adjunto_acuse_id?: string | null
           adjunto_id?: string | null
           checks?: Json
           created_at?: string

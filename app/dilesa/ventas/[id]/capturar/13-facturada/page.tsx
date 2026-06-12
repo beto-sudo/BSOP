@@ -113,6 +113,7 @@ const DOCS_FASE13: SlotDef[] = [
   },
   { rol: 'nota_credito', label: 'PDF Nota de Crédito (si aplica)', requerido: false },
   { rol: 'aviso_pld', label: 'PDF Aviso PLD', requerido: true },
+  { rol: 'acuse_pld', label: 'PDF Acuse de envío PLD', requerido: true },
 ];
 const ROLES_FASE13 = DOCS_FASE13.map((d) => d.rol);
 const ROLES_REQUERIDOS = DOCS_FASE13.filter((d) => d.requerido).map((d) => d.rol);
@@ -140,6 +141,7 @@ type Deposito = {
 type RevisionDto = {
   id: string;
   adjuntoId: string | null;
+  adjuntoAcuseId: string | null;
   estado: 'completada' | 'error';
   veredicto: VeredictoRevision;
   checks: RevisionCheck[];
@@ -453,8 +455,8 @@ function CapturarFase13Body() {
           type: advertencias > 0 ? 'info' : 'success',
         });
         await cargarDocs();
-        // Un PLD nuevo deja la revisión anterior obsoleta (stale).
-        if (slot.rol === 'aviso_pld') void cargarRevision();
+        // Un informe o acuse nuevos dejan la revisión anterior obsoleta.
+        if (slot.rol === 'aviso_pld' || slot.rol === 'acuse_pld') void cargarRevision();
       } finally {
         setSubiendoRol(null);
       }
@@ -713,8 +715,8 @@ function CapturarFase13Body() {
                 {!revision.vigente ? (
                   <p className="flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    El Aviso PLD cambió después de esta revisión — re-ejecútala para que el cierre
-                    la tome en cuenta.
+                    El Aviso PLD o su acuse cambiaron después de esta revisión — re-ejecútala para
+                    que el cierre la tome en cuenta.
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3">

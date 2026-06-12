@@ -400,3 +400,146 @@ export function veredictoDe(checks: RevisionCheck[]): VeredictoRevision {
   if (checks.some((c) => !c.ok)) return 'advertencias';
   return 'verde';
 }
+
+// ── Acuse de envío SPPLD (cierre del ciclo — decisión Beto 2026-06-12) ──
+
+export const ExtraccionAcuseSchema = z.object({
+  folioAcuse: z.string().describe('Folio o número del acuse de recepción/envío. "" si no aparece.'),
+  rfcSujetoObligado: z
+    .string()
+    .describe('RFC del sujeto obligado que presentó el aviso. "" si no aparece.'),
+  fechaPresentacion: z
+    .string()
+    .describe(
+      'Fecha de presentación/recepción del aviso ante Hacienda en formato YYYY-MM-DD. "" si no aparece.'
+    ),
+  mesReportado: z
+    .string()
+    .describe('Mes reportado en formato YYYYMM si el acuse lo indica. "" si no aparece.'),
+  referenciaAviso: z
+    .string()
+    .describe('Referencia del aviso a la que corresponde el acuse. "" si no aparece.'),
+  numeroAvisos: z
+    .number()
+    .describe('Número de avisos que ampara el acuse si lo indica. 0 si no aparece.'),
+});
+
+export type ExtraccionAcuse = z.infer<typeof ExtraccionAcuseSchema>;
+
+export const PROMPT_EXTRACCION_ACUSE =
+  `Eres un oficial de cumplimiento PLD (LFPIORPI). El PDF es el ACUSE de envío/recepción de ` +
+  `avisos de actividades vulnerables del portal SPPLD de Hacienda (SAT/UIF) — el comprobante de ` +
+  `que el aviso SÍ se presentó. Extrae los campos exactamente como aparecen.` +
+  `\n\nReglas:` +
+  `\n- Fechas en formato YYYY-MM-DD (el PDF puede traerlas DD/MM/YYYY).` +
+  `\n- Campos string ausentes = "" y números ausentes = 0 (NO inventes valores).`;
+
+/**
+ * Checks del acuse contra el informe revisado y la empresa. El acuse cierra
+ * el ciclo: comprueba que el aviso (el informe ya cruzado) efectivamente se
+ * PRESENTÓ ante Hacienda.
+ */
+export function cruzarAcuseConInforme(
+  acuse: ExtraccionAcuse,
+  informe: ExtraccionPld,
+  empresaRfc: string
+): RevisionCheck[] {
+  const checks: RevisionCheck[] = [];
+
+  if (acuse.rfcSujetoObligado) {
+    checks.push(
+      normalizarTexto(acuse.rfcSujetoObligado) === normalizarTexto(empresaRfc)
+        ? ok('acuse_rfc', 'Acuse a nombre de DILESA', 'error')
+        : falla(
+            'acuse_rfc',
+            'Acuse a nombre de DILESA',
+            'error',
+            `El acuse es del RFC ${acuse.rfcSujetoObligado}; se esperaba ${empresaRfc}.`
+          )
+    );
+  } else {
+    checks.push(
+      falla(
+        'acuse_rfc',
+        'Acuse a nombre de DILESA',
+        'warning',
+        'El acuse no trae RFC legible — verificar manualmente.'
+      )
+    );
+  }
+
+  // Correspondencia acuse ↔ informe: por referencia del aviso si ambos la
+  // traen; si el acuse no la trae, por mes reportado.
+  if (acuse.referenciaAviso && informe.referenciaAviso) {
+    checks.push(
+      normalizarTexto(acuse.referenciaAviso) === normalizarTexto(informe.referenciaAviso)
+        ? ok('acuse_referencia', 'Acuse corresponde al aviso del informe', 'error')
+        : falla(
+            'acuse_referencia',
+            'Acuse corresponde al aviso del informe',
+            'error',
+            `El acuse ampara la referencia ${acuse.referenciaAviso}; el informe es la ${informe.referenciaAviso}.`
+          )
+    );
+  } else if (acuse.mesReportado && informe.mesReportado) {
+    checks.push(
+      acuse.mesReportado === informe.mesReportado
+        ? ok('acuse_referencia', 'Acuse corresponde al periodo del informe', 'warning')
+        : falla(
+            'acuse_referencia',
+            'Acuse corresponde al periodo del informe',
+            'warning',
+            `El acuse es del periodo ${acuse.mesReportado}; el informe reporta ${informe.mesReportado}.`
+          )
+    );
+  } else {
+    checks.push(
+      falla(
+        'acuse_referencia',
+        'Acuse corresponde al aviso del informe',
+        'warning',
+        'No se pudo ligar el acuse al informe (sin referencia ni periodo legibles) — verificar manualmente.'
+      )
+    );
+  }
+
+  // Plazo LFPIORPI: presentación a más tardar el día 17 del mes siguiente a
+  // la operación (la fecha de operación viene del informe).
+  if (acuse.fechaPresentacion && informe.fechaOperacion) {
+    const y = Number(informe.fechaOperacion.slice(0, 4));
+    const m = Number(informe.fechaOperacion.slice(5, 7));
+    const limite =
+      y && m ? (m === 12 ? `${y + 1}-01-17` : `${y}-${String(m + 1).padStart(2, '0')}-17`) : '';
+    checks.push(
+      limite && acuse.fechaPresentacion <= limite
+        ? ok('acuse_plazo', 'Presentado dentro del plazo (día 17 del mes siguiente)', 'warning')
+        : falla(
+            'acuse_plazo',
+            'Presentado dentro del plazo (día 17 del mes siguiente)',
+            'warning',
+            `El acuse es del ${acuse.fechaPresentacion}; el plazo para la operación del ${informe.fechaOperacion} vencía el ${limite || '—'}.`
+          )
+    );
+  } else {
+    checks.push(
+      falla(
+        'acuse_plazo',
+        'Presentado dentro del plazo (día 17 del mes siguiente)',
+        'warning',
+        'Sin fecha de presentación legible en el acuse — verificar manualmente.'
+      )
+    );
+  }
+
+  return checks;
+}
+
+/** Check duro cuando el expediente no tiene acuse: el ciclo no está cerrado. */
+export function checkAcuseFaltante(): RevisionCheck {
+  return falla(
+    'acuse_presente',
+    'Acuse de envío SPPLD en el expediente',
+    'error',
+    'Falta el acuse de envío del aviso — sin él no se acredita que el aviso se presentó ante Hacienda.'
+  );
+}
