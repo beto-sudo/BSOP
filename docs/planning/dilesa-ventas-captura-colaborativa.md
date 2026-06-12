@@ -194,8 +194,8 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 - **2026-06-12** — Sprint 4a entregado (PR en revisión): acuse de envío
   SPPLD requerido en F13 con extracción IA y cruce contra el informe
   (correspondencia de referencia, RFC, plazo legal); la revisión y el gate
-  cubren el ciclo completo. Migración `adjunto_acuse_id` pendiente de
-  aplicar a prod. Nota: el prompt del acuse se calibró con campos estándar
+  cubren el ciclo completo. Migración `adjunto_acuse_id` aplicada a prod
+  (OK Beto, verificada). Nota: el prompt del acuse se calibró con campos estándar
   del SPPLD — validar con un acuse real en la prueba de prod y ajustar si
   el formato difiere.
 
