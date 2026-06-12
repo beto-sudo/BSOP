@@ -5404,6 +5404,10 @@ export type Database = {
         Args: { p_construccion_id: string; p_costo: number }
         Returns: undefined
       }
+      fn_copiar_comprobante_detonacion: {
+        Args: { p_pago_id: string }
+        Returns: undefined
+      }
       fn_es_vendedor_restringido: { Args: never; Returns: boolean }
       fn_estimaciones_backfill_incremental: {
         Args: never
