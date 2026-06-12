@@ -14,6 +14,9 @@
  * Requisitos para autorizar:
  *  - La venta debe estar en `fase_posicion=1` (Solicitud).
  *  - Debe ser **líder de la cola** (posición=1 en `v_unidad_hold_queue`).
+ *    Las ventas históricas de Coda no participan en la cola (D4): son
+ *    autorizables mientras la fila de su unidad esté vacía — ver
+ *    `lib/dilesa/hold-lider.ts`.
  *  - Los 3 adjuntos requeridos deben estar cargados:
  *      `aviso_privacidad`, `ficu`, `expediente_digital`.
  *
@@ -30,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
+import { esLiderDeCola, type ColaHoldRow } from '@/lib/dilesa/hold-lider';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 
@@ -56,6 +60,7 @@ type VentaCtx = {
   fase_posicion: number | null;
   estado: string;
   enganche_requerido: number | null;
+  coda_row_id: string | null;
 };
 
 type ReciboEnganche = {
@@ -108,7 +113,9 @@ function CapturarFase2Body() {
     const { data: v, error: vErr } = await sb
       .schema('dilesa')
       .from('ventas')
-      .select('id, empresa_id, persona_id, unidad_id, fase_posicion, estado, enganche_requerido')
+      .select(
+        'id, empresa_id, persona_id, unidad_id, fase_posicion, estado, enganche_requerido, coda_row_id'
+      )
       .eq('id', ventaId)
       .maybeSingle();
     if (vErr || !v) {
@@ -118,17 +125,15 @@ function CapturarFase2Body() {
     }
     setVenta(v as unknown as VentaCtx);
 
-    // Verificar líder de cola
+    // Verificar líder de cola. Las históricas de Coda no entran a la fila
+    // (D4) — autorizables si nadie en BSOP tiene el hold de la unidad.
     if (v.unidad_id) {
       const { data: cola } = await sb
         .schema('dilesa')
         .from('v_unidad_hold_queue')
         .select('venta_id, posicion')
         .eq('unidad_id', v.unidad_id);
-      const lider = ((cola ?? []) as Array<{ venta_id: string; posicion: number }>).find(
-        (c) => c.posicion === 1
-      );
-      setEsLider(lider?.venta_id === ventaId);
+      setEsLider(esLiderDeCola((cola ?? []) as ColaHoldRow[], ventaId, !!v.coda_row_id));
     } else {
       setEsLider(false);
     }

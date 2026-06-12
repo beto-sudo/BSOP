@@ -127,6 +127,19 @@ export function deriveKpis(rows: readonly VentaListaRow[]): readonly ModuleKpi[]
   ];
 }
 
+/**
+ * Búsqueda de texto de la lista: matchea comprador o identificador de
+ * unidad (ej. "M22-L5-LDLE") — el identificador es como Ventas ubica una
+ * operación cuando el dato que tiene a la mano es la unidad, no el cliente.
+ */
+export function matchVentaSearch(v: VentaListaRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    v.cliente.toLowerCase().includes(q) || (v.unidadIdentificador ?? '').toLowerCase().includes(q)
+  );
+}
+
 export function VentasModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -341,13 +354,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   );
 
   const filtrados = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return ventas.filter((v) => {
       if (proyectoFiltro && v.proyectoNombre !== proyectoFiltro) return false;
       if (faseFiltro && v.fase_actual !== faseFiltro) return false;
       if (estadoFiltro && v.estado !== estadoFiltro) return false;
       if (!isInDateRange(v.fecha_escritura, rangoEscritura)) return false;
-      if (q && !v.cliente.toLowerCase().includes(q)) return false;
+      if (!matchVentaSearch(v, search)) return false;
       return true;
     });
   }, [ventas, search, proyectoFiltro, faseFiltro, estadoFiltro, rangoEscritura]);
@@ -432,7 +444,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar comprador…"
+            placeholder="Buscar comprador o unidad…"
             className="w-64 pl-9"
           />
         </div>
