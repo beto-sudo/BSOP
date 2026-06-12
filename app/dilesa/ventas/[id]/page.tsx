@@ -225,6 +225,8 @@ type Abono = {
   forma_pago: string | null;
   referencia: string | null;
   notas: string | null;
+  /** Folio fiscal del recibo de caja (CFDI) — null si se capturó sin XML. */
+  uuid_sat: string | null;
 };
 type Adjunto = {
   id: string;
@@ -405,6 +407,20 @@ function DetailInner() {
   const reciboUploadAbonoIdRef = useRef<string | null>(null);
   const [subiendoReciboId, setSubiendoReciboId] = useState<string | null>(null);
   const toast = useToast();
+
+  // Deep-link desde la guía de Fase 12: `?abono=1` abre el drawer de
+  // Registrar abono. window.location en effect (no useSearchParams — evita
+  // el bailout CSR de Next 16). El flag se limpia para que un refresh no
+  // re-abra el drawer.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('abono') === '1') {
+      setAbonoOpen(true);
+      sp.delete('abono');
+      const qs = sp.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    }
+  }, []);
   const triggerPrint = useTriggerPrint();
 
   useEffect(() => {
@@ -513,7 +529,7 @@ function DetailInner() {
         sb
           .schema('erp')
           .from('cxc_pagos')
-          .select('id, fecha, monto_total, fuente, forma_pago, referencia, notas')
+          .select('id, fecha, monto_total, fuente, forma_pago, referencia, notas, uuid_sat')
           .eq('origen_tipo', 'venta_dilesa')
           .eq('origen_id', ventaRow.id)
           .is('deleted_at', null)
@@ -1658,6 +1674,7 @@ function DetailInner() {
                           <th className="py-1 pr-2 text-right font-medium">Monto</th>
                           <th className="py-1 pr-2 text-right font-medium">Aplicado</th>
                           <th className="py-1 pr-2 text-right font-medium">Saldo a favor</th>
+                          <th className="py-1 pr-2 font-medium">Recibo fiscal</th>
                           <th className="py-1 pr-2 font-medium">Comprobante</th>
                           <th className="py-1 pl-2 font-medium"></th>
                         </tr>
@@ -1688,6 +1705,22 @@ function DetailInner() {
                                   </span>
                                 ) : (
                                   <span className="text-[var(--text)]/30">—</span>
+                                )}
+                              </td>
+                              <td className="py-1.5 pr-2">
+                                {a.uuid_sat ? (
+                                  <Badge tone="success">
+                                    <span title={`Folio fiscal ${a.uuid_sat}`}>
+                                      XML ✓ …{a.uuid_sat.slice(-6)}
+                                    </span>
+                                  </Badge>
+                                ) : (
+                                  <span
+                                    className="text-[var(--text)]/40"
+                                    title="Abono registrado sin XML del recibo de caja"
+                                  >
+                                    sin XML
+                                  </span>
                                 )}
                               </td>
                               <td className="py-1.5 pr-2">
@@ -1784,6 +1817,7 @@ function DetailInner() {
         empresaId={venta.empresa_id}
         personaId={venta.persona_id}
         clienteNombre={clienteNombre}
+        clienteRfc={persona?.rfc ?? null}
         onDone={() => setRefreshKey((k) => k + 1)}
       />
 

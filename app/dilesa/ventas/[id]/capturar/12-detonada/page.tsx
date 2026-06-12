@@ -1,35 +1,34 @@
 'use client';
 
 /**
- * Captura Fase 12 — Detonada (Sprint 7j) — RESPALDO MANUAL.
+ * Fase 12 — Detonada. GUÍA a Cobranza + cierre manual SOLO Dirección.
  *
  * "Detonar" el crédito = la institución libera el recurso y DILESA recibe el
- * depósito. Desde el 2026-06-11 el camino normal es AUTOMÁTICO: Contabilidad
- * registra el abono de la institución en Cobranza y el trigger
- * `dilesa.fn_detonar_venta_desde_cxc` (migración 20260611174917) cierra esta
- * fase solo — un registro, un lugar, y el dinero queda en CxC (diseño de
- * Beto). Esta pantalla queda como fallback (mismo patrón que F8 manual vs
- * magic link del notario).
+ * depósito. El camino ÚNICO normal (2026-06-11) es: Contabilidad registra el
+ * abono de la institución en el estado de cuenta de la venta y el trigger
+ * `dilesa.fn_detonar_venta_desde_cxc` cierra esta fase solo — un registro,
+ * un lugar, el dinero en CxC y el comprobante copiado al expediente.
  *
- * Captura (fallback):
- *   - `fecha_detonacion` → fecha del depósito (default hoy)
- *   - `monto_detonado` → monto recibido (opcional, cuadratura)
- *   - Doc requerido: rol `imagen_detonacion` (comprobante del depósito).
- *
- * OJO: cerrar por aquí NO registra el abono en Cobranza — si se usa el
- * fallback, el depósito se registra aparte en CxC (el trigger en ese caso
- * solo completa monto/fecha si quedaron vacíos).
+ * Esta pantalla ya NO captura para el equipo (2026-06-12, caso Ahumada
+ * Castillo: el cierre manual con imagen hacía creer que el depósito quedaba
+ * registrado, y el estado de cuenta quedaba en ceros). Para no-Dirección es
+ * una guía con botón directo a "Registrar abono". El form manual queda como
+ * cierre de emergencia exclusivo de Dirección/admin, con advertencia de que
+ * NO registra el dinero en Cobranza.
  *
  * Enforcement: Fase 11 (Escriturada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase12_detonada` (Contabilidad + Gerencia Ventas +
- * Dirección).
+ * Dirección); el form de emergencia además exige Dirección
+ * (`EffectiveUser.direccionEmpresaIds` o admin global).
  */
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
+import { Banknote, CheckCircle2, Loader2, Save, ShieldAlert, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
+import { useEffectiveUser } from '@/components/providers';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +68,13 @@ function CapturarFase12Body() {
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
+
+  // Cierre manual = SOLO Dirección (admin global o rol Dirección en DILESA).
+  // El resto del equipo ve la guía hacia el estado de cuenta.
+  const { data: effectiveUser, loading: userLoading } = useEffectiveUser();
+  const esDireccion =
+    !!effectiveUser?.isAdmin ||
+    (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>('');
@@ -309,8 +315,33 @@ function CapturarFase12Body() {
             </Link>
           }
         />
+      ) : userLoading ? (
+        <Skeleton className="h-48 w-full rounded-lg" />
+      ) : !esDireccion ? (
+        <GuiaCobranza ventaId={venta.id} />
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
+          <div className="rounded-lg border border-amber-400/50 bg-amber-50 p-4 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">Cierre manual de emergencia (solo Dirección)</p>
+                <p>
+                  Esta pantalla NO registra el depósito en Cobranza: el estado de cuenta de la venta
+                  quedará sin el abono. El camino normal es registrar el abono de la institución en
+                  el estado de cuenta — la fase se cierra sola y el comprobante se copia al
+                  expediente. Si cierras por aquí, registra el abono en Cobranza después.
+                </p>
+                <Link
+                  href={`/dilesa/ventas/${venta.id}?abono=1`}
+                  className="inline-block font-medium underline"
+                >
+                  Mejor registrar el abono ahora →
+                </Link>
+              </div>
+            </div>
+          </div>
+
           <Section title="Comprobante del depósito">
             <FileSlot
               label="Comprobante de transferencia/depósito *"
@@ -367,6 +398,33 @@ function CapturarFase12Body() {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+function GuiaCobranza({ ventaId }: { ventaId: string }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--card)] p-6">
+      <div className="flex items-start gap-3">
+        <Banknote className="h-6 w-6 shrink-0 text-[var(--accent)]" />
+        <div className="space-y-2 text-sm">
+          <p className="font-medium text-[var(--text)]">
+            La detonación se registra en Cobranza, no aquí.
+          </p>
+          <p className="text-[var(--text)]/70">
+            Registra el abono de la institución en el estado de cuenta de la venta — con su
+            comprobante y el XML del recibo de caja. Al registrarlo, esta fase se cierra sola y el
+            comprobante se copia al expediente. Con coacreditados (p. ej. Infonavit Unamos),
+            registra un abono por cada depósito, cada uno con su comprobante.
+          </p>
+        </div>
+      </div>
+      <Link
+        href={`/dilesa/ventas/${ventaId}?abono=1`}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--card)] hover:opacity-90"
+      >
+        <Banknote className="h-4 w-4" /> Registrar abono en el estado de cuenta
+      </Link>
     </div>
   );
 }
