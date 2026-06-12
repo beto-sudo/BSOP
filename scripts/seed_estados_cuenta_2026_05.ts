@@ -1,13 +1,17 @@
 /**
- * Seed baseline de `erp.estados_cuenta` — mayo 2026 (Afirme, BBVA MN, Monex).
+ * Seed baseline de `erp.estados_cuenta` — mayo 2026 (Afirme, BBVA MN, Monex,
+ * BBVA USD; Finamex pendiente de accesos — se agrega cuando llegue su estado).
  *
- * Iniciativa `conciliacion-bancaria` v0: carga los 3 primeros estados de
- * cuenta (totales de carátula verificados al centavo contra los PDFs) y sube
- * los PDFs al bucket `adjuntos` con la convención del módulo
- * (`dilesa/estados_cuenta/<cuentaId>/<ts>-<archivo>.pdf`).
+ * Iniciativa `conciliacion-bancaria` v0: carga los estados de cuenta del
+ * baseline (totales de carátula verificados al centavo contra los PDFs) y
+ * sube los PDFs al bucket `adjuntos` con la convención del módulo
+ * (`dilesa/estados_cuenta/<cuentaId>/<ts>-<archivo>.pdf`). Para cuentas cuyo
+ * estado llegó después de la migración `cuentas_bancarias_ficha`, también
+ * completa la ficha (FICHA_UPDATES) y el snapshot baseline (SNAPSHOTS).
  *
  * Idempotente: si la fila (cuenta, periodo) ya existe Y tiene archivo_path,
- * se salta (no re-sube el PDF). Si existe sin archivo, sube y completa.
+ * se salta (no re-sube el PDF). Ficha = UPDATE con valores constantes;
+ * snapshot = INSERT solo si no existe (cuenta, fecha).
  *
  * Uso (PDFs archivados en el staging local de Beto):
  *   npx tsx --env-file /Users/Beto/BSOP/.env.local scripts/seed_estados_cuenta_2026_05.ts
@@ -79,6 +83,47 @@ const SEEDS: Seed[] = [
     comisiones: 0,
     notas: `${NOTAS_SEED} Inversiones = posición en reporto BANOB 21-4X al 29-may (venc. 01-jun).`,
   },
+  {
+    cuentaNombre: 'BBVA Bancomer Dólares',
+    pdf: '2026-05_BBVA-USD_0120889296.pdf',
+    fechaCorte: '2026-05-31',
+    saldoInicial: 0,
+    depositos: 0,
+    retiros: 0,
+    saldoFinal: 0,
+    saldoInversiones: 0,
+    numAbonos: 0,
+    numCargos: 0,
+    comisiones: 0,
+    notas: `${NOTAS_SEED} Cuenta sin movimiento en mayo (en ceros).`,
+  },
+];
+
+// Ficha de cuentas cuyo estado llegó después de la migración
+// `cuentas_bancarias_ficha` (que dejó su ficha como pendiente).
+const FICHA_UPDATES: Array<{ cuentaNombre: string; update: Record<string, string | null> }> = [
+  {
+    cuentaNombre: 'BBVA Bancomer Dólares',
+    update: {
+      producto: 'Maestra Dólares Pyme',
+      numero_cuenta: '0120889296',
+      clabe: '012075001208892964',
+      numero_cliente: '49331625',
+      sucursal: '0832 Empresas Saltillo',
+      telefono: '411-1911',
+      notas: 'Cuenta vista USD, espejo de la operativa MN (mismo no. de cliente).',
+    },
+  },
+];
+
+// Snapshots baseline al corte que la migración no pudo cargar (sin estado).
+const SNAPSHOTS: Array<{ cuentaNombre: string; fecha: string; saldo: number; notas: string }> = [
+  {
+    cuentaNombre: 'BBVA Bancomer Dólares',
+    fecha: '2026-05-31',
+    saldo: 0,
+    notas: 'Baseline estado de cuenta mayo 2026 (cuenta sin movimiento).',
+  },
 ];
 
 async function main() {
@@ -98,6 +143,59 @@ async function main() {
     .ilike('nombre', '%dilesa%')
     .single();
   if (empErr || !empresa) throw new Error(`empresa DILESA: ${empErr?.message}`);
+
+  // ── Fichas pendientes ───────────────────────────────────────────────────────
+  for (const f of FICHA_UPDATES) {
+    const { error } = await sb
+      .schema('erp')
+      .from('cuentas_bancarias')
+      .update({ ...f.update, updated_at: new Date().toISOString() })
+      .eq('empresa_id', empresa.id)
+      .eq('nombre', f.cuentaNombre);
+    if (error) {
+      console.error(`✗ ficha ${f.cuentaNombre}: ${error.message}`);
+    } else {
+      console.log(`✓ ficha ${f.cuentaNombre} actualizada`);
+    }
+  }
+
+  // ── Snapshots baseline faltantes ────────────────────────────────────────────
+  for (const s of SNAPSHOTS) {
+    const { data: cuenta } = await sb
+      .schema('erp')
+      .from('cuentas_bancarias')
+      .select('id')
+      .eq('empresa_id', empresa.id)
+      .eq('nombre', s.cuentaNombre)
+      .single();
+    if (!cuenta) {
+      console.error(`✗ snapshot ${s.cuentaNombre}: cuenta no encontrada`);
+      continue;
+    }
+    const { data: ya } = await sb
+      .schema('erp')
+      .from('cuenta_saldos')
+      .select('id')
+      .eq('cuenta_id', cuenta.id)
+      .eq('fecha', s.fecha)
+      .maybeSingle();
+    if (ya) {
+      console.log(`↷ snapshot ${s.cuentaNombre} ${s.fecha}: ya existe, skip.`);
+      continue;
+    }
+    const { error } = await sb.schema('erp').from('cuenta_saldos').insert({
+      empresa_id: empresa.id,
+      cuenta_id: cuenta.id,
+      fecha: s.fecha,
+      saldo: s.saldo,
+      notas: s.notas,
+    });
+    if (error) {
+      console.error(`✗ snapshot ${s.cuentaNombre}: ${error.message}`);
+    } else {
+      console.log(`✓ snapshot ${s.cuentaNombre} ${s.fecha} = ${s.saldo}`);
+    }
+  }
 
   for (const seed of SEEDS) {
     const { data: cuenta, error: ctaErr } = await sb
