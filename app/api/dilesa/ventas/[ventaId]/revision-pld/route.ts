@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any --
- * `dilesa.venta_fase_revisiones` entra a types/supabase.ts cuando la
- * migración se aplique a prod; mientras, el insert/select usa `as any`
- * (mismo patrón que otros endpoints erp/dilesa).
+ * Los jsonb de `venta_fase_revisiones` (checks/extraccion) llevan shapes
+ * con campos opcionales que el tipo `Json` generado no acepta; el cast es
+ * deliberado (mismo patrón que otros endpoints erp/dilesa).
  */
 
 /**
