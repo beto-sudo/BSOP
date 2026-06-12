@@ -356,7 +356,7 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 | Read-only "viendo como"            | [ADR-027](../adr/027_viendo_como_readonly.md)         | cookie `bsop_preview_as` + `assertNotInPreview()` (V1-V5)                |
 | Sub-module permissions (sub-slugs) | [ADR-030](../adr/030_submodule_permissions.md)        | sub-slugs `<padre>.<sub>` + `<RoutedModuleTabs module>` filter (SS1-SS7) |
 | Workflow CC owns planning          | [ADR-012](../adr/012_workflow_cc_owns_planning.md)    | meta-decisión sobre roles                                                |
-| Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)        | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M7)  |
+| Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)        | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M8)  |
 
 ### Data / DB
 

@@ -3,11 +3,11 @@
 **Slug:** `manual-usuario`
 **Empresas:** DILESA (golden; piloto = módulo Ventas). Sistema cross-empresa, pensado para rollout a las 5 empresas.
 **Schemas afectados:** `core.modulos` (slug nuevo `dilesa.manual` + backfill defensivo de permisos). El **contenido vive en el repo** (markdown versionado con git), **no** en la DB.
-**Estado:** in_progress
-**Próximo hito:** Sprint 2 (export PDF on-demand + buscador en la portada /dilesa/manual) + Sprint 3 (closeout + plantilla replicable a las otras empresas). Cobertura actual: 57 docs, 100% de pantallas DILESA (incluye dinámicas vía normalización + fallback)
+**Estado:** done
+**Próximo hito:** — (cerrada; el rollout a RDB/ANSA/COAGAN/Nigropetense se promoverá como iniciativa propia cuando Beto lo decida, con `content/manual/README.md` como receta)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-11 (ayuda contextual en rutas dinámicas + 22 docs nuevos: expediente, 17 fases de captura, RUV, Saldos Bancos, Costo materiales, portada)
+**Última actualización:** 2026-06-11 (Sprint 2 PDF + buscador en PR #854; Sprint 3 plantilla replicable + closeout)
 
 ## Problema
 
@@ -92,6 +92,15 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   donde el texto no baste.
 - **D7 — Versionado por módulo** (semver + fecha + changelog en el frontmatter del
   `.md`) + una versión global del manual visible en la portada.
+- **D8 — PDF = print del browser sobre una vista imprimible; react-pdf
+  descartado** (2026-06-11, Sprint 2). "Una sola fuente de verdad" (D1) tiene
+  que incluir el _renderer_: la vista `/dilesa/manual/imprimir` renderiza el
+  mismo markdown con el mismo `<ManualMarkdown>` del drawer y el PDF sale del
+  diálogo de impresión (patrón ADR-021). Un mapper markdown→react-pdf paralelo
+  habría duplicado cada elemento (tablas GFM a mano, fuentes, gotcha de `gap`
+  en @react-pdf v4.5.x) y driftearía — justo el envejecimiento que M6 combate.
+  Trade-off aceptado: guardar el PDF pasa por el diálogo de impresión (1 clic
+  extra) en vez de descargar el archivo directo. Registrada como M8 en ADR-043.
 
 ## Riesgos
 
@@ -194,3 +203,28 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   cada page), `ruv.md`, `saldos-bancos.md`, `compras/costo_materiales.md` y
   `manual.md` (portada). Verificación: 66 pantallas DILESA → doc existente,
   57 docs servibles por el loader, 0 huecos.
+- **2026-06-11** — **Sprint 2 (PDF on-demand + buscador) en PR #854** (UI
+  visible → preview a Beto, sin auto-merge). Export PDF vía print del browser
+  (decisión D8/M8): vista `/dilesa/manual/imprimir` (completa o
+  `?modulo=<grupo>`) con portada, índice y page-break por pantalla, sobre el
+  `<ManualMarkdown>` compartido extraído del drawer (RSC, cero JS de contenido
+  al cliente); CSS vars fijadas a "modo documento" para que el PDF salga
+  legible en dark mode; `generateMetadata` → nombre del archivo. Buscador
+  full-text en la portada: `/api/manual/search` (título + contenido, AND
+  multi-palabra, insensible a acentos, ranking título>contenido, snippet con
+  match) + `<ManualSearch>` con debounce que abre el `<HelpDrawer>`; portada
+  re-agrupada por módulo (taxonomía del sidebar, `lib/manual/groups.ts` con
+  test anti-drift de labels) con PDF global y por grupo. `outputFileTracingIncludes`
+  por cada ruta nueva. 6 checks verdes (1656 tests, +14 de groups/search).
+- **2026-06-11** — **Sprint 3 (closeout)**: plantilla canónica
+  `content/manual/_PLANTILLA.md` (frontmatter + secciones estándar destiladas
+  de los 57 docs reales) + `content/manual/README.md` con el patrón replicable:
+  Checklist A (pantalla nueva, 6 pasos) y Checklist B (rollout a empresa
+  nueva, 7 pasos con los deltas exactos: módulo RBAC, portada+imprimir,
+  grupos por empresa, parámetro de empresa en search, file tracing). Iniciativa
+  **cerrada**: outcome 1-6 completo (ayuda contextual + portada + markdown
+  versionado + versión/changelog + PDF + patrón replicable). La cobertura
+  rebasó el alcance v1 (piloto Ventas): 57 docs = 100% de pantallas DILESA.
+  Métrica pendiente de observar en operación: que el siguiente PR que toque un
+  módulo actualice su `.md` sin recordatorio (M6). El PR #854 (S2) queda en
+  preview esperando OK de Beto para mergear.
