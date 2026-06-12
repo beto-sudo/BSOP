@@ -59,6 +59,8 @@ import type {
   Modulo,
   ModuloSeccion,
   PermisoRol,
+  RolPlantilla,
+  RolPlantillaItem,
   RolRecord,
   UsuarioCore,
   UsuarioEmpresa,
@@ -82,6 +84,8 @@ import {
   deleteExcepcionUsuario,
   toggleActivo,
   removeUsuario,
+  savePlantillaFromRol,
+  deleteRolPlantilla,
 } from './actions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -102,6 +106,8 @@ interface Props {
   usuarios: UsuarioCore[];
   usuariosEmpresas: UsuarioEmpresa[];
   excepciones: ExcepcionUsuario[];
+  plantillas: RolPlantilla[];
+  plantillaItems: RolPlantillaItem[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -206,6 +212,8 @@ export function AccesoClient({
   usuarios,
   usuariosEmpresas,
   excepciones,
+  plantillas,
+  plantillaItems,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const { startImpersonate } = usePermissions();
@@ -249,6 +257,13 @@ export function AccesoClient({
     editing: null,
   });
   const [rolNombre, setRolNombre] = useState('');
+  // Plantilla elegida en el alta de rol ('' = empezar en blanco) — S3.
+  const [rolPlantillaId, setRolPlantillaId] = useState('');
+
+  // ── "Guardar como plantilla" dialog (snapshot del rol seleccionado) ──
+  const [plantillaDialogOpen, setPlantillaDialogOpen] = useState(false);
+  const [plantillaNombre, setPlantillaNombre] = useState('');
+  const [plantillaDescripcion, setPlantillaDescripcion] = useState('');
 
   // ── Usuario dialog ──
   const [usuarioDialogOpen, setUsuarioDialogOpen] = useState(false);
@@ -381,6 +396,17 @@ export function AccesoClient({
   function openRolDialog(editing: RolRecord | null) {
     setRolDialog({ open: true, editing });
     setRolNombre(editing?.nombre ?? '');
+    setRolPlantillaId('');
+    setToast(null);
+  }
+
+  function openPlantillaDialog(rol: RolRecord) {
+    setPlantillaDialogOpen(true);
+    setPlantillaNombre(rol.nombre);
+    setPlantillaDescripcion(
+      plantillas.find((p) => p.empresa_id === rol.empresa_id && p.nombre === rol.nombre)
+        ?.descripcion ?? ''
+    );
     setToast(null);
   }
 
@@ -399,6 +425,8 @@ export function AccesoClient({
   }
 
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
+  const plantillasDeEmpresa = plantillas.filter((p) => p.empresa_id === filterEmpresaId);
+  const rolPlantilla = plantillasDeEmpresa.find((p) => p.id === rolPlantillaId) ?? null;
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
   const accesosIncompletos = accesosSinRol(usuariosEmpresas);
   const modulosDelRol = selectedRol
@@ -560,64 +588,115 @@ export function AccesoClient({
           </div>
 
           <div className="grid grid-cols-[220px_1fr] gap-4">
-            {/* Roles list */}
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-              <div className="border-b border-[var(--border)] px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
-                  Roles
-                </p>
-              </div>
-              {rolesDeEmpresa.length === 0 ? (
-                <p className="px-4 py-8 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
-                  Sin roles para esta empresa.
-                </p>
-              ) : (
-                <ul>
-                  {rolesDeEmpresa.map((rol) => (
-                    <li key={rol.id}>
-                      <div
-                        className={cn(
-                          'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
-                          selectedRolId === rol.id
-                            ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                            : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3'
-                        )}
-                        onClick={() => setSelectedRolId(rol.id)}
-                      >
-                        <span className="flex-1 truncate">{rol.nombre}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openRolDialog(rol);
-                          }}
+            {/* Roles list + plantillas */}
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                    Roles
+                  </p>
+                </div>
+                {rolesDeEmpresa.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
+                    Sin roles para esta empresa.
+                  </p>
+                ) : (
+                  <ul>
+                    {rolesDeEmpresa.map((rol) => (
+                      <li key={rol.id}>
+                        <div
+                          className={cn(
+                            'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
+                            selectedRolId === rol.id
+                              ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                              : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3'
+                          )}
+                          onClick={() => setSelectedRolId(rol.id)}
                         >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                          <span className="flex-1 truncate">{rol.nombre}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRolDialog(rol);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
+                              run(
+                                () => deleteRolRecord(rol.id),
+                                () => {
+                                  if (selectedRolId === rol.id) setSelectedRolId(null);
+                                }
+                              );
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Plantillas de rol (S3): se aplican desde "Nuevo rol"; se crean
+                  con "Guardar como plantilla" en la matriz del rol. */}
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                    Plantillas
+                  </p>
+                </div>
+                {plantillasDeEmpresa.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
+                    Sin plantillas. Configura un rol y usa &ldquo;Guardar como plantilla&rdquo;.
+                  </p>
+                ) : (
+                  <ul>
+                    {plantillasDeEmpresa.map((p) => (
+                      <li
+                        key={p.id}
+                        title={p.descripcion ?? undefined}
+                        className="group flex items-center gap-1 px-3 py-2 text-sm dark:text-white/70 text-[var(--text)]/70"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{p.nombre}</span>
+                          <span className="block text-[11px] dark:text-white/35 text-[var(--text-subtle)]">
+                            {plantillaItems.filter((i) => i.plantilla_id === p.id).length} permisos
+                          </span>
+                        </span>
                         <Button
                           variant="ghost"
                           size="icon"
+                          disabled={isPending}
                           className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
-                            run(
-                              () => deleteRolRecord(rol.id),
-                              () => {
-                                if (selectedRolId === rol.id) setSelectedRolId(null);
-                              }
-                            );
+                          onClick={() => {
+                            if (
+                              !confirm(
+                                `¿Eliminar la plantilla "${p.nombre}"? Los roles ya creados con ella no se tocan.`
+                              )
+                            )
+                              return;
+                            run(() => deleteRolPlantilla(p.id));
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* Permissions matrix */}
@@ -630,15 +709,27 @@ export function AccesoClient({
                 </div>
               ) : (
                 <>
-                  <div className="border-b border-[var(--border)] px-4 py-3">
-                    <p className="text-sm font-semibold dark:text-white/85 text-[var(--text)]/85">
-                      {selectedRol.nombre}
-                    </p>
-                    <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
-                      Permisos por módulo — haz clic para cambiar. Un hub aparece en el menú si él o
-                      cualquiera de sus sub-módulos tiene Lectura; cada sub-módulo gobierna su
-                      pestaña.
-                    </p>
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold dark:text-white/85 text-[var(--text)]/85">
+                        {selectedRol.nombre}
+                      </p>
+                      <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
+                        Permisos por módulo — haz clic para cambiar. Un hub aparece en el menú si él
+                        o cualquiera de sus sub-módulos tiene Lectura; cada sub-módulo gobierna su
+                        pestaña.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      className="h-7 shrink-0 gap-1 rounded-lg text-xs"
+                      title="Guarda los permisos actuales de este rol como plantilla reutilizable al crear roles."
+                      onClick={() => openPlantillaDialog(selectedRol)}
+                    >
+                      <Plus className="h-3 w-3" /> Guardar como plantilla
+                    </Button>
                   </div>
                   <Table>
                     <TableHeader>
@@ -1562,6 +1653,30 @@ export function AccesoClient({
                 autoFocus
               />
             </div>
+            {!rolDialog.editing && plantillasDeEmpresa.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                  Plantilla{' '}
+                  <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+                </p>
+                <Combobox
+                  value={rolPlantillaId}
+                  disabled={isPending}
+                  onChange={(v) => setRolPlantillaId(v)}
+                  options={plantillasDeEmpresa.map((p) => ({
+                    value: p.id,
+                    label: p.nombre,
+                    sub: `${plantillaItems.filter((i) => i.plantilla_id === p.id).length} permisos`,
+                  }))}
+                  placeholder="Empezar en blanco"
+                  allowClear
+                />
+                <p className="text-xs dark:text-white/35 text-[var(--text)]/35">
+                  {rolPlantilla?.descripcion ??
+                    'El rol nace con los permisos de la plantilla (más sus requisitos de navegación); después los ajustas en la matriz.'}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -1575,16 +1690,102 @@ export function AccesoClient({
               disabled={!rolNombre.trim() || isPending}
               onClick={() => {
                 const editing = rolDialog.editing;
+                const nombre = rolNombre;
+                const plantilla = rolPlantilla;
                 run(
-                  () =>
-                    editing
-                      ? updateRolRecord(editing.id, rolNombre)
-                      : createRolRecord(rolNombre, filterEmpresaId),
+                  async () => {
+                    if (editing) {
+                      await updateRolRecord(editing.id, nombre);
+                      return;
+                    }
+                    const { permisos } = await createRolRecord(
+                      nombre,
+                      filterEmpresaId,
+                      plantilla?.id
+                    );
+                    if (plantilla) {
+                      setToast({
+                        kind: 'success',
+                        msg: `Rol "${nombre.trim()}" creado con ${permisos} permisos de la plantilla "${plantilla.nombre}".`,
+                      });
+                    }
+                  },
                   () => setRolDialog({ open: false, editing: null })
                 );
               }}
             >
               {isPending ? 'Guardando…' : rolDialog.editing ? 'Guardar cambios' : 'Crear rol'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── "Guardar como plantilla" Dialog (S3) ──────────────────────────── */}
+      <Dialog open={plantillaDialogOpen} onOpenChange={setPlantillaDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar como plantilla</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
+              Toma una foto de los permisos actuales de{' '}
+              <span className="font-medium">{selectedRol?.nombre}</span> para reutilizarla al crear
+              roles. Si ya existe una plantilla con el mismo nombre, se reemplaza con esta foto.
+            </p>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Nombre de la plantilla
+              </p>
+              <Input
+                value={plantillaNombre}
+                onChange={(e) => setPlantillaNombre(e.target.value)}
+                placeholder="Ej. Vendedor, Mesa de control"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Descripción{' '}
+                <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+              </p>
+              <Input
+                value={plantillaDescripcion}
+                onChange={(e) => setPlantillaDescripcion(e.target.value)}
+                placeholder="Qué hace alguien con este perfil"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPlantillaDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!plantillaNombre.trim() || !selectedRol || isPending}
+              onClick={() => {
+                const rol = selectedRol;
+                if (!rol) return;
+                const nombre = plantillaNombre;
+                run(
+                  async () => {
+                    const { items } = await savePlantillaFromRol(
+                      rol.id,
+                      nombre,
+                      plantillaDescripcion
+                    );
+                    setToast({
+                      kind: 'success',
+                      msg: `Plantilla "${nombre.trim()}" guardada con ${items} permisos.`,
+                    });
+                  },
+                  () => setPlantillaDialogOpen(false)
+                );
+              }}
+            >
+              {isPending ? 'Guardando…' : 'Guardar plantilla'}
             </Button>
           </DialogFooter>
         </DialogContent>

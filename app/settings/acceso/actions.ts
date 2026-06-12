@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
-import { validarRolParaEmpresa } from './acceso-rules';
+import { validarRolParaEmpresa, resolverPermisosDePlantilla } from './acceso-rules';
 
 // ── Legacy flat-role types (pre-RBAC) ──────────────────────────────────────
 export type Rol = 'admin' | 'viewer' | 'cashier';
@@ -60,6 +60,18 @@ export type UsuarioCore = {
   welcome_sent_at: string | null;
 };
 export type UsuarioEmpresa = { usuario_id: string; empresa_id: string; rol_id: string | null };
+export type RolPlantilla = {
+  id: string;
+  empresa_id: string;
+  nombre: string;
+  descripcion: string | null;
+};
+export type RolPlantillaItem = {
+  plantilla_id: string;
+  modulo_id: string;
+  acceso_lectura: boolean;
+  acceso_escritura: boolean;
+};
 export type ExcepcionUsuario = {
   usuario_id: string;
   empresa_id: string;
@@ -188,15 +200,71 @@ export async function updateEmpresa(id: string, nombre: string, slug: string): P
 
 // ── Rol CRUD (RBAC) ────────────────────────────────────────────────────────
 
-export async function createRolRecord(nombre: string, empresa_id: string): Promise<void> {
+/**
+ * Crea un rol; con `plantilla_id` copia los permisos de la plantilla
+ * (accesos-intuitivos S3) expandiendo sus requisitos de navegación en
+ * lectura, para que el rol nazca coherente aunque la plantilla envejezca.
+ * Devuelve cuántos permisos se otorgaron (0 sin plantilla).
+ */
+export async function createRolRecord(
+  nombre: string,
+  empresa_id: string,
+  plantilla_id?: string
+): Promise<{ permisos: number }> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
-  const { error } = await admin
+
+  let permisosPlantilla: Array<{
+    modulo_id: string;
+    acceso_lectura: boolean;
+    acceso_escritura: boolean;
+  }> = [];
+
+  if (plantilla_id) {
+    const { data: plantilla, error: plantillaError } = await admin
+      .schema('core')
+      .from('rol_plantillas')
+      .select('id, empresa_id')
+      .eq('id', plantilla_id)
+      .maybeSingle();
+    if (plantillaError) throw new Error(plantillaError.message);
+    if (!plantilla) throw new Error('La plantilla seleccionada no existe.');
+    if (plantilla.empresa_id !== empresa_id)
+      throw new Error('La plantilla seleccionada pertenece a otra empresa.');
+
+    const [{ data: items, error: itemsError }, { data: modulos, error: modulosError }] =
+      await Promise.all([
+        admin
+          .schema('core')
+          .from('rol_plantilla_items')
+          .select('modulo_id, acceso_lectura, acceso_escritura')
+          .eq('plantilla_id', plantilla_id),
+        admin.schema('core').from('modulos').select('id, slug').eq('empresa_id', empresa_id),
+      ]);
+    if (itemsError) throw new Error(itemsError.message);
+    if (modulosError) throw new Error(modulosError.message);
+
+    permisosPlantilla = resolverPermisosDePlantilla(items ?? [], modulos ?? []);
+  }
+
+  const { data: rol, error } = await admin
     .schema('core')
     .from('roles')
-    .insert({ nombre: nombre.trim(), empresa_id });
+    .insert({ nombre: nombre.trim(), empresa_id })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
+
+  if (permisosPlantilla.length > 0) {
+    const { error: permisosError } = await admin
+      .schema('core')
+      .from('permisos_rol')
+      .insert(permisosPlantilla.map((p) => ({ rol_id: rol.id, ...p })));
+    if (permisosError) throw new Error(permisosError.message);
+  }
+
   revalidatePath('/settings/acceso');
+  return { permisos: permisosPlantilla.length };
 }
 
 export async function updateRolRecord(id: string, nombre: string): Promise<void> {
@@ -215,6 +283,98 @@ export async function deleteRolRecord(id: string): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
   const { error } = await admin.schema('core').from('roles').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath('/settings/acceso');
+}
+
+// ── Plantillas de rol (accesos-intuitivos S3) ──────────────────────────────
+
+/**
+ * Guarda (o re-guarda, por nombre) una plantilla a partir del snapshot de
+ * permisos actuales de un rol. Solo se copian permisos encendidos. Re-guardar
+ * con el mismo nombre reemplaza los items — así "editar plantilla" = ajustar
+ * un rol en la matriz y volver a guardarla.
+ */
+export async function savePlantillaFromRol(
+  rol_id: string,
+  nombre: string,
+  descripcion?: string
+): Promise<{ items: number }> {
+  await requireAdmin();
+  const admin = getSupabaseAdminClient()!;
+
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio) throw new Error('Ponle nombre a la plantilla.');
+
+  const { data: rol, error: rolError } = await admin
+    .schema('core')
+    .from('roles')
+    .select('id, empresa_id')
+    .eq('id', rol_id)
+    .maybeSingle();
+  if (rolError) throw new Error(rolError.message);
+  if (!rol?.empresa_id) throw new Error('El rol no existe o no tiene empresa.');
+
+  const { data: permisos, error: permisosError } = await admin
+    .schema('core')
+    .from('permisos_rol')
+    .select('modulo_id, acceso_lectura, acceso_escritura')
+    .eq('rol_id', rol_id)
+    .or('acceso_lectura.eq.true,acceso_escritura.eq.true');
+  if (permisosError) throw new Error(permisosError.message);
+  if (!permisos || permisos.length === 0)
+    throw new Error('El rol no tiene permisos activos — no hay nada que guardar.');
+
+  const { data: plantilla, error: upsertError } = await admin
+    .schema('core')
+    .from('rol_plantillas')
+    .upsert(
+      {
+        empresa_id: rol.empresa_id,
+        nombre: nombreLimpio,
+        descripcion: descripcion?.trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'empresa_id,nombre' }
+    )
+    .select('id')
+    .single();
+  if (upsertError) throw new Error(upsertError.message);
+
+  // Reemplazo completo de items: la plantilla ES el snapshot.
+  const { error: deleteError } = await admin
+    .schema('core')
+    .from('rol_plantilla_items')
+    .delete()
+    .eq('plantilla_id', plantilla.id);
+  if (deleteError) throw new Error(deleteError.message);
+
+  // permisos_rol es nullable en DB; rol_plantilla_items es NOT NULL.
+  const { error: insertError } = await admin
+    .schema('core')
+    .from('rol_plantilla_items')
+    .insert(
+      permisos.map((p) => ({
+        plantilla_id: plantilla.id,
+        modulo_id: p.modulo_id,
+        acceso_lectura: p.acceso_lectura ?? false,
+        acceso_escritura: p.acceso_escritura ?? false,
+      }))
+    );
+  if (insertError) throw new Error(insertError.message);
+
+  revalidatePath('/settings/acceso');
+  return { items: permisos.length };
+}
+
+export async function deleteRolPlantilla(plantilla_id: string): Promise<void> {
+  await requireAdmin();
+  const admin = getSupabaseAdminClient()!;
+  const { error } = await admin
+    .schema('core')
+    .from('rol_plantillas')
+    .delete()
+    .eq('id', plantilla_id);
   if (error) throw new Error(error.message);
   revalidatePath('/settings/acceso');
 }
