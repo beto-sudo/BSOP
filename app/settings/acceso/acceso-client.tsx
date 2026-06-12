@@ -29,7 +29,9 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -57,11 +59,14 @@ import type {
   Modulo,
   ModuloSeccion,
   PermisoRol,
+  RolPlantilla,
+  RolPlantillaItem,
   RolRecord,
   UsuarioCore,
   UsuarioEmpresa,
 } from './actions';
 import { nestModulosByHub, shortChildName } from './modulos-tree';
+import { accesosSinRol } from './acceso-rules';
 import { requisitosFaltantes } from '@/lib/permissions-deps';
 import {
   createEmpresa,
@@ -73,12 +78,14 @@ import {
   upsertPermisosRolBatch,
   createUsuarioCore,
   updateUsuarioNombre,
-  setUsuarioEmpresaAcceso,
-  updateUsuarioEmpresaRol,
+  grantUsuarioEmpresaAcceso,
+  revokeUsuarioEmpresaAcceso,
   upsertExcepcionUsuario,
   deleteExcepcionUsuario,
   toggleActivo,
   removeUsuario,
+  savePlantillaFromRol,
+  deleteRolPlantilla,
 } from './actions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -99,6 +106,8 @@ interface Props {
   usuarios: UsuarioCore[];
   usuariosEmpresas: UsuarioEmpresa[];
   excepciones: ExcepcionUsuario[];
+  plantillas: RolPlantilla[];
+  plantillaItems: RolPlantillaItem[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -203,6 +212,8 @@ export function AccesoClient({
   usuarios,
   usuariosEmpresas,
   excepciones,
+  plantillas,
+  plantillaItems,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const { startImpersonate } = usePermissions();
@@ -217,6 +228,12 @@ export function AccesoClient({
   // Usuarios tab + Sheet
   const [selectedUsuario, setSelectedUsuario] = useState<UsuarioCore | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Alta de acceso usuario↔empresa en dos tiempos (accesos-intuitivos S2):
+  // marcar el checkbox abre un draft local (empresa_id → rol_id elegido,
+  // '' = pendiente) y nada se guarda hasta confirmar con rol. Así es
+  // imposible crear un acceso con `rol_id NULL` desde la UI.
+  const [grantDrafts, setGrantDrafts] = useState<Record<string, string>>({});
 
   // Exception form
   const [addingExcepcion, setAddingExcepcion] = useState(false);
@@ -240,6 +257,13 @@ export function AccesoClient({
     editing: null,
   });
   const [rolNombre, setRolNombre] = useState('');
+  // Plantilla elegida en el alta de rol ('' = empezar en blanco) — S3.
+  const [rolPlantillaId, setRolPlantillaId] = useState('');
+
+  // ── "Guardar como plantilla" dialog (snapshot del rol seleccionado) ──
+  const [plantillaDialogOpen, setPlantillaDialogOpen] = useState(false);
+  const [plantillaNombre, setPlantillaNombre] = useState('');
+  const [plantillaDescripcion, setPlantillaDescripcion] = useState('');
 
   // ── Usuario dialog ──
   const [usuarioDialogOpen, setUsuarioDialogOpen] = useState(false);
@@ -353,6 +377,7 @@ export function AccesoClient({
   function openUserSheet(usuario: UsuarioCore) {
     setSelectedUsuario(usuario);
     setSheetOpen(true);
+    setGrantDrafts({});
     setAddingExcepcion(false);
     setNewExcEmpresaId('');
     setNewExcModuloId('');
@@ -371,6 +396,17 @@ export function AccesoClient({
   function openRolDialog(editing: RolRecord | null) {
     setRolDialog({ open: true, editing });
     setRolNombre(editing?.nombre ?? '');
+    setRolPlantillaId('');
+    setToast(null);
+  }
+
+  function openPlantillaDialog(rol: RolRecord) {
+    setPlantillaDialogOpen(true);
+    setPlantillaNombre(rol.nombre);
+    setPlantillaDescripcion(
+      plantillas.find((p) => p.empresa_id === rol.empresa_id && p.nombre === rol.nombre)
+        ?.descripcion ?? ''
+    );
     setToast(null);
   }
 
@@ -382,8 +418,17 @@ export function AccesoClient({
     setUsuarioDialogOpen(true);
   }
 
+  function getUsuarioLabel(id: string) {
+    const u = usuarios.find((x) => x.id === id);
+    if (!u) return id;
+    return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email;
+  }
+
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
+  const plantillasDeEmpresa = plantillas.filter((p) => p.empresa_id === filterEmpresaId);
+  const rolPlantilla = plantillasDeEmpresa.find((p) => p.id === rolPlantillaId) ?? null;
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
+  const accesosIncompletos = accesosSinRol(usuariosEmpresas);
   const modulosDelRol = selectedRol
     ? modulosAsignablesParaRol(modulos, selectedRol.empresa_id, empresas)
     : [];
@@ -543,64 +588,115 @@ export function AccesoClient({
           </div>
 
           <div className="grid grid-cols-[220px_1fr] gap-4">
-            {/* Roles list */}
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
-              <div className="border-b border-[var(--border)] px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
-                  Roles
-                </p>
-              </div>
-              {rolesDeEmpresa.length === 0 ? (
-                <p className="px-4 py-8 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
-                  Sin roles para esta empresa.
-                </p>
-              ) : (
-                <ul>
-                  {rolesDeEmpresa.map((rol) => (
-                    <li key={rol.id}>
-                      <div
-                        className={cn(
-                          'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
-                          selectedRolId === rol.id
-                            ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
-                            : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3'
-                        )}
-                        onClick={() => setSelectedRolId(rol.id)}
-                      >
-                        <span className="flex-1 truncate">{rol.nombre}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openRolDialog(rol);
-                          }}
+            {/* Roles list + plantillas */}
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                    Roles
+                  </p>
+                </div>
+                {rolesDeEmpresa.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
+                    Sin roles para esta empresa.
+                  </p>
+                ) : (
+                  <ul>
+                    {rolesDeEmpresa.map((rol) => (
+                      <li key={rol.id}>
+                        <div
+                          className={cn(
+                            'group flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer',
+                            selectedRolId === rol.id
+                              ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
+                              : 'dark:text-white/70 text-[var(--text)]/70 dark:hover:bg-white/5 hover:bg-black/3'
+                          )}
+                          onClick={() => setSelectedRolId(rol.id)}
                         >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                          <span className="flex-1 truncate">{rol.nombre}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRolDialog(rol);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
+                              run(
+                                () => deleteRolRecord(rol.id),
+                                () => {
+                                  if (selectedRolId === rol.id) setSelectedRolId(null);
+                                }
+                              );
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Plantillas de rol (S3): se aplican desde "Nuevo rol"; se crean
+                  con "Guardar como plantilla" en la matriz del rol. */}
+              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide dark:text-white/40 text-[var(--text-subtle)]">
+                    Plantillas
+                  </p>
+                </div>
+                {plantillasDeEmpresa.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs dark:text-white/30 text-[var(--text)]/35">
+                    Sin plantillas. Configura un rol y usa &ldquo;Guardar como plantilla&rdquo;.
+                  </p>
+                ) : (
+                  <ul>
+                    {plantillasDeEmpresa.map((p) => (
+                      <li
+                        key={p.id}
+                        title={p.descripcion ?? undefined}
+                        className="group flex items-center gap-1 px-3 py-2 text-sm dark:text-white/70 text-[var(--text)]/70"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{p.nombre}</span>
+                          <span className="block text-[11px] dark:text-white/35 text-[var(--text-subtle)]">
+                            {plantillaItems.filter((i) => i.plantilla_id === p.id).length} permisos
+                          </span>
+                        </span>
                         <Button
                           variant="ghost"
                           size="icon"
+                          disabled={isPending}
                           className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
-                            run(
-                              () => deleteRolRecord(rol.id),
-                              () => {
-                                if (selectedRolId === rol.id) setSelectedRolId(null);
-                              }
-                            );
+                          onClick={() => {
+                            if (
+                              !confirm(
+                                `¿Eliminar la plantilla "${p.nombre}"? Los roles ya creados con ella no se tocan.`
+                              )
+                            )
+                              return;
+                            run(() => deleteRolPlantilla(p.id));
                           }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* Permissions matrix */}
@@ -613,15 +709,27 @@ export function AccesoClient({
                 </div>
               ) : (
                 <>
-                  <div className="border-b border-[var(--border)] px-4 py-3">
-                    <p className="text-sm font-semibold dark:text-white/85 text-[var(--text)]/85">
-                      {selectedRol.nombre}
-                    </p>
-                    <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
-                      Permisos por módulo — haz clic para cambiar. Un hub aparece en el menú si él o
-                      cualquiera de sus sub-módulos tiene Lectura; cada sub-módulo gobierna su
-                      pestaña.
-                    </p>
+                  <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold dark:text-white/85 text-[var(--text)]/85">
+                        {selectedRol.nombre}
+                      </p>
+                      <p className="mt-0.5 text-xs dark:text-white/40 text-[var(--text-subtle)]">
+                        Permisos por módulo — haz clic para cambiar. Un hub aparece en el menú si él
+                        o cualquiera de sus sub-módulos tiene Lectura; cada sub-módulo gobierna su
+                        pestaña.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      className="h-7 shrink-0 gap-1 rounded-lg text-xs"
+                      title="Guarda los permisos actuales de este rol como plantilla reutilizable al crear roles."
+                      onClick={() => openPlantillaDialog(selectedRol)}
+                    >
+                      <Plus className="h-3 w-3" /> Guardar como plantilla
+                    </Button>
                   </div>
                   <Table>
                     <TableHeader>
@@ -822,6 +930,26 @@ export function AccesoClient({
               Nuevo usuario
             </Button>
           </div>
+          {accesosIncompletos.length > 0 && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {accesosIncompletos.length === 1
+                  ? 'Hay 1 acceso sin rol'
+                  : `Hay ${accesosIncompletos.length} accesos sin rol`}
+                {': '}
+                {accesosIncompletos
+                  .map(
+                    (ue) => `${getUsuarioLabel(ue.usuario_id)} → ${getEmpresaNombre(ue.empresa_id)}`
+                  )
+                  .join(', ')}
+                . Ven la empresa pero ningún módulo — abre el usuario y asígnale rol.
+              </span>
+            </div>
+          )}
           <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
             <Table>
               <TableHeader>
@@ -871,14 +999,25 @@ export function AccesoClient({
                                 Sin acceso
                               </span>
                             ) : (
-                              userEmpresas.map((ue) => (
-                                <span
-                                  key={ue.empresa_id}
-                                  className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
-                                >
-                                  {getEmpresaNombre(ue.empresa_id)}
-                                </span>
-                              ))
+                              userEmpresas.map((ue) =>
+                                ue.rol_id === null ? (
+                                  <Badge
+                                    key={ue.empresa_id}
+                                    tone="warning"
+                                    title="Acceso sin rol — ve la empresa pero ningún módulo. Abre el usuario para asignar rol."
+                                  >
+                                    <TriangleAlert />
+                                    {getEmpresaNombre(ue.empresa_id)} · sin rol
+                                  </Badge>
+                                ) : (
+                                  <span
+                                    key={ue.empresa_id}
+                                    className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
+                                  >
+                                    {getEmpresaNombre(ue.empresa_id)}
+                                  </span>
+                                )
+                              )
                             )}
                           </div>
                         </TableCell>
@@ -958,6 +1097,12 @@ export function AccesoClient({
                           (x) => x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id
                         );
                         const empRoles = roles.filter((r) => r.empresa_id === emp.id);
+                        const draftRolId = grantDrafts[emp.id];
+                        const drafting = !ue && draftRolId !== undefined;
+                        const rolOptions = empRoles.map((rol) => ({
+                          value: rol.id,
+                          label: rol.nombre,
+                        }));
 
                         return (
                           <div
@@ -968,15 +1113,28 @@ export function AccesoClient({
                               <input
                                 type="checkbox"
                                 disabled={isPending}
-                                checked={!!ue}
+                                checked={!!ue || drafting}
                                 onChange={(e) => {
-                                  run(() =>
-                                    setUsuarioEmpresaAcceso(
-                                      selectedUsuario.id,
-                                      emp.id,
-                                      e.target.checked
+                                  if (e.target.checked) {
+                                    // No guarda todavía — abre el draft que exige rol.
+                                    setGrantDrafts((prev) => ({ ...prev, [emp.id]: '' }));
+                                  } else if (ue) {
+                                    if (
+                                      !confirm(
+                                        `¿Quitar el acceso a ${emp.nombre}? Para devolverlo tendrás que elegir rol de nuevo.`
+                                      )
                                     )
-                                  );
+                                      return;
+                                    run(() =>
+                                      revokeUsuarioEmpresaAcceso(selectedUsuario.id, emp.id)
+                                    );
+                                  } else {
+                                    setGrantDrafts((prev) => {
+                                      const next = { ...prev };
+                                      delete next[emp.id];
+                                      return next;
+                                    });
+                                  }
                                 }}
                                 className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
                               />
@@ -985,28 +1143,114 @@ export function AccesoClient({
                               </span>
                             </label>
 
+                            {drafting && (
+                              <div className="ml-7 space-y-2 rounded-lg border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 p-3">
+                                {empRoles.length === 0 ? (
+                                  <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
+                                    {emp.nombre} no tiene roles configurados. Crea uno en{' '}
+                                    <span className="font-medium">Roles y Permisos</span> antes de
+                                    dar acceso — sin rol, el usuario no vería ningún módulo.
+                                  </p>
+                                ) : (
+                                  <>
+                                    <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
+                                      Elige el rol con el que entra — define qué módulos ve.
+                                    </p>
+                                    <Combobox
+                                      value={draftRolId}
+                                      disabled={isPending}
+                                      onChange={(v) => {
+                                        if (v) setGrantDrafts((prev) => ({ ...prev, [emp.id]: v }));
+                                      }}
+                                      options={rolOptions}
+                                      placeholder="Selecciona rol"
+                                      size="sm"
+                                      className="w-48 text-xs"
+                                    />
+                                  </>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 rounded-lg text-xs"
+                                    disabled={!draftRolId || isPending}
+                                    onClick={() => {
+                                      const rolNombre =
+                                        empRoles.find((r) => r.id === draftRolId)?.nombre ?? '';
+                                      run(
+                                        () =>
+                                          grantUsuarioEmpresaAcceso(
+                                            selectedUsuario.id,
+                                            emp.id,
+                                            draftRolId
+                                          ),
+                                        () => {
+                                          setGrantDrafts((prev) => {
+                                            const next = { ...prev };
+                                            delete next[emp.id];
+                                            return next;
+                                          });
+                                          setToast({
+                                            kind: 'success',
+                                            msg: `Acceso a ${emp.nombre} otorgado con rol ${rolNombre}.`,
+                                          });
+                                        }
+                                      );
+                                    }}
+                                  >
+                                    Dar acceso
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 rounded-lg text-xs"
+                                    disabled={isPending}
+                                    onClick={() =>
+                                      setGrantDrafts((prev) => {
+                                        const next = { ...prev };
+                                        delete next[emp.id];
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
                             {ue && (
-                              <div className="ml-7 flex items-center gap-2">
-                                <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
-                                  Rol base:
-                                </span>
-                                <Combobox
-                                  value={ue.rol_id ?? ''}
-                                  disabled={isPending}
-                                  onChange={(v) => {
-                                    run(() =>
-                                      updateUsuarioEmpresaRol(selectedUsuario.id, emp.id, v || null)
-                                    );
-                                  }}
-                                  options={empRoles.map((rol) => ({
-                                    value: rol.id,
-                                    label: rol.nombre,
-                                  }))}
-                                  placeholder="Sin rol"
-                                  allowClear
-                                  size="sm"
-                                  className="w-48 text-xs"
-                                />
+                              <div className="ml-7 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
+                                    Rol base:
+                                  </span>
+                                  <Combobox
+                                    value={ue.rol_id ?? ''}
+                                    disabled={isPending}
+                                    onChange={(v) => {
+                                      if (!v) return;
+                                      run(() =>
+                                        grantUsuarioEmpresaAcceso(selectedUsuario.id, emp.id, v)
+                                      );
+                                    }}
+                                    options={rolOptions}
+                                    placeholder="Sin rol"
+                                    size="sm"
+                                    className="w-48 text-xs"
+                                  />
+                                  {ue.rol_id === null && (
+                                    <Badge tone="warning">
+                                      <TriangleAlert /> Sin rol
+                                    </Badge>
+                                  )}
+                                </div>
+                                {ue.rol_id === null && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    Acceso incompleto: ve la empresa pero ningún módulo. Asigna un
+                                    rol para completarlo.
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1409,6 +1653,30 @@ export function AccesoClient({
                 autoFocus
               />
             </div>
+            {!rolDialog.editing && plantillasDeEmpresa.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                  Plantilla{' '}
+                  <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+                </p>
+                <Combobox
+                  value={rolPlantillaId}
+                  disabled={isPending}
+                  onChange={(v) => setRolPlantillaId(v)}
+                  options={plantillasDeEmpresa.map((p) => ({
+                    value: p.id,
+                    label: p.nombre,
+                    sub: `${plantillaItems.filter((i) => i.plantilla_id === p.id).length} permisos`,
+                  }))}
+                  placeholder="Empezar en blanco"
+                  allowClear
+                />
+                <p className="text-xs dark:text-white/35 text-[var(--text)]/35">
+                  {rolPlantilla?.descripcion ??
+                    'El rol nace con los permisos de la plantilla (más sus requisitos de navegación); después los ajustas en la matriz.'}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -1422,16 +1690,102 @@ export function AccesoClient({
               disabled={!rolNombre.trim() || isPending}
               onClick={() => {
                 const editing = rolDialog.editing;
+                const nombre = rolNombre;
+                const plantilla = rolPlantilla;
                 run(
-                  () =>
-                    editing
-                      ? updateRolRecord(editing.id, rolNombre)
-                      : createRolRecord(rolNombre, filterEmpresaId),
+                  async () => {
+                    if (editing) {
+                      await updateRolRecord(editing.id, nombre);
+                      return;
+                    }
+                    const { permisos } = await createRolRecord(
+                      nombre,
+                      filterEmpresaId,
+                      plantilla?.id
+                    );
+                    if (plantilla) {
+                      setToast({
+                        kind: 'success',
+                        msg: `Rol "${nombre.trim()}" creado con ${permisos} permisos de la plantilla "${plantilla.nombre}".`,
+                      });
+                    }
+                  },
                   () => setRolDialog({ open: false, editing: null })
                 );
               }}
             >
               {isPending ? 'Guardando…' : rolDialog.editing ? 'Guardar cambios' : 'Crear rol'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── "Guardar como plantilla" Dialog (S3) ──────────────────────────── */}
+      <Dialog open={plantillaDialogOpen} onOpenChange={setPlantillaDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar como plantilla</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs dark:text-white/45 text-[var(--text)]/45">
+              Toma una foto de los permisos actuales de{' '}
+              <span className="font-medium">{selectedRol?.nombre}</span> para reutilizarla al crear
+              roles. Si ya existe una plantilla con el mismo nombre, se reemplaza con esta foto.
+            </p>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Nombre de la plantilla
+              </p>
+              <Input
+                value={plantillaNombre}
+                onChange={(e) => setPlantillaNombre(e.target.value)}
+                placeholder="Ej. Vendedor, Mesa de control"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm dark:text-white/60 text-[var(--text)]/60">
+                Descripción{' '}
+                <span className="dark:text-white/35 text-[var(--text)]/35">(opcional)</span>
+              </p>
+              <Input
+                value={plantillaDescripcion}
+                onChange={(e) => setPlantillaDescripcion(e.target.value)}
+                placeholder="Qué hace alguien con este perfil"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPlantillaDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!plantillaNombre.trim() || !selectedRol || isPending}
+              onClick={() => {
+                const rol = selectedRol;
+                if (!rol) return;
+                const nombre = plantillaNombre;
+                run(
+                  async () => {
+                    const { items } = await savePlantillaFromRol(
+                      rol.id,
+                      nombre,
+                      plantillaDescripcion
+                    );
+                    setToast({
+                      kind: 'success',
+                      msg: `Plantilla "${nombre.trim()}" guardada con ${items} permisos.`,
+                    });
+                  },
+                  () => setPlantillaDialogOpen(false)
+                );
+              }}
+            >
+              {isPending ? 'Guardando…' : 'Guardar plantilla'}
             </Button>
           </DialogFooter>
         </DialogContent>

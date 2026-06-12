@@ -1089,6 +1089,87 @@ export type Database = {
         }
         Relationships: []
       }
+      rol_plantilla_items: {
+        Row: {
+          acceso_escritura: boolean
+          acceso_lectura: boolean
+          modulo_id: string
+          plantilla_id: string
+        }
+        Insert: {
+          acceso_escritura?: boolean
+          acceso_lectura?: boolean
+          modulo_id: string
+          plantilla_id: string
+        }
+        Update: {
+          acceso_escritura?: boolean
+          acceso_lectura?: boolean
+          modulo_id?: string
+          plantilla_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rol_plantilla_items_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rol_plantilla_items_plantilla_id_fkey"
+            columns: ["plantilla_id"]
+            isOneToOne: false
+            referencedRelation: "rol_plantillas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rol_plantillas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rol_plantillas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rol_plantillas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roles: {
         Row: {
           created_at: string | null

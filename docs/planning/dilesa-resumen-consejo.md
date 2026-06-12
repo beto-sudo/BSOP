@@ -253,6 +253,37 @@ hora de envío se acepta en v1.
 
 ## Bitácora
 
+- **2026-06-11 (fix post-cierre — paridad de fórmulas con Coda + saneo de tubería)** —
+  Beto revisó el correo del 11-jun y reportó: "viviendas en construcción" difería
+  entre secciones, "parque disponible" equivocado, y la tubería con el histórico
+  aplastado en "Entregada". Diagnóstico contra prod + **fórmulas reales del doc
+  Coda** (leídas vía API): (1) "En construcción" en Avances/Inventario contaba
+  `unidades.estado='en_construccion'`, que pierde la casa cuando se asigna en
+  preventa (estado pasa a `asignada`); Coda contaba OBRA física
+  (`Construcción por Lote` con arranque y no terminada) — por eso Contratistas
+  (obra real: 12) no cuadraba con Avances/Inventario (11). (2) "Parque
+  disponible" usaba `viv_total - viv_vendidas` (lotes baldíos incluidos:
+  Ampliación 354 / Delicias 163 sin un ladrillo); fórmula Coda = casas con obra
+  arrancada sin escriturar no-demo; Beto eligió además excluir comprometidas
+  (asignada/vendida) → Encinos 154, Sol 27, anteproyectos 0. (3) Col "Lotes" en
+  0 para anteproyectos (`lotes_residenciales` no contaba `tipo_lote='habitacional'`
+  de la carga de plano). (4) Tubería: 1,089 históricas en "Entregada" + 1 en fase
+  legacy "Comision Pagada" (invisible, fuera de catálogo) + 4 con grafía sin
+  tilde "Solicitud de Dictaminacion" (el correo mostraba 1 cliente en vez de 5)
+  - 50 ventas activas sin fase (45 sin unidad). **Fix** (migración
+    `20260612025311`, aplicada a prod con OK de Beto): vistas `v_proyecto_avances`
+    y `v_inventario_prototipo` re-fuentean "en construcción" desde
+    `dilesa.construccion` (estado `en_progreso`) y parque desde obra arrancada no
+    comprometida no-demo; + `habitacional` en residenciales. Data-fix: 1,094
+    ventas → "Operación Terminada" (decisión Beto: el cutover real de ventas fue
+    2026-06-10, todas las entregadas son operaciones terminadas; las nuevas fluyen
+    el pipeline completo), 4 grafías normalizadas, 5 sin-fase sincronizadas con su
+    unidad. Código: `armarTuberia()` extraída pura — solo ventas `activa` + fila
+    "Sin fase asignada" para que la tubería nunca pierda clientes en silencio.
+    **Pendiente de revisión aparte: 45 ventas activas sin fase NI unidad (residuo
+    de migración Coda, valor $0)** — visibles en el correo como "Sin fase
+    asignada" hasta que se limpien.
+
 - **2026-06-08 (fix post-cierre — el correo no llegaba)** — Beto reportó que el
   correo no llegó a las 20:00. Diagnóstico: el correo **nunca había salido** por
   dos causas. (1) **Horario:** el cron estaba en `0 2 * * *` (02:00 UTC),

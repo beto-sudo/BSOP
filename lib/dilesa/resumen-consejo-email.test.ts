@@ -6,6 +6,7 @@ import {
   fechaTituloCST,
   relojMatamoros,
   renderResumenConsejoHtml,
+  armarTuberia,
   type ResumenConsejoData,
 } from './resumen-consejo-email';
 
@@ -147,5 +148,57 @@ describe('renderResumenConsejoHtml', () => {
     // Avances siempre se renderiza (no es opcional); sin filas muestra el placeholder
     expect(html).toContain('Resumen Avances Proyectos');
     expect(html).toContain('Sin datos.');
+  });
+});
+
+describe('armarTuberia', () => {
+  const CAT = [
+    { nombre: 'Asignada', posicion: 2 },
+    { nombre: 'Solicitud de Asignación', posicion: 1 },
+    { nombre: 'Operación Terminada', posicion: 17 },
+  ];
+
+  it('agrupa ventas activas por fase en el orden del catálogo', () => {
+    const rows = armarTuberia(CAT, [
+      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 1000 },
+      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 500 },
+      { estado: 'activa', fase_actual: 'Operación Terminada', valor_escrituracion: 2000 },
+    ]);
+    expect(rows.map((r) => r.fase)).toEqual([
+      'Solicitud de Asignación',
+      'Asignada',
+      'Operación Terminada',
+    ]);
+    expect(rows[1]).toEqual({ fase: 'Asignada', clientes: 2, valor: 1500 });
+    expect(rows[0]).toEqual({ fase: 'Solicitud de Asignación', clientes: 0, valor: 0 });
+  });
+
+  it('excluye desasignadas aunque conserven fase', () => {
+    const rows = armarTuberia(CAT, [
+      { estado: 'desasignada', fase_actual: 'Asignada', valor_escrituracion: 999 },
+    ]);
+    expect(rows.find((r) => r.fase === 'Asignada')).toEqual({
+      fase: 'Asignada',
+      clientes: 0,
+      valor: 0,
+    });
+    expect(rows.find((r) => r.fase === 'Sin fase asignada')).toBeUndefined();
+  });
+
+  it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
+    const rows = armarTuberia(CAT, [
+      { estado: 'activa', fase_actual: null, valor_escrituracion: null },
+      // grafía sin tilde — no existe en el catálogo
+      { estado: 'activa', fase_actual: 'Solicitud de Asignacion', valor_escrituracion: 700 },
+    ]);
+    const sinFase = rows[rows.length - 1];
+    expect(sinFase).toEqual({ fase: 'Sin fase asignada', clientes: 2, valor: 700 });
+  });
+
+  it('sin huérfanas no agrega la fila extra', () => {
+    const rows = armarTuberia(CAT, [
+      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 0 },
+    ]);
+    expect(rows).toHaveLength(CAT.length);
   });
 });
