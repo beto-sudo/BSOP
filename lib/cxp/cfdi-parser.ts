@@ -46,6 +46,13 @@ export type CfdiParsed = {
   retencionIva: number;
   /** Retención de ISR total (impuesto 001). */
   retencionIsr: number;
+  /**
+   * CFDI relacionados (nodo CfdiRelacionados): UUIDs en mayúsculas con su
+   * tipo de relación ('01' nota de crédito, '03' devolución, ...). Vacío si
+   * el comprobante no relaciona otros. Lo usa la validación NC → factura de
+   * ventas DILESA (`dilesa-ventas-captura-colaborativa` S2).
+   */
+  relacionados: { tipoRelacion: string | null; uuids: string[] }[];
 };
 
 /** Error de parseo de CFDI con mensaje legible para el operador. */
@@ -164,6 +171,16 @@ export function parseCfdiXml(xml: string): CfdiParsed {
   const fechaRaw = str(comp['@_Fecha']) ?? '';
   const fecha = fechaRaw.split('T')[0]; // "2026-01-15T10:30:00" → "2026-01-15"
 
+  // CFDI relacionados (la NC referencia a su factura con TipoRelacion 01).
+  // En 4.0 puede haber varios nodos CfdiRelacionados, cada uno con 1..N hijos.
+  const relacionados = asArray(comp.CfdiRelacionados as unknown).map((nodo) => {
+    const n = nodo as Record<string, unknown>;
+    const uuids = asArray(n.CfdiRelacionado as unknown)
+      .map((h) => str((h as Record<string, unknown>)['@_UUID'])?.toUpperCase() ?? null)
+      .filter((u): u is string => !!u);
+    return { tipoRelacion: str(n['@_TipoRelacion']), uuids };
+  });
+
   return {
     version: str(comp['@_Version']) ?? str(comp['@_version']) ?? '',
     uuid,
@@ -185,5 +202,6 @@ export function parseCfdiXml(xml: string): CfdiParsed {
     tasaIva,
     retencionIva,
     retencionIsr,
+    relacionados,
   };
 }

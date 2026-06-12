@@ -130,3 +130,36 @@ describe('parseCfdiXml — errores', () => {
     expect(() => parseCfdiXml(sinEmisor)).toThrow(CfdiParseError);
   });
 });
+
+// Nota de crédito (egreso) que relaciona a su factura con TipoRelacion 01.
+const CFDI_40_NOTA_CREDITO = `<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+  Version="4.0" Serie="NC" Folio="9" Fecha="2026-06-05T11:00:00"
+  SubTotal="50000.00" Total="50000.00" Moneda="MXN" FormaPago="03" MetodoPago="PUE" TipoDeComprobante="E">
+  <cfdi:CfdiRelacionados TipoRelacion="01">
+    <cfdi:CfdiRelacionado UUID="c381d054-b2b4-4e4c-915f-642ae2bac9d1"/>
+  </cfdi:CfdiRelacionados>
+  <cfdi:Emisor Rfc="DIE030904866" Nombre="DESARROLLO INMOBILIARIO LOS ENCINOS"/>
+  <cfdi:Receptor Rfc="CUVJ0102087M1" Nombre="JOSUE DANIEL CRUZ VALVERDE" UsoCFDI="G02"/>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital UUID="99999999-8888-7777-6666-555555555555"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>`;
+
+describe('parseCfdiXml — CFDI relacionados (nota de crédito)', () => {
+  const nc = parseCfdiXml(CFDI_40_NOTA_CREDITO);
+
+  it('extrae los UUID relacionados en mayúsculas con su tipo de relación', () => {
+    expect(nc.relacionados).toHaveLength(1);
+    expect(nc.relacionados[0].tipoRelacion).toBe('01');
+    expect(nc.relacionados[0].uuids).toEqual(['C381D054-B2B4-4E4C-915F-642AE2BAC9D1']);
+  });
+
+  it('identifica el tipo de comprobante E (egreso)', () => {
+    expect(nc.tipoComprobante).toBe('E');
+  });
+
+  it('los CFDI sin nodo CfdiRelacionados devuelven lista vacía', () => {
+    expect(parseCfdiXml(CFDI_40_IVA16).relacionados).toEqual([]);
+  });
+});
