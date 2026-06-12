@@ -8,10 +8,22 @@
  * FIFO a los cargos abiertos de la venta (ver iniciativa `cxc`, ADR-037).
  * La fuente (cliente/institución) es etiqueta para cobranza/reportería,
  * no filtra el cálculo.
+ *
+ * Recibo de caja XML (2026-06-12, decisión de Beto): el CFDI que emite
+ * CONTPAQi por cada pago se sube aquí y es la FUENTE de los datos — fecha,
+ * monto, forma de pago y referencia se extraen del XML (no se capturan a
+ * mano) y el receptor se verifica contra el cliente de la venta (RFC, con
+ * fallback a nombre). Mismatch de receptor exige confirmación explícita
+ * (con coacreditados el recibo puede venir a nombre del cónyuge). El folio
+ * fiscal va a `cxc_pagos.uuid_sat` (unique parcial: un recibo = un abono).
+ *
+ * Si el abono es de institución y la venta ya está detonada (o se detona
+ * con este abono), el comprobante se copia solo al expediente de la venta
+ * (trigger sobre `comprobante_adjunto_id`, migración 20260612173513).
  */
 
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Pencil, Plus } from 'lucide-react';
 import { z } from 'zod';
 
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
@@ -24,6 +36,15 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { WizardFileSlot } from '@/components/wizard/wizard-file-slot';
+import {
+  mapFormaPagoSat,
+  parseReciboCfdi,
+  verificarReciboVsCliente,
+  type ReciboPagoParsed,
+  type VerificacionRecibo,
+} from '@/lib/dilesa/cxc/cfdi-recibo';
+import { CfdiParseError } from '@/lib/cxp/cfdi-parser';
+import type { Json } from '@/types/supabase';
 
 const FUENTE_OPTIONS = [
   { value: 'cliente', label: 'Cliente' },
@@ -69,6 +90,8 @@ export type AbonoCaptureDrawerProps = {
   empresaId: string;
   personaId: string;
   clienteNombre: string;
+  /** RFC del cliente (erp.personas.rfc) — verificación fuerte del recibo. */
+  clienteRfc?: string | null;
   /** Llamado tras registrar con éxito — el detalle re-fetchea. */
   onDone: () => void;
 };
@@ -80,17 +103,48 @@ export function AbonoCaptureDrawer({
   empresaId,
   personaId,
   clienteNombre,
+  clienteRfc,
   onDone,
 }: AbonoCaptureDrawerProps) {
   const toast = useToast();
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [recibo, setRecibo] = useState<File | null>(null);
+  const [reciboXml, setReciboXml] = useState<File | null>(null);
+  const [parsed, setParsed] = useState<ReciboPagoParsed | null>(null);
+  const [verif, setVerif] = useState<VerificacionRecibo | null>(null);
+  const [confirmaOtroReceptor, setConfirmaOtroReceptor] = useState(false);
+  const [editManual, setEditManual] = useState(false);
+  const [empresaRfc, setEmpresaRfc] = useState<string | null>(null);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
+
+  // RFC de la empresa (emisor esperado del recibo) — 1 fetch por apertura.
+  useEffect(() => {
+    if (!open || empresaRfc !== null) return;
+    let activo = true;
+    (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('core')
+        .from('empresas')
+        .select('rfc')
+        .eq('id', empresaId)
+        .maybeSingle();
+      if (activo) setEmpresaRfc((data?.rfc as string | null) ?? '');
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, empresaId, empresaRfc]);
 
   const reset = () => {
     form.reset(defaults);
     setComprobante(null);
     setRecibo(null);
+    setReciboXml(null);
+    setParsed(null);
+    setVerif(null);
+    setConfirmaOtroReceptor(false);
+    setEditManual(false);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -98,8 +152,71 @@ export function AbonoCaptureDrawer({
     onOpenChange(next);
   };
 
+  /** Campos de datos bloqueados mientras el XML es la fuente. */
+  const lockCampos = parsed != null && !editManual;
+
+  const handleXmlChange = async (file: File | null) => {
+    if (!file) {
+      // Quitar el XML desbloquea la captura manual (valores se conservan).
+      setReciboXml(null);
+      setParsed(null);
+      setVerif(null);
+      setConfirmaOtroReceptor(false);
+      setEditManual(false);
+      return;
+    }
+    let r: ReciboPagoParsed;
+    try {
+      r = parseReciboCfdi(await file.text());
+    } catch (e) {
+      toast.add({
+        title: 'XML no válido como recibo de pago',
+        description: e instanceof CfdiParseError ? e.message : 'No se pudo leer el archivo.',
+        type: 'error',
+      });
+      return;
+    }
+    const v = verificarReciboVsCliente(
+      r,
+      { rfc: clienteRfc ?? null, nombre: clienteNombre },
+      empresaRfc || null
+    );
+    setReciboXml(file);
+    setParsed(r);
+    setVerif(v);
+    setConfirmaOtroReceptor(false);
+    setEditManual(false);
+
+    // El XML es la fuente de los datos del abono.
+    form.setValue('fecha', r.fecha, { shouldValidate: true });
+    form.setValue('monto', String(r.monto), { shouldValidate: true });
+    const forma = mapFormaPagoSat(r.formaPagoSat);
+    if (forma) form.setValue('forma_pago', forma);
+    const ref = [r.serie, r.folio].filter(Boolean).join('-') || r.uuid.slice(0, 8);
+    form.setValue('referencia', ref);
+  };
+
   const handleSubmit = async (values: AbonoValues) => {
+    if (parsed && verif && !verif.receptorCoincide && !confirmaOtroReceptor) {
+      toast.add({
+        title: 'El recibo es de otro receptor',
+        description:
+          'Confirma con la casilla que el recibo corresponde a esta venta, o sube el recibo correcto.',
+        type: 'error',
+      });
+      return;
+    }
+
     const sb = createSupabaseBrowserClient();
+    const notasFinal = [
+      values.notas || '',
+      parsed && verif && !verif.receptorCoincide
+        ? `[Recibo a nombre de ${parsed.receptorNombre ?? parsed.receptorRfc} (${parsed.receptorRfc}) — receptor distinto confirmado por quien captura]`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
     const { data: pagoId, error } = await sb.schema('erp').rpc('cxc_pago_registrar', {
       p_empresa_id: empresaId,
       p_persona_id: personaId,
@@ -109,13 +226,18 @@ export function AbonoCaptureDrawer({
       p_fuente: values.fuente,
       p_forma_pago: values.forma_pago || undefined,
       p_referencia: values.referencia || undefined,
-      p_notas: values.notas || undefined,
+      p_uuid_sat: parsed?.uuid ?? undefined,
+      p_notas: notasFinal || undefined,
     });
 
     if (error) {
+      const esDuplicado =
+        error.code === '23505' || /cxc_pagos_empresa_uuid_sat_uk/.test(error.message ?? '');
       toast.add({
-        title: 'No se pudo registrar el abono',
-        description: getSupabaseErrorMessage(error, 'Error en el RPC.'),
+        title: esDuplicado ? 'Este recibo ya está registrado' : 'No se pudo registrar el abono',
+        description: esDuplicado
+          ? `El folio fiscal ${parsed?.uuid ?? ''} ya existe en otro abono — un recibo de caja solo puede registrarse una vez.`
+          : getSupabaseErrorMessage(error, 'Error en el RPC.'),
         type: 'error',
       });
       return;
@@ -126,7 +248,12 @@ export function AbonoCaptureDrawer({
     // Roles espejo del módulo Coda "Depositos Clientes": el comprobante del
     // depósito lo trae ventas; el recibo de caja / factura lo emite CxC.
     if (typeof pagoId === 'string') {
-      const subirAdjunto = async (file: File, rol: string, etiqueta: string) => {
+      const subirAdjunto = async (
+        file: File,
+        rol: string,
+        etiqueta: string,
+        metadata?: Json
+      ): Promise<string | null> => {
         const path = buildAdjuntoPath({
           empresa: 'dilesa',
           entidad: 'cxc_pagos',
@@ -143,9 +270,9 @@ export function AbonoCaptureDrawer({
             description: getSupabaseErrorMessage(upErr, 'Reintenta adjuntarlo desde el abono.'),
             type: 'error',
           });
-          return;
+          return null;
         }
-        await sb
+        const { data: adjRow } = await sb
           .schema('erp')
           .from('adjuntos')
           .insert({
@@ -156,11 +283,57 @@ export function AbonoCaptureDrawer({
             nombre: file.name,
             url: path,
             tipo_mime: file.type || null,
-          });
+            ...(metadata !== undefined ? { metadata } : {}),
+          })
+          .select('id')
+          .single();
+        return (adjRow?.id as string | undefined) ?? null;
       };
 
-      if (comprobante) await subirAdjunto(comprobante, 'comprobante_deposito', 'el comprobante');
+      if (comprobante) {
+        const comprobanteId = await subirAdjunto(
+          comprobante,
+          'comprobante_deposito',
+          'el comprobante'
+        );
+        // Liga el comprobante al pago: si la venta está detonada y el abono
+        // es de institución, el trigger lo copia al expediente (imagen_detonacion).
+        if (comprobanteId) {
+          await sb
+            .schema('erp')
+            .from('cxc_pagos')
+            .update({ comprobante_adjunto_id: comprobanteId })
+            .eq('id', pagoId);
+        }
+      }
       if (recibo) await subirAdjunto(recibo, 'recibo_caja', 'el recibo de caja');
+      if (reciboXml && parsed) {
+        await subirAdjunto(reciboXml, 'recibo_caja_xml', 'el XML del recibo', {
+          cfdi: {
+            uuid: parsed.uuid,
+            tipo: parsed.tipoComprobante,
+            fecha: parsed.fecha,
+            monto: parsed.monto,
+            serie: parsed.serie,
+            folio: parsed.folio,
+            receptor_rfc: parsed.receptorRfc,
+            receptor_nombre: parsed.receptorNombre,
+            emisor_rfc: parsed.emisorRfc,
+          },
+          ...(verif
+            ? {
+                verificacion: {
+                  receptor_coincide: verif.receptorCoincide,
+                  verificado_por: verif.verificadoPor,
+                  warnings: verif.warnings,
+                  ...(verif.receptorCoincide
+                    ? {}
+                    : { confirmado_por_operador: confirmaOtroReceptor }),
+                },
+              }
+            : {}),
+        });
+      }
     }
 
     toast.add({ title: 'Abono registrado', type: 'success' });
@@ -179,6 +352,64 @@ export function AbonoCaptureDrawer({
     >
       <DetailDrawerContent>
         <Form form={form} onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
+              Recibo de caja (CFDI)
+            </span>
+            <WizardFileSlot
+              role="recibo_caja_xml"
+              label="XML del recibo — llena los datos solo"
+              file={reciboXml}
+              onChange={(f) => void handleXmlChange(f)}
+              accept=".xml,text/xml,application/xml"
+            />
+            {parsed && verif ? (
+              <div
+                className={`mt-2 rounded-lg border p-3 text-xs ${
+                  verif.receptorCoincide
+                    ? 'border-emerald-400/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
+                    : 'border-amber-400/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  {verif.receptorCoincide ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {verif.receptorCoincide
+                        ? `Receptor verificado por ${verif.verificadoPor === 'rfc' ? 'RFC' : 'nombre'}`
+                        : 'El receptor del recibo NO coincide con el cliente'}
+                    </p>
+                    <p>
+                      {parsed.receptorNombre ?? '(sin nombre)'} · {parsed.receptorRfc} · Folio
+                      fiscal …{parsed.uuid.slice(-8)}
+                    </p>
+                    {verif.warnings.map((w) => (
+                      <p key={w} className="opacity-80">
+                        {w}
+                      </p>
+                    ))}
+                    {!verif.receptorCoincide ? (
+                      <label className="mt-1 flex cursor-pointer items-start gap-2 font-medium">
+                        <input
+                          type="checkbox"
+                          checked={confirmaOtroReceptor}
+                          onChange={(e) => setConfirmaOtroReceptor(e.target.checked)}
+                          className="mt-0.5"
+                        />
+                        El recibo corresponde a esta venta (coacreditado u otro receptor) —
+                        registrar de todos modos
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <FormRow cols={2}>
             <FormField name="fecha" label="Fecha" required>
               {(field) => (
@@ -186,6 +417,7 @@ export function AbonoCaptureDrawer({
                   {...field}
                   id={field.id}
                   type="date"
+                  disabled={lockCampos}
                   aria-invalid={field.invalid || undefined}
                   aria-describedby={field.describedBy}
                   className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
@@ -203,6 +435,7 @@ export function AbonoCaptureDrawer({
                   step="0.01"
                   min="0"
                   placeholder="0.00"
+                  disabled={lockCampos}
                   aria-invalid={field.invalid || undefined}
                   aria-describedby={field.describedBy}
                   className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-right tabular-nums text-[var(--text)]"
@@ -210,6 +443,16 @@ export function AbonoCaptureDrawer({
               )}
             </FormField>
           </FormRow>
+
+          {lockCampos ? (
+            <button
+              type="button"
+              onClick={() => setEditManual(true)}
+              className="-mt-3 inline-flex items-center gap-1 text-xs text-[var(--text)]/60 underline hover:text-[var(--text)]"
+            >
+              <Pencil className="h-3 w-3" /> Editar datos manualmente (el XML deja de mandar)
+            </button>
+          ) : null}
 
           <FormRow cols={2}>
             <FormField
@@ -237,6 +480,7 @@ export function AbonoCaptureDrawer({
                   options={FORMA_PAGO_OPTIONS}
                   placeholder="Sin especificar"
                   allowClear
+                  disabled={lockCampos}
                   className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
                 />
               )}
@@ -249,6 +493,7 @@ export function AbonoCaptureDrawer({
                 {...field}
                 id={field.id}
                 placeholder="Folio, número de operación..."
+                disabled={lockCampos}
                 aria-invalid={field.invalid || undefined}
                 aria-describedby={field.describedBy}
                 className="rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
@@ -283,11 +528,11 @@ export function AbonoCaptureDrawer({
 
           <div>
             <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
-              Recibo de caja / factura
+              Recibo de caja / factura (PDF)
             </span>
             <WizardFileSlot
               role="recibo_caja"
-              label="Recibo de caja o factura (opcional)"
+              label="Versión imprimible (opcional)"
               file={recibo}
               onChange={setRecibo}
               accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
