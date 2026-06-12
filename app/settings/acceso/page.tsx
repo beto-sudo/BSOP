@@ -7,6 +7,8 @@ import type {
   Empresa,
   Modulo,
   RolRecord,
+  RolPlantilla,
+  RolPlantillaItem,
   PermisoRol,
   UsuarioCore,
   UsuarioEmpresa,
@@ -87,6 +89,8 @@ export default async function AccesoPage() {
     { data: usuarios },
     { data: usuariosEmpresas },
     { data: excepciones },
+    { data: plantillas },
+    { data: plantillaItems },
   ] = await Promise.all([
     admin.schema('core').from('empresas').select('id, nombre, slug').order('nombre'),
     admin
@@ -109,6 +113,15 @@ export default async function AccesoPage() {
       .schema('core')
       .from('permisos_usuario_excepcion')
       .select('usuario_id, empresa_id, modulo_id, acceso_lectura, acceso_escritura'),
+    admin
+      .schema('core')
+      .from('rol_plantillas')
+      .select('id, empresa_id, nombre, descripcion')
+      .order('nombre'),
+    admin
+      .schema('core')
+      .from('rol_plantilla_items')
+      .select('plantilla_id, modulo_id, acceso_lectura, acceso_escritura'),
   ]);
 
   return (
@@ -123,6 +136,8 @@ export default async function AccesoPage() {
           usuarios={(usuarios ?? []) as UsuarioCore[]}
           usuariosEmpresas={(usuariosEmpresas ?? []) as UsuarioEmpresa[]}
           excepciones={(excepciones ?? []) as ExcepcionUsuario[]}
+          plantillas={(plantillas ?? []) as RolPlantilla[]}
+          plantillaItems={(plantillaItems ?? []) as RolPlantillaItem[]}
         />
       </div>
     </>

@@ -3,11 +3,11 @@
 **Slug:** `accesos-intuitivos`
 **Empresas:** todas (la pantalla de Accesos es global; los catálogos de módulos son por empresa)
 **Schemas afectados:** `core` (datos: `modulos.nombre/descripcion`; posible `rol_plantillas` en S3). El grueso es UI (`app/settings/acceso`) + un mapa de dependencias en `lib/`.
-**Estado:** in_progress
-**Próximo hito:** S3 — plantillas de rol (decisión de diseño pendiente con Beto: constantes vs `core.rol_plantillas`)
+**Estado:** done
+**Próximo hito:** — (S1+S2+S3 entregados; iniciativa cerrada 2026-06-12. El saneo de los accesos `rol_id NULL` que delate el banner lo opera Beto desde la propia UI)
 **Dueño:** Beto
 **Creada:** 2026-06-11
-**Última actualización:** 2026-06-11 (S2 entregado: rol obligatorio en el alta + badges de accesos sin rol)
+**Última actualización:** 2026-06-12 (S3 entregado: plantillas de rol en `core.rol_plantillas` + seed Vendedor/Mesa de control + aplicar-al-crear-rol + guardar-como-plantilla)
 
 ## Problema
 
@@ -125,6 +125,20 @@ Dar de alta un usuario operativo toma minutos y queda bien a la primera:
   tabla de usuarios y en el drawer + banner-resumen arriba de la tabla que
   nombra usuario → empresa; sanear = elegir rol en el mismo Combobox de
   siempre (que perdió `allowClear` — ya no se puede regresar a NULL).
+- **2026-06-12 (S3):** Plantillas de rol en DB (decisión de Beto:
+  `core.rol_plantillas`, no constantes). Migración `20260612024520` aplicada a
+  prod con su OK verbal: `rol_plantillas` (header por empresa, UNIQUE
+  empresa+nombre, trigger updated_at) + `rol_plantilla_items` (FK a
+  `core.modulos`, CASCADE), RLS patrón sidebar_oculto (lectura authenticated,
+  escritura `fn_is_admin`), seed de los 2 perfiles reales de Ventas DILESA
+  ("Vendedor" 23 permisos, "Mesa de control" 8 — espejo de los roles que ya
+  operan post-caso-Nelcy, verificado contra prod). UI: selector de plantilla
+  en "Nuevo rol" (aplica permisos vía `createRolRecord` extendida, expandiendo
+  requisitos con `expandirPermisosConRequisitos` — helper puro + 4 tests),
+  botón "Guardar como plantilla" en la matriz (snapshot de permisos
+  encendidos; re-guardar con el mismo nombre reemplaza = editar), lista de
+  plantillas con conteo y borrado bajo la lista de roles. Cierre de la
+  iniciativa.
 
 ## Decisiones registradas
 
@@ -141,3 +155,14 @@ Dar de alta un usuario operativo toma minutos y queda bien a la primera:
 - **2026-06-11 (S2):** Los accesos `rol_id NULL` existentes se sanean desde la
   UI (banner + badge), **no** con migración de datos: elegir qué rol le toca a
   cada usuario es decisión humana, y el universo es chico.
+- **2026-06-12 (S3):** Plantillas en `core.rol_plantillas` (Beto eligió tabla
+  sobre constantes): se crean/editan desde la UI sin deploy, y el editor de
+  plantillas ES la matriz de roles ("Guardar como plantilla" = snapshot del
+  rol seleccionado) — no se construyó un editor dedicado.
+- **2026-06-12 (S3):** Las plantillas son por empresa (FK `empresa_id` en el
+  header, items con FK a `core.modulos`): los slugs llevan prefijo de empresa
+  y los catálogos difieren — una plantilla cross-empresa exigiría un mapeo
+  semántico que no existe.
+- **2026-06-12 (S3):** Aplicar plantilla expande los requisitos de navegación
+  (S1) en lectura server-side: el rol nace coherente aunque la plantilla
+  envejezca; los items cuyo módulo ya no exista se descartan sin tronar.

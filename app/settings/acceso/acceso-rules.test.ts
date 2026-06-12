@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { validarRolParaEmpresa, accesosSinRol } from './acceso-rules';
+import {
+  validarRolParaEmpresa,
+  accesosSinRol,
+  expandirPermisosConRequisitos,
+  resolverPermisosDePlantilla,
+} from './acceso-rules';
 import type { UsuarioEmpresa } from './actions';
 
 /**
@@ -56,5 +61,88 @@ describe('accesosSinRol', () => {
     expect(
       accesosSinRol([{ usuario_id: 'u-1', empresa_id: 'emp-dilesa', rol_id: 'rol-dilesa-ventas' }])
     ).toEqual([]);
+  });
+});
+
+describe('expandirPermisosConRequisitos', () => {
+  it('adds the missing navigation requirement in read-only', () => {
+    // `dilesa.ventas.autorizar` requiere `dilesa.ventas.lista` (MODULE_DEPS).
+    const out = expandirPermisosConRequisitos([
+      { slug: 'dilesa.ventas.autorizar', acceso_lectura: true, acceso_escritura: true },
+    ]);
+    expect(out).toContainEqual({
+      slug: 'dilesa.ventas.lista',
+      acceso_lectura: true,
+      acceso_escritura: false,
+    });
+  });
+
+  it('upgrades an existing write-only requirement to read without touching write', () => {
+    const out = expandirPermisosConRequisitos([
+      { slug: 'dilesa.ventas.autorizar', acceso_lectura: true, acceso_escritura: false },
+      { slug: 'dilesa.ventas.lista', acceso_lectura: false, acceso_escritura: true },
+    ]);
+    expect(out).toContainEqual({
+      slug: 'dilesa.ventas.lista',
+      acceso_lectura: true,
+      acceso_escritura: true,
+    });
+    expect(out).toHaveLength(2);
+  });
+
+  it('drops all-false items and never adds write implicitly', () => {
+    const out = expandirPermisosConRequisitos([
+      { slug: 'dilesa.ventas.fase03_formalizada', acceso_lectura: true, acceso_escritura: true },
+      { slug: 'dilesa.manual', acceso_lectura: false, acceso_escritura: false },
+    ]);
+    expect(out.map((p) => p.slug).sort()).toEqual([
+      'dilesa.ventas.fase03_formalizada',
+      'dilesa.ventas.lista',
+    ]);
+    const lista = out.find((p) => p.slug === 'dilesa.ventas.lista');
+    expect(lista?.acceso_escritura).toBe(false);
+  });
+
+  it('keeps an already-coherent set unchanged', () => {
+    const coherente = [
+      { slug: 'dilesa.ventas.lista', acceso_lectura: true, acceso_escritura: false },
+      { slug: 'dilesa.ventas.fase01_solicitud', acceso_lectura: true, acceso_escritura: true },
+    ];
+    expect(expandirPermisosConRequisitos(coherente)).toEqual(coherente);
+  });
+});
+
+describe('resolverPermisosDePlantilla', () => {
+  const MODULOS = [
+    { id: 'm-lista', slug: 'dilesa.ventas.lista' },
+    { id: 'm-autorizar', slug: 'dilesa.ventas.autorizar' },
+  ];
+
+  it('round-trips ids through slugs adding the missing requirement', () => {
+    const out = resolverPermisosDePlantilla(
+      [{ modulo_id: 'm-autorizar', acceso_lectura: true, acceso_escritura: true }],
+      MODULOS
+    );
+    expect(out).toContainEqual({
+      modulo_id: 'm-autorizar',
+      acceso_lectura: true,
+      acceso_escritura: true,
+    });
+    expect(out).toContainEqual({
+      modulo_id: 'm-lista',
+      acceso_lectura: true,
+      acceso_escritura: false,
+    });
+  });
+
+  it('drops items whose módulo no longer exists instead of throwing', () => {
+    const out = resolverPermisosDePlantilla(
+      [
+        { modulo_id: 'm-borrado', acceso_lectura: true, acceso_escritura: true },
+        { modulo_id: 'm-lista', acceso_lectura: true, acceso_escritura: false },
+      ],
+      MODULOS
+    );
+    expect(out).toEqual([{ modulo_id: 'm-lista', acceso_lectura: true, acceso_escritura: false }]);
   });
 });
