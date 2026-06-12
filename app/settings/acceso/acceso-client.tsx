@@ -29,7 +29,9 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -62,6 +64,7 @@ import type {
   UsuarioEmpresa,
 } from './actions';
 import { nestModulosByHub, shortChildName } from './modulos-tree';
+import { accesosSinRol } from './acceso-rules';
 import { requisitosFaltantes } from '@/lib/permissions-deps';
 import {
   createEmpresa,
@@ -73,8 +76,8 @@ import {
   upsertPermisosRolBatch,
   createUsuarioCore,
   updateUsuarioNombre,
-  setUsuarioEmpresaAcceso,
-  updateUsuarioEmpresaRol,
+  grantUsuarioEmpresaAcceso,
+  revokeUsuarioEmpresaAcceso,
   upsertExcepcionUsuario,
   deleteExcepcionUsuario,
   toggleActivo,
@@ -218,6 +221,12 @@ export function AccesoClient({
   const [selectedUsuario, setSelectedUsuario] = useState<UsuarioCore | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Alta de acceso usuario↔empresa en dos tiempos (accesos-intuitivos S2):
+  // marcar el checkbox abre un draft local (empresa_id → rol_id elegido,
+  // '' = pendiente) y nada se guarda hasta confirmar con rol. Así es
+  // imposible crear un acceso con `rol_id NULL` desde la UI.
+  const [grantDrafts, setGrantDrafts] = useState<Record<string, string>>({});
+
   // Exception form
   const [addingExcepcion, setAddingExcepcion] = useState(false);
   const [newExcEmpresaId, setNewExcEmpresaId] = useState<string>('');
@@ -353,6 +362,7 @@ export function AccesoClient({
   function openUserSheet(usuario: UsuarioCore) {
     setSelectedUsuario(usuario);
     setSheetOpen(true);
+    setGrantDrafts({});
     setAddingExcepcion(false);
     setNewExcEmpresaId('');
     setNewExcModuloId('');
@@ -382,8 +392,15 @@ export function AccesoClient({
     setUsuarioDialogOpen(true);
   }
 
+  function getUsuarioLabel(id: string) {
+    const u = usuarios.find((x) => x.id === id);
+    if (!u) return id;
+    return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email;
+  }
+
   const rolesDeEmpresa = roles.filter((r) => r.empresa_id === filterEmpresaId);
   const selectedRol = roles.find((r) => r.id === selectedRolId) ?? null;
+  const accesosIncompletos = accesosSinRol(usuariosEmpresas);
   const modulosDelRol = selectedRol
     ? modulosAsignablesParaRol(modulos, selectedRol.empresa_id, empresas)
     : [];
@@ -822,6 +839,26 @@ export function AccesoClient({
               Nuevo usuario
             </Button>
           </div>
+          {accesosIncompletos.length > 0 && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {accesosIncompletos.length === 1
+                  ? 'Hay 1 acceso sin rol'
+                  : `Hay ${accesosIncompletos.length} accesos sin rol`}
+                {': '}
+                {accesosIncompletos
+                  .map(
+                    (ue) => `${getUsuarioLabel(ue.usuario_id)} → ${getEmpresaNombre(ue.empresa_id)}`
+                  )
+                  .join(', ')}
+                . Ven la empresa pero ningún módulo — abre el usuario y asígnale rol.
+              </span>
+            </div>
+          )}
           <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]">
             <Table>
               <TableHeader>
@@ -871,14 +908,25 @@ export function AccesoClient({
                                 Sin acceso
                               </span>
                             ) : (
-                              userEmpresas.map((ue) => (
-                                <span
-                                  key={ue.empresa_id}
-                                  className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
-                                >
-                                  {getEmpresaNombre(ue.empresa_id)}
-                                </span>
-                              ))
+                              userEmpresas.map((ue) =>
+                                ue.rol_id === null ? (
+                                  <Badge
+                                    key={ue.empresa_id}
+                                    tone="warning"
+                                    title="Acceso sin rol — ve la empresa pero ningún módulo. Abre el usuario para asignar rol."
+                                  >
+                                    <TriangleAlert />
+                                    {getEmpresaNombre(ue.empresa_id)} · sin rol
+                                  </Badge>
+                                ) : (
+                                  <span
+                                    key={ue.empresa_id}
+                                    className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-xs text-[var(--accent)]"
+                                  >
+                                    {getEmpresaNombre(ue.empresa_id)}
+                                  </span>
+                                )
+                              )
                             )}
                           </div>
                         </TableCell>
@@ -958,6 +1006,12 @@ export function AccesoClient({
                           (x) => x.usuario_id === selectedUsuario.id && x.empresa_id === emp.id
                         );
                         const empRoles = roles.filter((r) => r.empresa_id === emp.id);
+                        const draftRolId = grantDrafts[emp.id];
+                        const drafting = !ue && draftRolId !== undefined;
+                        const rolOptions = empRoles.map((rol) => ({
+                          value: rol.id,
+                          label: rol.nombre,
+                        }));
 
                         return (
                           <div
@@ -968,15 +1022,28 @@ export function AccesoClient({
                               <input
                                 type="checkbox"
                                 disabled={isPending}
-                                checked={!!ue}
+                                checked={!!ue || drafting}
                                 onChange={(e) => {
-                                  run(() =>
-                                    setUsuarioEmpresaAcceso(
-                                      selectedUsuario.id,
-                                      emp.id,
-                                      e.target.checked
+                                  if (e.target.checked) {
+                                    // No guarda todavía — abre el draft que exige rol.
+                                    setGrantDrafts((prev) => ({ ...prev, [emp.id]: '' }));
+                                  } else if (ue) {
+                                    if (
+                                      !confirm(
+                                        `¿Quitar el acceso a ${emp.nombre}? Para devolverlo tendrás que elegir rol de nuevo.`
+                                      )
                                     )
-                                  );
+                                      return;
+                                    run(() =>
+                                      revokeUsuarioEmpresaAcceso(selectedUsuario.id, emp.id)
+                                    );
+                                  } else {
+                                    setGrantDrafts((prev) => {
+                                      const next = { ...prev };
+                                      delete next[emp.id];
+                                      return next;
+                                    });
+                                  }
                                 }}
                                 className="h-4 w-4 cursor-pointer rounded accent-[var(--accent)]"
                               />
@@ -985,28 +1052,114 @@ export function AccesoClient({
                               </span>
                             </label>
 
+                            {drafting && (
+                              <div className="ml-7 space-y-2 rounded-lg border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 p-3">
+                                {empRoles.length === 0 ? (
+                                  <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
+                                    {emp.nombre} no tiene roles configurados. Crea uno en{' '}
+                                    <span className="font-medium">Roles y Permisos</span> antes de
+                                    dar acceso — sin rol, el usuario no vería ningún módulo.
+                                  </p>
+                                ) : (
+                                  <>
+                                    <p className="text-xs dark:text-white/55 text-[var(--text-muted)]">
+                                      Elige el rol con el que entra — define qué módulos ve.
+                                    </p>
+                                    <Combobox
+                                      value={draftRolId}
+                                      disabled={isPending}
+                                      onChange={(v) => {
+                                        if (v) setGrantDrafts((prev) => ({ ...prev, [emp.id]: v }));
+                                      }}
+                                      options={rolOptions}
+                                      placeholder="Selecciona rol"
+                                      size="sm"
+                                      className="w-48 text-xs"
+                                    />
+                                  </>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 rounded-lg text-xs"
+                                    disabled={!draftRolId || isPending}
+                                    onClick={() => {
+                                      const rolNombre =
+                                        empRoles.find((r) => r.id === draftRolId)?.nombre ?? '';
+                                      run(
+                                        () =>
+                                          grantUsuarioEmpresaAcceso(
+                                            selectedUsuario.id,
+                                            emp.id,
+                                            draftRolId
+                                          ),
+                                        () => {
+                                          setGrantDrafts((prev) => {
+                                            const next = { ...prev };
+                                            delete next[emp.id];
+                                            return next;
+                                          });
+                                          setToast({
+                                            kind: 'success',
+                                            msg: `Acceso a ${emp.nombre} otorgado con rol ${rolNombre}.`,
+                                          });
+                                        }
+                                      );
+                                    }}
+                                  >
+                                    Dar acceso
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 rounded-lg text-xs"
+                                    disabled={isPending}
+                                    onClick={() =>
+                                      setGrantDrafts((prev) => {
+                                        const next = { ...prev };
+                                        delete next[emp.id];
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
                             {ue && (
-                              <div className="ml-7 flex items-center gap-2">
-                                <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
-                                  Rol base:
-                                </span>
-                                <Combobox
-                                  value={ue.rol_id ?? ''}
-                                  disabled={isPending}
-                                  onChange={(v) => {
-                                    run(() =>
-                                      updateUsuarioEmpresaRol(selectedUsuario.id, emp.id, v || null)
-                                    );
-                                  }}
-                                  options={empRoles.map((rol) => ({
-                                    value: rol.id,
-                                    label: rol.nombre,
-                                  }))}
-                                  placeholder="Sin rol"
-                                  allowClear
-                                  size="sm"
-                                  className="w-48 text-xs"
-                                />
+                              <div className="ml-7 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs dark:text-white/50 text-[var(--text)]/50">
+                                    Rol base:
+                                  </span>
+                                  <Combobox
+                                    value={ue.rol_id ?? ''}
+                                    disabled={isPending}
+                                    onChange={(v) => {
+                                      if (!v) return;
+                                      run(() =>
+                                        grantUsuarioEmpresaAcceso(selectedUsuario.id, emp.id, v)
+                                      );
+                                    }}
+                                    options={rolOptions}
+                                    placeholder="Sin rol"
+                                    size="sm"
+                                    className="w-48 text-xs"
+                                  />
+                                  {ue.rol_id === null && (
+                                    <Badge tone="warning">
+                                      <TriangleAlert /> Sin rol
+                                    </Badge>
+                                  )}
+                                </div>
+                                {ue.rol_id === null && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    Acceso incompleto: ve la empresa pero ningún módulo. Asigna un
+                                    rol para completarlo.
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
