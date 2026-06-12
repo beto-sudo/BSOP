@@ -132,11 +132,13 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
-- **2026-06-12 — Corrección de montos = re-subir XML, no editar el número.**
-  Con XML vigente, `valor_facturado`/`monto_nota_credito` son read-only
-  derivados del CFDI; la "corrección manual auditada" se materializa
-  subiendo el XML corregido (queda versionado en el expediente). Sin XML
-  (degradación/históricas) la captura manual sigue.
+- **2026-06-12 — En F13 nada se captura a mano (feedback Beto en review).**
+  `valor_escrituracion` viene de la Fase 8 (Dictaminada) y en F13 solo se
+  muestra; `valor_facturado`/`monto_nota_credito` se derivan SOLO del XML
+  (sin captura manual ni siquiera como degradación) — corregir = subir el
+  XML corregido (queda versionado). El cierre no pisa montos que el XML no
+  respalde (las históricas migradas conservan los suyos). El botón "Guardar
+  montos" desaparece: la sección Montos es informativa.
 
 - **2026-06-12 — Gate duro con override de Dirección.** El cierre de fase
   bloquea si la revisión no está en verde; la advertencia informa que

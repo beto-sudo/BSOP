@@ -16,10 +16,12 @@
  *     relacionada al folio de la factura, folio fiscal no usado en otra
  *     venta. Errores bloquean la subida; warnings quedan visibles y
  *     persistidos en `erp.adjuntos.metadata`.
- *   - `valor_facturado` y `monto_nota_credito` se derivan del XML vigente
- *     (read-only); corregir un monto = subir el XML correcto (queda
- *     versionado — esa es la auditoría). Sin XML (degradación) la captura
- *     manual sigue disponible.
+ *   - NADA se captura a mano en esta pantalla: `valor_escrituracion` viene
+ *     de la Fase 8 (Dictaminada) y aquí solo se muestra; `valor_facturado`
+ *     y `monto_nota_credito` se derivan del XML vigente. Corregir un monto
+ *     = subir el XML correcto (queda versionado — esa es la auditoría).
+ *     Las ventas históricas (sin XML) conservan sus montos migrados: el
+ *     cierre no pisa nada que el XML no respalde.
  *   - El PDF de la factura pasa a opcional (representación visual); el XML
  *     es el documento fiscal.
  *   - Si la NC se sube antes que la factura, su check de relación queda en
@@ -48,7 +50,6 @@ import {
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -170,13 +171,8 @@ function CapturarFase13Body() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [subiendoRol, setSubiendoRol] = useState<string | null>(null);
 
-  const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
-  const [valorFacturado, setValorFacturado] = useState<string>('');
-  const [montoNotaCredito, setMontoNotaCredito] = useState<string>('');
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [guardandoMontos, setGuardandoMontos] = useState(false);
   const [cerrando, setCerrando] = useState(false);
 
   const cargarDocs = useCallback(async () => {
@@ -249,10 +245,6 @@ function CapturarFase13Body() {
       }
       const v = vRes.data as unknown as VentaCtx;
       setVenta(v);
-      if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
-      if (v.valor_facturado != null) setValorFacturado(String(v.valor_facturado));
-      if (v.monto_nota_credito != null) setMontoNotaCredito(String(v.monto_nota_credito));
-
       setDepositos((dRes.data ?? []) as unknown as Deposito[]);
       const posiciones = ((fRes.data ?? []) as { posicion: number }[]).map((f) => f.posicion);
       setFase12Cerrada(posiciones.includes(12));
@@ -371,7 +363,8 @@ function CapturarFase13Body() {
           return;
         }
 
-        // 4) Montos derivados del XML — se persisten de inmediato.
+        // 4) Montos derivados del XML — se persisten de inmediato (la UI
+        //    los pinta del metadata del doc vigente tras recargar docs).
         if (slot.cfdi) {
           const totalXml = leerCfdiMetadata(metadata ?? null)?.total ?? null;
           if (totalXml != null) {
@@ -379,15 +372,7 @@ function CapturarFase13Body() {
               slot.cfdi === 'factura'
                 ? { valor_facturado: totalXml }
                 : { monto_nota_credito: totalXml };
-            const { error: mErr } = await sb
-              .schema('dilesa')
-              .from('ventas')
-              .update(camposXml)
-              .eq('id', ventaId);
-            if (!mErr) {
-              if (slot.cfdi === 'factura') setValorFacturado(String(totalXml));
-              else setMontoNotaCredito(String(totalXml));
-            }
+            await sb.schema('dilesa').from('ventas').update(camposXml).eq('id', ventaId);
           }
         }
 
@@ -412,73 +397,6 @@ function CapturarFase13Body() {
     [sb, ventaId, userId, empresaRfc, clienteRfc, cfdiFactura, toast, cargarDocs]
   );
 
-  // ── Guardar montos (sin cerrar la fase) ──────────────────────────
-  const persistirMontos = useCallback(async (): Promise<boolean> => {
-    const vEscr = Number(valorEscrituracion);
-    if (!Number.isFinite(vEscr) || vEscr <= 0) {
-      toast.add({
-        title: 'Valor de escrituración inválido',
-        description: 'Captura el valor de escrituración (mayor a cero).',
-        type: 'error',
-      });
-      return false;
-    }
-    const campos: {
-      valor_escrituracion: number;
-      valor_facturado: number | null;
-      monto_nota_credito: number | null;
-      valor_real_venta_dilesa?: number;
-    } = {
-      valor_escrituracion: vEscr,
-      // Con XML vigente, el XML manda (read-only en UI); sin XML, captura manual.
-      valor_facturado: cfdiFactura
-        ? cfdiFactura.total
-        : valorFacturado === ''
-          ? null
-          : Number(valorFacturado),
-      monto_nota_credito: cfdiNotaCredito
-        ? cfdiNotaCredito.total
-        : montoNotaCredito === ''
-          ? null
-          : Number(montoNotaCredito),
-    };
-    // Snapshot del derivado (fuente: motor de cuadratura). Solo si el
-    // resumen cargó — no pisar un valor previo con null por un error de red.
-    if (cuadratura) campos.valor_real_venta_dilesa = cuadratura.valorRealVentaDilesa;
-
-    const { error: e } = await sb.schema('dilesa').from('ventas').update(campos).eq('id', ventaId);
-    if (e) {
-      toast.add({
-        title: 'No se pudieron guardar los montos',
-        description: getSupabaseErrorMessage(e, 'Reintenta.'),
-        type: 'error',
-      });
-      return false;
-    }
-    return true;
-  }, [
-    valorEscrituracion,
-    valorFacturado,
-    montoNotaCredito,
-    cfdiFactura,
-    cfdiNotaCredito,
-    cuadratura,
-    sb,
-    ventaId,
-    toast,
-  ]);
-
-  const onGuardarMontos = useCallback(async () => {
-    setGuardandoMontos(true);
-    try {
-      if (await persistirMontos()) {
-        toast.add({ title: 'Montos guardados', type: 'success' });
-      }
-    } finally {
-      setGuardandoMontos(false);
-    }
-  }, [persistirMontos, toast]);
-
   // ── Cerrar fase (valida contra el expediente persistido) ─────────
   const faltantes = useMemo(
     () => (docs ? faltantesParaCerrar(docs, ROLES_REQUERIDOS) : ROLES_REQUERIDOS),
@@ -494,9 +412,45 @@ function CapturarFase13Body() {
       });
       return;
     }
+    // El valor de escrituración se captura en Fase 8 (Dictaminada) — aquí
+    // solo se exige que exista; no es editable en esta pantalla.
+    const vEscr = Number(venta?.valor_escrituracion ?? 0);
+    if (!(vEscr > 0)) {
+      toast.add({
+        title: 'Falta el valor de escrituración',
+        description: 'Se captura en la Fase 8 (Dictaminada); esta venta no lo trae.',
+        type: 'error',
+      });
+      return;
+    }
     setCerrando(true);
     try {
-      if (!(await persistirMontos())) return;
+      // Snapshot de los derivados antes de cerrar: XML (fuente de facturado
+      // y NC) + motor de cuadratura (valor real). Sin XML no se pisa nada —
+      // las ventas históricas conservan sus montos migrados.
+      const campos: {
+        valor_real_venta_dilesa?: number;
+        valor_facturado?: number;
+        monto_nota_credito?: number;
+      } = {};
+      if (cuadratura) campos.valor_real_venta_dilesa = cuadratura.valorRealVentaDilesa;
+      if (cfdiFactura) campos.valor_facturado = cfdiFactura.total;
+      if (cfdiNotaCredito) campos.monto_nota_credito = cfdiNotaCredito.total;
+      if (Object.keys(campos).length > 0) {
+        const { error: e } = await sb
+          .schema('dilesa')
+          .from('ventas')
+          .update(campos)
+          .eq('id', ventaId);
+        if (e) {
+          toast.add({
+            title: 'No se pudieron guardar los montos',
+            description: getSupabaseErrorMessage(e, 'Reintenta.'),
+            type: 'error',
+          });
+          return;
+        }
+      }
 
       const result = await marcarFase(sb, {
         ventaId,
@@ -524,7 +478,18 @@ function CapturarFase13Body() {
     } finally {
       setCerrando(false);
     }
-  }, [faltantes, persistirMontos, sb, ventaId, userId, toast, router]);
+  }, [
+    faltantes,
+    venta,
+    cuadratura,
+    cfdiFactura,
+    cfdiNotaCredito,
+    sb,
+    ventaId,
+    userId,
+    toast,
+    router,
+  ]);
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -623,91 +588,43 @@ function CapturarFase13Body() {
             </div>
           </Section>
 
-          <Section title="Montos">
+          <Section title="Montos (informativos — nada se captura aquí)">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Valor de escrituración *">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={valorEscrituracion}
-                  onChange={(e) => setValorEscrituracion(e.target.value)}
-                  disabled={yaCerrada}
-                  required
-                />
-                <Hint>{money(Number(valorEscrituracion) || 0)}</Hint>
+              <Field label="Valor de escrituración">
+                <MontoDerivado valor={venta.valor_escrituracion} />
+                <Hint>
+                  {venta.valor_escrituracion == null
+                    ? 'Falta — se captura en la Fase 8 (Dictaminada).'
+                    : 'Capturado en la Fase 8 (Dictaminada).'}
+                </Hint>
               </Field>
               <Field label="Valor real venta Dilesa (calculado)">
                 <MontoDerivado valor={cuadratura ? cuadratura.valorRealVentaDilesa : null} />
                 <Hint>Del motor de cuadratura (depósitos − cheque notaría + pagaré).</Hint>
               </Field>
-              <Field label={cfdiFactura ? 'Valor facturado (del XML)' : 'Valor facturado'}>
-                {cfdiFactura ? (
-                  <>
-                    <MontoDerivado valor={cfdiFactura.total} />
-                    <Hint>
-                      CFDI{' '}
-                      {[cfdiFactura.serie, cfdiFactura.folio].filter(Boolean).join('-') ||
-                        's/folio'}
-                      {cuadratura
-                        ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturado)}`
-                        : ''}
-                    </Hint>
-                  </>
-                ) : (
-                  <>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={valorFacturado}
-                      onChange={(e) => setValorFacturado(e.target.value)}
-                      disabled={yaCerrada}
-                    />
-                    <Hint>
-                      {valorFacturado === '' ? '—' : money(Number(valorFacturado) || 0)}
-                      {cuadratura
-                        ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturado)}`
-                        : ''}
-                    </Hint>
-                  </>
-                )}
+              <Field label="Valor facturado (del XML)">
+                <MontoDerivado valor={cfdiFactura ? cfdiFactura.total : null} />
+                <Hint>
+                  {cfdiFactura
+                    ? `CFDI ${[cfdiFactura.serie, cfdiFactura.folio].filter(Boolean).join('-') || 's/folio'}${
+                        cuadratura
+                          ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturado)}`
+                          : ''
+                      }`
+                    : 'Se llena solo al subir el XML de la factura.'}
+                </Hint>
               </Field>
-              <Field
-                label={
-                  cfdiNotaCredito ? 'Monto nota de crédito (del XML)' : 'Monto nota de crédito'
-                }
-              >
-                {cfdiNotaCredito ? (
-                  <>
-                    <MontoDerivado valor={cfdiNotaCredito.total} />
-                    <Hint>
-                      CFDI{' '}
-                      {[cfdiNotaCredito.serie, cfdiNotaCredito.folio].filter(Boolean).join('-') ||
-                        's/folio'}
-                      {cuadratura
-                        ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCredito)}`
-                        : ''}
-                    </Hint>
-                  </>
-                ) : (
-                  <>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={montoNotaCredito}
-                      onChange={(e) => setMontoNotaCredito(e.target.value)}
-                      disabled={yaCerrada}
-                    />
-                    <Hint>
-                      {montoNotaCredito === '' ? '—' : money(Number(montoNotaCredito) || 0)}
-                      {cuadratura
-                        ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCredito)}`
-                        : ''}
-                    </Hint>
-                  </>
-                )}
+              <Field label="Monto nota de crédito (del XML)">
+                <MontoDerivado valor={cfdiNotaCredito ? cfdiNotaCredito.total : null} />
+                <Hint>
+                  {cfdiNotaCredito
+                    ? `CFDI ${[cfdiNotaCredito.serie, cfdiNotaCredito.folio].filter(Boolean).join('-') || 's/folio'}${
+                        cuadratura
+                          ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCredito)}`
+                          : ''
+                      }`
+                    : 'Se llena solo al subir el XML de la nota de crédito (si aplica).'}
+                </Hint>
               </Field>
             </div>
           </Section>
@@ -770,24 +687,8 @@ function CapturarFase13Body() {
               </Link>
               <Button
                 type="button"
-                variant="outline"
-                onClick={() => void onGuardarMontos()}
-                disabled={guardandoMontos || cerrando}
-              >
-                {guardandoMontos ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
-                  </>
-                ) : (
-                  'Guardar montos'
-                )}
-              </Button>
-              <Button
-                type="button"
                 onClick={() => void onCerrarFase()}
-                disabled={
-                  cerrando || guardandoMontos || subiendoRol != null || faltantes.length > 0
-                }
+                disabled={cerrando || subiendoRol != null || faltantes.length > 0}
               >
                 {cerrando ? (
                   <>
