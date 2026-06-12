@@ -290,7 +290,9 @@ async function regresarAFaseInner(
     .eq('id', ventaId)
     .maybeSingle();
   if (!v) return { ok: false, error: 'Venta no encontrada' };
-  if (v.estado !== 'activa') {
+  // 'terminada' también puede regresarse (deshacer un cierre erróneo de la
+  // fase 17): al bajar fase_posicion, el trigger de DB la regresa a 'activa'.
+  if (v.estado !== 'activa' && v.estado !== 'terminada') {
     return { ok: false, error: `La venta está en estado "${v.estado}" — no se puede regresar.` };
   }
   if (faseDestino >= (v.fase_posicion ?? 0)) {
@@ -439,6 +441,13 @@ async function desasignarVentaInner(ventaId: string, motivo: string): Promise<Ac
   if (!v) return { ok: false, error: 'Venta no encontrada' };
   if (v.estado === 'desasignada') {
     return { ok: false, error: 'La venta ya está desasignada.' };
+  }
+  if (v.estado === 'terminada') {
+    return {
+      ok: false,
+      error:
+        'La venta está terminada (fase 17) — no se puede desasignar. Si el cierre fue un error, primero hay que regresarla a una fase anterior.',
+    };
   }
 
   // Resolver identificador de unidad + proyecto para incluir en la nota

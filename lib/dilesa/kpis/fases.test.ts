@@ -26,8 +26,13 @@ describe('deriveFasesKpis (DILESA Fases — ADR-034)', () => {
     ]);
   });
 
-  it('activas cuenta solo estado="activa"', () => {
-    const rows = [v({ estado: 'activa' }), v({ estado: 'activa' }), v({ estado: 'desasignada' })];
+  it('activas cuenta solo estado="activa" — terminadas y desasignadas quedan fuera del pipeline vivo', () => {
+    const rows = [
+      v({ estado: 'activa' }),
+      v({ estado: 'activa' }),
+      v({ estado: 'desasignada' }),
+      v({ estado: 'terminada', fase_actual: 'Operación Terminada', fase_posicion: 17 }),
+    ];
     expect(deriveFasesKpis(rows, { now: NOW })[0]?.value).toBe(2);
   });
 

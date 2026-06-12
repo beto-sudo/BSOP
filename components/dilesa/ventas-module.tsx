@@ -16,7 +16,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
-import type { BadgeTone } from '@/components/ui/badge';
+import { VENTA_ESTADO_CONFIG, VENTA_ESTADOS } from '@/lib/status-tokens';
 import { Input } from '@/components/ui/input';
 import {
   DateRangeFilter,
@@ -55,15 +55,6 @@ export type VentaListaRow = VentaRow & {
   precio: number | null;
 };
 
-const ESTADO_TONE: Record<string, BadgeTone> = {
-  activa: 'info',
-  desasignada: 'neutral',
-};
-const ESTADO_LABEL: Record<string, string> = {
-  activa: 'Activa',
-  desasignada: 'Desasignada',
-};
-
 /**
  * KPIs reactivos a filtros — ADR-034 (Module-level KPI strips).
  * Deriva 100% client-side desde el array que alimenta la tabla (KPI2);
@@ -71,9 +62,10 @@ const ESTADO_LABEL: Record<string, string> = {
  * render (KPI3). Cap 5 (KPI1).
  *
  * Ajustes vs curaduría Sprint 0 (planning doc § "KPIs aprobados — Ventas"):
- * - KPI3 "% cerradas" → "% Escrituradas": el modelo solo tiene estado
- *   `activa | desasignada`; "cerrada" en el negocio inmobiliario significa
- *   escriturada → `numero_escritura IS NOT NULL` es la señal canónica.
+ * - KPI3 "% cerradas" → "% Escrituradas": "cerrada" en el negocio
+ *   inmobiliario significa escriturada → `numero_escritura IS NOT NULL` es
+ *   la señal canónica. (Con el filtro default en 'activa' el KPI lee la
+ *   madurez del pipeline vivo: cuántas vivas ya pasaron escritura.)
  * - KPI4 "Días promedio en fase" → "Avance promedio": `fase_posicion` no
  *   trae fecha de entrada a la fase, pero el promedio de la posición en el
  *   pipeline de 17 fases es proxy directo del avance global.
@@ -152,7 +144,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const [estadoFiltro, setEstadoFiltro] = useState('');
+  // Default 'activa' = pipeline vivo: el uso diario es ver lo que se está
+  // moviendo; el histórico (terminadas/desasignadas) queda a un cambio de
+  // dropdown ("Todos los estados").
+  const [estadoFiltro, setEstadoFiltro] = useState('activa');
+  const [vendedorFiltro, setVendedorFiltro] = useState('');
+  const [creditoFiltro, setCreditoFiltro] = useState('');
   const [rangoEscritura, setRangoEscritura] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // `faseFiltro` se deriva del query param (single source of truth: el URL).
@@ -352,17 +349,42 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       ),
     [ventas]
   );
+  const vendedoresPresentes = useMemo(
+    () =>
+      [...new Set(ventas.map((v) => v.vendedor).filter((x): x is string => !!x))].sort((a, b) =>
+        a.localeCompare(b, 'es')
+      ),
+    [ventas]
+  );
+  const creditosPresentes = useMemo(
+    () =>
+      [...new Set(ventas.map((v) => v.tipo_credito).filter((x): x is string => !!x))].sort((a, b) =>
+        a.localeCompare(b, 'es')
+      ),
+    [ventas]
+  );
 
   const filtrados = useMemo(() => {
     return ventas.filter((v) => {
       if (proyectoFiltro && v.proyectoNombre !== proyectoFiltro) return false;
       if (faseFiltro && v.fase_actual !== faseFiltro) return false;
       if (estadoFiltro && v.estado !== estadoFiltro) return false;
+      if (vendedorFiltro && v.vendedor !== vendedorFiltro) return false;
+      if (creditoFiltro && v.tipo_credito !== creditoFiltro) return false;
       if (!isInDateRange(v.fecha_escritura, rangoEscritura)) return false;
       if (!matchVentaSearch(v, search)) return false;
       return true;
     });
-  }, [ventas, search, proyectoFiltro, faseFiltro, estadoFiltro, rangoEscritura]);
+  }, [
+    ventas,
+    search,
+    proyectoFiltro,
+    faseFiltro,
+    estadoFiltro,
+    vendedorFiltro,
+    creditoFiltro,
+    rangoEscritura,
+  ]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -410,8 +432,12 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       label: 'Estado',
       type: 'custom',
       render: (v) => (
-        <Badge tone={ESTADO_TONE[v.estado] ?? 'neutral'}>
-          {ESTADO_LABEL[v.estado] ?? v.estado}
+        <Badge
+          tone={
+            VENTA_ESTADO_CONFIG[v.estado as keyof typeof VENTA_ESTADO_CONFIG]?.tone ?? 'neutral'
+          }
+        >
+          {VENTA_ESTADO_CONFIG[v.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ?? v.estado}
         </Badge>
       ),
     },
@@ -477,9 +503,36 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           onChange={(e) => setEstadoFiltro(e.target.value)}
           className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
         >
-          <option value="">Activa + Desasignada</option>
-          <option value="activa">Activa</option>
-          <option value="desasignada">Desasignada</option>
+          <option value="">Todos los estados</option>
+          {VENTA_ESTADOS.map((e) => (
+            <option key={e} value={e}>
+              {VENTA_ESTADO_CONFIG[e].label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={vendedorFiltro}
+          onChange={(e) => setVendedorFiltro(e.target.value)}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+        >
+          <option value="">Todos los vendedores</option>
+          {vendedoresPresentes.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <select
+          value={creditoFiltro}
+          onChange={(e) => setCreditoFiltro(e.target.value)}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+        >
+          <option value="">Todos los créditos</option>
+          {creditosPresentes.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
         <DateRangeFilter
           label="Escritura"

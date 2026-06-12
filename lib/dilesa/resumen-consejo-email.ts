@@ -63,12 +63,15 @@ export type VentaTuberiaInput = {
 };
 
 /**
- * Tubería del correo: ventas ACTIVAS agrupadas por fase, en el orden del
- * catálogo, + una fila final "Sin fase asignada" si hay activas con fase NULL
- * o con una grafía que no existe en el catálogo — así la tubería nunca pierde
- * clientes en silencio (2026-06-11: 4 ventas "Solicitud de Dictaminacion" sin
- * tilde + 50 sin fase eran invisibles en el correo). Las desasignadas no
- * cuentan aunque conserven fase: son ventas caídas.
+ * Tubería del correo: ventas VIVAS (activas + terminadas) agrupadas por fase,
+ * en el orden del catálogo, + una fila final "Sin fase asignada" si hay vivas
+ * con fase NULL o con una grafía que no existe en el catálogo — así la tubería
+ * nunca pierde clientes en silencio (2026-06-11: 4 ventas "Solicitud de
+ * Dictaminacion" sin tilde + 50 sin fase eran invisibles en el correo). Las
+ * 'terminada' cuentan porque la fila "Operación Terminada" es la estación
+ * final de la tubería (sin ellas el acumulado histórico desaparecería del
+ * correo). Las desasignadas/expiradas no cuentan aunque conserven fase: son
+ * ventas caídas.
  */
 export function armarTuberia(
   fasesCat: { nombre: string; posicion: number }[],
@@ -79,7 +82,7 @@ export function armarTuberia(
   const porFase = new Map<string, { clientes: number; valor: number }>();
   const sinFase = { clientes: 0, valor: 0 };
   for (const v of ventas) {
-    if (v.estado !== 'activa') continue;
+    if (v.estado !== 'activa' && v.estado !== 'terminada') continue;
     const valor = Number(v.valor_escrituracion ?? 0);
     if (v.fase_actual && conocidas.has(v.fase_actual)) {
       const acc = porFase.get(v.fase_actual) ?? { clientes: 0, valor: 0 };
