@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Aplicar migración `20260612173513` (fix FIFO sin fuente + recibo XML — frena la generación nueva de saldos a favor por enganche exentado) con OK de Beto, y que Contabilidad registre los 2 abonos de la venta Ahumada. Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
+**Próximo hito:** Contabilidad registra los 2 abonos de la venta Ahumada (con XML y comprobante c/u — ya con FIFO sin fuente, saldan ambos cargos y los comprobantes caen al expediente). Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-12 (recibo de caja XML con extracción + verificación, F12 manual solo Dirección, fix regresión FIFO, comprobantes al expediente vía trigger)
+**Última actualización:** 2026-06-12 (migración `20260612173513` APLICADA a prod y verificada: FIFO sin fuente restaurado, unique uuid_sat, triggers de comprobantes; PRs #863 + #865 mergeados)
 
 ## Problema
 
@@ -329,6 +329,19 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-12 — Migración `20260612173513` APLICADA a prod y verificada
+
+Beto aprobó en chat ("Aplicala por favor") tras revisar el preview y
+mergear #863 (CC resolvió el conflicto de INITIATIVES con #862 vía
+theirs+regen). `db push` con dry-run previo (solo esa migración
+pendiente). Verificación independiente post-aplicación: el RPC ya NO
+contiene el filtro `fuente_esperada = p_fuente`, índice
+`cxc_pagos_empresa_uuid_sat_uk` creado, `fn_copiar_comprobante_detonacion`
+existe, y ambos triggers (`trg_detonar_venta_desde_cxc` +
+`trg_comprobante_cxc_actualizado`) habilitados. `types/supabase.ts`
+regenerado y mergeado en #865; `SCHEMA_REF.md` sin cambio real. Queda el
+paso operativo: Contabilidad registra los 2 abonos de Ahumada.
 
 ### 2026-06-12 — Recibo XML + F12 solo Dirección + fix regresión FIFO (caso Ahumada)
 

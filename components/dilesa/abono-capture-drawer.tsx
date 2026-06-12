@@ -115,6 +115,10 @@ export function AbonoCaptureDrawer({
   const [confirmaOtroReceptor, setConfirmaOtroReceptor] = useState(false);
   const [editManual, setEditManual] = useState(false);
   const [empresaRfc, setEmpresaRfc] = useState<string | null>(null);
+  // RFC del cliente: la prop manda si el caller la pasa (detalle de venta);
+  // si viene `undefined` (p.ej. Cobranza · Pagos), se resuelve aquí desde
+  // erp.personas — sin él, la verificación del recibo caería al nombre.
+  const [rfcResuelto, setRfcResuelto] = useState<string | null>(null);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
 
   // RFC de la empresa (emisor esperado del recibo) — 1 fetch por apertura.
@@ -135,6 +139,26 @@ export function AbonoCaptureDrawer({
       activo = false;
     };
   }, [open, empresaId, empresaRfc]);
+
+  useEffect(() => {
+    if (!open || clienteRfc !== undefined) return;
+    let activo = true;
+    (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('personas')
+        .select('rfc')
+        .eq('id', personaId)
+        .maybeSingle();
+      if (activo) setRfcResuelto((data?.rfc as string | null) ?? null);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, personaId, clienteRfc]);
+
+  const rfcCliente = clienteRfc !== undefined ? clienteRfc : rfcResuelto;
 
   const reset = () => {
     form.reset(defaults);
@@ -178,7 +202,7 @@ export function AbonoCaptureDrawer({
     }
     const v = verificarReciboVsCliente(
       r,
-      { rfc: clienteRfc ?? null, nombre: clienteNombre },
+      { rfc: rfcCliente ?? null, nombre: clienteNombre },
       empresaRfc || null
     );
     setReciboXml(file);
