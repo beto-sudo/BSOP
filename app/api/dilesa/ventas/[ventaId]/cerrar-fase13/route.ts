@@ -12,9 +12,10 @@
  * Reglas:
  *   - Fase 12 cerrada, Fase 13 sin cerrar.
  *   - Documentos requeridos vigentes en el expediente (factura_xml +
- *     aviso_pld) y valor de escrituración capturado (F8).
- *   - Revisión PLD VIGENTE (sobre el aviso_pld actual) con veredicto
- *     `verde` → cierra directo.
+ *     aviso_pld + acuse_pld) y valor de escrituración capturado (F8).
+ *   - Revisión PLD VIGENTE (sobre el informe Y el acuse actuales — ciclo
+ *     completo, decisión Beto 2026-06-12) con veredicto `verde` → cierra
+ *     directo.
  *   - Cualquier otro caso (sin revisión, stale, advertencias, rojo o
  *     error de IA) → requiere `override.motivo` y que el caller sea
  *     Dirección/admin (`checkDireccionEmpresa`); queda en `core.audit_log`
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq('empresa_id', DILESA_EMPRESA_ID)
     .eq('entidad_tipo', 'venta')
     .eq('entidad_id', ventaId)
-    .in('rol', ['factura_xml', 'nota_credito_xml', 'aviso_pld'])
+    .in('rol', ['factura_xml', 'nota_credito_xml', 'aviso_pld', 'acuse_pld'])
     .order('created_at', { ascending: false });
   const adjuntos = (adjRows ?? []) as {
     id: string;
@@ -147,8 +148,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const facturaXml = vigentePorRol.get('factura_xml');
   const avisoPld = vigentePorRol.get('aviso_pld');
-  if (!facturaXml || !avisoPld) {
-    const faltan = [!facturaXml && 'XML Factura (CFDI)', !avisoPld && 'PDF Aviso PLD']
+  const acusePld = vigentePorRol.get('acuse_pld');
+  if (!facturaXml || !avisoPld || !acusePld) {
+    const faltan = [
+      !facturaXml && 'XML Factura (CFDI)',
+      !avisoPld && 'PDF Aviso PLD',
+      !acusePld && 'PDF Acuse de envío PLD',
+    ]
       .filter(Boolean)
       .join(', ');
     return NextResponse.json(
@@ -157,10 +163,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  // ── Gate de revisión ─────────────────────────────────────────────
+  // ── Gate de revisión (ciclo completo: informe + acuse) ──────────
   const { data: revRow } = await (admin.schema('dilesa') as any)
     .from('venta_fase_revisiones')
-    .select('id, adjunto_id, estado, veredicto')
+    .select('id, adjunto_id, adjunto_acuse_id, estado, veredicto')
     .eq('venta_id', ventaId)
     .eq('fase', FASE)
     .order('created_at', { ascending: false })
@@ -169,15 +175,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   const revision = revRow as {
     id: string;
     adjunto_id: string | null;
+    adjunto_acuse_id: string | null;
     estado: string;
     veredicto: string;
   } | null;
 
+  const revisionStale =
+    !!revision &&
+    (revision.adjunto_id !== avisoPld.id || (revision.adjunto_acuse_id ?? null) !== acusePld.id);
   const revisionVigenteVerde =
     !!revision &&
     revision.estado === 'completada' &&
     revision.veredicto === 'verde' &&
-    revision.adjunto_id === avisoPld.id;
+    !revisionStale;
 
   const motivoOverride = body.override?.motivo?.trim() ?? '';
   let cierreConOverride = false;
@@ -185,8 +195,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!revisionVigenteVerde) {
     const razon = !revision
       ? 'La operación no tiene revisión PLD.'
-      : revision.adjunto_id !== avisoPld.id
-        ? 'El Aviso PLD cambió después de la última revisión.'
+      : revisionStale
+        ? 'El Aviso PLD o su acuse cambiaron después de la última revisión.'
         : revision.estado !== 'completada'
           ? 'La última revisión no pudo completarse.'
           : `La revisión está en ${revision.veredicto}.`;

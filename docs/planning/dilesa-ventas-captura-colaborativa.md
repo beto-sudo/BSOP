@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** prueba en prod con venta real en F13 (revisión PLD + gate) → decidir Sprint 4 (rollout del patrón a las demás fases) o cierre
+**Próximo hito:** aplicar migración del acuse + merge S4a → prueba en prod del ciclo completo → S4b (rollout del patrón a las demás fases)
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -132,6 +132,14 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
+- **2026-06-12 — El acuse de envío SPPLD entra al ciclo (S4a).** El informe
+  de avisos acredita el contenido pero no el envío ("la impresión no implica
+  que la información haya sido enviada"); el acuse cierra el ciclo. Slot
+  `acuse_pld` requerido en F13, extracción IA propia y checks de
+  correspondencia (RFC, referencia del aviso, plazo del día 17). Sin acuse,
+  la revisión sale en rojo (`acuse_presente`). La revisión queda ligada a la
+  versión exacta de AMBOS documentos.
+
 - **2026-06-12 — En F13 nada se captura a mano (feedback Beto en review).**
   `valor_escrituracion` viene de la Fase 8 (Dictaminada) y en F13 solo se
   muestra; `valor_facturado`/`monto_nota_credito` se derivan SOLO del XML
@@ -169,9 +177,8 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Preguntas abiertas
 
-- [ ] El Informe de Avisos dice "la impresión no implica envío
-      satisfactorio" — ¿exigir también el **acuse** de envío SPPLD como doc
-      aparte? (propuesta: rol `acuse_pld` opcional en S3)
+- [x] ~~¿Exigir también el acuse de envío SPPLD?~~ → SÍ (decisión Beto
+      2026-06-12, implementado en S4a como requerido)
 - [ ] ¿El override de Dirección se notifica (email al estilo resumen diario)
       o basta el registro en audit?
 
@@ -183,6 +190,14 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 4a entregado (PR en revisión): acuse de envío
+  SPPLD requerido en F13 con extracción IA y cruce contra el informe
+  (correspondencia de referencia, RFC, plazo legal); la revisión y el gate
+  cubren el ciclo completo. Migración `adjunto_acuse_id` pendiente de
+  aplicar a prod. Nota: el prompt del acuse se calibró con campos estándar
+  del SPPLD — validar con un acuse real en la prueba de prod y ajustar si
+  el formato difiere.
 
 - **2026-06-12** — Sprint 3 mergeado (PR #864) y migración
   `venta_fase_revisiones` aplicada a prod (db push aprobado por Beto,

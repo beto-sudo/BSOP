@@ -5,21 +5,24 @@
  */
 
 /**
- * Revisión asistida del Aviso PLD de la Fase 13 (iniciativa
- * `dilesa-ventas-captura-colaborativa`, Sprint 3).
+ * Revisión asistida del ciclo PLD de la Fase 13 (iniciativa
+ * `dilesa-ventas-captura-colaborativa`, Sprints 3-4).
  *
- * POST — ejecuta la revisión sobre el Aviso PLD VIGENTE del expediente:
- *   1. Baja el PDF de storage y lo manda a Claude (visión) con el schema de
- *      extracción (`lib/dilesa/captura/pld-revision.ts`).
- *   2. Cruza DETERMINISTA los 10 checks contra el expediente (venta,
- *      cliente, unidad, escritura F11, avalúo F5, depósitos CxC).
+ * POST — ejecuta la revisión sobre el ciclo PLD VIGENTE del expediente:
+ *   1. Baja el INFORME de avisos (rol `aviso_pld`) y lo extrae con Claude
+ *      (visión); cruza DETERMINISTA los 10 checks contra el expediente
+ *      (venta, cliente, unidad, escritura F11, avalúo F5, depósitos CxC).
+ *   2. Si hay ACUSE DE ENVÍO (rol `acuse_pld`), lo extrae y cruza contra el
+ *      informe (RFC, referencia del aviso, plazo) — cierra el ciclo: el
+ *      aviso no solo existe, SE PRESENTÓ (decisión Beto 2026-06-12). Sin
+ *      acuse, el check `acuse_presente` sale en rojo.
  *   3. Persiste la corrida en `dilesa.venta_fase_revisiones` (append-only,
- *      ligada al adjunto exacto) + `core.audit_log`.
+ *      ligada a la versión exacta de AMBOS adjuntos) + `core.audit_log`.
  *   Si la extracción IA falla, la corrida queda `estado='error'` — la
  *   operación no se atora: el cierre admite override de Dirección.
  *
- * GET — última revisión de la venta para la fase + si sigue vigente (el
- * adjunto revisado es el PLD vigente del expediente).
+ * GET — última revisión de la venta para la fase + si sigue vigente (los
+ * adjuntos revisados son los vigentes del expediente).
  *
  * Auth: miembro activo de DILESA o admin global.
  */
@@ -34,11 +37,16 @@ import { anthropic, ensurePdfFitsForClaude, MODELO_CLAUDE } from '@/lib/document
 import { getNotaria } from '@/lib/dilesa/notarios';
 import { getAdjuntoPath } from '@/lib/adjuntos';
 import {
+  checkAcuseFaltante,
+  cruzarAcuseConInforme,
   cruzarPldConExpediente,
+  ExtraccionAcuseSchema,
   ExtraccionPldSchema,
+  PROMPT_EXTRACCION_ACUSE,
   PROMPT_EXTRACCION_PLD,
   veredictoDe,
   type ExpedientePld,
+  type RevisionCheck,
 } from '@/lib/dilesa/captura/pld-revision';
 
 export const runtime = 'nodejs';
@@ -123,6 +131,7 @@ async function adjuntoVigente(
 type RevisionRow = {
   id: string;
   adjunto_id: string | null;
+  adjunto_acuse_id: string | null;
   estado: string;
   veredicto: string;
   checks: unknown;
@@ -132,15 +141,16 @@ type RevisionRow = {
   created_at: string;
 };
 
+const REVISION_COLS =
+  'id, adjunto_id, adjunto_acuse_id, estado, veredicto, checks, extraccion, error_detalle, ejecutado_por, created_at';
+
 async function ultimaRevision(
   admin: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
   ventaId: string
 ): Promise<RevisionRow | null> {
   const { data } = await (admin.schema('dilesa') as any)
     .from('venta_fase_revisiones')
-    .select(
-      'id, adjunto_id, estado, veredicto, checks, extraccion, error_detalle, ejecutado_por, created_at'
-    )
+    .select(REVISION_COLS)
     .eq('venta_id', ventaId)
     .eq('fase', FASE)
     .order('created_at', { ascending: false })
@@ -165,10 +175,25 @@ async function nombreUsuario(
   return completo || data.email || null;
 }
 
+/**
+ * La revisión es vigente si revisó exactamente los adjuntos vigentes del
+ * expediente: el informe siempre; el acuse cuando exista (una revisión sin
+ * acuse deja de ser vigente en cuanto alguien lo sube — debe re-correrse
+ * para cubrir el ciclo completo).
+ */
+function esVigente(revision: RevisionRow, pldId: string | null, acuseId: string | null): boolean {
+  return (
+    !!pldId &&
+    revision.adjunto_id === pldId &&
+    (revision.adjunto_acuse_id ?? null) === (acuseId ?? null)
+  );
+}
+
 function revisionDto(r: RevisionRow, ejecutadoPorNombre: string | null, vigente: boolean) {
   return {
     id: r.id,
     adjuntoId: r.adjunto_id,
+    adjuntoAcuseId: r.adjunto_acuse_id,
     estado: r.estado,
     veredicto: r.veredicto,
     checks: r.checks,
@@ -184,19 +209,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const auth = await autorizar(ventaId);
   if (!auth.ok) return auth.res;
 
-  const [revision, pld] = await Promise.all([
+  const [revision, pld, acuse] = await Promise.all([
     ultimaRevision(auth.admin, ventaId),
     adjuntoVigente(auth.admin, ventaId, 'aviso_pld'),
+    adjuntoVigente(auth.admin, ventaId, 'acuse_pld'),
   ]);
   if (!revision) {
-    return NextResponse.json({ ok: true, revision: null, tienePld: !!pld });
+    return NextResponse.json({ ok: true, revision: null, tienePld: !!pld, tieneAcuse: !!acuse });
   }
   const nombre = await nombreUsuario(auth.admin, revision.ejecutado_por);
-  const vigente = !!pld && revision.adjunto_id === pld.id;
+  const vigente = esVigente(revision, pld?.id ?? null, acuse?.id ?? null);
   return NextResponse.json({
     ok: true,
     revision: revisionDto(revision, nombre, vigente),
     tienePld: !!pld,
+    tieneAcuse: !!acuse,
   });
 }
 
@@ -206,8 +233,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!auth.ok) return auth.res;
   const { admin, userId } = auth;
 
-  // El PLD vigente del expediente (la revisión queda ligada a ESTA versión).
-  const pld = await adjuntoVigente(admin, ventaId, 'aviso_pld');
+  // Documentos vigentes del ciclo (la revisión queda ligada a ESTAS versiones).
+  const [pld, acuse] = await Promise.all([
+    adjuntoVigente(admin, ventaId, 'aviso_pld'),
+    adjuntoVigente(admin, ventaId, 'acuse_pld'),
+  ]);
   if (!pld) {
     return NextResponse.json(
       { ok: false, error: 'El expediente no tiene Aviso PLD — súbelo primero.' },
@@ -267,8 +297,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
         .is('deleted_at', null),
     ]);
 
+  const empresaRfc = String((empresa as { rfc: string | null } | null)?.rfc ?? '');
   const expediente: ExpedientePld = {
-    empresaRfc: String((empresa as { rfc: string | null } | null)?.rfc ?? ''),
+    empresaRfc,
     clienteNombre: (persona as { nombre: string | null } | null)?.nombre ?? null,
     clienteApellidoPaterno:
       (persona as { apellido_paterno: string | null } | null)?.apellido_paterno ?? null,
@@ -291,15 +322,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
     ),
   };
 
-  // ── PDF → extracción IA → cruce ──────────────────────────────────
-  const path = getAdjuntoPath(pld.url);
-  const { data: blob, error: dlErr } = await admin.storage.from('adjuntos').download(path ?? '');
-  if (dlErr || !blob) {
-    return NextResponse.json(
-      { ok: false, error: `No se pudo descargar el PLD del expediente: ${dlErr?.message ?? ''}` },
-      { status: 500 }
-    );
-  }
+  // ── PDFs del ciclo ───────────────────────────────────────────────
+  const descargarPdf = async (adj: { url: string; nombre: string }): Promise<Uint8Array> => {
+    const path = getAdjuntoPath(adj.url);
+    const { data: blob, error } = await admin.storage.from('adjuntos').download(path ?? '');
+    if (error || !blob) {
+      throw new Error(`No se pudo descargar "${adj.nombre}": ${error?.message ?? ''}`);
+    }
+    return ensurePdfFitsForClaude(new Uint8Array(await blob.arrayBuffer()));
+  };
 
   const insertarRevision = async (fila: Record<string, unknown>) => {
     const { data, error } = await (admin.schema('dilesa') as any)
@@ -309,21 +340,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
         venta_id: ventaId,
         fase: FASE,
         adjunto_id: pld.id,
+        adjunto_acuse_id: acuse?.id ?? null,
         modelo: MODELO_CLAUDE,
         ejecutado_por: userId,
         ...fila,
       })
-      .select(
-        'id, adjunto_id, estado, veredicto, checks, extraccion, error_detalle, ejecutado_por, created_at'
-      )
+      .select(REVISION_COLS)
       .single();
     if (error) throw new Error(error.message);
     return data as RevisionRow;
   };
 
   try {
-    const pdf = await ensurePdfFitsForClaude(new Uint8Array(await blob.arrayBuffer()));
-    const { object: extraccion } = await generateObject({
+    // 1) Informe de avisos → extracción + cruce contra el expediente.
+    const pdfInforme = await descargarPdf(pld);
+    const { object: informe } = await generateObject({
       model: anthropic(MODELO_CLAUDE),
       schema: ExtraccionPldSchema,
       maxRetries: 2,
@@ -332,19 +363,43 @@ export async function POST(_req: NextRequest, { params }: Params) {
           role: 'user',
           content: [
             { type: 'text', text: PROMPT_EXTRACCION_PLD },
-            { type: 'file', data: pdf, mediaType: 'application/pdf' },
+            { type: 'file', data: pdfInforme, mediaType: 'application/pdf' },
           ],
         },
       ],
     });
+    const checks: RevisionCheck[] = cruzarPldConExpediente(informe, expediente);
 
-    const checks = cruzarPldConExpediente(extraccion, expediente);
+    // 2) Acuse de envío → cierra el ciclo (sin acuse, rojo explícito).
+    let extraccionAcuse: unknown = null;
+    if (acuse) {
+      const pdfAcuse = await descargarPdf(acuse);
+      const { object: acuseExt } = await generateObject({
+        model: anthropic(MODELO_CLAUDE),
+        schema: ExtraccionAcuseSchema,
+        maxRetries: 2,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: PROMPT_EXTRACCION_ACUSE },
+              { type: 'file', data: pdfAcuse, mediaType: 'application/pdf' },
+            ],
+          },
+        ],
+      });
+      extraccionAcuse = acuseExt;
+      checks.push(...cruzarAcuseConInforme(acuseExt, informe, empresaRfc));
+    } else {
+      checks.push(checkAcuseFaltante());
+    }
+
     const veredicto = veredictoDe(checks);
     const revision = await insertarRevision({
       estado: 'completada',
       veredicto,
       checks,
-      extraccion,
+      extraccion: { informe, acuse: extraccionAcuse },
     });
 
     await admin
@@ -356,7 +411,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
         accion: 'fase13_revision_pld',
         tabla: 'dilesa.venta_fase_revisiones',
         registro_id: revision.id,
-        datos_nuevos: { venta_id: ventaId, veredicto, adjunto_id: pld.id },
+        datos_nuevos: {
+          venta_id: ventaId,
+          veredicto,
+          adjunto_id: pld.id,
+          adjunto_acuse_id: acuse?.id ?? null,
+        },
       });
 
     const nombre = await nombreUsuario(admin, userId);

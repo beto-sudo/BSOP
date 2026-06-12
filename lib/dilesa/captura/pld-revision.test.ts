@@ -185,3 +185,86 @@ describe('veredictoDe', () => {
     expect(veredictoDe(checks)).toBe('verde');
   });
 });
+
+// ── Acuse de envío (ciclo completo) ─────────────────────────────────────
+
+import { checkAcuseFaltante, cruzarAcuseConInforme, type ExtraccionAcuse } from './pld-revision';
+
+function acuse(partial: Partial<ExtraccionAcuse> = {}): ExtraccionAcuse {
+  return {
+    folioAcuse: 'AV-2026-000123',
+    rfcSujetoObligado: 'DIE030904866',
+    fechaPresentacion: '2026-06-10',
+    mesReportado: '202606',
+    referenciaAviso: '20260602',
+    numeroAvisos: 1,
+    ...partial,
+  };
+}
+
+describe('cruzarAcuseConInforme', () => {
+  const informe = extraccion(); // operación 2026-06-01, referencia 20260602
+
+  it('todo verde con acuse de DILESA, misma referencia y dentro de plazo', () => {
+    const checks = cruzarAcuseConInforme(acuse(), informe, 'DIE030904866');
+    expect(checks.every((c) => c.ok)).toBe(true);
+    expect(veredictoDe(checks)).toBe('verde');
+  });
+
+  it('rojo si el acuse ampara otra referencia de aviso', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ referenciaAviso: '20260699' }),
+      informe,
+      'DIE030904866'
+    );
+    const c = checks.find((x) => x.clave === 'acuse_referencia');
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('error');
+  });
+
+  it('rojo si el acuse es de otro RFC', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ rfcSujetoObligado: 'XAXX010101000' }),
+      informe,
+      'DIE030904866'
+    );
+    expect(veredictoDe(checks)).toBe('rojo');
+  });
+
+  it('cae a periodo (warning) si el acuse no trae referencia', () => {
+    const checks = cruzarAcuseConInforme(acuse({ referenciaAviso: '' }), informe, 'DIE030904866');
+    const c = checks.find((x) => x.clave === 'acuse_referencia');
+    expect(c?.ok).toBe(true);
+    expect(c?.severidad).toBe('warning');
+  });
+
+  it('warning si se presentó fuera del plazo (después del día 17 del mes siguiente)', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ fechaPresentacion: '2026-07-20' }),
+      informe,
+      'DIE030904866'
+    );
+    const c = checks.find((x) => x.clave === 'acuse_plazo');
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('warning');
+    expect(c?.detalle).toContain('2026-07-17');
+  });
+
+  it('presentado el día límite exacto cuenta como dentro de plazo', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ fechaPresentacion: '2026-07-17' }),
+      informe,
+      'DIE030904866'
+    );
+    expect(checks.find((x) => x.clave === 'acuse_plazo')?.ok).toBe(true);
+  });
+});
+
+describe('checkAcuseFaltante', () => {
+  it('es un error duro: sin acuse el ciclo no cierra', () => {
+    const c = checkAcuseFaltante();
+    expect(c.ok).toBe(false);
+    expect(c.severidad).toBe('error');
+    expect(veredictoDe([c])).toBe('rojo');
+  });
+});
