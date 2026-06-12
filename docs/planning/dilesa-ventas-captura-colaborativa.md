@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** merge S4b (rollout, PR en revisión) + prueba en prod del ciclo completo en F13 → cierre de iniciativa
+**Próximo hito:** merge S4c (flujo PLD en dos pasos, PR en revisión) → prueba en prod con PLD y acuse reales → cierre de iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -132,6 +132,15 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
+- **2026-06-12 — Presentación PLD por operación, en dos pasos (S4c).** El
+  esquema histórico era revisión manual de Michelle + envío masivo mensual
+  (un acuse por lote). Nuevo flujo: la revisión IA sustituye el control
+  manual — Paso 1: el informe se revisa contra el expediente y al quedar en
+  verde se CONGELA (solo Dirección puede reemplazarlo; hacerlo reinicia el
+  ciclo); Paso 2: se presenta el aviso en el SPPLD y se carga el acuse, que
+  completa la revisión y habilita el cierre. Acuses de lote (numeroAvisos >
+  1, históricos) cruzan por periodo en vez de referencia exacta.
+
 - **2026-06-12 — El acuse de envío SPPLD entra al ciclo (S4a).** El informe
   de avisos acredita el contenido pero no el envío ("la impresión no implica
   que la información haya sido enviada"); el acuse cierra el ciclo. Slot
@@ -190,6 +199,14 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 4c entregado (PR en revisión): flujo PLD en dos
+  pasos en F13 — veredictos separados informe/acuse (separarChecks, sin
+  migración), slot del acuse deshabilitado hasta informe verde, PLD
+  congelado en verde (reemplazo solo Dirección), banner "preséntalo en el
+  SPPLD", y reúso de la extracción del informe al completar el ciclo (no se
+  re-paga la visión). Pendiente: acuse real de ejemplo para calibrar el
+  prompt (Beto lo iba a adjuntar; no llegó).
 
 - **2026-06-12** — Sprint 4b entregado (PR en revisión): rollout de la
   captura colaborativa a las fases 3, 5, 6, 9, 10, 12, 14 y 15 vía pieza

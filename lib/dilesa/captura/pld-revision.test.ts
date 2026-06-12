@@ -188,38 +188,55 @@ describe('veredictoDe', () => {
 
 // ── Acuse de envío (ciclo completo) ─────────────────────────────────────
 
-import { checkAcuseFaltante, cruzarAcuseConInforme, type ExtraccionAcuse } from './pld-revision';
+import { cruzarAcuseConInforme, separarChecks, type ExtraccionAcuse } from './pld-revision';
 
+/**
+ * Fixture del formato real "Presentación de Avisos" (acuse SPPLD): folio,
+ * sujeto obligado, tabla de avisos reportados con fecha de envío, número de
+ * avisos y ESTATUS (calibrado con un acuse real de DILESA: folio 18825514,
+ * 14 avisos del envío masivo, ACEPTADO).
+ */
 function acuse(partial: Partial<ExtraccionAcuse> = {}): ExtraccionAcuse {
   return {
-    folioAcuse: 'AV-2026-000123',
+    folioAcuse: '18825514',
     rfcSujetoObligado: 'DIE030904866',
     fechaPresentacion: '2026-06-10',
-    mesReportado: '202606',
-    referenciaAviso: '20260602',
+    estatusEnvio: 'ACEPTADO',
+    actividadVulnerable: 'TRANSMISION DE DERECHOS SOBRE BIENES INMUEBLES',
+    tipoEnvio: 'PORTAL',
     numeroAvisos: 1,
+    referenciaAviso: '',
     ...partial,
   };
 }
 
-describe('cruzarAcuseConInforme', () => {
-  const informe = extraccion(); // operación 2026-06-01, referencia 20260602
+describe('cruzarAcuseConInforme — formato real Presentación de Avisos', () => {
+  const informe = extraccion(); // operación 2026-06-01
 
-  it('todo verde con acuse de DILESA, misma referencia y dentro de plazo', () => {
+  it('todo verde: DILESA, ACEPTADO, actividad de inmuebles, fecha en ventana', () => {
     const checks = cruzarAcuseConInforme(acuse(), informe, 'DIE030904866');
     expect(checks.every((c) => c.ok)).toBe(true);
     expect(veredictoDe(checks)).toBe('verde');
   });
 
-  it('rojo si el acuse ampara otra referencia de aviso', () => {
+  it('rojo si el estatus del envío no es ACEPTADO', () => {
     const checks = cruzarAcuseConInforme(
-      acuse({ referenciaAviso: '20260699' }),
+      acuse({ estatusEnvio: 'RECHAZADO' }),
       informe,
       'DIE030904866'
     );
-    const c = checks.find((x) => x.clave === 'acuse_referencia');
+    const c = checks.find((x) => x.clave === 'acuse_estatus');
     expect(c?.ok).toBe(false);
     expect(c?.severidad).toBe('error');
+    expect(veredictoDe(checks)).toBe('rojo');
+  });
+
+  it('estatus ilegible degrada a warning (verificación manual), no bloquea', () => {
+    const checks = cruzarAcuseConInforme(acuse({ estatusEnvio: '' }), informe, 'DIE030904866');
+    const c = checks.find((x) => x.clave === 'acuse_estatus');
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('warning');
+    expect(veredictoDe(checks)).toBe('advertencias');
   });
 
   it('rojo si el acuse es de otro RFC', () => {
@@ -231,26 +248,21 @@ describe('cruzarAcuseConInforme', () => {
     expect(veredictoDe(checks)).toBe('rojo');
   });
 
-  it('cae a periodo (warning) si el acuse no trae referencia', () => {
-    const checks = cruzarAcuseConInforme(acuse({ referenciaAviso: '' }), informe, 'DIE030904866');
-    const c = checks.find((x) => x.clave === 'acuse_referencia');
-    expect(c?.ok).toBe(true);
-    expect(c?.severidad).toBe('warning');
-  });
-
-  it('warning si se presentó fuera del plazo (después del día 17 del mes siguiente)', () => {
+  it('fecha de envío fuera de la ventana de la operación: warning con el plazo', () => {
     const checks = cruzarAcuseConInforme(
       acuse({ fechaPresentacion: '2026-07-20' }),
       informe,
       'DIE030904866'
     );
-    const c = checks.find((x) => x.clave === 'acuse_plazo');
-    expect(c?.ok).toBe(false);
-    expect(c?.severidad).toBe('warning');
-    expect(c?.detalle).toContain('2026-07-17');
+    const corr = checks.find((x) => x.clave === 'acuse_correspondencia');
+    const plazo = checks.find((x) => x.clave === 'acuse_plazo');
+    expect(corr?.ok).toBe(false);
+    expect(plazo?.ok).toBe(false);
+    expect(plazo?.detalle).toContain('2026-07-17');
+    expect(veredictoDe(checks)).toBe('advertencias');
   });
 
-  it('presentado el día límite exacto cuenta como dentro de plazo', () => {
+  it('el día límite exacto (17 del mes siguiente) cuenta como dentro de plazo', () => {
     const checks = cruzarAcuseConInforme(
       acuse({ fechaPresentacion: '2026-07-17' }),
       informe,
@@ -258,13 +270,44 @@ describe('cruzarAcuseConInforme', () => {
     );
     expect(checks.find((x) => x.clave === 'acuse_plazo')?.ok).toBe(true);
   });
+
+  it('acuse de lote (14 avisos, esquema masivo): la correspondencia es por ventana y lo señala', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ numeroAvisos: 14, fechaPresentacion: '2026-07-20' }),
+      informe,
+      'DIE030904866'
+    );
+    const c = checks.find((x) => x.clave === 'acuse_correspondencia');
+    expect(c?.severidad).toBe('warning');
+    expect(c?.detalle).toContain('14 avisos');
+  });
+
+  it('referencia exacta se exige solo si ambos documentos la traen', () => {
+    const checks = cruzarAcuseConInforme(
+      acuse({ referenciaAviso: '20260699' }),
+      informe, // informe.referenciaAviso = '20260602'
+      'DIE030904866'
+    );
+    const c = checks.find((x) => x.clave === 'acuse_correspondencia');
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('error');
+  });
 });
 
-describe('checkAcuseFaltante', () => {
-  it('es un error duro: sin acuse el ciclo no cierra', () => {
-    const c = checkAcuseFaltante();
-    expect(c.ok).toBe(false);
-    expect(c.severidad).toBe('error');
-    expect(veredictoDe([c])).toBe('rojo');
+describe('separarChecks (flujo en dos pasos)', () => {
+  it('separa informe vs acuse por clave y los veredictos parciales son independientes', () => {
+    const informeChecks = cruzarPldConExpediente(extraccion(), expediente());
+    const acuseChecks = cruzarAcuseConInforme(
+      acuse({ rfcSujetoObligado: 'XAXX010101000' }), // acuse de otro RFC → rojo
+      extraccion(),
+      'DIE030904866'
+    );
+    const { informe, acuse: soloAcuse } = separarChecks([...informeChecks, ...acuseChecks]);
+    expect(informe).toHaveLength(informeChecks.length);
+    expect(soloAcuse).toHaveLength(acuseChecks.length);
+    expect(soloAcuse.every((c) => c.clave.startsWith('acuse_'))).toBe(true);
+    // El informe puede estar en advertencias mientras el acuse está en rojo.
+    expect(veredictoDe(informe)).toBe('advertencias');
+    expect(veredictoDe(soloAcuse)).toBe('rojo');
   });
 });
