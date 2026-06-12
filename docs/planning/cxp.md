@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 (pago en efectivo + conciliación contra cortes, engancha cortes-conciliacion) + Sprint 6 (migrar erp.gastos → CxP + rollout COAGAN/ANSA). Sprints 1-4 (schema + ingesta XML CFDI + match OC + UI programación/aprobación de pagos) ya en prod
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-12 (audit trail server-side de rechazos en upload-xml + `p_usuario_id` en `cxp_factura_alta` — migración pendiente de aplicar por Beto)
+**Última actualización:** 2026-06-12 (audit trail server-side de rechazos en upload-xml + `p_usuario_id` en `cxp_factura_alta` — migración aplicada a prod con OK de Beto, PR #859)
 
 ## Problema
 
@@ -229,9 +229,9 @@ patrón canónico de **ADR-037** (subledger gemelo):
   dejar overload) y deja de registrar `usuario_id=NULL` vía service role.
   Status del endpoint: 200 todo cargado / 207 parcial / 422 ningún archivo
   pasó (el modal ya manejaba non-2xx con `results`; verificado sin cambios
-  de cliente). Tests del route nuevos (6). **Migración NO aplicada a prod**
-  — modo autónomo; la aplica Beto y se regenera `types/supabase.ts` antes
-  del merge.
+  de cliente). Tests del route nuevos (6). Migración aplicada a prod el
+  mismo día con OK verbal de Beto (`supabase db push`, firma verificada
+  sin overload) + `types/supabase.ts` regenerado. PR #859.
 - **2026-06-11 — Hotfix cross-sesión (sesión presupuesto-baseline, con OK de
   Beto): `20260611003056_cxp_fix_saldo_solo_pagos_ejecutados`.** Bug
   reportado por Beto: al PROGRAMAR un pago las facturas se marcaban
