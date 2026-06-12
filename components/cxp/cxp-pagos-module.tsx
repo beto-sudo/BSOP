@@ -22,8 +22,12 @@
  * no se ejecuta nunca sale de la vista hasta estar pagado.
  *
  * El drawer de detalle muestra las facturas aplicadas
- * (`cxp_pago_aplicaciones` → `facturas`), montos, quién aprobó/pagó y los
- * comprobantes adjuntos.
+ * (`cxp_pago_aplicaciones` → `facturas`), montos, quién aprobó/pagó, los
+ * comprobantes adjuntos y el **control por partida**: por cada partida
+ * presupuestal de las facturas, qué hay contratado contra ella
+ * (`dilesa.contratos_construccion.valor_total`, fallback presupuesto
+ * aprobado), los abonos EJECUTADOS previos, lo que aplica este pago y cómo
+ * quedará (`armarControlPorPartida`).
  *
  * No inventa lógica financiera: solo cablea las RPCs con buenas
  * confirmaciones. Parametrizado por `empresaId` (UUID). RDB y DILESA lo
@@ -100,7 +104,104 @@ type FacturaAplicada = {
   emisor_nombre: string | null;
   total: number | null;
   saldo: number | null;
+  partida_id: string | null;
 };
+
+// ── Control por partida (estado de cuenta al momento de pagar) ───────────────
+
+export type AbonoEjecutado = {
+  pago_id: string;
+  partida_id: string;
+  monto: number;
+  fecha: string | null;
+  referencia: string | null;
+};
+
+export type PartidaControlCard = {
+  partida_id: string;
+  concepto: string;
+  /** Σ valor_total de contratos vivos ligados a la partida. null = sin contrato. */
+  contratado: number | null;
+  /** Código del contrato si la partida tiene exactamente uno. */
+  contratoCodigo: string | null;
+  presupuesto: number | null;
+  /** Abonado ejecutado a la partida ANTES de este pago. */
+  abonadoPrevio: number;
+  /** Lo que este pago aplica a la partida. */
+  estePago: number;
+  /** Abonos ejecutados previos (agrupados por pago), más reciente primero. */
+  abonos: { pago_id: string; fecha: string | null; referencia: string | null; monto: number }[];
+};
+
+/**
+ * Arma el estado de cuenta por partida de un pago: qué hay contratado contra
+ * la partida, cuánto se le ha abonado (solo pagos EJECUTADOS — los
+ * programados/aprobados son compromiso, no abono), cuánto aplica este pago y
+ * cómo quedará. Si el pago ya está pagado, sus propias aplicaciones se
+ * excluyen de "abonadoPrevio" para no contarlo doble contra "estePago".
+ */
+export function armarControlPorPartida(opts: {
+  pagoId: string;
+  aplicacionesDelPago: { monto_aplicado: number; partida_id: string | null }[];
+  partidas: { id: string; concepto_texto: string | null; presupuesto_aprobado: number | null }[];
+  contratos: { partida_id: string | null; codigo: string; valor_total: number | null }[];
+  abonosEjecutados: AbonoEjecutado[];
+}): PartidaControlCard[] {
+  const { pagoId, aplicacionesDelPago, partidas, contratos, abonosEjecutados } = opts;
+
+  const estePagoPorPartida = new Map<string, number>();
+  for (const a of aplicacionesDelPago) {
+    if (!a.partida_id) continue;
+    estePagoPorPartida.set(
+      a.partida_id,
+      (estePagoPorPartida.get(a.partida_id) ?? 0) + Number(a.monto_aplicado ?? 0)
+    );
+  }
+
+  const cards: PartidaControlCard[] = [];
+  for (const p of partidas) {
+    const estePago = estePagoPorPartida.get(p.id);
+    if (estePago == null) continue;
+
+    const contratosPartida = contratos.filter((c) => c.partida_id === p.id);
+    const contratado =
+      contratosPartida.length > 0
+        ? contratosPartida.reduce((acc, c) => acc + Number(c.valor_total ?? 0), 0)
+        : null;
+
+    // Abonos previos: ejecutados, agrupados por pago, sin este pago.
+    const porPago = new Map<
+      string,
+      { pago_id: string; fecha: string | null; referencia: string | null; monto: number }
+    >();
+    for (const ab of abonosEjecutados) {
+      if (ab.partida_id !== p.id || ab.pago_id === pagoId) continue;
+      const g = porPago.get(ab.pago_id) ?? {
+        pago_id: ab.pago_id,
+        fecha: ab.fecha,
+        referencia: ab.referencia,
+        monto: 0,
+      };
+      g.monto += Number(ab.monto ?? 0);
+      porPago.set(ab.pago_id, g);
+    }
+    const abonos = [...porPago.values()].sort((a, b) =>
+      (b.fecha ?? '').localeCompare(a.fecha ?? '')
+    );
+
+    cards.push({
+      partida_id: p.id,
+      concepto: p.concepto_texto ?? '(partida)',
+      contratado,
+      contratoCodigo: contratosPartida.length === 1 ? contratosPartida[0].codigo : null,
+      presupuesto: p.presupuesto_aprobado != null ? Number(p.presupuesto_aprobado) : null,
+      abonadoPrevio: abonos.reduce((acc, a) => acc + a.monto, 0),
+      estePago,
+      abonos,
+    });
+  }
+  return cards.sort((a, b) => a.concepto.localeCompare(b.concepto));
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -575,6 +676,7 @@ function PagoDrawer({
   onCancelar: (pago: Pago) => void;
 }) {
   const [aplicaciones, setAplicaciones] = useState<FacturaAplicada[]>([]);
+  const [controlPartidas, setControlPartidas] = useState<PartidaControlCard[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -583,12 +685,13 @@ function PagoDrawer({
     (async () => {
       setLoading(true);
       setAplicaciones([]);
+      setControlPartidas([]);
       const sb = createSupabaseBrowserClient();
       const { data } = await sb
         .schema('erp')
         .from('cxp_pago_aplicaciones')
         .select(
-          'id, monto_aplicado, factura_id, factura:facturas!factura_id(uuid_sat, emisor_nombre, total, saldo)'
+          'id, monto_aplicado, factura_id, factura:facturas!factura_id(uuid_sat, emisor_nombre, total, saldo, partida_id)'
         )
         .eq('pago_id', pago.id);
       if (!activo) return;
@@ -602,20 +705,87 @@ function PagoDrawer({
           emisor_nombre: string | null;
           total: number | null;
           saldo: number | null;
+          partida_id: string | null;
         } | null;
       };
       const rows = (data ?? []) as unknown as Raw[];
-      setAplicaciones(
-        rows.map((r) => ({
-          id: r.id,
-          monto_aplicado: Number(r.monto_aplicado),
-          factura_id: r.factura_id,
-          uuid_sat: r.factura?.uuid_sat ?? null,
-          emisor_nombre: r.factura?.emisor_nombre ?? null,
-          total: r.factura?.total ?? null,
-          saldo: r.factura?.saldo ?? null,
-        }))
-      );
+      const apls: FacturaAplicada[] = rows.map((r) => ({
+        id: r.id,
+        monto_aplicado: Number(r.monto_aplicado),
+        factura_id: r.factura_id,
+        uuid_sat: r.factura?.uuid_sat ?? null,
+        emisor_nombre: r.factura?.emisor_nombre ?? null,
+        total: r.factura?.total ?? null,
+        saldo: r.factura?.saldo ?? null,
+        partida_id: r.factura?.partida_id ?? null,
+      }));
+      setAplicaciones(apls);
+
+      // Estado de cuenta por partida: contratado / abonado / este pago.
+      // Tolerante a fallas parciales — la sección se omite, el drawer vive.
+      const partidaIds = [
+        ...new Set(apls.map((a) => a.partida_id).filter((x): x is string => !!x)),
+      ];
+      if (partidaIds.length > 0) {
+        const [partidasRes, contratosRes, abonosRes] = await Promise.all([
+          sb
+            .schema('erp')
+            .from('presupuesto_partidas')
+            .select('id, concepto_texto, presupuesto_aprobado')
+            .in('id', partidaIds),
+          sb
+            .schema('dilesa')
+            .from('contratos_construccion')
+            .select('partida_id, codigo, valor_total')
+            .in('partida_id', partidaIds)
+            .is('deleted_at', null)
+            .is('cancelada_at', null),
+          sb
+            .schema('erp')
+            .from('cxp_pago_aplicaciones')
+            .select(
+              'monto_aplicado, pago_id, factura:facturas!factura_id!inner(partida_id), pago:cxp_pagos!pago_id!inner(estado, deleted_at, fecha_pago, referencia)'
+            )
+            .in('factura.partida_id', partidaIds)
+            .eq('pago.estado', 'pagado')
+            .is('pago.deleted_at', null),
+        ]);
+        if (!activo) return;
+
+        type AbonoRaw = {
+          monto_aplicado: number;
+          pago_id: string;
+          factura: { partida_id: string | null } | null;
+          pago: { fecha_pago: string | null; referencia: string | null } | null;
+        };
+        const abonos: AbonoEjecutado[] = ((abonosRes.data ?? []) as unknown as AbonoRaw[])
+          .filter((a) => !!a.factura?.partida_id)
+          .map((a) => ({
+            pago_id: a.pago_id,
+            partida_id: a.factura!.partida_id as string,
+            monto: Number(a.monto_aplicado ?? 0),
+            fecha: a.pago?.fecha_pago ?? null,
+            referencia: a.pago?.referencia ?? null,
+          }));
+
+        setControlPartidas(
+          armarControlPorPartida({
+            pagoId: pago.id,
+            aplicacionesDelPago: apls,
+            partidas: (partidasRes.data ?? []) as {
+              id: string;
+              concepto_texto: string | null;
+              presupuesto_aprobado: number | null;
+            }[],
+            contratos: (contratosRes.data ?? []) as {
+              partida_id: string | null;
+              codigo: string;
+              valor_total: number | null;
+            }[],
+            abonosEjecutados: abonos,
+          })
+        );
+      }
       setLoading(false);
     })();
     return () => {
@@ -761,6 +931,98 @@ function PagoDrawer({
                 </ul>
               )}
             </section>
+
+            {controlPartidas.length > 0 && (
+              <>
+                <Separator />
+
+                {/* Estado de cuenta por partida: contratado / abonado / este pago */}
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Control por partida
+                  </div>
+                  <div className="space-y-2">
+                    {controlPartidas.map((c) => {
+                      const referencia = c.contratado ?? c.presupuesto;
+                      const despues = c.abonadoPrevio + c.estePago;
+                      const porAbonar = referencia != null ? referencia - despues : null;
+                      const pct =
+                        referencia != null && referencia > 0
+                          ? Math.round((despues / referencia) * 100)
+                          : null;
+                      const yaPagado = pago.estado === 'pagado';
+                      return (
+                        <div key={c.partida_id} className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-medium">{c.concepto}</span>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                              {c.contratado != null
+                                ? `${c.contratoCodigo ? `Contrato ${c.contratoCodigo} · ` : ''}contratado ${formatCurrency(c.contratado)}`
+                                : c.presupuesto != null
+                                  ? `presupuesto ${formatCurrency(c.presupuesto)}`
+                                  : 'sin contrato ni presupuesto'}
+                            </span>
+                          </div>
+                          <dl className="mt-1.5 space-y-0.5 text-xs">
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Abonado previo</dt>
+                              <dd className="tabular-nums">{formatCurrency(c.abonadoPrevio)}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt className="text-muted-foreground">Este pago</dt>
+                              <dd className="tabular-nums font-medium">
+                                + {formatCurrency(c.estePago)}
+                              </dd>
+                            </div>
+                            <div className="flex justify-between border-t pt-0.5 font-medium">
+                              <dt>
+                                {yaPagado ? 'Abonado (incluye este pago)' : 'Quedará abonado'}
+                              </dt>
+                              <dd className="tabular-nums">
+                                {formatCurrency(despues)}
+                                {pct != null ? ` (${pct}%)` : ''}
+                              </dd>
+                            </div>
+                            {porAbonar != null && (
+                              <div className="flex justify-between">
+                                <dt className="text-muted-foreground">
+                                  {c.contratado != null
+                                    ? 'Por abonar del contrato'
+                                    : 'Por abonar del presupuesto'}
+                                </dt>
+                                <dd className="tabular-nums">{formatCurrency(porAbonar)}</dd>
+                              </div>
+                            )}
+                          </dl>
+                          <div className="mt-1.5 border-t pt-1.5">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Abonos anteriores
+                            </div>
+                            {c.abonos.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">Sin abonos previos.</p>
+                            ) : (
+                              <ul className="mt-0.5 space-y-0.5 text-xs">
+                                {c.abonos.map((a) => (
+                                  <li key={a.pago_id} className="flex justify-between gap-2">
+                                    <span className="truncate text-muted-foreground">
+                                      {formatDate(a.fecha)}
+                                      {a.referencia ? (
+                                        <span className="font-mono"> · {a.referencia}</span>
+                                      ) : null}
+                                    </span>
+                                    <span className="tabular-nums">{formatCurrency(a.monto)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </>
+            )}
 
             <Separator />
 
