@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveKpis, type VentaListaRow } from './ventas-module';
+import { deriveKpis, matchVentaSearch, type VentaListaRow } from './ventas-module';
 
 function row(overrides: Partial<VentaListaRow>): VentaListaRow {
   return {
@@ -117,5 +117,37 @@ describe('deriveKpis (Ventas DILESA — ADR-034)', () => {
     // Pipeline también cambia
     expect(String(deriveKpis(todos)[1]?.value)).toContain('3');
     expect(String(deriveKpis(soloLomas)[1]?.value)).toContain('1');
+  });
+});
+
+describe('matchVentaSearch (búsqueda por comprador o unidad)', () => {
+  const venta = row({
+    cliente: 'Cristian Eugenio Nieto Marquez',
+    unidadIdentificador: 'M22-L5-LDLE',
+  });
+
+  it('query vacío o solo espacios matchea todo', () => {
+    expect(matchVentaSearch(venta, '')).toBe(true);
+    expect(matchVentaSearch(venta, '   ')).toBe(true);
+  });
+
+  it('matchea por nombre del comprador (case-insensitive)', () => {
+    expect(matchVentaSearch(venta, 'nieto')).toBe(true);
+    expect(matchVentaSearch(venta, 'CRISTIAN')).toBe(true);
+  });
+
+  it('matchea por identificador de unidad (case-insensitive, parcial)', () => {
+    expect(matchVentaSearch(venta, 'm22-l5')).toBe(true);
+    expect(matchVentaSearch(venta, 'M22-L5-LDLE')).toBe(true);
+    expect(matchVentaSearch(venta, 'ldle')).toBe(true);
+  });
+
+  it('sin match en comprador ni unidad → false', () => {
+    expect(matchVentaSearch(venta, 'm23-l9')).toBe(false);
+    expect(matchVentaSearch(venta, 'garcia')).toBe(false);
+  });
+
+  it('venta sin unidad asignada no truena buscando por unidad', () => {
+    expect(matchVentaSearch(row({ cliente: 'Ana', unidadIdentificador: null }), 'm22')).toBe(false);
   });
 });

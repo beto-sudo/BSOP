@@ -338,8 +338,18 @@ expediente, copiloto), no reescritura.
   `lote_urbanizado` sigue siendo liberable a portafolio y contando como
   urbanizado en avances. Queda desambiguada la semántica: `terminada` ya
   solo significa casa terminada.
-
-## Decisiones registradas
+- **2026-06-11 (fix gate de líder para ventas de Coda + búsqueda por unidad,
+  PR #852):** Beto no podía autorizar la asignación de M22-L5-LDLE — el
+  banner decía que otra solicitud era líder de la fila, pero la venta
+  (Cristian Eugenio Nieto Marquez) es la única activa de esa unidad. Causa:
+  el gate de Fase 2 solo miraba `v_unidad_hold_queue`, que excluye por
+  diseño (D4, migración 20260528191807) a las ventas con `coda_row_id` →
+  para TODA venta del cutover la fila estaba vacía y `esLider` daba false.
+  Fix en `lib/dilesa/hold-lider.ts` (regla extraída + tests): con fila
+  vacía, una venta histórica de Coda es autorizable; si hay líder BSOP,
+  solo él (una Coda no brinca el hold). Mismo PR: la búsqueda de la lista
+  de Ventas ahora matchea identificador de unidad además de comprador
+  (antes era imposible ubicar una venta partiendo de la unidad).
 
 - **2026-06-09:** Ir por rediseño completo (workspace "Expediente de
   Operación"), reusando los datos y formularios de las 13 fases ya
