@@ -675,7 +675,7 @@ function CapturarFase13Body() {
         <Banner
           tone="success"
           title="Fase 13 ya está cerrada"
-          body="Esta venta ya está facturada. Puedes reemplazar un documento si hubo una corrección — queda versionado."
+          body="Esta venta ya está facturada. Los documentos quedan congelados; si hubo un error, solo Dirección puede reemplazarlos (queda versionado y la revisión debe re-correrse)."
         />
       ) : bloqueadaPorFase12 ? (
         <Banner
@@ -713,8 +713,11 @@ function CapturarFase13Body() {
               {DOCS_FASE13.map((d) => {
                 // Paso 1 en verde → el PLD se congela (solo Dirección
                 // reemplaza); el acuse se habilita hasta entonces.
-                const bloqueo =
-                  d.rol === 'aviso_pld' && !docs?.factura_xml
+                const bloqueo = yaCerrada
+                  ? soyDireccion
+                    ? null
+                    : 'La fase está cerrada — solo Dirección puede reemplazar documentos.'
+                  : d.rol === 'aviso_pld' && !docs?.factura_xml
                     ? 'Se habilita al cargar el XML de la factura (y la nota de crédito, si aplica).'
                     : d.rol === 'aviso_pld' && pasosPld.informeVerde && !soyDireccion
                       ? 'El PLD quedó congelado para presentación — solo Dirección puede reemplazarlo.'
