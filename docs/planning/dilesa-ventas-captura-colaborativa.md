@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** merge de Sprint 2 (XML CFDI, PR en revisión) → Sprint 3 (revisión IA del PLD + gate)
+**Próximo hito:** aplicar migración venta_fase_revisiones a prod + merge de Sprint 3 (PR en revisión) → cierre de iniciativa (S4 rollout queda opcional)
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -183,6 +183,15 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 3 entregado (PR en revisión): extracción IA del
+  Aviso PLD (visión, mismo stack que estados de cuenta) + cruce determinista
+  de los 10 checks + tabla `dilesa.venta_fase_revisiones` (append-only,
+  ligada al adjunto exacto) + semáforo en F13 + **cierre movido a endpoint
+  con gate server-side** (`cerrar-fase13`): solo revisión vigente en verde
+  cierra; cualquier otro caso requiere override de Dirección con motivo
+  (audit_log + nota en venta_fases). 9 tests fijan el contrato del gate.
+  Migración pendiente de aplicar a prod (requiere aprobación explícita).
 
 - **2026-06-12** — Sprint 2 entregado (PR en revisión con preview): slots
   `factura_xml` (requerido) y `nota_credito_xml` con validación determinista

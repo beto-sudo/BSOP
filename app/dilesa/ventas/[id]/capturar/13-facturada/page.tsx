@@ -6,8 +6,16 @@
  *
  * Sprint 1 — colaborativo: cada documento PERSISTE AL SUBIRSE
  * (storage + `erp.adjuntos` con `uploaded_by`); el slot muestra quién y
- * cuándo; "Cambiar" versiona; los montos se guardan sin cerrar; "Cerrar
- * fase" valida contra el expediente persistido (marcarFase con docs: []).
+ * cuándo; "Cambiar" versiona.
+ *
+ * Sprint 3 — revisión asistida + gate: la sección "Revisión de la
+ * operación" corre la extracción IA del Aviso PLD y el cruce determinista
+ * contra el expediente (10 checks, semáforo persistido en
+ * `dilesa.venta_fase_revisiones`). El cierre va por
+ * `POST /api/dilesa/ventas/[id]/cerrar-fase13` — el gate vive en el server:
+ * solo cierra con revisión VIGENTE en verde, o con override de Dirección
+ * (motivo obligatorio, auditado). Una persona sin Dirección recibe la
+ * advertencia de que la operación requiere esa autorización.
  *
  * Sprint 2 — XML CFDI como fuente de verdad:
  *   - `factura_xml` (requerido) y `nota_credito_xml` (opcional) se validan
@@ -44,6 +52,7 @@ import {
   Loader2,
   Lock,
   Save,
+  ShieldCheck,
   Upload,
   XCircle,
 } from 'lucide-react';
@@ -56,7 +65,6 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
-import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import {
   faltantesParaCerrar,
   fetchDocsFase,
@@ -73,7 +81,18 @@ import {
   type CfdiResumen,
 } from '@/lib/dilesa/captura/cfdi-validacion';
 import { CfdiParseError, parseCfdiXml } from '@/lib/cxp/cfdi-parser';
+import type { RevisionCheck, VeredictoRevision } from '@/lib/dilesa/captura/pld-revision';
 import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
+import { useEffectiveUser } from '@/components/providers';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 type SlotDef = {
   rol: string;
@@ -115,6 +134,20 @@ type Deposito = {
   fuente: string | null;
   forma_pago: string | null;
   referencia: string | null;
+};
+
+/** DTO de `GET/POST /api/dilesa/ventas/[id]/revision-pld`. */
+type RevisionDto = {
+  id: string;
+  adjuntoId: string | null;
+  estado: 'completada' | 'error';
+  veredicto: VeredictoRevision;
+  checks: RevisionCheck[];
+  errorDetalle: string | null;
+  ejecutadoPorNombre: string | null;
+  createdAt: string;
+  /** false si el Aviso PLD del expediente cambió después de esta revisión. */
+  vigente: boolean;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -171,9 +204,21 @@ function CapturarFase13Body() {
   const [docsError, setDocsError] = useState<string | null>(null);
   const [subiendoRol, setSubiendoRol] = useState<string | null>(null);
 
+  const [revision, setRevision] = useState<RevisionDto | null>(null);
+  const [tienePld, setTienePld] = useState(false);
+  const [revisando, setRevisando] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideMotivo, setOverrideMotivo] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cerrando, setCerrando] = useState(false);
+
+  const effectiveUser = useEffectiveUser();
+  const soyDireccion =
+    !!effectiveUser.data &&
+    (effectiveUser.data.isAdmin ||
+      effectiveUser.data.direccionEmpresaIds.includes(DILESA_EMPRESA_ID));
 
   const cargarDocs = useCallback(async () => {
     const r = await fetchDocsFase(ventaId, ROLES_FASE13);
@@ -182,6 +227,23 @@ function CapturarFase13Body() {
       setDocsError(null);
     } else {
       setDocsError(r.error);
+    }
+  }, [ventaId]);
+
+  const cargarRevision = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/dilesa/ventas/${ventaId}/revision-pld`);
+      const json = (await res.json()) as {
+        ok: boolean;
+        revision: RevisionDto | null;
+        tienePld: boolean;
+      };
+      if (res.ok && json.ok) {
+        setRevision(json.revision);
+        setTienePld(json.tienePld);
+      }
+    } catch {
+      // Silencioso: la sección de revisión muestra su propio estado.
     }
   }, [ventaId]);
 
@@ -251,6 +313,7 @@ function CapturarFase13Body() {
       setYaCerrada(posiciones.includes(13));
       setUserId(userRes.data?.user?.id ?? null);
       setEmpresaRfc(((eRes.data as { rfc: string | null } | null)?.rfc ?? '').trim() || null);
+      void cargarRevision();
 
       // RFC del cliente — receptor esperado de los CFDI.
       const { data: pRow } = await sb
@@ -269,7 +332,7 @@ function CapturarFase13Body() {
     return () => {
       activo = false;
     };
-  }, [ventaId, sb, cargarDocs]);
+  }, [ventaId, sb, cargarDocs, cargarRevision]);
 
   const totalDepositos = useMemo(
     () => depositos.reduce((s, d) => s + Number(d.monto_total ?? 0), 0),
@@ -390,20 +453,111 @@ function CapturarFase13Body() {
           type: advertencias > 0 ? 'info' : 'success',
         });
         await cargarDocs();
+        // Un PLD nuevo deja la revisión anterior obsoleta (stale).
+        if (slot.rol === 'aviso_pld') void cargarRevision();
       } finally {
         setSubiendoRol(null);
       }
     },
-    [sb, ventaId, userId, empresaRfc, clienteRfc, cfdiFactura, toast, cargarDocs]
+    [sb, ventaId, userId, empresaRfc, clienteRfc, cfdiFactura, toast, cargarDocs, cargarRevision]
   );
 
-  // ── Cerrar fase (valida contra el expediente persistido) ─────────
+  // ── Revisión PLD (extracción IA + cruce contra el expediente) ────
+  const onRevisar = useCallback(async () => {
+    setRevisando(true);
+    try {
+      const res = await fetch(`/api/dilesa/ventas/${ventaId}/revision-pld`, { method: 'POST' });
+      const json = (await res.json()) as {
+        ok: boolean;
+        revision?: RevisionDto;
+        error?: string;
+      };
+      if (json.revision) setRevision(json.revision);
+      if (!res.ok || !json.ok) {
+        toast.add({
+          title: 'La revisión no pudo completarse',
+          description: json.error ?? 'Error desconocido.',
+          type: 'error',
+        });
+        return;
+      }
+      const v = json.revision?.veredicto;
+      toast.add({
+        title:
+          v === 'verde'
+            ? 'Revisión en verde — la operación cumple'
+            : v === 'advertencias'
+              ? 'Revisión con advertencias'
+              : 'Revisión en rojo',
+        description:
+          v === 'verde'
+            ? 'Todos los checks del Aviso PLD cuadran con el expediente.'
+            : 'Revisa el detalle de los checks marcados.',
+        type: v === 'verde' ? 'success' : 'info',
+      });
+    } finally {
+      setRevisando(false);
+    }
+  }, [ventaId, toast]);
+
+  // ── Cerrar fase (el gate real vive en el endpoint) ───────────────
   const faltantes = useMemo(
     () => (docs ? faltantesParaCerrar(docs, ROLES_REQUERIDOS) : ROLES_REQUERIDOS),
     [docs]
   );
+  const revisionVerdeVigente =
+    !!revision &&
+    revision.vigente &&
+    revision.estado === 'completada' &&
+    revision.veredicto === 'verde';
 
-  const onCerrarFase = useCallback(async () => {
+  const cerrar = useCallback(
+    async (motivoOverride?: string) => {
+      setCerrando(true);
+      try {
+        const res = await fetch(`/api/dilesa/ventas/${ventaId}/cerrar-fase13`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            valorRealSnapshot: cuadratura?.valorRealVentaDilesa ?? null,
+            ...(motivoOverride ? { override: { motivo: motivoOverride } } : {}),
+          }),
+        });
+        const json = (await res.json()) as {
+          ok: boolean;
+          error?: string;
+          requiereDireccion?: boolean;
+        };
+        if (!res.ok || !json.ok) {
+          if (json.requiereDireccion && !motivoOverride && soyDireccion) {
+            setOverrideOpen(true);
+            return;
+          }
+          toast.add({
+            title: json.requiereDireccion
+              ? 'La operación no cumple la revisión'
+              : 'No se pudo cerrar la fase',
+            description: json.error ?? 'Error desconocido.',
+            type: json.requiereDireccion ? 'info' : 'error',
+          });
+          return;
+        }
+        toast.add({
+          title: 'Fase 13 cerrada',
+          description: motivoOverride
+            ? 'Cierre autorizado por Dirección — quedó registrado en la bitácora.'
+            : 'Facturación registrada. Continúa con la siguiente fase desde el detalle.',
+          type: 'success',
+        });
+        router.push(`/dilesa/ventas/${ventaId}`);
+      } finally {
+        setCerrando(false);
+      }
+    },
+    [ventaId, cuadratura, soyDireccion, toast, router]
+  );
+
+  const onCerrarFase = useCallback(() => {
     if (faltantes.length > 0) {
       toast.add({
         title: 'Faltan documentos en el expediente',
@@ -412,84 +566,30 @@ function CapturarFase13Body() {
       });
       return;
     }
-    // El valor de escrituración se captura en Fase 8 (Dictaminada) — aquí
-    // solo se exige que exista; no es editable en esta pantalla.
-    const vEscr = Number(venta?.valor_escrituracion ?? 0);
-    if (!(vEscr > 0)) {
-      toast.add({
-        title: 'Falta el valor de escrituración',
-        description: 'Se captura en la Fase 8 (Dictaminada); esta venta no lo trae.',
-        type: 'error',
-      });
-      return;
-    }
-    setCerrando(true);
-    try {
-      // Snapshot de los derivados antes de cerrar: XML (fuente de facturado
-      // y NC) + motor de cuadratura (valor real). Sin XML no se pisa nada —
-      // las ventas históricas conservan sus montos migrados.
-      const campos: {
-        valor_real_venta_dilesa?: number;
-        valor_facturado?: number;
-        monto_nota_credito?: number;
-      } = {};
-      if (cuadratura) campos.valor_real_venta_dilesa = cuadratura.valorRealVentaDilesa;
-      if (cfdiFactura) campos.valor_facturado = cfdiFactura.total;
-      if (cfdiNotaCredito) campos.monto_nota_credito = cfdiNotaCredito.total;
-      if (Object.keys(campos).length > 0) {
-        const { error: e } = await sb
-          .schema('dilesa')
-          .from('ventas')
-          .update(campos)
-          .eq('id', ventaId);
-        if (e) {
-          toast.add({
-            title: 'No se pudieron guardar los montos',
-            description: getSupabaseErrorMessage(e, 'Reintenta.'),
-            type: 'error',
-          });
-          return;
-        }
-      }
-
-      const result = await marcarFase(sb, {
-        ventaId,
-        faseNombre: 'Facturada',
-        faseposicion: 13,
-        docs: [], // los documentos ya viven en el expediente (subida incremental)
-        camposVenta: {},
-        notas: null,
-        registradoPor: userId,
-      });
-      if (!result.ok) {
-        toast.add({
-          title: 'Error al cerrar Fase 13',
-          description: result.error ?? 'Error desconocido.',
-          type: 'error',
-        });
+    // Sin revisión en verde: Dirección autoriza con motivo; el resto recibe
+    // la advertencia (el endpoint re-valida todo server-side).
+    if (!revisionVerdeVigente) {
+      if (soyDireccion) {
+        setOverrideOpen(true);
         return;
       }
       toast.add({
-        title: 'Fase 13 cerrada',
-        description: 'Facturación registrada. Continúa con la siguiente fase desde el detalle.',
-        type: 'success',
+        title: 'La operación no cumple la revisión',
+        description:
+          'Para avanzar una operación que no cumple, debe autorizarla Dirección. Corre la revisión o pide la autorización.',
+        type: 'info',
       });
-      router.push(`/dilesa/ventas/${ventaId}`);
-    } finally {
-      setCerrando(false);
+      return;
     }
-  }, [
-    faltantes,
-    venta,
-    cuadratura,
-    cfdiFactura,
-    cfdiNotaCredito,
-    sb,
-    ventaId,
-    userId,
-    toast,
-    router,
-  ]);
+    void cerrar();
+  }, [faltantes, revisionVerdeVigente, soyDireccion, cerrar, toast]);
+
+  const onConfirmarOverride = useCallback(() => {
+    const motivo = overrideMotivo.trim();
+    if (!motivo) return;
+    setOverrideOpen(false);
+    void cerrar(motivo);
+  }, [overrideMotivo, cerrar]);
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -588,6 +688,69 @@ function CapturarFase13Body() {
             </div>
           </Section>
 
+          <Section title="Revisión de la operación (Aviso PLD)">
+            {!tienePld ? (
+              <p className="text-sm text-[var(--text)]/60">
+                Sube el Aviso PLD al expediente para poder correr la revisión.
+              </p>
+            ) : revisando ? (
+              <p className="flex items-center gap-2 text-sm text-[var(--text)]/70">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Extrayendo el aviso y cruzándolo contra el expediente… (~1 minuto)
+              </p>
+            ) : !revision ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-[var(--text)]/60">
+                  La operación aún no tiene revisión. El sistema lee el Aviso PLD y lo cruza contra
+                  el expediente (cliente, escritura, avalúo, depósitos).
+                </p>
+                <Button type="button" variant="outline" onClick={() => void onRevisar()}>
+                  <ShieldCheck className="mr-2 size-4" /> Revisar operación
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {!revision.vigente ? (
+                  <p className="flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    El Aviso PLD cambió después de esta revisión — re-ejecútala para que el cierre
+                    la tome en cuenta.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <VeredictoBadge veredicto={revision.veredicto} estado={revision.estado} />
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[var(--text)]/55">
+                      {revision.ejecutadoPorNombre
+                        ? `Revisó ${revision.ejecutadoPorNombre} · `
+                        : ''}
+                      {fmtMomento(revision.createdAt)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void onRevisar()}
+                    >
+                      Re-ejecutar
+                    </Button>
+                  </div>
+                </div>
+                {revision.estado === 'error' ? (
+                  <p className="text-xs text-destructive">
+                    La última revisión falló: {revision.errorDetalle ?? 'error desconocido'}. Puedes
+                    re-ejecutarla; si persiste, el cierre requiere autorización de Dirección.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {revision.checks.map((c) => (
+                      <CheckLinea key={c.clave} check={c} />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </Section>
           <Section title="Montos (informativos — nada se captura aquí)">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Valor de escrituración">
@@ -687,12 +850,16 @@ function CapturarFase13Body() {
               </Link>
               <Button
                 type="button"
-                onClick={() => void onCerrarFase()}
-                disabled={cerrando || subiendoRol != null || faltantes.length > 0}
+                onClick={() => onCerrarFase()}
+                disabled={cerrando || revisando || subiendoRol != null || faltantes.length > 0}
               >
                 {cerrando ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" /> Cerrando…
+                  </>
+                ) : !revisionVerdeVigente && soyDireccion ? (
+                  <>
+                    <ShieldCheck className="mr-2 size-4" /> Autorizar y cerrar (Dirección)
                   </>
                 ) : (
                   <>
@@ -704,7 +871,103 @@ function CapturarFase13Body() {
           ) : null}
         </>
       ) : null}
+
+      {/* Override de Dirección: la operación no cumple la revisión. */}
+      <Dialog
+        open={overrideOpen}
+        onOpenChange={(v) => {
+          if (!v) setOverrideOpen(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Autorizar cierre sin revisión en verde</DialogTitle>
+            <DialogDescription>
+              {revision
+                ? revision.vigente
+                  ? `La revisión está en ${revision.veredicto}.`
+                  : 'El Aviso PLD cambió después de la última revisión.'
+                : 'La operación no tiene revisión PLD.'}{' '}
+              El cierre quedará registrado en la bitácora como autorizado por Dirección, con tu
+              motivo.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={overrideMotivo}
+            onChange={(e) => setOverrideMotivo(e.target.value)}
+            placeholder="Motivo de la autorización (obligatorio)…"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOverrideOpen(false)} disabled={cerrando}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => onConfirmarOverride()}
+              disabled={overrideMotivo.trim().length === 0 || cerrando}
+            >
+              <ShieldCheck className="mr-2 size-4" /> Autorizar y cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function VeredictoBadge({
+  veredicto,
+  estado,
+}: {
+  veredicto: VeredictoRevision;
+  estado: 'completada' | 'error';
+}) {
+  if (estado === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800 dark:bg-red-950/40 dark:text-red-200">
+        <XCircle className="h-3.5 w-3.5" /> Revisión fallida
+      </span>
+    );
+  }
+  if (veredicto === 'verde') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Cumple — listo para cerrar
+      </span>
+    );
+  }
+  if (veredicto === 'advertencias') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <AlertTriangle className="h-3.5 w-3.5" /> Con advertencias — requiere Dirección
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800 dark:bg-red-950/40 dark:text-red-200">
+      <XCircle className="h-3.5 w-3.5" /> No cumple — requiere Dirección
+    </span>
+  );
+}
+
+function CheckLinea({ check }: { check: RevisionCheck }) {
+  const icono = check.ok ? (
+    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+  ) : check.severidad === 'error' ? (
+    <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+  ) : (
+    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+  );
+  return (
+    <li className="flex items-start gap-1.5 text-xs">
+      {icono}
+      <span className={check.ok ? 'text-[var(--text)]/60' : 'text-[var(--text)]'}>
+        {check.label}
+        {!check.ok && check.detalle ? (
+          <span className="text-[var(--text)]/60"> — {check.detalle}</span>
+        ) : null}
+      </span>
+    </li>
   );
 }
 

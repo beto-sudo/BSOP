@@ -4671,6 +4671,69 @@ export type Database = {
         }
         Relationships: []
       }
+      venta_fase_revisiones: {
+        Row: {
+          adjunto_id: string | null
+          checks: Json
+          created_at: string
+          ejecutado_por: string | null
+          empresa_id: string
+          error_detalle: string | null
+          estado: string
+          extraccion: Json | null
+          fase: number
+          id: string
+          modelo: string | null
+          venta_id: string
+          veredicto: string
+        }
+        Insert: {
+          adjunto_id?: string | null
+          checks?: Json
+          created_at?: string
+          ejecutado_por?: string | null
+          empresa_id: string
+          error_detalle?: string | null
+          estado?: string
+          extraccion?: Json | null
+          fase: number
+          id?: string
+          modelo?: string | null
+          venta_id: string
+          veredicto: string
+        }
+        Update: {
+          adjunto_id?: string | null
+          checks?: Json
+          created_at?: string
+          ejecutado_por?: string | null
+          empresa_id?: string
+          error_detalle?: string | null
+          estado?: string
+          extraccion?: Json | null
+          fase?: number
+          id?: string
+          modelo?: string | null
+          venta_id?: string
+          veredicto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venta_fases: {
         Row: {
           created_at: string
