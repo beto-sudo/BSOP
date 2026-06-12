@@ -1,47 +1,32 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 import { loadManualDoc } from '@/lib/manual/load';
+import { canReadManualDoc } from '@/lib/manual/access';
+import { getManualReaderContext } from '@/lib/manual/server';
 
 /**
  * Sirve el contenido de un doc del manual por su slug (`/api/manual/dilesa/
  * ventas/lista`). Lo consume `<HelpDrawer>` (client) al abrir la ayuda
  * contextual de una pantalla.
  *
- * Auth: el contenido es "cómo se usa" (no sensible), pero el endpoint exige
- * sesión — el botón "?" solo aparece en pantallas ya gateadas, así que el
- * fetch siempre ocurre autenticado; un anónimo no debe poder enumerar la
- * estructura interna de módulos (defense in depth).
+ * RBAC: además de exigir sesión, el doc solo se sirve si el usuario tiene
+ * acceso de lectura al módulo del doc (frontmatter `modulo:`, misma semántica
+ * que el sidebar). El drawer contextual ya hereda el gate de la pantalla,
+ * pero el endpoint no debe confiar en eso: sin este check, cualquier usuario
+ * autenticado podía leer el manual completo por URL (defense in depth, R3).
+ * Sin acceso → 404 (mismo shape que not_found: no se revela qué existe).
  *
  * El loader (`lib/manual/load.ts`) valida los segmentos contra path traversal
- * y exige frontmatter con versión, así que aquí solo cableamos auth + IO.
+ * y exige frontmatter con versión, así que aquí solo cableamos auth + RBAC.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string[] }> }) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        // GET de solo lectura — no necesitamos escribir cookies de refresh.
-        setAll() {},
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const ctx = await getManualReaderContext();
+  if (!ctx) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
   const { slug } = await params;
   const doc = await loadManualDoc(slug);
-  if (!doc) {
+  if (!doc || !canReadManualDoc(ctx.perms, doc)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 

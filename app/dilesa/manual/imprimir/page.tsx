@@ -7,7 +7,12 @@ import {
   manualGroupKey,
   manualGroupLabel,
 } from '@/lib/manual/groups';
+import { filterManualDocs } from '@/lib/manual/access';
+import { getManualReaderContext } from '@/lib/manual/server';
+import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
+import { getEffectiveUser } from '@/lib/auth/effective-user';
 import { RequireAccess } from '@/components/require-access';
+import { AccessDenied } from '@/components/access-denied/access-denied';
 import { ManualMarkdown } from '@/components/manual/manual-markdown';
 import { ManualPrintToolbar } from '@/components/manual/manual-print-toolbar';
 import { PrintLayout } from '@/components/print';
@@ -22,6 +27,13 @@ import { PrintLayout } from '@/components/print';
  * contextual — una sola fuente de verdad incluye el renderer (vs mantener un
  * mapper react-pdf paralelo que driftearía). Patrón ADR-021: `<PrintLayout
  * size="letter">`, page breaks por doc, toolbar `print:hidden`.
+ *
+ * **Solo Dirección/admin** (`checkDireccionEmpresa`, server-side): el manual
+ * empaquetado es el blueprint operativo del negocio — la consulta es in-app
+ * por pantalla; el documento completo no sale en un clic. Cada PDF lleva
+ * marca de confidencialidad con quién lo generó y cuándo (audit trail).
+ * Defensa adicional: aun para Dirección, el contenido pasa por
+ * `filterManualDocs` (módulos legibles).
  *
  * `?modulo=<grupo>` exporta solo ese módulo; sin query, el manual completo.
  * El título del documento (metadata) es el nombre de archivo que el browser
@@ -57,8 +69,29 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
   const { modulo } = await searchParams;
   if (modulo !== undefined && !isRegisteredManualGroup(modulo)) notFound();
 
-  const all = await listManualDocs('dilesa');
-  const docs = modulo ? all.filter((d) => manualGroupKey(d.slug) === modulo) : all;
+  const ctx = await getManualReaderContext();
+  if (!ctx) notFound(); // sin sesión el middleware ya redirigió a /login
+
+  // Gate Dirección/admin del export (server-side, no solo esconder el botón).
+  const { data: empresa } = await ctx.supabase
+    .schema('core')
+    .from('empresas')
+    .select('id')
+    .eq('slug', 'dilesa')
+    .maybeSingle();
+  const gate = empresa ? await checkDireccionEmpresa(ctx.supabase, empresa.id) : null;
+  if (!gate?.ok || !gate.autorizado) {
+    return (
+      <AccessDenied
+        title="Export restringido"
+        description="La descarga del manual en PDF está limitada a Dirección. Puedes consultar toda tu ayuda en el manual in-app."
+        required="DILESA · rol Dirección"
+      />
+    );
+  }
+
+  const visibles = filterManualDocs(ctx.perms, await listManualDocs('dilesa'));
+  const docs = modulo ? visibles.filter((d) => manualGroupKey(d.slug) === modulo) : visibles;
   if (docs.length === 0) notFound();
 
   const grupos = groupManualDocs(docs);
@@ -73,6 +106,12 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
     year: 'numeric',
     timeZone: 'America/Matamoros',
   });
+  // Marca de confidencialidad: quién generó el documento (audit trail).
+  const usuario = await getEffectiveUser(ctx.supabase);
+  const generadoPor = usuario?.firstName
+    ? `${usuario.firstName} (${usuario.email})`
+    : (usuario?.email ?? 'usuario autenticado');
+  const confidencial = `Documento confidencial de DILESA — uso interno. Generado por ${generadoPor} el ${generado}.`;
 
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.manual">
@@ -86,6 +125,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
         <PrintLayout
           size="letter"
           className="rounded-lg p-10 shadow-sm print:rounded-none print:shadow-none"
+          footer={<p className="text-center">{confidencial}</p>}
         >
           {/* Portada del documento */}
           <header className="flex min-h-[3in] flex-col justify-center text-center">
@@ -99,6 +139,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
               {' · '}Última actualización {formatActualizado(ultimaActualizacion)}
             </p>
             <p className="text-sm text-zinc-500">Generado el {generado}</p>
+            <p className="mx-auto mt-8 max-w-md text-xs text-zinc-400">{confidencial}</p>
           </header>
 
           {/* Índice */}

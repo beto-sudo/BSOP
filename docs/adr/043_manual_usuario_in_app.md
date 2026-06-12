@@ -1,7 +1,7 @@
 # ADR-043 — Manual de usuario in-app (contextual + versionado en git)
 
 **Estado:** Aceptado · Implementado (S0 fundación · S1 contenido DILESA 100% · S2 PDF + buscador)
-**Fecha:** 2026-06-07 (M8: 2026-06-11)
+**Fecha:** 2026-06-07 (M8: 2026-06-11 · RBAC/D9-D10: 2026-06-12)
 **Iniciativa:** `manual-usuario` (ver [planning](../planning/manual-usuario.md))
 
 ## Contexto
@@ -44,9 +44,15 @@ git**, con export a PDF on-demand (Sprint 2). Reglas canónicas:
   ghostscript-wasm). El loader valida los segmentos contra path traversal.
 - **M4 — Sin entrada de sidebar para la ayuda.** El botón "?" global (M2) es el
   único punto de acceso — no hay sección "Ayuda" en el sidebar. La portada
-  `/dilesa/manual` (índice de docs por versión; módulo RBAC `dilesa.manual`
-  read-only, `lectura=true/escritura=false` a todos los roles) sigue existiendo
-  como página accesible por URL, pero ya no se enlaza desde el sidebar.
+  `/dilesa/manual` (índice + buscador; módulo RBAC `dilesa.manual` read-only,
+  `lectura=true/escritura=false` a todos los roles) se alcanza por el link
+  "Ver manual completo" al pie del drawer del "?" (S2 — antes era URL-only y
+  no descubrible). **El contenido se filtra por permisos** (S2, R3): la
+  portada, el buscador y el endpoint `/api/manual/[...slug]` solo muestran/
+  sirven docs de módulos a los que el usuario tiene lectura
+  (`lib/manual/access.ts` sobre el frontmatter `modulo:`, misma semántica que
+  el sidebar; umbrella vía padre-o-cualquier-sub-slug, SS8) — quien no opera
+  Tesorería o RH no lee cómo funcionan.
 - **M5 — Versionado por módulo y global.** Cada `.md` lleva su `version`
   semántica, la fecha `actualizado` y un changelog `## Cambios` al pie. El
   usuario ve "v1.2 · actualizado 07-jun" en el drawer.
@@ -71,7 +77,12 @@ size="letter">` + `useTriggerPrint()` + page breaks por doc). Razón: "una
   cualquier elemento markdown nuevo se agrega AHÍ, nunca en un renderer
   paralelo. El buscador full-text de la portada (`/api/manual/search`,
   insensible a acentos) busca sobre el mismo contenido vía
-  `lib/manual/search.ts`.
+  `lib/manual/search.ts` (filtrado por permisos, M4). **El export es solo
+  Dirección/admin** (`checkDireccionEmpresa`, gate server-side en la vista y
+  botones ocultos en portada): el manual empaquetado es el blueprint operativo
+  del negocio — en pantalla cada quien consulta su módulo; el documento
+  completo no sale en un clic. Cada PDF lleva marca de confidencialidad con
+  quién lo generó y cuándo (audit trail, decidido con Beto 2026-06-12).
 
 ## Consecuencias
 

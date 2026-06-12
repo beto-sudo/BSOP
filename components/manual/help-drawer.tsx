@@ -1,13 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { HelpCircle } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, HelpCircle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page/detail-drawer';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { resolveHelpSlug } from '@/lib/manual/help-routes';
 import { ManualMarkdown } from './manual-markdown';
+
+/** Empresas con portada de manual publicada (hoy solo DILESA; el rollout a
+ * otras empresas agrega su slug aquí — ver content/manual/README.md). */
+const EMPRESAS_CON_MANUAL = new Set(['dilesa']);
 
 /**
  * Ayuda contextual del Manual de usuario (iniciativa `manual-usuario`).
@@ -52,6 +57,12 @@ export function HelpDrawer({
 }) {
   const [doc, setDoc] = useState<ManualDocResponse | null>(null);
   const [state, setState] = useState<LoadState>('loading');
+  const pathname = usePathname();
+  // Puente a la portada (índice + buscador): la empresa sale del doc abierto
+  // o de la URL actual. En la portada misma el link sobra.
+  const empresa = slug?.split('/')[0] ?? pathname.split('/')[1] ?? '';
+  const portadaHref = `/${empresa}/manual`;
+  const muestraPortada = EMPRESAS_CON_MANUAL.has(empresa) && pathname !== portadaHref;
 
   useEffect(() => {
     // Fetch solo al abrir (lazy). El setState vive en los callbacks async —
@@ -100,6 +111,18 @@ export function HelpDrawer({
           <p className="text-sm text-muted-foreground">Cargando ayuda…</p>
         ) : (
           <ManualMarkdown body={doc!.body} />
+        )}
+        {muestraPortada && (
+          <div className="mt-6 border-t border-[var(--border)] pt-3">
+            <Link
+              href={portadaHref}
+              onClick={() => onOpenChange(false)}
+              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              <BookOpen className="h-4 w-4" />
+              Ver manual completo
+            </Link>
+          </div>
         )}
       </DetailDrawerContent>
     </DetailDrawer>
