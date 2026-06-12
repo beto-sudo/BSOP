@@ -56,6 +56,52 @@ export type TuberiaRow = {
   valor: number;
 };
 
+export type VentaTuberiaInput = {
+  estado: string | null;
+  fase_actual: string | null;
+  valor_escrituracion: number | null;
+};
+
+/**
+ * Tubería del correo: ventas ACTIVAS agrupadas por fase, en el orden del
+ * catálogo, + una fila final "Sin fase asignada" si hay activas con fase NULL
+ * o con una grafía que no existe en el catálogo — así la tubería nunca pierde
+ * clientes en silencio (2026-06-11: 4 ventas "Solicitud de Dictaminacion" sin
+ * tilde + 50 sin fase eran invisibles en el correo). Las desasignadas no
+ * cuentan aunque conserven fase: son ventas caídas.
+ */
+export function armarTuberia(
+  fasesCat: { nombre: string; posicion: number }[],
+  ventas: VentaTuberiaInput[]
+): TuberiaRow[] {
+  const orden = [...fasesCat].sort((a, b) => a.posicion - b.posicion);
+  const conocidas = new Set(orden.map((f) => f.nombre));
+  const porFase = new Map<string, { clientes: number; valor: number }>();
+  const sinFase = { clientes: 0, valor: 0 };
+  for (const v of ventas) {
+    if (v.estado !== 'activa') continue;
+    const valor = Number(v.valor_escrituracion ?? 0);
+    if (v.fase_actual && conocidas.has(v.fase_actual)) {
+      const acc = porFase.get(v.fase_actual) ?? { clientes: 0, valor: 0 };
+      acc.clientes += 1;
+      acc.valor += valor;
+      porFase.set(v.fase_actual, acc);
+    } else {
+      sinFase.clientes += 1;
+      sinFase.valor += valor;
+    }
+  }
+  const rows: TuberiaRow[] = orden.map((f) => ({
+    fase: f.nombre,
+    clientes: porFase.get(f.nombre)?.clientes ?? 0,
+    valor: porFase.get(f.nombre)?.valor ?? 0,
+  }));
+  if (sinFase.clientes > 0) {
+    rows.push({ fase: 'Sin fase asignada', clientes: sinFase.clientes, valor: sinFase.valor });
+  }
+  return rows;
+}
+
 export type AsignacionRow = {
   nombre: string;
   asignaciones_mes: number;
@@ -417,7 +463,7 @@ export async function fetchResumenConsejoData(
     dilesa.from('productos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
     dilesa
       .from('ventas')
-      .select('fase_actual,fase_posicion,valor_escrituracion')
+      .select('estado,fase_actual,fase_posicion,valor_escrituracion')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null),
     dilesa
@@ -487,24 +533,12 @@ export async function fetchResumenConsejoData(
     .filter((i) => i.en_inventario > 0)
     .sort((x, y) => x.nombre.localeCompare(y.nombre));
 
-  // Tubería: count + sum(valor_escrituracion) por fase, en el orden del catálogo
-  const fasesCat = (fasesCatRes.data ?? []).sort(
-    (a: { posicion: number }, b: { posicion: number }) => a.posicion - b.posicion
+  // Tubería: count + sum(valor_escrituracion) por fase del catálogo + fila
+  // "Sin fase asignada" (lógica pura en armarTuberia).
+  const tuberia = armarTuberia(
+    (fasesCatRes.data ?? []) as { nombre: string; posicion: number }[],
+    (ventasRes.data ?? []) as VentaTuberiaInput[]
   );
-  const porFase = new Map<string, { clientes: number; valor: number }>();
-  for (const v of ventasRes.data ?? []) {
-    const fase = (v as { fase_actual: string | null }).fase_actual;
-    if (!fase) continue;
-    const acc = porFase.get(fase) ?? { clientes: 0, valor: 0 };
-    acc.clientes += 1;
-    acc.valor += Number((v as { valor_escrituracion: number | null }).valor_escrituracion ?? 0);
-    porFase.set(fase, acc);
-  }
-  const tuberia: TuberiaRow[] = fasesCat.map((f: { nombre: string }) => ({
-    fase: f.nombre,
-    clientes: porFase.get(f.nombre)?.clientes ?? 0,
-    valor: porFase.get(f.nombre)?.valor ?? 0,
-  }));
 
   // Asignaciones/escrituras del mes: por venta_fases del mes, agrupadas por prototipo.
   // Requiere resolver venta → unidad → producto. Se hace con un fetch puntual de las
