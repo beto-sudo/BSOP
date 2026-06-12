@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** aplicar migración venta_fase_revisiones a prod + merge de Sprint 3 (PR en revisión) → cierre de iniciativa (S4 rollout queda opcional)
+**Próximo hito:** prueba en prod con venta real en F13 (revisión PLD + gate) → decidir Sprint 4 (rollout del patrón a las demás fases) o cierre
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -183,6 +183,12 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 3 mergeado (PR #864) y migración
+  `venta_fase_revisiones` aplicada a prod (db push aprobado por Beto,
+  verificada con information_schema). S1 (#860) y S2 (#862) mergeados el
+  mismo día. Iniciativa funcional end-to-end en producción; queda la prueba
+  con venta real y decidir el rollout (S4).
 
 - **2026-06-12** — Sprint 3 entregado (PR en revisión): extracción IA del
   Aviso PLD (visión, mismo stack que estados de cuenta) + cruce determinista
