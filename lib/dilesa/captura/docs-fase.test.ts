@@ -16,6 +16,7 @@ function doc(partial: Partial<DocFase> & Pick<DocFase, 'id' | 'rol' | 'subidoAt'
     tamanoBytes: 1024,
     subidoPor: 'u1',
     subidoPorNombre: 'Usuario Uno',
+    metadata: null,
     ...partial,
   };
 }

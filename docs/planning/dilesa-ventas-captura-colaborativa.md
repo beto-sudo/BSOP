@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** merge de Sprint 1 (PR #860, preview en revisión) → Sprint 2 (XML CFDI + montos automáticos)
+**Próximo hito:** merge de Sprint 2 (XML CFDI, PR en revisión) → Sprint 3 (revisión IA del PLD + gate)
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -132,6 +132,14 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
+- **2026-06-12 — En F13 nada se captura a mano (feedback Beto en review).**
+  `valor_escrituracion` viene de la Fase 8 (Dictaminada) y en F13 solo se
+  muestra; `valor_facturado`/`monto_nota_credito` se derivan SOLO del XML
+  (sin captura manual ni siquiera como degradación) — corregir = subir el
+  XML corregido (queda versionado). El cierre no pisa montos que el XML no
+  respalde (las históricas migradas conservan los suyos). El botón "Guardar
+  montos" desaparece: la sección Montos es informativa.
+
 - **2026-06-12 — Gate duro con override de Dirección.** El cierre de fase
   bloquea si la revisión no está en verde; la advertencia informa que
   avanzar requiere autorización de Dirección. Override registrado con motivo
@@ -175,6 +183,14 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 2 entregado (PR en revisión con preview): slots
+  `factura_xml` (requerido) y `nota_credito_xml` con validación determinista
+  al subir (parser CxP extendido con CfdiRelacionados), dedup de folio
+  fiscal cross-venta, montos derivados del XML (read-only; corregir = subir
+  XML corregido, queda versionado), checks persistidos en
+  `erp.adjuntos.metadata`. PDF de factura pasa a opcional. Sprint 1 (PR
+  #860) mergeado el mismo día.
 
 - **2026-06-12** — Sprint 1 entregado (PR #860, sin auto-merge por ser UI
   visible — preview a revisión de Beto): captura incremental con autoría

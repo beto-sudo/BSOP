@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data: rows, error: adjErr } = await admin
     .schema('erp')
     .from('adjuntos')
-    .select('id, rol, nombre, url, tipo_mime, tamano_bytes, uploaded_by, created_at')
+    .select('id, rol, nombre, url, tipo_mime, tamano_bytes, uploaded_by, created_at, metadata')
     .eq('empresa_id', DILESA_EMPRESA_ID)
     .eq('entidad_tipo', 'venta')
     .eq('entidad_id', ventaId)
@@ -97,6 +97,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     tamano_bytes: number | null;
     uploaded_by: string | null;
     created_at: string;
+    metadata: Record<string, unknown> | null;
   };
   const adjuntos = (rows ?? []) as Row[];
 
@@ -132,6 +133,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     subidoPor: a.uploaded_by,
     subidoPorNombre: a.uploaded_by ? (nombrePorId.get(a.uploaded_by) ?? null) : null,
     subidoAt: a.created_at,
+    metadata: a.metadata,
   }));
 
   return NextResponse.json({ ok: true, docs });
