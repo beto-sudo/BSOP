@@ -6,7 +6,9 @@
  * Tras la firma en notaría, las escrituras llegan a Dirección (Beto, o quien
  * de Dirección esté) para firmar. Se registra:
  *   - `fecha_escritura` → fecha de la escritura
- *   - `numero_escritura` → # de escritura (opcional)
+ *   - `numero_escritura` → número de instrumento público del NOTARIO
+ *     (no el folio interno — la revisión PLD de F13 lo cruza contra el
+ *     aviso). Corrige post-cierre sin tocar venta_fases.
  *   - `numero_cheque_notaria` → número del cheque enviado a la notaría
  *   - `monto_cheque_notaria` → monto del cheque (parte de la cuadratura)
  *
@@ -255,6 +257,47 @@ function CapturarFase11Body() {
     [fechaEscritura, montoCheque, numeroCheque, numeroEscritura, router, sb, toast, venta]
   );
 
+  // ── Corrección post-cierre (no toca venta_fases — patrón F8) ─────
+  // Las ventas migradas traen folio interno en numero_escritura; la
+  // revisión PLD de F13 exige el instrumento real del notario.
+  const onActualizarEscritura = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!venta) return;
+      if (!fechaEscritura) {
+        toast.add({
+          title: 'Falta la fecha de escritura',
+          type: 'error',
+        });
+        return;
+      }
+      setSubmitting(true);
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          fecha_escritura: fechaEscritura,
+          numero_escritura: numeroEscritura.trim() || null,
+        })
+        .eq('id', venta.id);
+      setSubmitting(false);
+      if (upErr) {
+        toast.add({
+          title: 'No se pudieron actualizar los datos',
+          description: getSupabaseErrorMessage(upErr, 'Reintenta.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({
+        title: 'Datos de escritura actualizados',
+        description: 'Si la Fase 13 ya tenía revisión, re-ejecútala para que tome el dato nuevo.',
+        type: 'success',
+      });
+    },
+    [venta, fechaEscritura, numeroEscritura, sb, toast]
+  );
+
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -295,11 +338,49 @@ function CapturarFase11Body() {
       />
 
       {yaCerrada ? (
-        <Banner
-          tone="success"
-          title="Fase 11 ya está cerrada"
-          body="Esta venta ya está escriturada. La siguiente fase es Detonada."
-        />
+        <div className="space-y-6">
+          <Banner
+            tone="success"
+            title="Fase 11 ya está cerrada"
+            body="Esta venta ya está escriturada. La siguiente fase es Detonada. Si el número o la fecha de la escritura quedaron mal capturados (ej. folio interno en lugar del instrumento del notario), corrígelos aquí — la revisión PLD de la Fase 13 los cruza contra el aviso."
+          />
+          <form onSubmit={onActualizarEscritura} className="space-y-6">
+            <Section title="Corregir datos de la escritura">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Fecha de escritura *">
+                  <Input
+                    type="date"
+                    value={fechaEscritura}
+                    onChange={(e) => setFechaEscritura(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Número de instrumento público (escritura)">
+                  <Input
+                    value={numeroEscritura}
+                    onChange={(e) => setNumeroEscritura(e.target.value)}
+                    placeholder="Número que asigna el notario, ej. 206"
+                  />
+                  <Hint>
+                    El número de la escritura del NOTARIO (instrumento público) — no el folio
+                    interno.
+                  </Hint>
+                </Field>
+              </div>
+            </Section>
+            <div className="flex items-center justify-end gap-3">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
+                  </>
+                ) : (
+                  'Actualizar datos de escritura'
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
       ) : fase10Cerrada === false ? (
         <Banner
           tone="warning"
@@ -331,12 +412,16 @@ function CapturarFase11Body() {
                   required
                 />
               </Field>
-              <Field label="Número de escritura">
+              <Field label="Número de instrumento público (escritura)">
                 <Input
                   value={numeroEscritura}
                   onChange={(e) => setNumeroEscritura(e.target.value)}
-                  placeholder="# de escritura (opcional)"
+                  placeholder="Número que asigna el notario, ej. 206"
                 />
+                <Hint>
+                  El número de la escritura del NOTARIO (instrumento público) — no el folio interno.
+                  La revisión PLD de la Fase 13 lo cruza contra el aviso.
+                </Hint>
               </Field>
             </div>
           </Section>
