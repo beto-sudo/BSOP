@@ -21,7 +21,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
-import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
+import { useVentaResumen, type VentaResumenState } from '@/lib/dilesa/use-venta-resumen';
 
 function fmtFechaCorta(s: string | null): string | null {
   if (!s) return null;
@@ -37,6 +37,7 @@ export function CapturarFaseHeader({
   faseposicion,
   faseNombre,
   descripcion,
+  resumen: resumenExterno,
 }: {
   ventaId: string;
   clienteNombre: string | null;
@@ -44,8 +45,15 @@ export function CapturarFaseHeader({
   faseposicion: number;
   faseNombre: string;
   descripcion?: string;
+  /**
+   * Resumen pre-cargado por la página (cuando ella también lo necesita,
+   * ej. F13 pinta la cuadratura). Si viene, el hook interno no carga nada
+   * (ventaId null lo deja inerte) — evita duplicar las queries.
+   */
+  resumen?: VentaResumenState;
 }) {
-  const resumen = useVentaResumen(ventaId);
+  const resumenInterno = useVentaResumen(resumenExterno ? null : ventaId);
+  const resumen = resumenExterno ?? resumenInterno;
 
   return (
     <header className="space-y-3">

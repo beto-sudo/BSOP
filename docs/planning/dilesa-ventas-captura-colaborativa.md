@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — captura colaborativa en Fase 13 (PR en preparación)
+**Próximo hito:** merge de Sprint 1 (PR #860, preview en revisión) → Sprint 2 (XML CFDI + montos automáticos)
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -176,6 +176,12 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Bitácora
 
+- **2026-06-12** — Sprint 1 entregado (PR #860, sin auto-merge por ser UI
+  visible — preview a revisión de Beto): captura incremental con autoría
+  visible en Fase 13, montos guardables sin cerrar, valor real pintado de
+  cuadratura, cierre validando contra expediente. Helper genérico
+  `lib/dilesa/captura/docs-fase.ts` + GET de docs con nombres resueltos
+  server-side.
 - **2026-06-12** — Promovida tras diagnóstico del incidente de Norberto
   (facturas "no guardadas" = diseño todo-al-final de la captura de fase).
   Alcance y decisiones confirmadas con Beto en sesión. PDF real de Aviso PLD
