@@ -29,7 +29,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Download, Loader2, Plus, Save, Trash2, Upload, XCircle } from 'lucide-react';
+import { Download, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,19 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  DocsFaseSection,
+  useDocsFaseColaborativos,
+  type SlotColaborativo,
+} from '@/components/dilesa/captura/docs-fase-colaborativos';
+
+const SLOTS_FASE: SlotColaborativo[] = [
+  {
+    rol: 'pagare_credito_directo',
+    label: 'Pagaré firmado (súbelo cuando lo tengas)',
+    requerido: false,
+  },
+];
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { getNotaria } from '@/lib/dilesa/notarios';
 
@@ -97,6 +110,7 @@ function CapturarFase10Body() {
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
+  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>('');
@@ -119,7 +133,6 @@ function CapturarFase10Body() {
   const [avalDomicilio, setAvalDomicilio] = useState<string>('');
   const [cdGuardado, setCdGuardado] = useState<boolean>(false);
   const [savingCD, setSavingCD] = useState<boolean>(false);
-  const [pagareArchivo, setPagareArchivo] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -456,7 +469,7 @@ function CapturarFase10Body() {
         ventaId: venta.id,
         faseNombre: 'Firmas Programadas',
         faseposicion: 10,
-        docs: pagareArchivo ? [{ rol: 'pagare_credito_directo', archivo: pagareArchivo }] : [],
+        docs: [], // el pagaré (si se subió) ya vive en el expediente
         camposVenta: {
           fecha_firma_programada: fechaFirma,
           hora_firma_programada: horaFirma,
@@ -481,7 +494,7 @@ function CapturarFase10Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [aplicaCD, cdGuardado, fechaFirma, horaFirma, pagareArchivo, router, sb, toast, venta]
+    [aplicaCD, cdGuardado, fechaFirma, horaFirma, router, sb, toast, venta]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -895,13 +908,9 @@ function CapturarFase10Body() {
                 )}
               </div>
 
-              {/* Subir pagaré firmado */}
+              {/* Pagaré firmado — persiste al subirse (captura colaborativa S4b) */}
               <div className="mt-4">
-                <FileSlot
-                  label="Pagaré firmado (opcional — súbelo cuando lo tengas)"
-                  archivo={pagareArchivo}
-                  onChange={setPagareArchivo}
-                />
+                <DocsFaseSection state={docsFase} titulo="Pagaré firmado" />
               </div>
             </Section>
           ) : (
@@ -987,77 +996,6 @@ function CoberturaRow({
         {label}
       </span>
       <span className={`${strong ? 'font-semibold' : 'font-medium'} ${toneClass}`}>{value}</span>
-    </div>
-  );
-}
-
-function FileSlot({
-  label,
-  archivo,
-  onChange,
-}: {
-  label: string;
-  archivo: File | null;
-  onChange: (f: File | null) => void;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const completo = !!archivo;
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        if (!dragOver) setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (!f) return;
-        if (
-          !(
-            f.type === 'application/pdf' ||
-            f.type.startsWith('image/') ||
-            f.name.toLowerCase().endsWith('.pdf')
-          )
-        ) {
-          return;
-        }
-        onChange(f);
-      }}
-      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
-        dragOver
-          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
-          : 'border-[var(--border)]'
-      }`}
-    >
-      <div className="flex flex-1 items-center gap-2 text-sm">
-        {completo ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-        ) : (
-          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
-        )}
-        <span className="font-medium">{label}</span>
-        {archivo ? (
-          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
-          </span>
-        ) : null}
-      </div>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-        <Upload className="h-3.5 w-3.5" />
-        {archivo ? 'Cambiar' : 'Subir PDF'}
-        <input
-          type="file"
-          accept="application/pdf,image/*"
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
     </div>
   );
 }

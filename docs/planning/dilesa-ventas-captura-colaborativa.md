@@ -4,7 +4,7 @@
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
 **Estado:** in_progress
-**Próximo hito:** aplicar migración del acuse + merge S4a → prueba en prod del ciclo completo → S4b (rollout del patrón a las demás fases)
+**Próximo hito:** merge S4b (rollout, PR en revisión) + prueba en prod del ciclo completo en F13 → cierre de iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-12
 **Última actualización:** 2026-06-12
@@ -190,6 +190,16 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-12** — Sprint 4b entregado (PR en revisión): rollout de la
+  captura colaborativa a las fases 3, 5, 6, 9, 10, 12, 14 y 15 vía pieza
+  compartida `components/dilesa/captura/docs-fase-colaborativos.tsx`
+  (hook + sección de slots); cada página cierra con `docs: []` validando
+  faltantes contra el expediente. **F8 (Dictaminada) queda fuera a
+  propósito**: su flujo dual (magic link del notario + análisis IA de la
+  carta) ya es semi-colaborativo y se migrará en pasada dedicada para no
+  arriesgar esa maquinaria. S4a (acuse) mergeado (#868) con su migración
+  aplicada a prod.
 
 - **2026-06-12** — Sprint 4a entregado (PR en revisión): acuse de envío
   SPPLD requerido en F13 con extracción IA y cruce contra el informe
