@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Limpieza de ~$2.0M en saldos a favor (185 ventas, depósitos Infonavit/Fovissste capturados ≥ precio — requiere regla + OK de Beto). Luego Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes"). Reversión LIQ-HIST de ventas en flujo aplicada y verificada 2026-06-11
+**Próximo hito:** Aplicar migración `20260612173513` (fix FIFO sin fuente + recibo XML — frena la generación nueva de saldos a favor por enganche exentado) con OK de Beto, y que Contabilidad registre los 2 abonos de la venta Ahumada. Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-11 (reversión LIQ-HIST aplicada a prod: 44 pagos / 31 ventas / $10.49M reabiertos como cartera viva; aging en 101 ventas / $91.1M)
+**Última actualización:** 2026-06-12 (recibo de caja XML con extracción + verificación, F12 manual solo Dirección, fix regresión FIFO, comprobantes al expediente vía trigger)
 
 ## Problema
 
@@ -211,6 +211,35 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Decisiones registradas
 
+### 2026-06-12 — El XML del recibo manda; F12 manual solo Dirección; FIFO sin fuente es canon
+
+Del caso Ahumada Castillo (F12 cerrada a mano sin abono en CxC) y la
+mejora pedida por Beto en chat:
+
+- **El recibo de caja (CFDI de CONTPAQi) se sube en XML al registrar el
+  abono y los datos se EXTRAEN del XML** (fecha, monto, forma de pago,
+  referencia, `uuid_sat`) en lugar de capturarse a mano. Verificación
+  del receptor contra el cliente de la venta: RFC (fuerte) con fallback
+  a nombre normalizado; emisor vs RFC de la empresa como warning.
+- **Mismatch de receptor ≠ bloqueo**: con coacreditados el recibo puede
+  venir a nombre del cónyuge → alerta + confirmación explícita del
+  operador, que queda en `notas` del pago y en `metadata` del adjunto.
+- **XML opcional** (no bloquea registrar el abono el día que cae el
+  depósito; el recibo a veces se emite después). El estado de cuenta
+  marca cada abono "XML ✓ …folio" o "sin XML" para perseguir el faltante.
+- **Folio fiscal único**: unique parcial sobre `(empresa_id, uuid_sat)`
+  vivos — un recibo no se registra dos veces.
+- **La pantalla F12 deja de capturar para el equipo**: queda como guía
+  con botón directo a "Registrar abono" (`?abono=1`). El form manual es
+  cierre de emergencia EXCLUSIVO de Dirección/admin con advertencia de
+  que no registra el dinero. Razón: el slot de imagen en la fase hacía
+  creer que el depósito quedaba registrado (2 casos en 2 días).
+- **FIFO sin fuente se restaura como decisión vigente**: el fix
+  `20260601201000` pisó por accidente a `20260601180854`; con el filtro
+  por fuente, el enganche exentado (el crédito lo cubre — práctica
+  frecuente de DILESA confirmada por Beto) dejaba cargo de enganche
+  pendiente eterno + saldo a favor fantasma del mismo monto.
+
 ### 2026-06-11 — El bucket "cerrada" por fase tiene falso positivo en ventas recientes; reversión acotada por fecha de escritura
 
 Beto detectó un abono fantasma de $1,622 (12-may) en la venta de Josue
@@ -300,6 +329,43 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-12 — Recibo XML + F12 solo Dirección + fix regresión FIFO (caso Ahumada)
+
+Diagnóstico del reporte de Beto (venta Jesus Santiago Ahumada Castillo,
+M11-L14-LDLE, Infonavit Unamos): la F12 se cerró por la pantalla manual
+el 11-jun 9:48 — **horas antes** de que se deployara el trigger de
+detonación por CxC ese mismo día — así que el estado de cuenta quedó sin
+los depósitos; el slot único de imagen además descartó silenciosamente
+la 1ª de 2 imágenes (coacreditados). En el camino se encontraron 2 bugs
+reales: (a) **regresión del FIFO sin fuente** (el fix de movimiento
+bancario `20260601201000` pisó a `20260601180854` — ver Decisiones), y
+(b) el comprobante del abono **nunca llegaba al expediente** vía trigger
+(`comprobante_adjunto_id` jamás se seteaba en el flujo del drawer y el
+dedupe por rol limitaba a 1 comprobante). Entregado en PR de esta sesión:
+
+- Migración `20260612173513`: `cxc_pago_registrar` con FIFO sin fuente
+  restaurado (conservando movimiento bancario + audit log), unique
+  parcial `uuid_sat`, helper `fn_copiar_comprobante_detonacion` (N
+  comprobantes, dedupe por adjunto de origen) llamado desde el trigger
+  de detonación + nuevo trigger `AFTER UPDATE OF comprobante_adjunto_id`
+  (cubre el deferred upload).
+- `lib/dilesa/cxc/cfdi-recibo.ts` (15 tests): parse de recibo tipo P
+  (complemento de Pagos 2.0) y tipo I, mapeo de claves SAT de forma de
+  pago, verificación receptor-vs-cliente RFC/nombre. No toca
+  `lib/cxp/cfdi-parser` (PR #862 lo extiende en paralelo para F13).
+- Drawer de abono: slot XML que autollena y bloquea los campos (con
+  "editar manualmente"), panel de verificación con confirmación para
+  receptor distinto, `p_uuid_sat`, mensaje claro en folio duplicado, y
+  liga del comprobante al pago (dispara la copia al expediente).
+- F12: guía a Cobranza para el equipo; form solo Dirección con banner
+  de emergencia. Detalle de venta: deep-link `?abono=1` + columna
+  "Recibo fiscal" (XML ✓ / sin XML) en abonos.
+
+**Operativo pendiente (Contabilidad):** registrar los 2 abonos reales de
+la institución de la venta Ahumada (uno por depósito, con comprobante y
+XML) — idealmente después de aplicar la migración para que salden ambos
+cargos ($930,800 disposición + $9,200 enganche, crédito cubre todo).
 
 ### 2026-06-11 — Reversión LIQ-HIST APLICADA a prod y verificada
 
