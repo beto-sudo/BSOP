@@ -1,17 +1,23 @@
 'use client';
 
 /**
- * Captura Fase 13 — Facturada (Sprint 7k).
+ * Captura Fase 13 — Facturada (captura colaborativa: Sprint 1 de
+ * `dilesa-ventas-captura-colaborativa`).
  *
- * Contabilidad registra la facturación: sube PDFs (factura, nota de crédito,
- * aviso PLD) y captura los montos de cuadratura. Los depósitos de la
- * operación se muestran como referencia (CxC `erp.cxc_pagos`).
+ * El flujo real es de varias personas en momentos distintos (una sube la
+ * factura, otra el Aviso PLD, una tercera revisa y cierra), así que:
  *
- * Captura:
- *   - Docs: factura (rol `factura`, requerido), nota de crédito (`nota_credito`),
- *     aviso PLD (`aviso_pld`) — los 2 últimos opcionales.
- *   - Montos: valor_escrituracion (requerido), valor_real_venta_dilesa,
- *     valor_facturado, monto_nota_credito.
+ *   - Cada documento PERSISTE AL SUBIRSE (storage + `erp.adjuntos` con
+ *     `uploaded_by`); el slot muestra quién lo subió y cuándo. "Cambiar"
+ *     versiona (conserva la anterior).
+ *   - Los montos se guardan sin cerrar la fase ("Guardar montos").
+ *   - "Cerrar fase" valida contra el expediente persistido — no contra la
+ *     memoria del navegador — y registra la fase vía `marcarFase` (docs: []).
+ *   - Valor real venta DILESA NO se captura: se pinta del motor de
+ *     cuadratura (`lib/dilesa/cuadratura.ts`, fórmulas Coda) y su snapshot
+ *     se persiste al guardar montos / cerrar. Valor facturado y monto NC
+ *     siguen capturables (Sprint 2 los automatiza vía XML CFDI) con la
+ *     sugerencia de la cuadratura como hint.
  *
  * Enforcement: Fase 12 (Detonada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
@@ -21,7 +27,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, Lock, Save, Upload, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -29,13 +35,29 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
-import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
+import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  faltantesParaCerrar,
+  fetchDocsFase,
+  subirDocFase,
+  type DocRolEstado,
+  type DocsPorRol,
+} from '@/lib/dilesa/captura/docs-fase';
+import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
+
+const DOCS_FASE13 = [
+  { rol: 'factura', label: 'PDF Factura', requerido: true },
+  { rol: 'nota_credito', label: 'PDF Nota de Crédito (si aplica)', requerido: false },
+  { rol: 'aviso_pld', label: 'PDF Aviso PLD', requerido: true },
+] as const;
+const ROLES_FASE13 = DOCS_FASE13.map((d) => d.rol as string);
+const ROLES_REQUERIDOS = DOCS_FASE13.filter((d) => d.requerido).map((d) => d.rol as string);
+const LABEL_POR_ROL = new Map<string, string>(DOCS_FASE13.map((d) => [d.rol as string, d.label]));
 
 type VentaCtx = {
   id: string;
-  persona_id: string;
-  unidad_id: string | null;
   valor_escrituracion: number | null;
   valor_real_venta_dilesa: number | null;
   valor_facturado: number | null;
@@ -59,6 +81,19 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
 const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
 
+/** `erp.adjuntos.created_at` viene en UTC — formatear en hora local. */
+function fmtMomento(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function CapturarFase13Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.ventas.fase13_facturada" write>
@@ -74,24 +109,40 @@ function CapturarFase13Body() {
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
 
+  const resumen = useVentaResumen(ventaId);
+  const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
+  const clienteNombre = resumen.status === 'ready' ? resumen.props.cliente.nombre : null;
+  const identificacionInv =
+    resumen.status === 'ready' ? (resumen.props.vivienda.identificador ?? null) : null;
+
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [clienteNombre, setClienteNombre] = useState<string>('');
-  const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [fase12Cerrada, setFase12Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const [facturaFile, setFacturaFile] = useState<File | null>(null);
-  const [notaCreditoFile, setNotaCreditoFile] = useState<File | null>(null);
-  const [avisoPldFile, setAvisoPldFile] = useState<File | null>(null);
+  const [docs, setDocs] = useState<DocsPorRol | null>(null);
+  const [docsError, setDocsError] = useState<string | null>(null);
+  const [subiendoRol, setSubiendoRol] = useState<string | null>(null);
+
   const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
-  const [valorRealVenta, setValorRealVenta] = useState<string>('');
   const [valorFacturado, setValorFacturado] = useState<string>('');
   const [montoNotaCredito, setMontoNotaCredito] = useState<string>('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [guardandoMontos, setGuardandoMontos] = useState(false);
+  const [cerrando, setCerrando] = useState(false);
+
+  const cargarDocs = useCallback(async () => {
+    const r = await fetchDocsFase(ventaId, ROLES_FASE13);
+    if (r.ok) {
+      setDocs(r.docs);
+      setDocsError(null);
+    } else {
+      setDocsError(r.error);
+    }
+  }, [ventaId]);
 
   // ── Cargar contexto ──────────────────────────────────────────────
   useEffect(() => {
@@ -102,162 +153,173 @@ function CapturarFase13Body() {
       setLoading(true);
       setError(null);
 
-      const { data: vRow, error: vErr } = await sb
-        .schema('dilesa')
-        .from('ventas')
-        .select(
-          'id, persona_id, unidad_id, valor_escrituracion, valor_real_venta_dilesa, valor_facturado, monto_nota_credito'
-        )
-        .eq('id', ventaId)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (!activo) return;
-      if (vErr) {
-        setError(getSupabaseErrorMessage(vErr, 'No se pudo cargar la venta.'));
-        setLoading(false);
-        return;
-      }
-      if (!vRow) {
-        setError('Venta no encontrada.');
-        setLoading(false);
-        return;
-      }
-      const v = vRow as unknown as VentaCtx;
-      setVenta(v);
-      if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
-      if (v.valor_real_venta_dilesa != null) setValorRealVenta(String(v.valor_real_venta_dilesa));
-      if (v.valor_facturado != null) setValorFacturado(String(v.valor_facturado));
-      if (v.monto_nota_credito != null) setMontoNotaCredito(String(v.monto_nota_credito));
-
-      const [pRes, uRes, fRes, dRes] = await Promise.all([
+      const [vRes, fRes, dRes, userRes] = await Promise.all([
         sb
-          .schema('erp')
-          .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
-          .eq('id', v.persona_id)
+          .schema('dilesa')
+          .from('ventas')
+          .select(
+            'id, valor_escrituracion, valor_real_venta_dilesa, valor_facturado, monto_nota_credito'
+          )
+          .eq('id', ventaId)
+          .is('deleted_at', null)
           .maybeSingle(),
-        v.unidad_id
-          ? sb
-              .schema('dilesa')
-              .from('unidades')
-              .select('identificador, producto_id')
-              .eq('id', v.unidad_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
         sb
           .schema('dilesa')
           .from('venta_fases')
           .select('posicion')
-          .eq('venta_id', v.id)
+          .eq('venta_id', ventaId)
           .is('deleted_at', null),
         sb
           .schema('erp')
           .from('cxc_pagos')
           .select('id, fecha, monto_total, fuente, forma_pago, referencia')
           .eq('origen_tipo', 'venta_dilesa')
-          .eq('origen_id', v.id)
+          .eq('origen_id', ventaId)
           .is('deleted_at', null)
           .order('fecha', { ascending: true }),
+        sb.auth.getUser(),
       ]);
       if (!activo) return;
 
-      if (pRes.data) {
-        setClienteNombre(
-          [pRes.data.nombre, pRes.data.apellido_paterno, pRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ') || '(sin nombre)'
-        );
+      if (vRes.error) {
+        setError(getSupabaseErrorMessage(vRes.error, 'No se pudo cargar la venta.'));
+        setLoading(false);
+        return;
       }
-      if (uRes.data) {
-        const prodSufijo = uRes.data.producto_id
-          ? (
-              await sb
-                .schema('dilesa')
-                .from('productos')
-                .select('nombre')
-                .eq('id', uRes.data.producto_id)
-                .maybeSingle()
-            ).data?.nombre
-              ?.split('-')
-              .pop()
-          : '';
-        setIdentificacionInv(
-          prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
-        );
+      if (!vRes.data) {
+        setError('Venta no encontrada.');
+        setLoading(false);
+        return;
       }
+      const v = vRes.data as unknown as VentaCtx;
+      setVenta(v);
+      if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
+      if (v.valor_facturado != null) setValorFacturado(String(v.valor_facturado));
+      if (v.monto_nota_credito != null) setMontoNotaCredito(String(v.monto_nota_credito));
+
       setDepositos((dRes.data ?? []) as unknown as Deposito[]);
-      const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
+      const posiciones = ((fRes.data ?? []) as { posicion: number }[]).map((f) => f.posicion);
       setFase12Cerrada(posiciones.includes(12));
       setYaCerrada(posiciones.includes(13));
+      setUserId(userRes.data?.user?.id ?? null);
 
+      void cargarDocs();
       setLoading(false);
     })();
 
     return () => {
       activo = false;
     };
-  }, [ventaId, sb]);
+  }, [ventaId, sb, cargarDocs]);
 
   const totalDepositos = useMemo(
     () => depositos.reduce((s, d) => s + Number(d.monto_total ?? 0), 0),
     [depositos]
   );
 
-  // ── Submit ───────────────────────────────────────────────────────
-  const onSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!venta) return;
-      if (!facturaFile) {
+  // ── Subir documento (persiste al instante) ───────────────────────
+  const onPickDoc = useCallback(
+    async (rol: string, file: File) => {
+      setSubiendoRol(rol);
+      try {
+        const r = await subirDocFase(sb, { ventaId, rol, archivo: file, userId });
+        if (!r.ok) {
+          toast.add({
+            title: 'No se pudo subir el documento',
+            description: r.error,
+            type: 'error',
+          });
+          return;
+        }
         toast.add({
-          title: 'Falta el PDF de la factura',
-          description: 'Sube el PDF de la factura emitida.',
-          type: 'error',
+          title: `${LABEL_POR_ROL.get(rol) ?? rol} guardado`,
+          description: 'El documento quedó en el expediente — no se pierde al salir.',
+          type: 'success',
         });
-        return;
+        await cargarDocs();
+      } finally {
+        setSubiendoRol(null);
       }
-      if (!avisoPldFile) {
-        toast.add({
-          title: 'Falta el PDF del Aviso PLD',
-          description: 'El Aviso PLD es obligatorio para facturar.',
-          type: 'error',
-        });
-        return;
-      }
-      const vEscr = Number(valorEscrituracion);
-      if (!Number.isFinite(vEscr) || vEscr <= 0) {
-        toast.add({
-          title: 'Valor de escrituración inválido',
-          description: 'Captura el valor de escrituración (mayor a cero).',
-          type: 'error',
-        });
-        return;
-      }
+    },
+    [sb, ventaId, userId, toast, cargarDocs]
+  );
 
-      setSubmitting(true);
-      const { data: userRes } = await sb.auth.getUser();
-      const userId = userRes?.user?.id ?? null;
+  // ── Guardar montos (sin cerrar la fase) ──────────────────────────
+  const persistirMontos = useCallback(async (): Promise<boolean> => {
+    const vEscr = Number(valorEscrituracion);
+    if (!Number.isFinite(vEscr) || vEscr <= 0) {
+      toast.add({
+        title: 'Valor de escrituración inválido',
+        description: 'Captura el valor de escrituración (mayor a cero).',
+        type: 'error',
+      });
+      return false;
+    }
+    const campos: {
+      valor_escrituracion: number;
+      valor_facturado: number | null;
+      monto_nota_credito: number | null;
+      valor_real_venta_dilesa?: number;
+    } = {
+      valor_escrituracion: vEscr,
+      valor_facturado: valorFacturado === '' ? null : Number(valorFacturado),
+      monto_nota_credito: montoNotaCredito === '' ? null : Number(montoNotaCredito),
+    };
+    // Snapshot del derivado (fuente: motor de cuadratura). Solo si el
+    // resumen cargó — no pisar un valor previo con null por un error de red.
+    if (cuadratura) campos.valor_real_venta_dilesa = cuadratura.valorRealVentaDilesa;
 
-      const docs: DocCaptura[] = [{ rol: 'factura', archivo: facturaFile }];
-      if (notaCreditoFile) docs.push({ rol: 'nota_credito', archivo: notaCreditoFile });
-      if (avisoPldFile) docs.push({ rol: 'aviso_pld', archivo: avisoPldFile });
+    const { error: e } = await sb.schema('dilesa').from('ventas').update(campos).eq('id', ventaId);
+    if (e) {
+      toast.add({
+        title: 'No se pudieron guardar los montos',
+        description: getSupabaseErrorMessage(e, 'Reintenta.'),
+        type: 'error',
+      });
+      return false;
+    }
+    return true;
+  }, [valorEscrituracion, valorFacturado, montoNotaCredito, cuadratura, sb, ventaId, toast]);
+
+  const onGuardarMontos = useCallback(async () => {
+    setGuardandoMontos(true);
+    try {
+      if (await persistirMontos()) {
+        toast.add({ title: 'Montos guardados', type: 'success' });
+      }
+    } finally {
+      setGuardandoMontos(false);
+    }
+  }, [persistirMontos, toast]);
+
+  // ── Cerrar fase (valida contra el expediente persistido) ─────────
+  const faltantes = useMemo(
+    () => (docs ? faltantesParaCerrar(docs, ROLES_REQUERIDOS) : ROLES_REQUERIDOS),
+    [docs]
+  );
+
+  const onCerrarFase = useCallback(async () => {
+    if (faltantes.length > 0) {
+      toast.add({
+        title: 'Faltan documentos en el expediente',
+        description: `Sube: ${faltantes.map((r) => LABEL_POR_ROL.get(r) ?? r).join(', ')}.`,
+        type: 'error',
+      });
+      return;
+    }
+    setCerrando(true);
+    try {
+      if (!(await persistirMontos())) return;
 
       const result = await marcarFase(sb, {
-        ventaId: venta.id,
+        ventaId,
         faseNombre: 'Facturada',
         faseposicion: 13,
-        docs,
-        camposVenta: {
-          valor_escrituracion: vEscr,
-          valor_real_venta_dilesa: valorRealVenta === '' ? null : Number(valorRealVenta),
-          valor_facturado: valorFacturado === '' ? null : Number(valorFacturado),
-          monto_nota_credito: montoNotaCredito === '' ? null : Number(montoNotaCredito),
-        },
+        docs: [], // los documentos ya viven en el expediente (subida incremental)
+        camposVenta: {},
         notas: null,
         registradoPor: userId,
       });
-
-      setSubmitting(false);
       if (!result.ok) {
         toast.add({
           title: 'Error al cerrar Fase 13',
@@ -271,22 +333,11 @@ function CapturarFase13Body() {
         description: 'Facturación registrada. Continúa con la siguiente fase desde el detalle.',
         type: 'success',
       });
-      router.push(`/dilesa/ventas/${venta.id}`);
-    },
-    [
-      avisoPldFile,
-      facturaFile,
-      montoNotaCredito,
-      notaCreditoFile,
-      router,
-      sb,
-      toast,
-      valorEscrituracion,
-      valorFacturado,
-      valorRealVenta,
-      venta,
-    ]
-  );
+      router.push(`/dilesa/ventas/${ventaId}`);
+    } finally {
+      setCerrando(false);
+    }
+  }, [faltantes, persistirMontos, sb, ventaId, userId, toast, router]);
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -308,6 +359,7 @@ function CapturarFase13Body() {
           identificacionInventario={null}
           faseposicion={13}
           faseNombre="Facturada"
+          resumen={resumen}
         />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
@@ -316,24 +368,28 @@ function CapturarFase13Body() {
     );
   }
 
+  const bloqueadaPorFase12 = fase12Cerrada === false && !yaCerrada;
+  const capturaHabilitada = !bloqueadaPorFase12;
+
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={venta.id}
+        ventaId={ventaId}
         clienteNombre={clienteNombre}
         identificacionInventario={identificacionInv}
         faseposicion={13}
         faseNombre="Facturada"
-        descripcion="Sube la factura (y nota de crédito / aviso PLD si aplican) y captura los montos de cuadratura."
+        descripcion="Sube la factura (y nota de crédito / aviso PLD si aplican) y captura los montos de cuadratura. Cada documento se guarda al subirse."
+        resumen={resumen}
       />
 
       {yaCerrada ? (
         <Banner
           tone="success"
           title="Fase 13 ya está cerrada"
-          body="Esta venta ya está facturada. La siguiente fase es Preparada para Entrega."
+          body="Esta venta ya está facturada. Puedes reemplazar un documento si hubo una corrección — queda versionado."
         />
-      ) : fase12Cerrada === false ? (
+      ) : bloqueadaPorFase12 ? (
         <Banner
           tone="warning"
           title="Falta cerrar Fase 12 (Detonada)"
@@ -345,24 +401,38 @@ function CapturarFase13Body() {
           }
           extra={
             <Link
-              href={`/dilesa/ventas/${venta.id}`}
+              href={`/dilesa/ventas/${ventaId}`}
               className="mt-3 inline-block text-sm font-medium text-[var(--accent)] underline"
             >
               Volver al detalle
             </Link>
           }
         />
-      ) : (
-        <form onSubmit={onSubmit} className="space-y-6">
+      ) : null}
+
+      {capturaHabilitada ? (
+        <>
           <Section title="Documentos">
+            {docsError ? (
+              <p className="mb-2 text-xs text-destructive">
+                {docsError}{' '}
+                <button type="button" className="underline" onClick={() => void cargarDocs()}>
+                  Reintentar
+                </button>
+              </p>
+            ) : null}
             <div className="space-y-2">
-              <FileSlot label="PDF Factura *" archivo={facturaFile} onChange={setFacturaFile} />
-              <FileSlot
-                label="PDF Nota de Crédito (si aplica)"
-                archivo={notaCreditoFile}
-                onChange={setNotaCreditoFile}
-              />
-              <FileSlot label="PDF Aviso PLD *" archivo={avisoPldFile} onChange={setAvisoPldFile} />
+              {DOCS_FASE13.map((d) => (
+                <DocSlot
+                  key={d.rol}
+                  label={`${d.label}${d.requerido ? ' *' : ''}`}
+                  estado={docs?.[d.rol]}
+                  cargando={docs == null && !docsError}
+                  subiendo={subiendoRol === d.rol}
+                  deshabilitado={subiendoRol != null && subiendoRol !== d.rol}
+                  onPick={(f) => void onPickDoc(d.rol, f)}
+                />
+              ))}
             </div>
           </Section>
 
@@ -375,19 +445,19 @@ function CapturarFase13Body() {
                   min="0"
                   value={valorEscrituracion}
                   onChange={(e) => setValorEscrituracion(e.target.value)}
+                  disabled={yaCerrada}
                   required
                 />
                 <Hint>{money(Number(valorEscrituracion) || 0)}</Hint>
               </Field>
-              <Field label="Valor real venta Dilesa">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={valorRealVenta}
-                  onChange={(e) => setValorRealVenta(e.target.value)}
-                />
-                <Hint>{valorRealVenta === '' ? '—' : money(Number(valorRealVenta) || 0)}</Hint>
+              <Field label="Valor real venta Dilesa (calculado)">
+                <div className="flex h-9 items-center justify-between rounded-md border border-[var(--border)] bg-[var(--bg)]/40 px-3 text-sm">
+                  <span className="font-medium tabular-nums">
+                    {cuadratura ? money(cuadratura.valorRealVentaDilesa) : '—'}
+                  </span>
+                  <Lock className="h-3.5 w-3.5 text-[var(--text)]/35" />
+                </div>
+                <Hint>Del motor de cuadratura (depósitos − cheque notaría + pagaré).</Hint>
               </Field>
               <Field label="Valor facturado">
                 <Input
@@ -396,8 +466,12 @@ function CapturarFase13Body() {
                   min="0"
                   value={valorFacturado}
                   onChange={(e) => setValorFacturado(e.target.value)}
+                  disabled={yaCerrada}
                 />
-                <Hint>{valorFacturado === '' ? '—' : money(Number(valorFacturado) || 0)}</Hint>
+                <Hint>
+                  {valorFacturado === '' ? '—' : money(Number(valorFacturado) || 0)}
+                  {cuadratura ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturado)}` : ''}
+                </Hint>
               </Field>
               <Field label="Monto nota de crédito">
                 <Input
@@ -406,8 +480,12 @@ function CapturarFase13Body() {
                   min="0"
                   value={montoNotaCredito}
                   onChange={(e) => setMontoNotaCredito(e.target.value)}
+                  disabled={yaCerrada}
                 />
-                <Hint>{montoNotaCredito === '' ? '—' : money(Number(montoNotaCredito) || 0)}</Hint>
+                <Hint>
+                  {montoNotaCredito === '' ? '—' : money(Number(montoNotaCredito) || 0)}
+                  {cuadratura ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCredito)}` : ''}
+                </Hint>
               </Field>
             </div>
           </Section>
@@ -455,27 +533,54 @@ function CapturarFase13Body() {
             )}
           </Section>
 
-          <div className="flex items-center justify-end gap-3">
-            <Link
-              href={`/dilesa/ventas/${venta.id}`}
-              className="text-sm text-muted-foreground hover:text-[var(--text)]"
-            >
-              Cancelar
-            </Link>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 size-4" /> Guardar fase
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      )}
+          {!yaCerrada ? (
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {faltantes.length > 0 && docs != null ? (
+                <p className="mr-auto text-xs text-[var(--text)]/55">
+                  Para cerrar falta: {faltantes.map((r) => LABEL_POR_ROL.get(r) ?? r).join(', ')}.
+                </p>
+              ) : null}
+              <Link
+                href={`/dilesa/ventas/${ventaId}`}
+                className="text-sm text-muted-foreground hover:text-[var(--text)]"
+              >
+                Salir
+              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void onGuardarMontos()}
+                disabled={guardandoMontos || cerrando}
+              >
+                {guardandoMontos ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
+                  </>
+                ) : (
+                  'Guardar montos'
+                )}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void onCerrarFase()}
+                disabled={
+                  cerrando || guardandoMontos || subiendoRol != null || faltantes.length > 0
+                }
+              >
+                {cerrando ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Cerrando…
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 size-4" /> Cerrar fase
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -506,17 +611,43 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-[11px] text-[var(--text)]/50">{children}</p>;
 }
 
-function FileSlot({
+/**
+ * Slot de documento con persistencia inmediata: muestra el vigente del
+ * expediente (quién lo subió y cuándo, link para verlo, versiones) y sube
+ * al seleccionar el archivo — sin esperar el cierre de la fase.
+ */
+function DocSlot({
   label,
-  archivo,
-  onChange,
+  estado,
+  cargando,
+  subiendo,
+  deshabilitado,
+  onPick,
 }: {
   label: string;
-  archivo: File | null;
-  onChange: (f: File | null) => void;
+  estado: DocRolEstado | undefined;
+  cargando: boolean;
+  subiendo: boolean;
+  deshabilitado: boolean;
+  onPick: (f: File) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
-  const completo = !!archivo;
+  const doc = estado?.vigente;
+
+  const aceptar = (f: File | undefined) => {
+    if (!f || subiendo || deshabilitado) return;
+    if (
+      !(
+        f.type === 'application/pdf' ||
+        f.type.startsWith('image/') ||
+        f.name.toLowerCase().endsWith('.pdf')
+      )
+    ) {
+      return;
+    }
+    onPick(f);
+  };
+
   return (
     <div
       onDragOver={(e) => {
@@ -531,18 +662,7 @@ function FileSlot({
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (!f) return;
-        if (
-          !(
-            f.type === 'application/pdf' ||
-            f.type.startsWith('image/') ||
-            f.name.toLowerCase().endsWith('.pdf')
-          )
-        ) {
-          return;
-        }
-        onChange(f);
+        aceptar(e.dataTransfer.files?.[0]);
       }}
       className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
         dragOver
@@ -550,27 +670,67 @@ function FileSlot({
           : 'border-[var(--border)]'
       }`}
     >
-      <div className="flex flex-1 items-center gap-2 text-sm">
-        {completo ? (
+      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+        {doc ? (
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
         ) : (
           <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
         )}
-        <span className="font-medium">{label}</span>
-        {archivo ? (
-          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
-          </span>
-        ) : null}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{label}</span>
+            {doc ? (
+              <a
+                href={getAdjuntoProxyUrl(doc.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 items-center gap-0.5 text-xs text-[var(--accent)] hover:underline"
+              >
+                Ver <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : null}
+          </div>
+          {cargando ? (
+            <p className="text-xs text-[var(--text)]/45">Cargando expediente…</p>
+          ) : doc ? (
+            <p className="truncate text-xs text-[var(--text)]/60">
+              <span className="font-mono">{doc.nombre}</span>
+              {' · '}
+              {doc.subidoPorNombre ? `Subió ${doc.subidoPorNombre}` : 'Subido'} ·{' '}
+              {fmtMomento(doc.subidoAt)}
+              {estado && estado.versiones > 1 ? ` · v${estado.versiones}` : ''}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--text)]/45">Sin documento en el expediente.</p>
+          )}
+        </div>
       </div>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-        <Upload className="h-3.5 w-3.5" />
-        {archivo ? 'Cambiar' : 'Subir'}
+      <label
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium ${
+          subiendo || deshabilitado
+            ? 'cursor-not-allowed text-[var(--text)]/40'
+            : 'cursor-pointer text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]'
+        }`}
+      >
+        {subiendo ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…
+          </>
+        ) : (
+          <>
+            <Upload className="h-3.5 w-3.5" />
+            {doc ? 'Cambiar' : 'Subir'}
+          </>
+        )}
         <input
           type="file"
           accept="application/pdf,image/*"
           className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          disabled={subiendo || deshabilitado}
+          onChange={(e) => {
+            aceptar(e.target.files?.[0] ?? undefined);
+            e.target.value = '';
+          }}
         />
       </label>
     </div>
