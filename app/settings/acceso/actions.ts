@@ -6,6 +6,7 @@ import { createServerClient } from '@supabase/ssr';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { generateWelcomeHtml, type WelcomeEmpresa } from '@/lib/welcome-email';
+import { validarRolParaEmpresa } from './acceso-rules';
 
 // ── Legacy flat-role types (pre-RBAC) ──────────────────────────────────────
 export type Rol = 'admin' | 'viewer' | 'cashier';
@@ -349,49 +350,54 @@ export async function updateUsuarioNombre(
 
 // ── Usuario-Empresa access ─────────────────────────────────────────────────
 
-export async function setUsuarioEmpresaAcceso(
+/**
+ * Otorga (o sanea) el acceso usuario↔empresa con rol obligatorio en el mismo
+ * paso (accesos-intuitivos S2). Upsert: alta nueva, cambio de rol y saneo de
+ * un acceso legacy con `rol_id NULL` son la misma operación. El rol se valida
+ * server-side contra la empresa — la FK de `usuarios_empresas.rol_id` no
+ * garantiza que el rol sea de la misma empresa.
+ */
+export async function grantUsuarioEmpresaAcceso(
   usuario_id: string,
   empresa_id: string,
-  has_access: boolean
+  rol_id: string
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
 
-  if (has_access) {
-    const { error } = await admin
-      .schema('core')
-      .from('usuarios_empresas')
-      .upsert({ usuario_id, empresa_id, rol_id: null }, { onConflict: 'usuario_id,empresa_id' });
-    if (error) throw new Error(error.message);
-    // No email here — sent when role is assigned
-  } else {
-    const { error } = await admin
-      .schema('core')
-      .from('usuarios_empresas')
-      .delete()
-      .eq('usuario_id', usuario_id)
-      .eq('empresa_id', empresa_id);
-    if (error) throw new Error(error.message);
-  }
+  const { data: rol, error: rolError } = await admin
+    .schema('core')
+    .from('roles')
+    .select('id, empresa_id')
+    .eq('id', rol_id)
+    .maybeSingle();
+  if (rolError) throw new Error(rolError.message);
+  const invalido = validarRolParaEmpresa(rol_id, empresa_id, rol ? [rol] : []);
+  if (invalido) throw new Error(invalido);
+
+  const { error } = await admin
+    .schema('core')
+    .from('usuarios_empresas')
+    .upsert({ usuario_id, empresa_id, rol_id }, { onConflict: 'usuario_id,empresa_id' });
+  if (error) throw new Error(error.message);
+
+  // Welcome email is sent manually by admin when setup is complete
   revalidatePath('/settings/acceso');
 }
 
-export async function updateUsuarioEmpresaRol(
+export async function revokeUsuarioEmpresaAcceso(
   usuario_id: string,
-  empresa_id: string,
-  rol_id: string | null
+  empresa_id: string
 ): Promise<void> {
   await requireAdmin();
   const admin = getSupabaseAdminClient()!;
   const { error } = await admin
     .schema('core')
     .from('usuarios_empresas')
-    .update({ rol_id })
+    .delete()
     .eq('usuario_id', usuario_id)
     .eq('empresa_id', empresa_id);
   if (error) throw new Error(error.message);
-
-  // Welcome email is sent manually by admin when setup is complete
   revalidatePath('/settings/acceso');
 }
 

@@ -4,10 +4,10 @@
 **Empresas:** todas (la pantalla de Accesos es global; los catálogos de módulos son por empresa)
 **Schemas afectados:** `core` (datos: `modulos.nombre/descripcion`; posible `rol_plantillas` en S3). El grueso es UI (`app/settings/acceso`) + un mapa de dependencias en `lib/`.
 **Estado:** in_progress
-**Próximo hito:** S2 — rol obligatorio al dar acceso usuario↔empresa + saneo de accesos con rol NULL
+**Próximo hito:** S3 — plantillas de rol (decisión de diseño pendiente con Beto: constantes vs `core.rol_plantillas`)
 **Dueño:** Beto
 **Creada:** 2026-06-11
-**Última actualización:** 2026-06-11 (S1 entregado: dependencias automáticas + descripciones en la matriz)
+**Última actualización:** 2026-06-11 (S2 entregado: rol obligatorio en el alta + badges de accesos sin rol)
 
 ## Problema
 
@@ -113,6 +113,18 @@ Dar de alta un usuario operativo toma minutos y queda bien a la primera:
   5 descripciones confusas de Ventas (lista/autorizar/fase02/F09/F16).
   Hallazgo: las descripciones YA existían en `core.modulos` — el problema era
   que la matriz nunca las mostraba; S1c pasó de "poblar todo" a pulir 5.
+- **2026-06-11 (S2):** Rol obligatorio al dar acceso usuario↔empresa. En el
+  drawer de usuario, marcar "Tiene acceso a X" ya no guarda: abre un draft
+  local que exige elegir rol antes de "Dar acceso" (si la empresa no tiene
+  roles, lo dice y no deja confirmar). Server: `setUsuarioEmpresaAcceso` +
+  `updateUsuarioEmpresaRol` reemplazadas por `grantUsuarioEmpresaAcceso`
+  (upsert con rol validado server-side: existe y es de la empresa — la FK no
+  lo garantiza) y `revokeUsuarioEmpresaAcceso` (con confirm en UI). La regla
+  vive en `acceso-rules.ts` (helper puro + 6 tests, patrón `modulos-tree`).
+  Accesos legacy con `rol_id NULL`: badge ámbar "Sin rol" en el chip de la
+  tabla de usuarios y en el drawer + banner-resumen arriba de la tabla que
+  nombra usuario → empresa; sanear = elegir rol en el mismo Combobox de
+  siempre (que perdió `allowClear` — ya no se puede regresar a NULL).
 
 ## Decisiones registradas
 
@@ -122,3 +134,10 @@ Dar de alta un usuario operativo toma minutos y queda bien a la primera:
   algún día se requiere editarlas sin deploy, se migra a tabla.
 - **2026-06-11:** El auto-marcado de dependencias agrega solo **lectura** del
   requisito; la escritura nunca se otorga implícitamente.
+- **2026-06-11 (S2):** Alta y saneo son la misma operación
+  (`grantUsuarioEmpresaAcceso` = upsert): dar acceso nuevo, cambiar rol y
+  completar un acceso legacy sin rol pasan por la misma action validada. No
+  quedó ninguna ruta de escritura que produzca `rol_id NULL`.
+- **2026-06-11 (S2):** Los accesos `rol_id NULL` existentes se sanean desde la
+  UI (banner + badge), **no** con migración de datos: elegir qué rol le toca a
+  cada usuario es decisión humana, y el universo es chico.
