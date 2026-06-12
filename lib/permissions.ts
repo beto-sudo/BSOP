@@ -1,4 +1,9 @@
-'use client';
+// Módulo universal (server + client) A PROPÓSITO — sin 'use client': solo
+// exporta tipos, mapas y funciones puras. Lo consumen client components
+// (sidebar, RequireAccess) Y server components/route handlers (el RBAC del
+// manual via lib/manual/{access,server}.ts). Marcarlo 'use client' rompe el
+// server en runtime: "Attempted to call fetchUserPermissions() from the
+// server but it's on the client" (500 con digest, no lo caza ni tsc ni CI).
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
