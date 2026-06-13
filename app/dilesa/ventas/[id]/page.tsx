@@ -1176,6 +1176,12 @@ function DetailInner() {
             cuadratura={cuadratura}
             valorEscrituracion={venta.valor_escrituracion}
             chequeCapturado={venta.monto_cheque_notaria != null}
+            valorFacturadoCfdi={venta.valor_facturado}
+            montoNotaCreditoCfdi={venta.monto_nota_credito}
+            // Señal de factura real = el CFDI subido en F13, no el snapshot de
+            // Coda que algunas ventas tienen en valor_facturado (= escrituración).
+            hayFacturaCfdi={(adjuntosPorRolMap.get('factura_xml')?.length ?? 0) > 0}
+            hayNotaCreditoCfdi={(adjuntosPorRolMap.get('nota_credito_xml')?.length ?? 0) > 0}
           />
         </div>
       ) : null}
@@ -1742,7 +1748,11 @@ function DetailInner() {
                               </td>
                               <td className="py-1.5 pl-2 text-right">
                                 <div className="inline-flex items-center gap-1">
-                                  {!tieneReciboCaja ? (
+                                  {/* Un abono de institución (disposición del
+                                      crédito) no lleva recibo de caja facturable:
+                                      sumarlo duplicaría el Valor Facturado en la
+                                      cuadratura (bug operativo 2026-06-12). */}
+                                  {!tieneReciboCaja && a.fuente !== 'institucion' ? (
                                     <button
                                       type="button"
                                       onClick={() => {

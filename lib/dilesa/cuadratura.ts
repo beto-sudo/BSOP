@@ -17,7 +17,12 @@
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
  *   Valor Real Venta Dilesa   = Depósitos Recibidos − Cheque Notaría + Pagaré.
- *   Valor Facturado           = Valor Escrituración + Σ depósitos(con recibo).
+ *   Valor Facturado           = Valor Escrituración + Σ depósitos del cliente
+ *                               (con recibo). NOTA: este es el ESTIMADO de
+ *                               respaldo; cuando ya hay CFDI de factura, la
+ *                               pestaña Cuadratura toma el valor persistido del
+ *                               XML (`dilesa.ventas.valor_facturado`) y deja
+ *                               esta fórmula como "sugerido".
  *   Monto Nota de Crédito     = Valor Facturado − Valor Real Venta Dilesa.
  *   Descuento Real            = Valor Escrituración − Valor Real Venta Dilesa.
  *   Comisión Vendedor         = Escrituración × (1.5% Loma Verde / 1.0% resto).
@@ -35,7 +40,12 @@ export type DepositoCuadratura = {
   monto: number | null;
   /** Tipo "Deposito Directo Cliente" (cuenta para Monto Disponible). */
   directoCliente?: boolean;
-  /** Tiene PDF Recibo de Caja (cuenta para Valor Facturado). */
+  /**
+   * Tiene PDF Recibo de Caja. Suma al Valor Facturado SOLO si además es
+   * `directoCliente`: la disposición del crédito (fuente='institucion') nunca
+   * factura, aunque traiga un recibo de caja importado de Coda. La fórmula de
+   * Coda filtraba por tipo de depósito, no por la sola presencia del PDF.
+   */
   tieneRecibo?: boolean;
 };
 
@@ -109,7 +119,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     .filter((d) => d.directoCliente)
     .reduce((s, d) => s + n(d.monto), 0);
   const depositosConRecibo = i.depositos
-    .filter((d) => d.tieneRecibo)
+    .filter((d) => d.tieneRecibo && d.directoCliente)
     .reduce((s, d) => s + n(d.monto), 0);
 
   const montoDisponible = depositosDirectoCliente + creditoInstitucion + montoCreditoDirecto;
