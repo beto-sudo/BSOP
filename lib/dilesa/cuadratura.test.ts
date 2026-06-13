@@ -82,4 +82,72 @@ describe('calcularCuadratura', () => {
     // min(25,000, 50,000) = 25,000
     expect(c.chequeNotariaCalculado).toBe(25000);
   });
+
+  describe('posibleDobleConteo', () => {
+    // Caso real 2026-06-12: la disposición del crédito Infonavit se capturó
+    // como abono fuente='cliente', así que el mismo dinero entra dos veces
+    // (depósito directo + crédito de la venta) y el disponible se infla.
+    it('detecta la disposición etiquetada como depósito del cliente', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328.45,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: null,
+        depositos: [
+          { monto: 261049.55, directoCliente: true },
+          // Disposición mal etiquetada: debió ser fuente='institucion'.
+          { monto: 636328.45, directoCliente: true },
+        ],
+      });
+      // disponible = 897,378 depósitos + 636,328.45 crédito = 1,533,706.45
+      expect(c.montoDisponible).toBe(1533706.45);
+      expect(c.posibleDobleConteo).toBe(true);
+    });
+
+    it('no marca la operación bien etiquetada (ejemplo de Coda)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328.45,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: null,
+        depositos: [
+          { monto: 261049.55, directoCliente: true },
+          { monto: 636328.45, directoCliente: false },
+        ],
+      });
+      expect(c.posibleDobleConteo).toBe(false);
+    });
+
+    it('tolera el excedente legítimo de gastos de escrituración', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 800000,
+        montoCreditoTitular: 750000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 30000,
+        // depósitos cliente = 80,000 (50,000 enganche + 30,000 para gastos)
+        depositos: [{ monto: 80000, directoCliente: true }],
+      });
+      // 80,000 + 750,000 − 800,000 − 30,000 = 0 ≤ 5% de 800,000
+      expect(c.posibleDobleConteo).toBe(false);
+    });
+
+    it('no marca ventas sin crédito de institución (contado / crédito directo)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 500000,
+        montoCreditoTitular: 0,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: null,
+        depositos: [{ monto: 600000, directoCliente: true }],
+      });
+      expect(c.posibleDobleConteo).toBe(false);
+    });
+  });
 });

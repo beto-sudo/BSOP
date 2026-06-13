@@ -13,6 +13,8 @@
  * caja por depósito).
  */
 
+import { AlertTriangle } from 'lucide-react';
+
 import type { Cuadratura } from '@/lib/dilesa/cuadratura';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -37,6 +39,19 @@ export function CuadraturaPanel({
 }: CuadraturaPanelProps) {
   return (
     <div className="space-y-5">
+      {c.posibleDobleConteo ? (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <strong>Posible doble conteo:</strong> los depósitos fuente «Cliente» (
+            {money(c.depositosDirectoCliente)}) más el crédito de institución (
+            {money(c.creditoInstitucion)}) exceden el valor de escrituración. Revisa si la
+            disposición del crédito se capturó como abono con fuente «Cliente» — ese dinero estaría
+            contando dos veces en el disponible.
+          </p>
+        </div>
+      ) : null}
+
       {/* Cobertura */}
       <Bloque titulo="Cobertura de la operación">
         <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />

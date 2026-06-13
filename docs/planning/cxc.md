@@ -7,7 +7,7 @@
 **Próximo hito:** Contabilidad registra los 2 abonos de la venta Ahumada (con XML y comprobante c/u — ya con FIFO sin fuente, saldan ambos cargos y los comprobantes caen al expediente). Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-12 (migración `20260612173513` APLICADA a prod y verificada: FIFO sin fuente restaurado, unique uuid_sat, triggers de comprobantes; PRs #863 + #865 mergeados)
+**Última actualización:** 2026-06-12 (guard-rails de fuente en captura de abono: pre-selección por cargo FIFO + aviso inline + flag de doble conteo en Cuadratura — caso Maribel/Infonavit)
 
 ## Problema
 
@@ -329,6 +329,30 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-12 — Guard-rails de fuente en captura de abono (doble conteo en cuadratura)
+
+Bug operativo detectado en prod: Maribel capturó las disposiciones de
+crédito Infonavit de 4 ventas con `fuente='cliente'` (el default del
+form). La cuadratura suma depósitos fuente-cliente **y** el crédito de
+institución de la venta, así que la disposición mal etiquetada cuenta
+dos veces → Disponible inflado (ej. $1,798,000 sobre escrituración de
+$899,000) y saldo negativo. Solo código/UI — la corrección de los 4
+abonos mal etiquetados es aparte, con aprobación de Beto. Entregado:
+
+- **Comentario falso corregido** en `abono-capture-drawer.tsx`: decía
+  que la fuente "no filtra el cálculo" — cierto para el FIFO, falso
+  para la cuadratura (`fuente='cliente'` ⇒ depósito directo en el
+  Monto Disponible).
+- **Prevención en captura**: el drawer trae los cargos abiertos de la
+  venta (mismo orden FIFO del RPC) al abrir; si lo siguiente por cubrir
+  espera institución, pre-selecciona `fuente='institucion'` (sin pisar
+  al usuario si ya tocó el campo). Aviso inline ámbar si deja
+  `cliente` y el monto cubriría mayormente cargos de institución.
+  Helpers puros en `lib/dilesa/cxc/fuente-abono.ts` (con tests).
+- **Flag `posibleDobleConteo`** en el motor (`lib/dilesa/cuadratura.ts`):
+  depósitos-cliente + crédito institución > escrituración + gastos
+  netos por >5% ⇒ alerta ámbar en la pestaña Cuadratura.
 
 ### 2026-06-12 — Migración `20260612173513` APLICADA a prod y verificada
 

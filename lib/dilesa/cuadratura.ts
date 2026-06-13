@@ -78,7 +78,21 @@ export type Cuadratura = {
   descuentoReal: number;
   comisionVendedor: number;
   comisionGerencia: number;
+  /**
+   * Señal de doble conteo: depósitos fuente-cliente + crédito institución
+   * exceden el valor de escrituración (+ gastos netos legítimos) por más del
+   * umbral. Típico cuando la disposición del crédito se capturó como abono
+   * fuente='cliente' — el mismo dinero entra dos veces al disponible.
+   */
+  posibleDobleConteo: boolean;
 };
+
+/**
+ * Umbral del flag de doble conteo: 5% del valor de escrituración. El cliente
+ * legítimamente deposita de más (gastos de escrituración, ya descontados) por
+ * montos chicos; una disposición duplicada es el monto del crédito completo.
+ */
+const UMBRAL_DOBLE_CONTEO = 0.05;
 
 /** ¿El proyecto cae en la tasa alta de comisión (Loma Verde / Loma Verde 2)? */
 function esLomaVerde(proyecto: string | null | undefined): boolean {
@@ -106,6 +120,13 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
   const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoOtorgadoTotal;
   const chequeNotariaCalculado = round2(Math.min(gastosNetos, excedenteDisponible));
+
+  // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
+  const posibleDobleConteo =
+    valorEscrituracion > 0 &&
+    creditoInstitucion > 0 &&
+    depositosDirectoCliente + creditoInstitucion - valorEscrituracion - Math.max(gastosNetos, 0) >
+      valorEscrituracion * UMBRAL_DOBLE_CONTEO;
 
   // El formulado de Coda usa el cheque CAPTURADO; si aún no se captura,
   // caemos al calculado para no dejar los derivados en blanco.
@@ -141,5 +162,6 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     descuentoReal,
     comisionVendedor,
     comisionGerencia,
+    posibleDobleConteo,
   };
 }
