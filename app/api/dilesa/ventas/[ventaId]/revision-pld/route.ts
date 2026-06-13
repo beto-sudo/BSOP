@@ -42,13 +42,17 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { anthropic, ensurePdfFitsForClaude, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
 import { getNotaria } from '@/lib/dilesa/notarios';
 import { getAdjuntoPath } from '@/lib/adjuntos';
+import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
+import { leerCfdiMetadata } from '@/lib/dilesa/captura/cfdi-validacion';
 import {
+  checksFacturacion,
   cruzarAcuseConInforme,
   cruzarPldConExpediente,
   ExtraccionAcuseSchema,
   ExtraccionPldSchema,
   PROMPT_EXTRACCION_ACUSE,
   PROMPT_EXTRACCION_PLD,
+  requiereNotaCredito,
   veredictoDe,
   type ExpedientePld,
   type RevisionCheck,
@@ -194,6 +198,28 @@ function esVigente(revision: RevisionRow, pldId: string | null, acuseId: string 
   );
 }
 
+/** Snapshot de facturación que la revisión guardó en `extraccion.facturacion`
+ *  (los ids dejan al cliente detectar que la NC cambió tras la revisión). */
+type FacturacionSnapshot = {
+  requerida: boolean;
+  montoEsperado: number;
+  facturaXmlId: string | null;
+  ncXmlId: string | null;
+  ncPdfId: string | null;
+};
+
+function facturacionDe(extraccion: unknown): FacturacionSnapshot | null {
+  const f = (extraccion as { facturacion?: Record<string, unknown> } | null)?.facturacion;
+  if (!f || typeof f !== 'object') return null;
+  return {
+    requerida: f.requerida === true,
+    montoEsperado: Number(f.montoEsperado ?? 0),
+    facturaXmlId: (f.facturaXmlId as string | null) ?? null,
+    ncXmlId: (f.ncXmlId as string | null) ?? null,
+    ncPdfId: (f.ncPdfId as string | null) ?? null,
+  };
+}
+
 function revisionDto(r: RevisionRow, ejecutadoPorNombre: string | null, vigente: boolean) {
   return {
     id: r.id,
@@ -202,6 +228,7 @@ function revisionDto(r: RevisionRow, ejecutadoPorNombre: string | null, vigente:
     estado: r.estado,
     veredicto: r.veredicto,
     checks: r.checks,
+    facturacion: facturacionDe(r.extraccion),
     errorDetalle: r.error_detalle,
     ejecutadoPorNombre,
     createdAt: r.created_at,
@@ -416,12 +443,54 @@ export async function POST(_req: NextRequest, { params }: Params) {
       checks.push(...cruzarAcuseConInforme(acuseExt, informe, empresaRfc));
     }
 
+    // 3) Facturación: la nota de crédito que exige la cuadratura (determinista,
+    //    sin IA). El monto se calcula server-side (control fiscal — no se
+    //    confía en un snapshot del cliente). Cuando la operación factura más
+    //    de lo que DILESA realmente recibe, exige el XML y PDF de la NC.
+    const cuad = await cargarCuadraturaVenta(admin, ventaId);
+    const { data: factDocs } = await admin
+      .schema('erp')
+      .from('adjuntos')
+      .select('id, rol, metadata')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .eq('entidad_tipo', 'venta')
+      .eq('entidad_id', ventaId)
+      .in('rol', ['factura_xml', 'nota_credito_xml', 'nota_credito'])
+      .order('created_at', { ascending: false });
+    const factVigente = new Map<string, { id: string; metadata: Record<string, unknown> | null }>();
+    for (const a of (factDocs ?? []) as {
+      id: string;
+      rol: string;
+      metadata: Record<string, unknown> | null;
+    }[]) {
+      if (!factVigente.has(a.rol)) factVigente.set(a.rol, { id: a.id, metadata: a.metadata });
+    }
+    const facturaXml = factVigente.get('factura_xml') ?? null;
+    const ncXml = factVigente.get('nota_credito_xml') ?? null;
+    const ncPdf = factVigente.get('nota_credito') ?? null;
+    const montoNotaCreditoEsperado = cuad?.montoNotaCredito ?? 0;
+    checks.push(
+      ...checksFacturacion({
+        montoNotaCreditoEsperado,
+        ncXmlTotal: leerCfdiMetadata(ncXml?.metadata)?.total ?? null,
+        ncXmlPresente: !!ncXml,
+        ncPdfPresente: !!ncPdf,
+      })
+    );
+    const facturacionSnapshot = {
+      requerida: requiereNotaCredito(montoNotaCreditoEsperado),
+      montoEsperado: montoNotaCreditoEsperado,
+      facturaXmlId: facturaXml?.id ?? null,
+      ncXmlId: ncXml?.id ?? null,
+      ncPdfId: ncPdf?.id ?? null,
+    };
+
     const veredicto = veredictoDe(checks);
     const revision = await insertarRevision({
       estado: 'completada',
       veredicto,
       checks,
-      extraccion: { informe, acuse: extraccionAcuse },
+      extraccion: { informe, acuse: extraccionAcuse, facturacion: facturacionSnapshot },
     });
 
     await admin

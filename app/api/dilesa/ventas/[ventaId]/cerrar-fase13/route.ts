@@ -35,11 +35,16 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
 import { leerCfdiMetadata } from '@/lib/dilesa/captura/cfdi-validacion';
+import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
+import { requiereNotaCredito } from '@/lib/dilesa/captura/pld-revision';
 
 type Params = { params: Promise<{ ventaId: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FASE = 13;
+
+const money = (n: number) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { ventaId } = await params;
@@ -135,7 +140,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq('empresa_id', DILESA_EMPRESA_ID)
     .eq('entidad_tipo', 'venta')
     .eq('entidad_id', ventaId)
-    .in('rol', ['factura_xml', 'nota_credito_xml', 'aviso_pld', 'acuse_pld'])
+    .in('rol', ['factura_xml', 'nota_credito_xml', 'nota_credito', 'aviso_pld', 'acuse_pld'])
     .order('created_at', { ascending: false });
   const adjuntos = (adjRows ?? []) as {
     id: string;
@@ -162,6 +167,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 409 }
     );
   }
+
+  // ── Nota de crédito exigida por la cuadratura (control fiscal) ───
+  // Si la operación factura más de lo que DILESA realmente recibe, debe
+  // existir la NC (XML + PDF) antes de cerrar. Se recalcula server-side —
+  // robusto aun si la revisión es vieja o nunca corrió. El override de
+  // Dirección sigue disponible (decisión Beto 2026-06-13).
+  const cuad = await cargarCuadraturaVenta(admin, ventaId);
+  const montoNc = cuad?.montoNotaCredito ?? 0;
+  const ncRequerida = requiereNotaCredito(montoNc);
+  const ncXml = vigentePorRol.get('nota_credito_xml');
+  const ncPdf = vigentePorRol.get('nota_credito');
+  const ncFaltante = ncRequerida && (!ncXml || !ncPdf);
 
   // ── Gate de revisión (ciclo completo: informe + acuse) ──────────
   const { data: revRow } = await (admin.schema('dilesa') as any)
@@ -192,14 +209,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   const motivoOverride = body.override?.motivo?.trim() ?? '';
   let cierreConOverride = false;
 
-  if (!revisionVigenteVerde) {
-    const razon = !revision
-      ? 'La operación no tiene revisión PLD.'
-      : revisionStale
-        ? 'El Aviso PLD o su acuse cambiaron después de la última revisión.'
-        : revision.estado !== 'completada'
-          ? 'La última revisión no pudo completarse.'
-          : `La revisión está en ${revision.veredicto}.`;
+  if (!revisionVigenteVerde || ncFaltante) {
+    const razon = ncFaltante
+      ? `La cuadratura exige nota de crédito por ${money(montoNc)} y falta su ${!ncXml ? 'XML' : 'PDF'} en el expediente. Súbela y re-ejecuta la revisión.`
+      : !revision
+        ? 'La operación no tiene revisión PLD.'
+        : revisionStale
+          ? 'El Aviso PLD o su acuse cambiaron después de la última revisión.'
+          : revision.estado !== 'completada'
+            ? 'La última revisión no pudo completarse.'
+            : `La revisión está en ${revision.veredicto}.`;
 
     if (!motivoOverride) {
       return NextResponse.json(
@@ -295,7 +314,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         venta_id: ventaId,
         veredicto: revision?.veredicto ?? null,
         revision_id: revision?.id ?? null,
-        ...(cierreConOverride ? { motivo: motivoOverride } : {}),
+        nc_requerida: ncRequerida,
+        ...(cierreConOverride ? { motivo: motivoOverride, nc_faltante: ncFaltante } : {}),
       },
     });
 

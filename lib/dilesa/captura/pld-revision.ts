@@ -393,6 +393,88 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
   return checks;
 }
 
+// ── Facturación: nota de crédito que exige la cuadratura ────────────────
+
+/**
+ * Umbral (MXN) para considerar que la operación REQUIERE nota de crédito.
+ * El motor de cuadratura redondea `valorFacturado` y `valorRealVentaDilesa`
+ * por separado, así que su diferencia (`montoNotaCredito`) puede traer ruido
+ * de centavos en operaciones sin descuento. Una NC real es del orden del
+ * descuento / cheque a notaría (cientos a miles). 1 peso filtra el ruido sin
+ * dejar pasar NCs legítimas. Ajustable si Beto quiere otra política.
+ */
+export const UMBRAL_NOTA_CREDITO = 1;
+
+/** Insumos del check de NC: el monto que exige la cuadratura + presencia y
+ *  monto de los documentos de NC vigentes en el expediente. */
+export type ExpedienteFacturacion = {
+  /** `montoNotaCredito` del motor (valorFacturado − valorRealVentaDilesa). */
+  montoNotaCreditoEsperado: number;
+  /** Total del XML de NC vigente; null si no hay XML de NC. */
+  ncXmlTotal: number | null;
+  ncXmlPresente: boolean;
+  ncPdfPresente: boolean;
+};
+
+export function requiereNotaCredito(montoNotaCreditoEsperado: number): boolean {
+  return montoNotaCreditoEsperado > UMBRAL_NOTA_CREDITO;
+}
+
+/**
+ * Checks DETERMINISTAS de facturación (sin IA — la cuadratura ya sabe el
+ * monto exacto). Cuando la operación factura más de lo que DILESA realmente
+ * recibe (cheque a notaría / descuento), debe expedirse una nota de crédito
+ * por la diferencia; este grupo exige su XML y PDF en el expediente y los
+ * pone en rojo si faltan. Clave prefijo `fact_` → bloque propio en la UI y
+ * en `separarChecks` (no estorba al flujo PLD informe→acuse).
+ */
+export function checksFacturacion(f: ExpedienteFacturacion): RevisionCheck[] {
+  if (!requiereNotaCredito(f.montoNotaCreditoEsperado)) {
+    return [ok('fact_nc', 'No se requiere nota de crédito (facturado = valor real)', 'error')];
+  }
+
+  const checks: RevisionCheck[] = [];
+  const esperado = money(f.montoNotaCreditoEsperado);
+
+  checks.push(
+    f.ncXmlPresente
+      ? ok('fact_nc_xml', 'XML de la nota de crédito capturado', 'error')
+      : falla(
+          'fact_nc_xml',
+          'XML de la nota de crédito capturado',
+          'error',
+          `La cuadratura exige nota de crédito por ${esperado} (facturado − valor real venta DILESA). Sube el XML de la NC en Documentos y re-ejecuta la revisión.`
+        )
+  );
+
+  checks.push(
+    f.ncPdfPresente
+      ? ok('fact_nc_pdf', 'PDF de la nota de crédito capturado', 'error')
+      : falla(
+          'fact_nc_pdf',
+          'PDF de la nota de crédito capturado',
+          'error',
+          'Falta el PDF de la nota de crédito (la representación impresa del CFDI). Súbelo en Documentos y re-ejecuta la revisión.'
+        )
+  );
+
+  // Monto: el XML de la NC debe cuadrar con lo que calcula el motor.
+  if (f.ncXmlPresente && f.ncXmlTotal != null) {
+    checks.push(
+      montosIguales(f.ncXmlTotal, f.montoNotaCreditoEsperado, 1)
+        ? ok('fact_nc_monto', 'Monto de la NC coincide con la cuadratura', 'warning')
+        : falla(
+            'fact_nc_monto',
+            'Monto de la NC coincide con la cuadratura',
+            'warning',
+            `El XML de la NC es por ${money(f.ncXmlTotal)}; la cuadratura esperaba ${esperado} (diferencia ${money(f.ncXmlTotal - f.montoNotaCreditoEsperado)}).`
+          )
+    );
+  }
+
+  return checks;
+}
+
 export type VeredictoRevision = 'verde' | 'advertencias' | 'rojo';
 
 export function veredictoDe(checks: RevisionCheck[]): VeredictoRevision {
@@ -594,17 +676,21 @@ export function cruzarAcuseConInforme(
 }
 
 /**
- * Separa los checks de una revisión por paso del ciclo: los del acuse llevan
- * clave `acuse_*`; el resto son del informe vs el expediente. La UI y el
- * gate derivan veredictos parciales de aquí (flujo en dos pasos, decisión
- * Beto 2026-06-12: revisar el PLD → congelarlo → presentar → acuse).
+ * Separa los checks de una revisión por grupo: acuse (`acuse_*`), facturación
+ * (`fact_*`, la nota de crédito que exige la cuadratura) e informe (el resto:
+ * el aviso PLD vs el expediente). La UI los pinta en bloques separados y el
+ * flujo PLD informe→acuse (decisión Beto 2026-06-12) no se mezcla con la NC:
+ * `informe` excluye facturación, así la NC no bloquea la presentación del
+ * aviso pero sí el cierre (entra al veredicto general).
  */
 export function separarChecks(checks: RevisionCheck[]): {
   informe: RevisionCheck[];
   acuse: RevisionCheck[];
+  facturacion: RevisionCheck[];
 } {
   return {
-    informe: checks.filter((c) => !c.clave.startsWith('acuse_')),
+    informe: checks.filter((c) => !c.clave.startsWith('acuse_') && !c.clave.startsWith('fact_')),
     acuse: checks.filter((c) => c.clave.startsWith('acuse_')),
+    facturacion: checks.filter((c) => c.clave.startsWith('fact_')),
   };
 }
