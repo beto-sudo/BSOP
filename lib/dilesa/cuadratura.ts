@@ -17,13 +17,15 @@
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
  *   Valor Real Venta Dilesa   = Depósitos Recibidos − Cheque Notaría + Pagaré.
- *   Valor Facturado           = Valor Escrituración + Σ depósitos del cliente
- *                               (con recibo). NOTA: este es el ESTIMADO de
- *                               respaldo; cuando ya hay CFDI de factura, la
- *                               pestaña Cuadratura toma el valor persistido del
- *                               XML (`dilesa.ventas.valor_facturado`) y deja
- *                               esta fórmula como "sugerido".
+ *   Valor Facturado           = el del CFDI de factura cuando ya hay factura
+ *                               (`valorFacturadoReal`); si no, el ESTIMADO de
+ *                               respaldo = Valor Escrituración + Σ depósitos
+ *                               del cliente (con recibo). El estimado se
+ *                               expone como `valorFacturadoSugerido`.
  *   Monto Nota de Crédito     = Valor Facturado − Valor Real Venta Dilesa.
+ *                               Es un DERIVADO, no el total del CFDI de NC: con
+ *                               factura real usa el facturado real; la Fase 13
+ *                               valida aparte que el CFDI de NC coincida.
  *   Descuento Real            = Valor Escrituración − Valor Real Venta Dilesa.
  *   Comisión Vendedor         = Escrituración × (1.5% Loma Verde / 1.0% resto).
  *   Comisión Gerencia         = Escrituración × 0.5%.
@@ -64,6 +66,16 @@ export type CuadraturaInput = {
   descuentoOtorgadoTotal?: number | null;
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
+  /**
+   * Valor Facturado AUTORITATIVO del CFDI de factura (Fase 13,
+   * `dilesa.ventas.valor_facturado`). Cuando se pasa, el motor lo usa como
+   * `valorFacturado` y deriva de él el `montoNotaCredito` (NC = facturado real
+   * − valor real venta DILESA). null/undefined ⇒ aún no hay factura: el motor
+   * cae al estimado de la fórmula de Coda. Solo pasarlo cuando exista el
+   * adjunto `factura_xml` (un snapshot de Coda en `valor_facturado` = valor de
+   * escrituración NO es una factura real).
+   */
+  valorFacturadoReal?: number | null;
   depositos: DepositoCuadratura[];
   /** Nombre del proyecto, para la tasa de comisión del vendedor. */
   proyectoNombre?: string | null;
@@ -83,8 +95,14 @@ export type Cuadratura = {
   /** Cheque usado para los derivados: el capturado si existe, si no el calculado. */
   chequeNotariaUsado: number;
   valorRealVentaDilesa: number;
+  /** Valor Facturado efectivo: el del CFDI real si se pasó, si no el estimado. */
   valorFacturado: number;
+  /** Estimado de la fórmula de Coda (escrituración + Σ dep. cliente con recibo). */
+  valorFacturadoSugerido: number;
+  /** NC efectiva: `valorFacturado` (efectivo) − valor real venta DILESA. */
   montoNotaCredito: number;
+  /** NC estimada: `valorFacturadoSugerido` − valor real venta DILESA. */
+  montoNotaCreditoSugerido: number;
   descuentoReal: number;
   comisionVendedor: number;
   comisionGerencia: number;
@@ -147,8 +165,13 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const valorRealVentaDilesa = round2(
     depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto
   );
-  const valorFacturado = round2(valorEscrituracion + depositosConRecibo);
+  // Estimado de la fórmula (respaldo pre-factura). Cuando ya hay CFDI de
+  // factura, el valor REAL del XML manda y la NC se deriva de él.
+  const valorFacturadoSugerido = round2(valorEscrituracion + depositosConRecibo);
+  const valorFacturado =
+    i.valorFacturadoReal != null ? round2(n(i.valorFacturadoReal)) : valorFacturadoSugerido;
   const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
+  const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
   const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
 
   const comisionVendedor = round2(
@@ -168,7 +191,9 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     chequeNotariaUsado,
     valorRealVentaDilesa,
     valorFacturado,
+    valorFacturadoSugerido,
     montoNotaCredito,
+    montoNotaCreditoSugerido,
     descuentoReal,
     comisionVendedor,
     comisionGerencia,

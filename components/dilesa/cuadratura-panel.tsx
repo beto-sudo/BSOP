@@ -31,30 +31,19 @@ export type CuadraturaPanelProps = {
   /** Si el cheque a notaría ya se capturó (Fase 11) vs el calculado. */
   chequeCapturado: boolean;
   /**
-   * Valor Facturado persistido desde el CFDI (Fase 13,
-   * `dilesa.ventas.valor_facturado`). Autoritativo cuando ya hay factura; la
-   * fórmula del motor (`cuadratura.valorFacturado`) queda como "sugerido".
-   */
-  valorFacturadoCfdi: number | null;
-  /** Monto de la Nota de Crédito persistido desde el CFDI (Fase 13). */
-  montoNotaCreditoCfdi: number | null;
-  /**
    * Ya existe el CFDI de factura (adjunto rol='factura_xml'), no solo un
    * snapshot de Coda en `valor_facturado` (= escrituración, sin factura real).
+   * Con factura, el motor ya trae `valorFacturado` del CFDI real y la NC
+   * derivada de él; aquí solo define la etiqueta «CFDI/requerida» vs «sugerido».
    */
   hayFacturaCfdi: boolean;
-  /** Ya existe el CFDI de nota de crédito (adjunto rol='nota_credito_xml'). */
-  hayNotaCreditoCfdi: boolean;
 };
 
 export function CuadraturaPanel({
   cuadratura: c,
   valorEscrituracion,
   chequeCapturado,
-  valorFacturadoCfdi,
-  montoNotaCreditoCfdi,
   hayFacturaCfdi,
-  hayNotaCreditoCfdi,
 }: CuadraturaPanelProps) {
   return (
     <div className="space-y-5">
@@ -102,13 +91,13 @@ export function CuadraturaPanel({
         <Fila label="Valor real venta Dilesa" value={money(c.valorRealVentaDilesa)} strong />
         <Fila
           label={`Valor facturado ${hayFacturaCfdi ? '(CFDI)' : '(sugerido)'}`}
-          value={money(hayFacturaCfdi ? valorFacturadoCfdi : c.valorFacturado)}
-          hint={hayFacturaCfdi ? `Sugerido: ${money(c.valorFacturado)}` : undefined}
+          value={money(c.valorFacturado)}
+          hint={hayFacturaCfdi ? `Sugerido: ${money(c.valorFacturadoSugerido)}` : undefined}
         />
         <Fila
-          label={`Monto nota de crédito ${hayNotaCreditoCfdi ? '(CFDI)' : '(sugerido)'}`}
-          value={money(hayNotaCreditoCfdi ? montoNotaCreditoCfdi : c.montoNotaCredito)}
-          hint={hayNotaCreditoCfdi ? `Sugerido: ${money(c.montoNotaCredito)}` : undefined}
+          label={`Monto nota de crédito ${hayFacturaCfdi ? '(requerida)' : '(sugerido)'}`}
+          value={money(c.montoNotaCredito)}
+          hint={hayFacturaCfdi ? `Sugerido: ${money(c.montoNotaCreditoSugerido)}` : undefined}
         />
         <Fila label="Descuento real" value={money(c.descuentoReal)} />
       </Bloque>
@@ -120,10 +109,11 @@ export function CuadraturaPanel({
       </Bloque>
 
       <p className="text-[11px] leading-relaxed text-[var(--text)]/45">
-        El Valor Facturado y la Nota de Crédito vienen del CFDI capturado en la Fase 13 cuando ya
-        hay factura; antes de facturar, la fórmula de Coda los estima como «sugerido». El resto de
-        los derivados sigue las fórmulas de Coda y queda aproximado hasta capturar el apoyo de
-        Infonavit por tipo de crédito y los buckets de descuento otorgado.
+        Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva como
+        Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda los estima
+        como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda aproximado
+        hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de descuento
+        otorgado.
       </p>
     </div>
   );

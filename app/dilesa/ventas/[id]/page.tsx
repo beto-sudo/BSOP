@@ -821,6 +821,13 @@ function DetailInner() {
       ),
     [adjuntosPorRolMap]
   );
+  // Señal de factura real: el CFDI subido en F13, no el snapshot de Coda que
+  // algunas ventas tienen en valor_facturado (= valor de escrituración). Con
+  // factura, el motor toma el valor_facturado real y deriva de él la NC.
+  const hayFacturaCfdi = useMemo(
+    () => (adjuntosPorRolMap.get('factura_xml')?.length ?? 0) > 0,
+    [adjuntosPorRolMap]
+  );
 
   // Pipeline combinado: una fila por cada una de las 17 fases, con su
   // fecha (si alcanzada), docs cargados (clickeables) y docs faltantes
@@ -900,6 +907,10 @@ function DetailInner() {
           (Number(cuadInputs.descuentoGastosEscr) || 0) +
           (Number(cuadInputs.descuentoNotaCredito) || 0),
         precioAsignacion: venta?.precio_asignacion ?? null,
+        // Solo cuando ya hay CFDI de factura: su total es el Valor Facturado
+        // autoritativo y la NC se deriva de él (NC = facturado real − valor
+        // real). Sin factura, el motor cae al estimado de la fórmula.
+        valorFacturadoReal: hayFacturaCfdi ? (venta?.valor_facturado ?? null) : null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
           directoCliente: a.fuente === 'cliente',
@@ -911,7 +922,15 @@ function DetailInner() {
         })),
         proyectoNombre,
       }),
-    [venta, abonos, proyectoNombre, cuadInputs, apoyoInfonavit, comprobantesPorAbono]
+    [
+      venta,
+      abonos,
+      proyectoNombre,
+      cuadInputs,
+      apoyoInfonavit,
+      comprobantesPorAbono,
+      hayFacturaCfdi,
+    ]
   );
 
   // Copiloto de cierre (S4): qué falta para Operación Terminada.
@@ -1176,12 +1195,7 @@ function DetailInner() {
             cuadratura={cuadratura}
             valorEscrituracion={venta.valor_escrituracion}
             chequeCapturado={venta.monto_cheque_notaria != null}
-            valorFacturadoCfdi={venta.valor_facturado}
-            montoNotaCreditoCfdi={venta.monto_nota_credito}
-            // Señal de factura real = el CFDI subido en F13, no el snapshot de
-            // Coda que algunas ventas tienen en valor_facturado (= escrituración).
-            hayFacturaCfdi={(adjuntosPorRolMap.get('factura_xml')?.length ?? 0) > 0}
-            hayNotaCreditoCfdi={(adjuntosPorRolMap.get('nota_credito_xml')?.length ?? 0) > 0}
+            hayFacturaCfdi={hayFacturaCfdi}
           />
         </div>
       ) : null}

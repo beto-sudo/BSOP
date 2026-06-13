@@ -55,6 +55,7 @@ type VentaRow = {
   tipo_credito: string | null;
   precio_asignacion: number | null;
   valor_escrituracion: number | null;
+  valor_facturado: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   monto_credito_directo: number | null;
@@ -86,7 +87,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, fecha_firma_programada, ine_numero'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, fecha_firma_programada, ine_numero'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -191,6 +192,19 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         );
       }
 
+      // ¿Ya hay CFDI de factura? Solo entonces `valor_facturado` es el real (y
+      // la NC se deriva de él); si no, el motor cae al estimado de la fórmula.
+      const { data: facturaAdj } = await sb
+        .schema('erp')
+        .from('adjuntos')
+        .select('id')
+        .eq('entidad_tipo', 'venta')
+        .eq('entidad_id', venta.id)
+        .eq('rol', 'factura_xml')
+        .limit(1);
+      if (!activo) return;
+      const hayFactura = ((facturaAdj ?? []) as { id: string }[]).length > 0;
+
       const [prjRes, prodRes] = await Promise.all([
         unidad?.proyecto_id
           ? sb
@@ -240,6 +254,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           (Number(venta.descuento_gastos_escrituracion) || 0) +
           (Number(venta.descuento_nota_credito) || 0),
         precioAsignacion: venta.precio_asignacion,
+        valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,
           directoCliente: a.fuente === 'cliente',

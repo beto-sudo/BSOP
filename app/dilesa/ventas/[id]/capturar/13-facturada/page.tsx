@@ -906,7 +906,7 @@ function CapturarFase13Body() {
                   {cfdiFactura
                     ? `CFDI ${[cfdiFactura.serie, cfdiFactura.folio].filter(Boolean).join('-') || 's/folio'}${
                         cuadratura
-                          ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturado)}`
+                          ? ` · Cuadratura sugiere ${money(cuadratura.valorFacturadoSugerido)}`
                           : ''
                       }`
                     : 'Se llena solo al subir el XML de la factura.'}
@@ -918,7 +918,7 @@ function CapturarFase13Body() {
                   {cfdiNotaCredito
                     ? `CFDI ${[cfdiNotaCredito.serie, cfdiNotaCredito.folio].filter(Boolean).join('-') || 's/folio'}${
                         cuadratura
-                          ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCredito)}`
+                          ? ` · Cuadratura sugiere ${money(cuadratura.montoNotaCreditoSugerido)}`
                           : ''
                       }`
                     : 'Se llena solo al subir el XML de la nota de crédito (si aplica).'}
