@@ -156,6 +156,15 @@ type RevisionDto = {
   estado: 'completada' | 'error';
   veredicto: VeredictoRevision;
   checks: RevisionCheck[];
+  /** Snapshot de la NC que exige la cuadratura (null en revisiones previas
+   *  al feature). Los ids permiten detectar que la NC cambió tras la corrida. */
+  facturacion: {
+    requerida: boolean;
+    montoEsperado: number;
+    facturaXmlId: string | null;
+    ncXmlId: string | null;
+    ncPdfId: string | null;
+  } | null;
   errorDetalle: string | null;
   ejecutadoPorNombre: string | null;
   createdAt: string;
@@ -276,7 +285,9 @@ function CapturarFase13Body() {
   // Paso 2: el acuse completa el ciclo. El gate server-side es la verdad;
   // estos derivados solo ordenan la UI.
   const pasosPld = useMemo(() => {
-    const partes = revision ? separarChecks(revision.checks) : { informe: [], acuse: [] };
+    const partes = revision
+      ? separarChecks(revision.checks)
+      : { informe: [], acuse: [], facturacion: [] };
     const informeVigente =
       !!revision &&
       revision.estado === 'completada' &&
@@ -284,9 +295,19 @@ function CapturarFase13Body() {
       revision.adjuntoId === docs.aviso_pld.vigente.id;
     const veredictoInforme =
       informeVigente && partes.informe.length > 0 ? veredictoDe(partes.informe) : null;
+    // La NC de la revisión quedó stale si los documentos de NC del expediente
+    // cambiaron después de la corrida (típico: se subieron en respuesta al
+    // check rojo) → hay que re-ejecutar para que el cierre la tome en cuenta.
+    const f = revision?.facturacion ?? null;
+    const facturacionStale =
+      !!f &&
+      ((docs?.nota_credito_xml?.vigente.id ?? null) !== f.ncXmlId ||
+        (docs?.nota_credito?.vigente.id ?? null) !== f.ncPdfId);
     return {
       checksInforme: partes.informe,
       checksAcuse: partes.acuse,
+      checksFacturacion: partes.facturacion,
+      facturacionStale,
       veredictoInforme,
       informeVerde: veredictoInforme === 'verde',
       acuseRevisado: !!revision && revision.adjuntoAcuseId != null && revision.vigente,
@@ -839,6 +860,27 @@ function CapturarFase13Body() {
                         </p>
                       )}
                     </div>
+
+                    {/* Facturación — la nota de crédito que exige la cuadratura */}
+                    {pasosPld.checksFacturacion.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+                          Facturación · Nota de crédito
+                        </p>
+                        <ul className="space-y-1">
+                          {pasosPld.checksFacturacion.map((c) => (
+                            <CheckLinea key={c.clave} check={c} />
+                          ))}
+                        </ul>
+                        {pasosPld.facturacionStale ? (
+                          <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            Los documentos de la nota de crédito cambiaron después de esta revisión
+                            — re-ejecútala para que el cierre la tome en cuenta.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>

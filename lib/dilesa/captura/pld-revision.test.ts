@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  checksFacturacion,
   cruzarPldConExpediente,
   normalizarTexto,
   veredictoDe,
@@ -186,6 +187,85 @@ describe('veredictoDe', () => {
   });
 });
 
+// ── Facturación: nota de crédito que exige la cuadratura ─────────────────
+
+describe('checksFacturacion', () => {
+  it('no requiere NC cuando facturado = valor real: un check ok, veredicto verde', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 0,
+      ncXmlTotal: null,
+      ncXmlPresente: false,
+      ncPdfPresente: false,
+    });
+    expect(checks).toHaveLength(1);
+    expect(checks[0].clave).toBe('fact_nc');
+    expect(checks[0].ok).toBe(true);
+    expect(veredictoDe(checks)).toBe('verde');
+  });
+
+  it('diferencia sub-peso (ruido de redondeo) no exige NC', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 0.11,
+      ncXmlTotal: null,
+      ncXmlPresente: false,
+      ncPdfPresente: false,
+    });
+    expect(veredictoDe(checks)).toBe('verde');
+  });
+
+  it('NC requerida y faltante (XML+PDF): dos errores con el monto, veredicto rojo', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 13378.11,
+      ncXmlTotal: null,
+      ncXmlPresente: false,
+      ncPdfPresente: false,
+    });
+    const xml = checks.find((c) => c.clave === 'fact_nc_xml');
+    const pdf = checks.find((c) => c.clave === 'fact_nc_pdf');
+    expect(xml?.ok).toBe(false);
+    expect(xml?.severidad).toBe('error');
+    expect(xml?.detalle).toContain('13,378.11');
+    expect(pdf?.ok).toBe(false);
+    expect(pdf?.severidad).toBe('error');
+    expect(veredictoDe(checks)).toBe('rojo');
+  });
+
+  it('NC requerida, XML+PDF presentes y monto cuadra: verde', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 13378.11,
+      ncXmlTotal: 13378.11,
+      ncXmlPresente: true,
+      ncPdfPresente: true,
+    });
+    expect(veredictoDe(checks)).toBe('verde');
+  });
+
+  it('NC presente pero monto distinto al esperado: warning visible, no bloquea', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 13378.11,
+      ncXmlTotal: 10000,
+      ncXmlPresente: true,
+      ncPdfPresente: true,
+    });
+    const c = checks.find((x) => x.clave === 'fact_nc_monto');
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('warning');
+    expect(veredictoDe(checks)).toBe('advertencias');
+  });
+
+  it('solo falta el PDF: rojo por el PDF, XML ok', () => {
+    const checks = checksFacturacion({
+      montoNotaCreditoEsperado: 13378.11,
+      ncXmlTotal: 13378.11,
+      ncXmlPresente: true,
+      ncPdfPresente: false,
+    });
+    expect(checks.find((c) => c.clave === 'fact_nc_xml')?.ok).toBe(true);
+    expect(checks.find((c) => c.clave === 'fact_nc_pdf')?.ok).toBe(false);
+    expect(veredictoDe(checks)).toBe('rojo');
+  });
+});
+
 // ── Acuse de envío (ciclo completo) ─────────────────────────────────────
 
 import { cruzarAcuseConInforme, separarChecks, type ExtraccionAcuse } from './pld-revision';
@@ -309,5 +389,22 @@ describe('separarChecks (flujo en dos pasos)', () => {
     // El informe puede estar en advertencias mientras el acuse está en rojo.
     expect(veredictoDe(informe)).toBe('advertencias');
     expect(veredictoDe(soloAcuse)).toBe('rojo');
+  });
+
+  it('aísla los checks de facturación (fact_) del informe y del acuse', () => {
+    const informeChecks = cruzarPldConExpediente(extraccion(), expediente());
+    const factChecks = checksFacturacion({
+      montoNotaCreditoEsperado: 13378.11,
+      ncXmlTotal: null,
+      ncXmlPresente: false,
+      ncPdfPresente: false,
+    });
+    const { informe, acuse, facturacion } = separarChecks([...informeChecks, ...factChecks]);
+    expect(facturacion).toHaveLength(factChecks.length);
+    expect(facturacion.every((c) => c.clave.startsWith('fact_'))).toBe(true);
+    expect(informe).toHaveLength(informeChecks.length);
+    expect(acuse).toHaveLength(0);
+    // El veredicto general incluye la NC (rojo) aunque el informe no.
+    expect(veredictoDe([...informeChecks, ...factChecks])).toBe('rojo');
   });
 });

@@ -1,0 +1,141 @@
+/**
+ * Carga server-side de la cuadratura de una venta DILESA.
+ *
+ * Espejo del armado de insumos que hace `useVentaResumen` (client-side) para
+ * el motor único `lib/dilesa/cuadratura.ts`: mismos campos, misma semántica
+ * (`fuente='cliente'` → directo cliente; adjunto `recibo_caja` → cuenta al
+ * valor facturado; 4 buckets de descuento; apoyo Infonavit del catálogo de
+ * tipos de crédito). Lo consumen los endpoints de la Fase 13 (revisión PLD y
+ * cierre) para conocer `montoNotaCredito` sin confiar en un snapshot del
+ * cliente — la NC es un control fiscal y se calcula del lado del servidor.
+ *
+ * IMPORTANTE: si cambia el armado de insumos en `useVentaResumen`, replicarlo
+ * aquí (ambos alimentan `calcularCuadratura`, que es la fórmula compartida).
+ */
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { calcularCuadratura, type Cuadratura } from '@/lib/dilesa/cuadratura';
+
+type VentaCuadraturaRow = {
+  empresa_id: string;
+  tipo_credito: string | null;
+  unidad_id: string | null;
+  precio_asignacion: number | null;
+  valor_escrituracion: number | null;
+  monto_credito_titular: number | null;
+  monto_credito_cotitular: number | null;
+  monto_credito_directo: number | null;
+  monto_cheque_notaria: number | null;
+  gastos_escrituracion: number | null;
+  descuento_precio: number | null;
+  descuento_equipamiento: number | null;
+  descuento_gastos_escrituracion: number | null;
+  descuento_nota_credito: number | null;
+};
+
+/**
+ * Devuelve la cuadratura calculada de la venta, o null si la venta no existe.
+ * `sb` debe poder leer `dilesa.*` y `erp.*` (admin client en los endpoints).
+ */
+export async function cargarCuadraturaVenta(
+  sb: SupabaseClient,
+  ventaId: string
+): Promise<Cuadratura | null> {
+  const { data: vRow } = await sb
+    .schema('dilesa')
+    .from('ventas')
+    .select(
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
+    )
+    .eq('id', ventaId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!vRow) return null;
+  const venta = vRow as unknown as VentaCuadraturaRow;
+
+  const [abonosRes, tcRes, unidadRes] = await Promise.all([
+    sb
+      .schema('erp')
+      .from('cxc_pagos')
+      .select('id, monto_total, fuente')
+      .eq('origen_tipo', 'venta_dilesa')
+      .eq('origen_id', ventaId)
+      .is('deleted_at', null),
+    venta.tipo_credito
+      ? sb
+          .schema('dilesa')
+          .from('tipos_credito')
+          .select('apoyo_infonavit_monto')
+          .eq('empresa_id', venta.empresa_id)
+          .eq('nombre', venta.tipo_credito)
+          .is('deleted_at', null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    venta.unidad_id
+      ? sb
+          .schema('dilesa')
+          .from('unidades')
+          .select('proyecto_id')
+          .eq('id', venta.unidad_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const abonos = (abonosRes.data ?? []) as {
+    id: string;
+    monto_total: number | null;
+    fuente: string | null;
+  }[];
+
+  // Recibos de caja por abono → cuentan al Valor Facturado del motor.
+  let abonosConRecibo = new Set<string>();
+  const abonoIds = abonos.map((a) => a.id);
+  if (abonoIds.length > 0) {
+    const { data: adjAbonos } = await sb
+      .schema('erp')
+      .from('adjuntos')
+      .select('entidad_id')
+      .eq('entidad_tipo', 'cxc_pago')
+      .eq('rol', 'recibo_caja')
+      .in('entidad_id', abonoIds);
+    abonosConRecibo = new Set(
+      ((adjAbonos ?? []) as { entidad_id: string }[]).map((a) => a.entidad_id)
+    );
+  }
+
+  let proyectoNombre: string | null = null;
+  const proyectoId = (unidadRes.data as { proyecto_id: string | null } | null)?.proyecto_id ?? null;
+  if (proyectoId) {
+    const { data: prj } = await sb
+      .schema('dilesa')
+      .from('proyectos')
+      .select('nombre')
+      .eq('id', proyectoId)
+      .maybeSingle();
+    proyectoNombre = (prj as { nombre: string | null } | null)?.nombre ?? null;
+  }
+
+  return calcularCuadratura({
+    valorEscrituracion: venta.valor_escrituracion,
+    montoCreditoTitular: venta.monto_credito_titular,
+    montoCreditoCotitular: venta.monto_credito_cotitular,
+    montoCreditoDirecto: venta.monto_credito_directo,
+    montoChequeNotaria: venta.monto_cheque_notaria,
+    gastosEscrituracion: venta.gastos_escrituracion,
+    apoyoInfonavit: Number(
+      (tcRes.data as { apoyo_infonavit_monto: number | null } | null)?.apoyo_infonavit_monto ?? 0
+    ),
+    descuentoOtorgadoTotal:
+      (Number(venta.descuento_precio) || 0) +
+      (Number(venta.descuento_equipamiento) || 0) +
+      (Number(venta.descuento_gastos_escrituracion) || 0) +
+      (Number(venta.descuento_nota_credito) || 0),
+    precioAsignacion: venta.precio_asignacion,
+    depositos: abonos.map((a) => ({
+      monto: a.monto_total,
+      directoCliente: a.fuente === 'cliente',
+      tieneRecibo: abonosConRecibo.has(a.id),
+    })),
+    proyectoNombre,
+  });
+}

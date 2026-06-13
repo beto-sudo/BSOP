@@ -7,7 +7,7 @@
 **Próximo hito:** merge S4c (flujo PLD en dos pasos, PR en revisión) → prueba en prod con PLD y acuse reales → cierre de iniciativa
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-06-12
+**Última actualización:** 2026-06-13
 
 ## Problema
 
@@ -132,6 +132,23 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 ## Decisiones registradas
 
+- **2026-06-13 — La nota de crédito que exige la cuadratura es un check del
+  cierre F13 (rojo + override Dirección).** La revisión de F13 cruzaba solo el
+  Aviso PLD; nada ligaba el `montoNotaCredito` del motor de cuadratura
+  (`valorFacturado − valorRealVentaDilesa`) al gate y los slots de NC eran
+  opcionales — una operación que factura más de lo que DILESA realmente recibe
+  (cheque a notaría / descuento) cerraba en verde sin NC. Ahora un grupo
+  determinista `fact_*` (sin IA — la cuadratura ya sabe el monto exacto) exige
+  XML+PDF de la NC cuando `montoNotaCredito > UMBRAL_NOTA_CREDITO` ($1, filtra
+  ruido de centavos), lo pinta en rojo en su propio bloque del panel y entra al
+  veredicto general. El monto se recalcula **server-side** (control fiscal — no
+  se confía en un snapshot del cliente; loader `lib/dilesa/cuadratura-server.ts`
+  compartido por la revisión y el cierre). Dureza elegida por Beto: **rojo con
+  override de Dirección** (motivo + audit), consistente con el resto del gate y
+  con "admin nunca bloqueado", en vez de bloqueo duro irreversible. La NC NO
+  estorba al flujo informe→acuse del PLD: es un grupo aparte de `informe` en
+  `separarChecks`, así que no afecta el congelado/presentación del aviso.
+
 - **2026-06-12 — Estado 'terminada': ciclo de vida ≠ avance de pipeline
   (sprint estados-venta).** `estado` responde solo "¿viva, cerró bien o
   cerró mal?" (activa / terminada / desasignada / expirada); el avance vive
@@ -214,6 +231,18 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-13** — Fix F13 (PR en revisión): la revisión asistida ahora
+  considera la nota de crédito que exige la cuadratura. Nuevo grupo `fact_*`
+  (`checksFacturacion` en `pld-revision.ts`, determinista + tests), loader
+  server-side `lib/dilesa/cuadratura-server.ts` (espejo de `useVentaResumen`),
+  cruce en la ruta `revision-pld` (snapshot de NC en `extraccion.facturacion`)
+  - gate redundante en `cerrar-fase13` (recalcula la NC server-side, robusto
+    aun con revisión vieja o inexistente), bloque "Facturación · Nota de crédito"
+    en el panel + nudge de re-ejecución cuando los docs de NC cambian tras la
+    corrida. Override de Dirección intacto. Origen: rebote de Beto — la venta
+    JUAN SPENCER ARZATE (M11-L3-LDLE) cerraba en verde sin NC pese a $13,378.11
+    de nota de crédito en la cuadratura.
 
 - **2026-06-12** — Sprint estados-venta entregado (PR #874): estado
   'terminada' separa pipeline vivo de operaciones concluidas. Migración
