@@ -38,6 +38,11 @@ import {
   splitRecipientsExtra,
   writeNotificationLog,
 } from '@/lib/notifications';
+import {
+  computeKpisDelDia,
+  upsertKpiSnapshot,
+  fechaLocalMatamoros,
+} from '@/lib/dilesa/resumen-consejo-kpis';
 
 export const maxDuration = 120;
 
@@ -158,6 +163,21 @@ export async function GET(req: NextRequest) {
     resendId: res.id ?? null,
     errorMessage: res.ok ? null : String(res.error ?? 'unknown'),
   });
+
+  // Snapshot de cierre del día (base de los deltas del resumen ejecutivo, Sprint
+  // 1 del rediseño). No-fatal: un fallo aquí no debe bloquear el correo, que ya
+  // se envió. La fecha es la LOCAL de Matamoros, no la UTC del cron.
+  try {
+    const fechaLocal = fechaLocalMatamoros(now);
+    const kpis = await computeKpisDelDia(supabase, DILESA_EMPRESA_ID, fechaLocal);
+    const up = await upsertKpiSnapshot(supabase, DILESA_EMPRESA_ID, fechaLocal, kpis);
+    console.log(
+      '[dilesa-resumen-consejo] snapshot',
+      JSON.stringify({ fecha: fechaLocal, ok: up.ok })
+    );
+  } catch (e) {
+    console.error('[dilesa-resumen-consejo] snapshot error', e);
+  }
 
   const summary = {
     status: res.ok ? 'sent' : 'error',
