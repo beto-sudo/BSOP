@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-11 (hotfix post-cutover #3: 178 lotes sin prototipo de LDLE reclasificados a lote_urbanizado — el inventario ya solo ofrece casas reales)
+**Última actualización:** 2026-06-13 (post-cierre: la pestaña Cuadratura toma Valor Facturado / Nota de Crédito del CFDI cuando ya hay factura — fórmula = sugerido pre-factura — + blindaje de `fuente` contra doble conteo)
 
 ## Problema
 
@@ -350,6 +350,28 @@ expediente, copiloto), no reescritura.
   solo él (una Coda no brinca el hold). Mismo PR: la búsqueda de la lista
   de Ventas ahora matchea identificador de unidad además de comprador
   (antes era imposible ubicar una venta partiendo de la unidad).
+- **2026-06-13 (post-cierre — Cuadratura toma el CFDI):** La pestaña
+  Cuadratura mostraba SIEMPRE el Valor Facturado y la Nota de Crédito
+  estimados por la fórmula del motor (`lib/dilesa/cuadratura.ts`), nunca los
+  valores reales del CFDI capturado en Fase 13 (`dilesa.ventas.valor_facturado`
+  / `monto_nota_credito`, persistidos del total del XML). Tres fixes en un PR
+  (lógica/backend, auto-merge): **(1)** el panel
+  (`components/dilesa/cuadratura-panel.tsx`) ahora recibe los valores
+  persistidos y los muestra como autoritativos cuando ya existe el CFDI —
+  señal = presencia del adjunto `rol='factura_xml'` (factura) /
+  `rol='nota_credito_xml'` (NC), NO `valor_facturado != null` a secas (algunas
+  ventas traen un snapshot de Coda = escrituración sin factura real, p.ej.
+  Ahumada/Spencer en Detonada). Pre-factura, la fórmula queda como hint
+  «Sugerido: $X», mismo patrón que la fila «Cheque a notaría». **(2)** El
+  estimado de respaldo dejó de duplicar: `depositosConRecibo` ahora filtra
+  `tieneRecibo && directoCliente` — la disposición del crédito
+  (fuente='institucion') nunca factura aunque traiga un recibo importado de
+  Coda (caso Ahumada: escrituración 940k mostraba 1,880,000). Test de
+  regresión agregado; el del ejemplo de Coda sigue verde. **(3)** Guard-rail
+  UI: el botón «Subir recibo» (sube adjunto `rol='recibo_caja'`, lo que dispara
+  el doble conteo) ya no aparece en abonos `fuente='institucion'`. (FIX 4 del
+  scope — pre-select de fuente + aviso inline en el drawer de abono — ya venía
+  resuelto en #875.)
 
 - **2026-06-09:** Ir por rediseño completo (workspace "Expediente de
   Operación"), reusando los datos y formularios de las 13 fases ya
@@ -417,3 +439,20 @@ expediente, copiloto), no reescritura.
   no se tocan (en preventa manda la fase de obra). Vive en el flujo nativo
   (asignar/desasignar/expirar) y en el sync de rescate
   `import_dilesa_ventas.ts`.
+- **2026-06-13 (Cuadratura — el CFDI manda, la fórmula respalda — Beto):** Con
+  factura emitida, el Valor Facturado y la Nota de Crédito de la Cuadratura son
+  los del CFDI capturado en Fase 13 (persistidos en `dilesa.ventas`); la
+  fórmula reverse-engineered de Coda baja a «sugerido» y solo aplica antes de
+  facturar. La señal de "ya hay factura" es la presencia del adjunto del XML
+  (`factura_xml` / `nota_credito_xml`), no el valor persistido a secas (puede
+  ser un snapshot de Coda = valor de escrituración sin factura real).
+- **2026-06-13 (la `fuente` del abono NO es solo etiqueta — durable):** Corrige
+  la afirmación histórica de que en Coda el crédito de institución "nunca
+  llevaba recibo": SÍ lo llevaba (34 importados con `coda_url`), pero la
+  FÓRMULA de Coda del Valor Facturado filtraba por **tipo de depósito**
+  (Directo Cliente), no por la presencia del PDF. Por eso una disposición de
+  crédito etiquetada con recibo no debe facturar. El motor (`directoCliente`),
+  el guard-rail UI (sin «Subir recibo» en institución) y el pre-select del
+  drawer (#875) son blindajes durables: los datos vivos ya se corrigieron en
+  prod (5 abonos re-etiquetados + 35 adjuntos `recibo_caja` reclasificados a
+  `comprobante_deposito` sobre 20 ventas el 2026-06-12).

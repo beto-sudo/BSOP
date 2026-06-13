@@ -36,6 +36,24 @@ describe('calcularCuadratura', () => {
     expect(c.comisionVendedor).toBe(8990); // 899,000 × 1.0% (no Loma Verde)
   });
 
+  // Regresión (caso Ahumada, 2026-06-13): la disposición del crédito de
+  // institución traía un recibo de caja importado de Coda. La fórmula NO debe
+  // facturarlo — solo los depósitos del cliente con recibo suman al Valor
+  // Facturado. Antes del fix, escrituración 940,000 mostraba 1,880,000.
+  it('el respaldo no factura la disposición del crédito (recibo importado de Coda)', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 940000,
+      montoCreditoTitular: 940000,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: null,
+      gastosEscrituracion: null,
+      depositos: [{ monto: 940000, directoCliente: false, tieneRecibo: true }],
+    });
+    // El recibo es de institución (directoCliente=false) → no factura.
+    expect(c.valorFacturado).toBe(940000); // 940,000 escrituración + 0
+  });
+
   it('marca cubierta cuando el disponible cubre la escrituración', () => {
     const c = calcularCuadratura({
       valorEscrituracion: 500000,
