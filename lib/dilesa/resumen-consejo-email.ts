@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { KpisDelDia } from './resumen-consejo-kpis';
 
 // ── Tipos por sección ───────────────────────────────────────────────────────
 
@@ -184,6 +185,20 @@ export type ResumenConsejoData = {
   construccion: ConstruccionResumen;
 };
 
+/**
+ * Cabecera ejecutiva (Sprint 3): los KPIs del día + sus deltas vs el snapshot
+ * previo + contexto de mes + CxP. Alimenta la tarjeta "Hoy en DILESA", las
+ * alertas por excepción, el asunto dinámico y la línea de Cobranza.
+ */
+export type Cabecera = {
+  kpis: KpisDelDia;
+  deltas: Record<keyof KpisDelDia, number | null>;
+  cobrado_mes: number;
+  escrituras_mes_n: number;
+  escrituras_mes_monto: number;
+  cxp_por_pagar: number;
+};
+
 // ── Formato ─────────────────────────────────────────────────────────────────
 
 export function fmtMoney(n: number | null | undefined): string {
@@ -212,6 +227,57 @@ function fmtShortDate(d: string | null | undefined): string {
   const [y, m, day] = d.slice(0, 10).split('-');
   if (!y || !m || !day) return d;
   return `${day}/${m}/${y}`;
+}
+
+/** Moneda compacta para tarjetas/asunto: $128.7M / $644K / $90. */
+export function fmtMoneyCompact(n: number | null | undefined): string {
+  if (n == null) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n)}`;
+}
+
+/** Días entre una fecha ISO y hoy (ambas YYYY-MM-DD). null si no hay fecha. */
+export function diasDesde(fechaISO: string | null | undefined, hoyISO: string): number | null {
+  if (!fechaISO) return null;
+  const a = Date.parse(`${fechaISO.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${hoyISO.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Días tras los cuales un saldo se considera stale (rojo + alerta). */
+export const SALDO_STALE_DIAS = 7;
+
+/** Color del punto de frescura por antigüedad del saldo. */
+export function frescuraColor(dias: number | null): string {
+  if (dias == null) return '#94a3b8'; // gris
+  if (dias <= 2) return '#1a7f37'; // verde
+  if (dias <= SALDO_STALE_DIAS) return '#b45309'; // ámbar
+  return '#cf222e'; // rojo
+}
+
+const MESES_CORTOS = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
+/** "2026-06-13" → "13 jun" (para el asunto). */
+export function fechaCortaDe(fechaLocal: string): string {
+  const [, mm, dd] = fechaLocal.slice(0, 10).split('-');
+  const mi = Number(mm) - 1;
+  return `${Number(dd)} ${MESES_CORTOS[mi] ?? mm}`;
 }
 
 // ── Render (puro) ────────────────────────────────────────────────────────────
@@ -263,7 +329,7 @@ export function renderSection(title: string, cols: Col[], rows: string[][]): str
     </div>`;
 }
 
-function renderSaldos(rows: SaldoBancoRow[]): string {
+function renderSaldos(rows: SaldoBancoRow[], hoyISO: string): string {
   return renderSection(
     'Saldos en Bancos',
     [
@@ -271,8 +337,162 @@ function renderSaldos(rows: SaldoBancoRow[]): string {
       { label: 'Saldo', align: 'right' },
       { label: 'Última actualización', align: 'right' },
     ],
-    rows.map((r) => [r.nombre, fmtMoney(r.saldo), fmtShortDate(r.fecha_saldo)])
+    rows.map((r) => {
+      const dias = diasDesde(r.fecha_saldo, hoyISO);
+      const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${frescuraColor(dias)};margin-right:6px;"></span>`;
+      const fecha =
+        dias != null && dias > SALDO_STALE_DIAS
+          ? `<span style="color:#cf222e;font-weight:600;">${fmtShortDate(r.fecha_saldo)} (${dias}d)</span>`
+          : fmtShortDate(r.fecha_saldo);
+      return [`${dot}${r.nombre}`, fmtMoney(r.saldo), fecha];
+    })
   );
+}
+
+/** Línea de Cobranza (CxC) bajo los saldos: abierto / cobrado mes / vencido / CxP. */
+function renderCxcLinea(cab: Cabecera): string {
+  const venc =
+    cab.kpis.cxc_vencido > 0
+      ? ` · <span style="color:#cf222e;font-weight:600;">vencido ${fmtMoney(cab.kpis.cxc_vencido)}</span>`
+      : '';
+  const cxp =
+    cab.cxp_por_pagar > 0 ? ` &nbsp;·&nbsp; CxP por pagar: ${fmtMoney(cab.cxp_por_pagar)}` : '';
+  return `
+    <div style="padding:2px 32px 10px;">
+      <p style="margin:0;font-size:12px;color:#1e293b;"><span style="color:#64748b;">Cobranza (CxC):</span> abierto ${fmtMoney(cab.kpis.cxc_abierto)} · cobrado mes ${fmtMoney(cab.cobrado_mes)}${venc}${cxp}</p>
+    </div>`;
+}
+
+/** Una tarjeta del bloque ejecutivo. */
+function cardCell(label: string, big: string, sub: string, subColor: string): string {
+  return `<td style="width:33%;padding:5px;vertical-align:top;">
+      <div style="background:#f1f5f9;border-radius:8px;padding:10px 12px;">
+        <div style="font-size:11px;color:#64748b;">${label}</div>
+        <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin:2px 0;">${big}</div>
+        <div style="font-size:11px;color:${subColor};">${sub}</div>
+      </div>
+    </td>`;
+}
+
+/** Tarjeta ejecutiva "Hoy en DILESA": 6 cifras con delta/contexto. */
+export function renderTarjetaEjecutiva(
+  cab: Cabecera,
+  data: ResumenConsejoData,
+  hoyISO: string
+): string {
+  const k = cab.kpis;
+  const dv = cab.deltas.ventas_hoy_n;
+  const ventasSub =
+    dv == null ? '&nbsp;' : dv > 0 ? `▲ +${dv} vs ayer` : dv < 0 ? `▼ ${dv} vs ayer` : '= vs ayer';
+  const ventasColor =
+    dv != null && dv > 0 ? '#1a7f37' : dv != null && dv < 0 ? '#cf222e' : '#64748b';
+  const stale = data.saldos.filter((s) => {
+    const d = diasDesde(s.fecha_saldo, hoyISO);
+    return d != null && d > SALDO_STALE_DIAS;
+  }).length;
+  const venc = data.construccion.vencidas;
+  const cards = [
+    cardCell(
+      'Ventas hoy',
+      `${k.ventas_hoy_n} · ${fmtMoneyCompact(k.ventas_hoy_monto)}`,
+      ventasSub,
+      ventasColor
+    ),
+    cardCell(
+      'Escrituras hoy',
+      `${k.escrituras_hoy_n} · ${fmtMoneyCompact(k.escrituras_hoy_monto)}`,
+      `mes: ${cab.escrituras_mes_n} · ${fmtMoneyCompact(cab.escrituras_mes_monto)}`,
+      '#64748b'
+    ),
+    cardCell(
+      'Cobrado hoy',
+      fmtMoneyCompact(k.cobrado_hoy),
+      `mes: ${fmtMoneyCompact(cab.cobrado_mes)}`,
+      '#64748b'
+    ),
+    cardCell(
+      'Liquidez total',
+      fmtMoneyCompact(k.liquidez_total),
+      stale > 0 ? `▼ ${stale} saldo(s) sin actualizar` : 'saldos al día',
+      stale > 0 ? '#cf222e' : '#1a7f37'
+    ),
+    cardCell(
+      'CxC abierto',
+      fmtMoneyCompact(k.cxc_abierto),
+      k.cxc_vencido > 0 ? `vencido ${fmtMoneyCompact(k.cxc_vencido)}` : 'sin vencido',
+      k.cxc_vencido > 0 ? '#cf222e' : '#64748b'
+    ),
+    cardCell(
+      'Casas en obra',
+      `${k.casas_en_obra}`,
+      venc > 0 ? `${venc} con hito vencido` : 'al día',
+      venc > 0 ? '#cf222e' : '#64748b'
+    ),
+  ];
+  return `
+    <div style="padding:14px 27px 4px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:#64748b;margin:0 5px 6px;">HOY EN DILESA</div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tr>${cards.slice(0, 3).join('')}</tr>
+        <tr>${cards.slice(3, 6).join('')}</tr>
+      </table>
+    </div>`;
+}
+
+/** Franja de alertas por excepción. Vacía → no se imprime (ausencia = buena señal). */
+export function renderAlertas(alertas: string[]): string {
+  if (alertas.length === 0) return '';
+  const items = alertas.map((a) => `<li style="margin:2px 0;">${a}</li>`).join('');
+  return `
+    <div style="padding:6px 32px 4px;">
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;">
+        <div style="font-size:12px;font-weight:700;color:#cf222e;margin-bottom:4px;">⚠️ Requiere atención</div>
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:#991b1b;">${items}</ul>
+      </div>
+    </div>`;
+}
+
+/**
+ * Alertas por excepción (cap 3): cobranza vencida, saldos stale, obra vencida.
+ * Solo dispara lo que aplica — cero alertas = la franja no se imprime.
+ */
+export function armarAlertas(cab: Cabecera, data: ResumenConsejoData, hoyISO: string): string[] {
+  const a: string[] = [];
+  if (cab.kpis.cxc_vencido > 0) a.push(`Cobranza vencida: ${fmtMoney(cab.kpis.cxc_vencido)}`);
+  const stale = data.saldos
+    .map((s) => ({ nombre: s.nombre, dias: diasDesde(s.fecha_saldo, hoyISO) }))
+    .filter((s) => s.dias != null && s.dias > SALDO_STALE_DIAS)
+    .sort((x, y) => (y.dias ?? 0) - (x.dias ?? 0));
+  if (stale.length === 1) a.push(`${stale[0].nombre} sin actualizar hace ${stale[0].dias} días`);
+  else if (stale.length > 1) a.push(`${stale.length} saldos bancarios sin actualizar`);
+  if (data.construccion.vencidas > 0)
+    a.push(`${data.construccion.vencidas} casa(s) de obra con hito vencido`);
+  return a.slice(0, 3);
+}
+
+/** Asunto dinámico: el titular del día. */
+export function armarAsunto(
+  cab: Cabecera,
+  fechaCorta: string,
+  data: ResumenConsejoData,
+  hoyISO: string
+): string {
+  const k = cab.kpis;
+  const segs: string[] = [`DILESA ${fechaCorta}`];
+  segs.push(
+    k.ventas_hoy_n > 0
+      ? `${k.ventas_hoy_n} venta${k.ventas_hoy_n > 1 ? 's' : ''} ${fmtMoneyCompact(k.ventas_hoy_monto)}`
+      : 'sin ventas hoy'
+  );
+  if (k.escrituras_hoy_n > 0)
+    segs.push(`${k.escrituras_hoy_n} escritura${k.escrituras_hoy_n > 1 ? 's' : ''}`);
+  if (k.cxc_vencido > 0) segs.push(`CxC venc. ${fmtMoneyCompact(k.cxc_vencido)}`);
+  const stale = data.saldos
+    .map((s) => ({ nombre: s.nombre, dias: diasDesde(s.fecha_saldo, hoyISO) }))
+    .filter((s) => s.dias != null && s.dias > SALDO_STALE_DIAS);
+  if (stale.length === 1) segs.push(`${stale[0].nombre} sin actualizar ${stale[0].dias}d`);
+  else if (stale.length > 1) segs.push(`${stale.length} saldos viejos`);
+  return segs.join(' · ');
 }
 
 function renderTuberiaViva(rows: TuberiaRow[]): string {
@@ -387,13 +607,27 @@ function renderConstruccion(c: ConstruccionResumen): string {
     </div>`;
 }
 
-/** Ensambla el correo completo en 4 secciones. */
+/** Ensambla el correo completo: cabecera ejecutiva (Sprint 3, si hay) + 4 secciones. */
 export function renderResumenConsejoHtml(
   data: ResumenConsejoData,
-  opts: { headerImageUrl?: string | null; fechaTitulo: string }
+  opts: {
+    headerImageUrl?: string | null;
+    fechaTitulo: string;
+    fechaLocal?: string;
+    cabecera?: Cabecera | null;
+  }
 ): string {
+  const hoyISO = opts.fechaLocal ?? '';
+  const cab = opts.cabecera ?? null;
+
+  const ejecutivo = cab
+    ? renderTarjetaEjecutiva(cab, data, hoyISO) + renderAlertas(armarAlertas(cab, data, hoyISO))
+    : '';
+
   const tesoreria = data.saldos.length
-    ? renderSectionBand('Tesorería') + renderSaldos(data.saldos)
+    ? renderSectionBand('Tesorería') +
+      renderSaldos(data.saldos, hoyISO) +
+      (cab ? renderCxcLinea(cab) : '')
     : '';
 
   const ventas =
@@ -409,7 +643,7 @@ export function renderResumenConsejoHtml(
 
   const construccion = renderSectionBand('Construcción') + renderConstruccion(data.construccion);
 
-  const body = [tesoreria, ventas, proyectos, construccion].filter(Boolean).join('\n');
+  const body = [ejecutivo, tesoreria, ventas, proyectos, construccion].filter(Boolean).join('\n');
 
   // Layout full-width que se adapta al ancho de la pantalla (preferencia de Beto).
   const header = opts.headerImageUrl

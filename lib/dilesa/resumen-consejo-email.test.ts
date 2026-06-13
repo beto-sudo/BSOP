@@ -3,15 +3,71 @@ import {
   fmtMoney,
   fmtPct,
   fmtInt,
+  fmtMoneyCompact,
+  diasDesde,
+  frescuraColor,
+  fechaCortaDe,
   fechaTituloCST,
   relojMatamoros,
   renderResumenConsejoHtml,
+  renderTarjetaEjecutiva,
+  renderAlertas,
+  armarAlertas,
+  armarAsunto,
   armarTuberiaSplit,
   armarPrototiposVivos,
   type ResumenConsejoData,
+  type Cabecera,
   type MargenRaw,
   type InventarioRaw,
 } from './resumen-consejo-email';
+import type { KpisDelDia } from './resumen-consejo-kpis';
+
+const KPIS_DEMO: KpisDelDia = {
+  ventas_hoy_n: 3,
+  ventas_hoy_monto: 5400000,
+  escrituras_hoy_n: 2,
+  escrituras_hoy_monto: 3200000,
+  cobrado_hoy: 1800000,
+  liquidez_total: 137800000,
+  cxc_abierto: 133200000,
+  cxc_vencido: 47500000,
+  casas_en_obra: 12,
+};
+
+const CAB_DEMO: Cabecera = {
+  kpis: KPIS_DEMO,
+  deltas: {
+    ventas_hoy_n: 2,
+    ventas_hoy_monto: null,
+    escrituras_hoy_n: null,
+    escrituras_hoy_monto: null,
+    cobrado_hoy: null,
+    liquidez_total: null,
+    cxc_abierto: null,
+    cxc_vencido: null,
+    casas_en_obra: null,
+  },
+  cobrado_mes: 27600000,
+  escrituras_mes_n: 9,
+  escrituras_mes_monto: 14100000,
+  cxp_por_pagar: 501000,
+};
+
+// data con un saldo stale (Afirme, 13 días) y 2 obras vencidas.
+const DATA_DEMO: ResumenConsejoData = {
+  saldos: [
+    { nombre: 'Monex', banco: null, saldo: 128700000, fecha_saldo: '2026-06-12' },
+    { nombre: 'Afirme', banco: null, saldo: 9535, fecha_saldo: '2026-05-31' },
+  ],
+  tuberiaViva: [],
+  tuberiaHistorico: { clientes: 0, valor: 0 },
+  asignaciones: [],
+  avances: [],
+  prototipos: [],
+  construccion: { casas_en_obra: 12, vencidas: 2, mo_por_ejecutar: 644988 },
+};
+const HOY = '2026-06-13';
 
 const EMPTY: ResumenConsejoData = {
   saldos: [],
@@ -251,5 +307,106 @@ describe('armarPrototiposVivos — fusión + filtro de vivos', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].en_obra).toBe(3);
     expect(rows[0].utilidad_potencial).toBe(0);
+  });
+});
+
+describe('helpers de cabecera (Sprint 3)', () => {
+  it('fmtMoneyCompact compacta a M/K', () => {
+    expect(fmtMoneyCompact(5400000)).toBe('$5.4M');
+    expect(fmtMoneyCompact(47500000)).toBe('$47.5M');
+    expect(fmtMoneyCompact(12000)).toBe('$12K');
+    expect(fmtMoneyCompact(90)).toBe('$90');
+    expect(fmtMoneyCompact(null)).toBe('—');
+  });
+
+  it('diasDesde cuenta días y maneja null', () => {
+    expect(diasDesde('2026-05-31', '2026-06-13')).toBe(13);
+    expect(diasDesde('2026-06-13', '2026-06-13')).toBe(0);
+    expect(diasDesde(null, '2026-06-13')).toBeNull();
+  });
+
+  it('frescuraColor: verde ≤2, ámbar ≤7, rojo >7, gris sin fecha', () => {
+    expect(frescuraColor(1)).toBe('#1a7f37');
+    expect(frescuraColor(5)).toBe('#b45309');
+    expect(frescuraColor(13)).toBe('#cf222e');
+    expect(frescuraColor(null)).toBe('#94a3b8');
+  });
+
+  it('fechaCortaDe formatea "13 jun"', () => {
+    expect(fechaCortaDe('2026-06-13')).toBe('13 jun');
+    expect(fechaCortaDe('2026-01-05')).toBe('5 ene');
+  });
+});
+
+describe('armarAlertas — excepción, cap 3', () => {
+  it('dispara cobranza vencida, saldo stale y obra vencida', () => {
+    const alertas = armarAlertas(CAB_DEMO, DATA_DEMO, HOY);
+    expect(alertas).toHaveLength(3);
+    expect(alertas[0]).toContain('Cobranza vencida');
+    expect(alertas.some((a) => a.includes('Afirme sin actualizar hace 13 días'))).toBe(true);
+    expect(alertas.some((a) => a.includes('2 casa(s) de obra con hito vencido'))).toBe(true);
+  });
+
+  it('sin nada que reportar devuelve lista vacía (no se imprime la franja)', () => {
+    const cab: Cabecera = { ...CAB_DEMO, kpis: { ...KPIS_DEMO, cxc_vencido: 0 } };
+    const data: ResumenConsejoData = {
+      ...DATA_DEMO,
+      saldos: [{ nombre: 'Monex', banco: null, saldo: 1, fecha_saldo: '2026-06-12' }],
+      construccion: { casas_en_obra: 5, vencidas: 0, mo_por_ejecutar: 0 },
+    };
+    expect(armarAlertas(cab, data, HOY)).toEqual([]);
+    expect(renderAlertas([])).toBe('');
+  });
+});
+
+describe('armarAsunto — titular dinámico', () => {
+  it('arma el asunto con ventas, escrituras, CxC vencido y saldo stale', () => {
+    const asunto = armarAsunto(CAB_DEMO, '13 jun', DATA_DEMO, HOY);
+    expect(asunto).toContain('DILESA 13 jun');
+    expect(asunto).toContain('3 ventas $5.4M');
+    expect(asunto).toContain('2 escrituras');
+    expect(asunto).toContain('CxC venc. $47.5M');
+    expect(asunto).toContain('Afirme sin actualizar 13d');
+  });
+
+  it('día plano: "sin ventas hoy"', () => {
+    const cab: Cabecera = {
+      ...CAB_DEMO,
+      kpis: { ...KPIS_DEMO, ventas_hoy_n: 0, escrituras_hoy_n: 0, cxc_vencido: 0 },
+    };
+    const data: ResumenConsejoData = { ...DATA_DEMO, saldos: [] };
+    expect(armarAsunto(cab, '14 jun', data, HOY)).toBe('DILESA 14 jun · sin ventas hoy');
+  });
+});
+
+describe('renderTarjetaEjecutiva + correo con cabecera', () => {
+  it('la tarjeta muestra las 6 cifras con delta y contexto', () => {
+    const html = renderTarjetaEjecutiva(CAB_DEMO, DATA_DEMO, HOY);
+    expect(html).toContain('HOY EN DILESA');
+    expect(html).toContain('Ventas hoy');
+    expect(html).toContain('▲ +2 vs ayer');
+    expect(html).toContain('Cobrado hoy');
+    expect(html).toContain('vencido $47.5M');
+    expect(html).toContain('2 con hito vencido');
+  });
+
+  it('renderResumenConsejoHtml con cabecera incluye tarjeta, alertas y línea CxC', () => {
+    const html = renderResumenConsejoHtml(DATA_DEMO, {
+      fechaTitulo: '13 de junio de 2026',
+      fechaLocal: HOY,
+      cabecera: CAB_DEMO,
+    });
+    expect(html).toContain('HOY EN DILESA');
+    expect(html).toContain('Requiere atención');
+    expect(html).toContain('Cobranza (CxC):');
+    expect(html).toContain('CxP por pagar');
+    // semáforo de frescura: el saldo stale (Afirme, 13d) se marca en rojo
+    expect(html).toContain('(13d)');
+  });
+
+  it('sin cabecera no renderiza la tarjeta (retrocompat Sprint 2)', () => {
+    const html = renderResumenConsejoHtml(DATA_DEMO, { fechaTitulo: 'x' });
+    expect(html).not.toContain('HOY EN DILESA');
+    expect(html).not.toContain('Cobranza (CxC):');
   });
 });

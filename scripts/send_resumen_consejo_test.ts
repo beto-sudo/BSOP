@@ -12,7 +12,16 @@ import {
   renderResumenConsejoHtml,
   fechaTituloCST,
   sendResumenEmail,
+  armarAsunto,
+  fechaCortaDe,
+  type Cabecera,
 } from '../lib/dilesa/resumen-consejo-email';
+import {
+  computeKpisDelDia,
+  fetchSnapshotPrevio,
+  calcularDeltas,
+  fechaLocalMatamoros,
+} from '../lib/dilesa/resumen-consejo-kpis';
 
 const DILESA_ID = 'f5942ed4-7a6b-4c39-af18-67b9fbf7f479';
 const HEADER =
@@ -35,8 +44,47 @@ async function main() {
 
   const now = new Date();
   const data = await fetchResumenConsejoData(supabase, DILESA_ID, now);
+  const fechaLocal = fechaLocalMatamoros(now);
+  const inicioMesISO = `${fechaLocal.slice(0, 7)}-01`;
+  const erp = supabase.schema('erp');
+  const [kpis, previo, cobradoMesRes, cxpRes] = await Promise.all([
+    computeKpisDelDia(supabase, DILESA_ID, fechaLocal),
+    fetchSnapshotPrevio(supabase, DILESA_ID, fechaLocal),
+    erp
+      .from('cxc_pagos')
+      .select('monto_total')
+      .eq('empresa_id', DILESA_ID)
+      .is('deleted_at', null)
+      .gte('fecha', inicioMesISO),
+    erp
+      .from('cxp_pagos')
+      .select('monto_total')
+      .eq('empresa_id', DILESA_ID)
+      .is('deleted_at', null)
+      .is('fecha_pago', null),
+  ]);
+  const cabecera: Cabecera = {
+    kpis,
+    deltas: calcularDeltas(kpis, previo),
+    cobrado_mes: (cobradoMesRes.data ?? []).reduce(
+      (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
+      0
+    ),
+    escrituras_mes_n: data.asignaciones.reduce((s, a) => s + a.escrituras_mes, 0),
+    escrituras_mes_monto: data.asignaciones.reduce((s, a) => s + a.monto_escrituras, 0),
+    cxp_por_pagar: (cxpRes.data ?? []).reduce(
+      (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
+      0
+    ),
+  };
   const fechaTitulo = fechaTituloCST(now);
-  const html = renderResumenConsejoHtml(data, { headerImageUrl: HEADER, fechaTitulo });
+  const html = renderResumenConsejoHtml(data, {
+    headerImageUrl: HEADER,
+    fechaTitulo,
+    fechaLocal,
+    cabecera,
+  });
+  const asunto = armarAsunto(cabecera, fechaCortaDe(fechaLocal), data, fechaLocal);
 
   console.log('Conteo por sección:', {
     saldos: data.saldos.length,
@@ -55,9 +103,10 @@ async function main() {
     return;
   }
 
+  console.log('Asunto:', `${asunto} [PRUEBA]`);
   const res = await sendResumenEmail(resendKey, {
     html,
-    subject: `Resumen Diario Operación Dilesa 🏘️ ${fechaTitulo} [PRUEBA]`,
+    subject: `${asunto} [PRUEBA]`,
     from: 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>',
     recipients: [TEST_TO],
   });

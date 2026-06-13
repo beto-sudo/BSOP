@@ -31,16 +31,20 @@ import {
   sendResumenEmail,
   relojMatamoros,
   HORA_ENVIO_LOCAL,
+  armarAsunto,
+  fechaCortaDe,
+  type Cabecera,
 } from '@/lib/dilesa/resumen-consejo-email';
 import {
   getDefinitionBySlug,
-  renderSubject,
   splitRecipientsExtra,
   writeNotificationLog,
 } from '@/lib/notifications';
 import {
   computeKpisDelDia,
   upsertKpiSnapshot,
+  fetchSnapshotPrevio,
+  calcularDeltas,
   fechaLocalMatamoros,
 } from '@/lib/dilesa/resumen-consejo-kpis';
 
@@ -52,7 +56,6 @@ const RESUMEN_SLUG = 'dilesa_resumen_consejo';
 /** Fallbacks si el catálogo no responde (FAIL-OPEN, patrón escrituración). */
 const CONSEJO_EMAIL_FALLBACK = 'consejo@dilesa.mx';
 const FROM_FALLBACK = 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>';
-const SUBJECT_FALLBACK = 'Resumen Diario Operación Dilesa 🏘️ {fecha}';
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim();
@@ -116,10 +119,49 @@ export async function GET(req: NextRequest) {
     .single();
 
   const data = await fetchResumenConsejoData(supabase, DILESA_EMPRESA_ID, now);
+
+  // Cabecera ejecutiva (Sprint 3): KPIs del día + deltas vs el snapshot previo +
+  // contexto de mes (cobrado/escrituras) + CxP por pagar.
+  const fechaLocal = fechaLocalMatamoros(now);
+  const inicioMesISO = `${fechaLocal.slice(0, 7)}-01`;
+  const erp = supabase.schema('erp');
+  const [kpis, previo, cobradoMesRes, cxpRes] = await Promise.all([
+    computeKpisDelDia(supabase, DILESA_EMPRESA_ID, fechaLocal),
+    fetchSnapshotPrevio(supabase, DILESA_EMPRESA_ID, fechaLocal),
+    erp
+      .from('cxc_pagos')
+      .select('monto_total')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .is('deleted_at', null)
+      .gte('fecha', inicioMesISO),
+    erp
+      .from('cxp_pagos')
+      .select('monto_total')
+      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .is('deleted_at', null)
+      .is('fecha_pago', null),
+  ]);
+  const cabecera: Cabecera = {
+    kpis,
+    deltas: calcularDeltas(kpis, previo),
+    cobrado_mes: (cobradoMesRes.data ?? []).reduce(
+      (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
+      0
+    ),
+    escrituras_mes_n: data.asignaciones.reduce((s, a) => s + a.escrituras_mes, 0),
+    escrituras_mes_monto: data.asignaciones.reduce((s, a) => s + a.monto_escrituras, 0),
+    cxp_por_pagar: (cxpRes.data ?? []).reduce(
+      (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
+      0
+    ),
+  };
+
   const fechaTitulo = fechaTituloCST(now);
   const html = renderResumenConsejoHtml(data, {
     headerImageUrl: empresa?.header_email_url ?? null,
     fechaTitulo,
+    fechaLocal,
+    cabecera,
   });
 
   // Destino: RESUMEN_CONSEJO_TEST_TO definida → modo prueba (subject [PRUEBA], NO
@@ -140,10 +182,9 @@ export async function GET(req: NextRequest) {
       ? `${def.from_name} <${def.from_email}>`
       : def.from_email
     : FROM_FALLBACK;
-  const subjectBase = renderSubject(def?.subject_template ?? SUBJECT_FALLBACK, {
-    fecha: fechaTitulo,
-  });
-  const subject = `${subjectBase}${testTo ? ' [PRUEBA]' : ''}`;
+  // Asunto dinámico: el titular del día (Sprint 3). Reemplaza el template estático
+  // del catálogo — el valor del correo está en que el asunto cuente qué pasó hoy.
+  const subject = `${armarAsunto(cabecera, fechaCortaDe(fechaLocal), data, fechaLocal)}${testTo ? ' [PRUEBA]' : ''}`;
 
   const res = await sendResumenEmail(resendKey, {
     html,
@@ -164,12 +205,9 @@ export async function GET(req: NextRequest) {
     errorMessage: res.ok ? null : String(res.error ?? 'unknown'),
   });
 
-  // Snapshot de cierre del día (base de los deltas del resumen ejecutivo, Sprint
-  // 1 del rediseño). No-fatal: un fallo aquí no debe bloquear el correo, que ya
-  // se envió. La fecha es la LOCAL de Matamoros, no la UTC del cron.
+  // Snapshot de cierre del día (base de los deltas, Sprint 1). No-fatal: el correo
+  // ya se envió. `kpis`/`fechaLocal` se computaron arriba para la cabecera.
   try {
-    const fechaLocal = fechaLocalMatamoros(now);
-    const kpis = await computeKpisDelDia(supabase, DILESA_EMPRESA_ID, fechaLocal);
     const up = await upsertKpiSnapshot(supabase, DILESA_EMPRESA_ID, fechaLocal, kpis);
     console.log(
       '[dilesa-resumen-consejo] snapshot',
