@@ -52,6 +52,7 @@ const CAB_DEMO: Cabecera = {
   escrituras_mes_n: 9,
   escrituras_mes_monto: 14100000,
   cxp_por_pagar: 501000,
+  cxc_preliminar: false,
 };
 
 // data con un saldo stale (Afirme, 13 días) y 2 obras vencidas.
@@ -408,5 +409,33 @@ describe('renderTarjetaEjecutiva + correo con cabecera', () => {
     const html = renderResumenConsejoHtml(DATA_DEMO, { fechaTitulo: 'x' });
     expect(html).not.toContain('HOY EN DILESA');
     expect(html).not.toContain('Cobranza (CxC):');
+  });
+});
+
+describe('CxC en reconciliación (preliminar)', () => {
+  const CAB_PRELIM: Cabecera = { ...CAB_DEMO, cxc_preliminar: true };
+
+  it('no emite la alerta de cobranza vencida', () => {
+    const alertas = armarAlertas(CAB_PRELIM, DATA_DEMO, HOY);
+    expect(alertas.some((a) => a.includes('Cobranza vencida'))).toBe(false);
+    // las otras alertas (saldo stale, obra vencida) sí siguen
+    expect(alertas.some((a) => a.includes('Afirme'))).toBe(true);
+  });
+
+  it('el asunto no incluye CxC vencido', () => {
+    const asunto = armarAsunto(CAB_PRELIM, '13 jun', DATA_DEMO, HOY);
+    expect(asunto).not.toContain('CxC venc.');
+  });
+
+  it('el correo marca CxC preliminar y omite el vencido', () => {
+    const html = renderResumenConsejoHtml(DATA_DEMO, {
+      fechaTitulo: 'x',
+      fechaLocal: HOY,
+      cabecera: CAB_PRELIM,
+    });
+    expect(html).toContain('preliminar, en reconciliación');
+    expect(html).toContain('Faltan aplicar desembolsos de crédito');
+    expect(html).not.toContain('vencido $47.5M');
+    expect(html).not.toContain('Cobranza vencida');
   });
 });
