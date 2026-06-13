@@ -6,8 +6,13 @@
  *
  * Llama `erp.cxc_pago_registrar`, que inserta el abono y lo auto-aplica
  * FIFO a los cargos abiertos de la venta (ver iniciativa `cxc`, ADR-037).
- * La fuente (cliente/institución) es etiqueta para cobranza/reportería,
- * no filtra el cálculo.
+ * La fuente (cliente/institución) NO filtra esa aplicación FIFO, pero SÍ
+ * pesa en la cuadratura (lib/dilesa/cuadratura.ts): los abonos
+ * fuente='cliente' suman al Monto Disponible como depósito directo, y el
+ * crédito de institución ya entra por los campos de crédito de la venta —
+ * capturar la disposición del crédito como 'cliente' la cuenta doble (bug
+ * operativo 2026-06-12). Por eso la fuente se pre-selecciona según el
+ * siguiente cargo abierto y hay aviso inline si la etiqueta no cuadra.
  *
  * Recibo de caja XML (2026-06-12, decisión de Beto): el CFDI que emite
  * CONTPAQi por cada pago se sube aquí y es la FUENTE de los datos — fecha,
@@ -22,7 +27,7 @@
  * (trigger sobre `comprobante_adjunto_id`, migración 20260612173513).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Pencil, Plus } from 'lucide-react';
 import { z } from 'zod';
 
@@ -43,6 +48,11 @@ import {
   type ReciboPagoParsed,
   type VerificacionRecibo,
 } from '@/lib/dilesa/cxc/cfdi-recibo';
+import {
+  abonoCubreMayormenteInstitucion,
+  sugerirFuenteAbono,
+  type CargoAbiertoFuente,
+} from '@/lib/dilesa/cxc/fuente-abono';
 import { CfdiParseError } from '@/lib/cxp/cfdi-parser';
 import type { Json } from '@/types/supabase';
 
@@ -119,6 +129,9 @@ export function AbonoCaptureDrawer({
   // si viene `undefined` (p.ej. Cobranza · Pagos), se resuelve aquí desde
   // erp.personas — sin él, la verificación del recibo caería al nombre.
   const [rfcResuelto, setRfcResuelto] = useState<string | null>(null);
+  // Cargos abiertos de la venta en el orden FIFO del RPC — sugieren la fuente
+  // del abono y alimentan el aviso de etiqueta vs lo que va a cubrir.
+  const [cargosAbiertos, setCargosAbiertos] = useState<CargoAbiertoFuente[] | null>(null);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
 
   // RFC de la empresa (emisor esperado del recibo) — 1 fetch por apertura.
@@ -160,8 +173,51 @@ export function AbonoCaptureDrawer({
 
   const rfcCliente = clienteRfc !== undefined ? clienteRfc : rfcResuelto;
 
+  // Cargos abiertos en cada apertura (los saldos cambian con cada abono;
+  // `reset()` limpia al cerrar). Si lo siguiente por cubrir espera pago de
+  // institución, el abono casi seguro es la disposición del crédito →
+  // pre-selecciona la fuente.
+  useEffect(() => {
+    if (!open) return;
+    let activo = true;
+    (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('cxc_cargos')
+        .select('saldo, fuente_esperada')
+        .eq('origen_tipo', 'venta_dilesa')
+        .eq('origen_id', ventaId)
+        .neq('estado', 'cancelado')
+        .gt('saldo', 0)
+        .is('deleted_at', null)
+        .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
+        .order('numero', { ascending: true });
+      if (!activo) return;
+      const cargos = ((data ?? []) as { saldo: number; fuente_esperada: string }[]).map((c) => ({
+        saldo: Number(c.saldo),
+        fuente_esperada: c.fuente_esperada,
+      }));
+      setCargosAbiertos(cargos);
+      if (!form.formState.dirtyFields.fuente && sugerirFuenteAbono(cargos) === 'institucion') {
+        form.setValue('fuente', 'institucion');
+      }
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, ventaId, form]);
+
+  const fuenteSel = form.watch('fuente');
+  const montoStr = form.watch('monto');
+  const avisoFuenteCliente = useMemo(() => {
+    if (fuenteSel !== 'cliente' || !cargosAbiertos?.length) return false;
+    return abonoCubreMayormenteInstitucion(cargosAbiertos, Number(montoStr));
+  }, [fuenteSel, montoStr, cargosAbiertos]);
+
   const reset = () => {
     form.reset(defaults);
+    setCargosAbiertos(null);
     setComprobante(null);
     setRecibo(null);
     setReciboXml(null);
@@ -510,6 +566,18 @@ export function AbonoCaptureDrawer({
               )}
             </FormField>
           </FormRow>
+
+          {avisoFuenteCliente ? (
+            <div className="-mt-3 flex items-start gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Este monto cubriría sobre todo el cargo que espera pago de{' '}
+                <strong>institución</strong> (la disposición del crédito). Si lo pagó
+                Infonavit/Fovissste/banco, cambia la fuente a «Institución» — etiquetado como
+                «Cliente» se cuenta doble en la cuadratura (depósito + crédito).
+              </p>
+            </div>
+          ) : null}
 
           <FormField name="referencia" label="Referencia">
             {(field) => (
