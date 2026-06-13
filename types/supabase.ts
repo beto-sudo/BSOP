@@ -2701,6 +2701,57 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_snapshot: {
+        Row: {
+          casas_en_obra: number
+          cobrado_hoy: number
+          created_at: string
+          cxc_abierto: number
+          cxc_vencido: number
+          empresa_id: string
+          escrituras_hoy_monto: number
+          escrituras_hoy_n: number
+          fecha: string
+          id: string
+          liquidez_total: number
+          updated_at: string
+          ventas_hoy_monto: number
+          ventas_hoy_n: number
+        }
+        Insert: {
+          casas_en_obra?: number
+          cobrado_hoy?: number
+          created_at?: string
+          cxc_abierto?: number
+          cxc_vencido?: number
+          empresa_id: string
+          escrituras_hoy_monto?: number
+          escrituras_hoy_n?: number
+          fecha: string
+          id?: string
+          liquidez_total?: number
+          updated_at?: string
+          ventas_hoy_monto?: number
+          ventas_hoy_n?: number
+        }
+        Update: {
+          casas_en_obra?: number
+          cobrado_hoy?: number
+          created_at?: string
+          cxc_abierto?: number
+          cxc_vencido?: number
+          empresa_id?: string
+          escrituras_hoy_monto?: number
+          escrituras_hoy_n?: number
+          fecha?: string
+          id?: string
+          liquidez_total?: number
+          updated_at?: string
+          ventas_hoy_monto?: number
+          ventas_hoy_n?: number
+        }
+        Relationships: []
+      }
       obra_estimaciones: {
         Row: {
           autorizada_at: string | null
