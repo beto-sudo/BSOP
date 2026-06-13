@@ -2,12 +2,12 @@
 
 **Slug:** `dilesa-resumen-consejo-rediseno`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa` (tabla nueva `kpi_snapshot` para deltas; vistas nuevas `v_margen_inventario_prototipo` y `v_absorcion_desarrollo`; lectura de `v_proyecto_avances`, `ventas`, `venta_fases`, `venta_fase_catalogo`, `v_inventario_prototipo`, `v_margen_prototipo`, `v_contratista_obra`, `v_unidad_hold_queue`), `erp` (lectura `v_cuenta_saldo_actual`, `cxc_cargos`, `cxc_pagos`, `cxp_pagos`), `core` (`notification_log`). Mayormente render del correo (`lib/dilesa/resumen-consejo-email.ts`) + el cron.
+**Schemas afectados:** `dilesa` (tabla `kpi_snapshot` para deltas — ya creada; vista nueva `v_absorcion_desarrollo` en Sprint 4; lectura de `v_proyecto_avances`, `ventas`, `venta_fases`, `venta_fase_catalogo`, `v_inventario_prototipo`, `v_margen_prototipo`, `v_contratista_obra`, `v_unidad_hold_queue`), `erp` (lectura `v_cuenta_saldo_actual`, `cxc_cargos`, `cxc_pagos`, `cxp_pagos`), `core` (`notification_log`). Mayormente render del correo (`lib/dilesa/resumen-consejo-email.ts`) + el cron. La fusión Margen+Inventario y el split de tubería se hacen en JS (sin vista nueva).
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — tabla `dilesa.kpi_snapshot` + el cron escribe el cierre diario (base de los deltas y el asunto dinámico).
+**Próximo hito:** Sprint 3 — tarjeta ejecutiva "Hoy en DILESA" + asunto dinámico + alertas por excepción + frescura de saldos + Cobranza (CxC) + deep-links (usa el snapshot que arrancó el 2026-06-13).
 **Dueño:** Beto
 **Creada:** 2026-06-13
-**Última actualización:** 2026-06-13 (promoción)
+**Última actualización:** 2026-06-13 (Sprints 1-2)
 
 > **Continuación de** [`dilesa-resumen-consejo`](dilesa-resumen-consejo.md) (cerrada 2026-06-08, v1 = paridad 1:1 con Coda). Aquella es la **referencia técnica** del correo (7 bloques, vistas, cron, guard de domingo, fechas DST). Esta iniciativa es la **Fase 2** que aquel doc dejó anotada: pasar de "réplica de Coda" a un reporte que el Consejo espere a diario.
 
@@ -140,6 +140,10 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 - 100% de envíos trazables en `core.notification_log` (heredado de v1).
 
 ## Bitácora
+
+- **2026-06-13 (Sprint 2 — reestructura visible, en preview)** — El correo pasa a 4 secciones dinero-arriba (① Tesorería → ② Ventas → ③ Proyectos → ④ Construcción), títulos sin "Resumen", Margen+Inventario fusionados en una tabla por prototipo vivo + utilidad potencial, tubería partida en pipeline vivo vs línea de histórico, contratistas a línea de excepción. **Hecho en JS sin tocar la DB** (fusión/split desde las vistas existentes), así el preview de Vercel renderiza contra prod de inmediato. Verificado con datos reales (DRY): 5 prototipos vivos, utilidad potencial total **$102.3M**, histórico **1,093 / $1,060M**, 12 casas en obra — cuadra con la auditoría de factibilidad. PR pendiente de revisión de Beto en preview antes de mergear (D6). 20 tests del módulo. La tarjeta ejecutiva + asunto dinámico + alertas + CxC van en Sprint 3.
+
+- **2026-06-13 (Sprint 1 — snapshot diario, #884)** — Tabla `dilesa.kpi_snapshot` (flujos del día + stocks de cierre) + el cron escribe el cierre al enviar (upsert idempotente, no-fatal). Base de los deltas ▲▼. Migración aplicada a prod con OK de Beto (vía MCP); `SCHEMA_REF`/`types` regenerados (#885). El primer snapshot se captura el 2026-06-13 a las 20:00. 14 tests. No cambia el correo visible.
 
 - **2026-06-13 (promoción)** — Beto pidió estresar al máximo el correo al Consejo. Panel de 6 lentes (workflow) + verificación en prod. Beto cerró alcance (D1–D6) y aprobó ejecutar las 2 capas. Iniciativa promovida a `in_progress`. Mockup del rediseño presentado en chat.
 

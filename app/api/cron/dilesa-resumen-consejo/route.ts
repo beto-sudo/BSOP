@@ -184,12 +184,11 @@ export async function GET(req: NextRequest) {
     recipients,
     secciones: {
       saldos: data.saldos.length,
-      avances: data.avances.length,
-      margen: data.margen.length,
-      inventario: data.inventario.length,
-      tuberia: data.tuberia.length,
+      tuberiaViva: data.tuberiaViva.length,
       asignaciones: data.asignaciones.length,
-      contratistas: data.contratistas.length,
+      avances: data.avances.length,
+      prototipos: data.prototipos.length,
+      casasEnObra: data.construccion.casas_en_obra,
     },
     error: res.ok ? undefined : res.error,
   };
