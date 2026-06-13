@@ -57,6 +57,15 @@ const RESUMEN_SLUG = 'dilesa_resumen_consejo';
 const CONSEJO_EMAIL_FALLBACK = 'consejo@dilesa.mx';
 const FROM_FALLBACK = 'Desarrollo Inmobiliario los Encinos <noreply@bsop.io>';
 
+/**
+ * CxC en reconciliación (iniciativa `cxc` in_progress): la carga histórica de
+ * pagos —sobre todo los desembolsos de crédito Infonavit/banco— está incompleta,
+ * así que los saldos abierto/vencido sobreestiman lo que de verdad se debe. El
+ * correo marca CxC como PRELIMINAR y no emite alerta de cobranza vencida hasta
+ * que la reconciliación esté al día. Cambiar a `false` cuando se complete.
+ */
+const CXC_EN_RECONCILIACION = true;
+
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim();
   const authHeader = req.headers.get('authorization');
@@ -154,6 +163,7 @@ export async function GET(req: NextRequest) {
       (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
       0
     ),
+    cxc_preliminar: CXC_EN_RECONCILIACION,
   };
 
   const fechaTitulo = fechaTituloCST(now);

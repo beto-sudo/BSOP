@@ -197,6 +197,15 @@ export type Cabecera = {
   escrituras_mes_n: number;
   escrituras_mes_monto: number;
   cxp_por_pagar: number;
+  /**
+   * CxC en reconciliación: la carga histórica de pagos (sobre todo los
+   * desembolsos de crédito Infonavit/banco) está incompleta — iniciativa `cxc`
+   * in_progress. Mientras esté `true`, el correo marca CxC como PRELIMINAR,
+   * muestra solo el abierto y NO emite la alerta/asunto de cobranza vencida (el
+   * "vencido" es mayormente fantasma por pagos sin aplicar). Apagar cuando la
+   * reconciliación esté al día.
+   */
+  cxc_preliminar: boolean;
 };
 
 // ── Formato ─────────────────────────────────────────────────────────────────
@@ -351,12 +360,20 @@ function renderSaldos(rows: SaldoBancoRow[], hoyISO: string): string {
 
 /** Línea de Cobranza (CxC) bajo los saldos: abierto / cobrado mes / vencido / CxP. */
 function renderCxcLinea(cab: Cabecera): string {
+  const cxp =
+    cab.cxp_por_pagar > 0 ? ` &nbsp;·&nbsp; CxP por pagar: ${fmtMoney(cab.cxp_por_pagar)}` : '';
+  // En reconciliación: solo el abierto, marcado preliminar; sin el "vencido"
+  // (mayormente fantasma por desembolsos de crédito sin aplicar todavía).
+  if (cab.cxc_preliminar) {
+    return `
+    <div style="padding:2px 32px 10px;">
+      <p style="margin:0;font-size:12px;color:#1e293b;"><span style="color:#9a6700;font-weight:600;">Cobranza (CxC) — preliminar, en reconciliación:</span> abierto ${fmtMoney(cab.kpis.cxc_abierto)} · cobrado mes ${fmtMoney(cab.cobrado_mes)}${cxp}. <span style="color:#94a3b8;">Faltan aplicar desembolsos de crédito.</span></p>
+    </div>`;
+  }
   const venc =
     cab.kpis.cxc_vencido > 0
       ? ` · <span style="color:#cf222e;font-weight:600;">vencido ${fmtMoney(cab.kpis.cxc_vencido)}</span>`
       : '';
-  const cxp =
-    cab.cxp_por_pagar > 0 ? ` &nbsp;·&nbsp; CxP por pagar: ${fmtMoney(cab.cxp_por_pagar)}` : '';
   return `
     <div style="padding:2px 32px 10px;">
       <p style="margin:0;font-size:12px;color:#1e293b;"><span style="color:#64748b;">Cobranza (CxC):</span> abierto ${fmtMoney(cab.kpis.cxc_abierto)} · cobrado mes ${fmtMoney(cab.cobrado_mes)}${venc}${cxp}</p>
@@ -419,8 +436,12 @@ export function renderTarjetaEjecutiva(
     cardCell(
       'CxC abierto',
       fmtMoneyCompact(k.cxc_abierto),
-      k.cxc_vencido > 0 ? `vencido ${fmtMoneyCompact(k.cxc_vencido)}` : 'sin vencido',
-      k.cxc_vencido > 0 ? '#cf222e' : '#64748b'
+      cab.cxc_preliminar
+        ? 'preliminar · en reconciliación'
+        : k.cxc_vencido > 0
+          ? `vencido ${fmtMoneyCompact(k.cxc_vencido)}`
+          : 'sin vencido',
+      cab.cxc_preliminar ? '#9a6700' : k.cxc_vencido > 0 ? '#cf222e' : '#64748b'
     ),
     cardCell(
       'Casas en obra',
@@ -458,7 +479,9 @@ export function renderAlertas(alertas: string[]): string {
  */
 export function armarAlertas(cab: Cabecera, data: ResumenConsejoData, hoyISO: string): string[] {
   const a: string[] = [];
-  if (cab.kpis.cxc_vencido > 0) a.push(`Cobranza vencida: ${fmtMoney(cab.kpis.cxc_vencido)}`);
+  // En reconciliación no se emite la alerta de vencido (mayormente fantasma).
+  if (!cab.cxc_preliminar && cab.kpis.cxc_vencido > 0)
+    a.push(`Cobranza vencida: ${fmtMoney(cab.kpis.cxc_vencido)}`);
   const stale = data.saldos
     .map((s) => ({ nombre: s.nombre, dias: diasDesde(s.fecha_saldo, hoyISO) }))
     .filter((s) => s.dias != null && s.dias > SALDO_STALE_DIAS)
@@ -486,7 +509,8 @@ export function armarAsunto(
   );
   if (k.escrituras_hoy_n > 0)
     segs.push(`${k.escrituras_hoy_n} escritura${k.escrituras_hoy_n > 1 ? 's' : ''}`);
-  if (k.cxc_vencido > 0) segs.push(`CxC venc. ${fmtMoneyCompact(k.cxc_vencido)}`);
+  if (!cab.cxc_preliminar && k.cxc_vencido > 0)
+    segs.push(`CxC venc. ${fmtMoneyCompact(k.cxc_vencido)}`);
   const stale = data.saldos
     .map((s) => ({ nombre: s.nombre, dias: diasDesde(s.fecha_saldo, hoyISO) }))
     .filter((s) => s.dias != null && s.dias > SALDO_STALE_DIAS);

@@ -76,6 +76,7 @@ async function main() {
       (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
       0
     ),
+    cxc_preliminar: true,
   };
   const fechaTitulo = fechaTituloCST(now);
   const html = renderResumenConsejoHtml(data, {
