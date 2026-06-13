@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (tabla `kpi_snapshot` para deltas — ya creada; vista nueva `v_absorcion_desarrollo` en Sprint 4; lectura de `v_proyecto_avances`, `ventas`, `venta_fases`, `venta_fase_catalogo`, `v_inventario_prototipo`, `v_margen_prototipo`, `v_contratista_obra`, `v_unidad_hold_queue`), `erp` (lectura `v_cuenta_saldo_actual`, `cxc_cargos`, `cxc_pagos`, `cxp_pagos`), `core` (`notification_log`). Mayormente render del correo (`lib/dilesa/resumen-consejo-email.ts`) + el cron. La fusión Margen+Inventario y el split de tubería se hacen en JS (sin vista nueva).
 **Estado:** in_progress
-**Próximo hito:** Sprint 3 — tarjeta ejecutiva "Hoy en DILESA" + asunto dinámico + alertas por excepción + frescura de saldos + Cobranza (CxC) + deep-links (usa el snapshot que arrancó el 2026-06-13).
+**Próximo hito:** Sprint 4 — KPIs de tendencia (absorción + meses de inventario por desarrollo + backlog de escrituración). Sprint 3 (tarjeta ejecutiva + asunto dinámico + alertas + CxC + frescura) en preview de revisión de Beto.
 **Dueño:** Beto
 **Creada:** 2026-06-13
-**Última actualización:** 2026-06-13 (Sprints 1-2)
+**Última actualización:** 2026-06-13 (Sprint 3 en preview)
 
 > **Continuación de** [`dilesa-resumen-consejo`](dilesa-resumen-consejo.md) (cerrada 2026-06-08, v1 = paridad 1:1 con Coda). Aquella es la **referencia técnica** del correo (7 bloques, vistas, cron, guard de domingo, fechas DST). Esta iniciativa es la **Fase 2** que aquel doc dejó anotada: pasar de "réplica de Coda" a un reporte que el Consejo espere a diario.
 
@@ -16,7 +16,7 @@
 El correo diario "Operación Dilesa" llega al Consejo (L–S 20:00 CST) pero es una **réplica 1:1 de Coda: 7 tablas planas apiladas, sin tesis, sin deltas, sin el dinero arriba**. Un panel de revisión (6 lentes: editor ejecutivo, CFO de vivienda, arquitectura de información, engagement, factibilidad contra prod, crítico adversarial) convergió en un diagnóstico:
 
 - **No tiene titular.** Abre con "Saldos Bancos" y obliga al consejero —el lector más ocupado— a derivar él mismo el estado del negocio leyendo ~80 celdas. Sin un "¿estamos bien o mal hoy?" arriba, el correo se abre 3 días y se archiva el resto.
-- **No tiene dinero de verdad.** Tesorería = saldo de bancos y nada más. La **cobranza (CxC) no aparece** pese a estar viva en prod: $133.2M abierto, $27.6M cobrados en 30d, y **$47.5M vencidos en 195 cargos que nadie está viendo**.
+- **No tiene dinero de verdad.** Tesorería = saldo de bancos y nada más. La **cobranza (CxC) no aparece** pese a estar viva en prod: **$87.5M abierto** (pendiente+parcial) y **$8.2M vencido** que nadie está viendo. (Nota: la cifra inicial del audit —$133.2M / $47.5M en 195 cargos— estaba inflada porque incluía 102 cargos `cancelado`; el filtro correcto `estado IN (pendiente, parcial)` da los números reales. Corregido en Sprint 3.)
 - **El asunto nunca cambia** ("Resumen Diario Operación Dilesa 🏘️"), igual el día que se vendieron 8 casas que el día que no pasó nada → entrena a no abrir.
 - **Redundancia que erosiona confianza:** "casas en construcción" aparece en 3 bloques (Avances, Inventario, Contratistas) calculado distinto; no cuadran → el consejo desconfía de todo.
 - **La tubería miente por escala:** la fila histórica "Operación Terminada" (1,093 ops / $1,060M) aplasta 10× el funnel vivo (107 / $110M).
@@ -74,7 +74,7 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 
 ## Hallazgos de factibilidad (verificados contra prod `ybklderteyhuugzfmxbi`, 2026-06-13)
 
-- **CxC vivo y rico** — `erp.cxc_cargos` / `cxc_pagos`: $133.2M abierto, $27.6M cobrados 30d, **$47.5M vencidos (195 cargos)**. FACTIBLE. _(Depende de la iniciativa `cxc`, in_progress.)_
+- **CxC vivo** — `erp.cxc_cargos` / `cxc_pagos`, filtro `estado IN (pendiente, parcial)`: **$87.5M abierto** (saldo), **$8.2M vencido** (con `fecha_vencimiento < hoy`). FACTIBLE. El "$133.2M / $47.5M en 195 cargos" del audit incluía `cancelado` (sobreestimación) — corregido en Sprint 3. _(Depende de la iniciativa `cxc`, in_progress.)_
 - **CxP casi sin uso** — `erp.cxp_pagos`: $0.5M en 2 pagos. Va como **cifra**, no como tabla.
 - **Saldos** — `erp.v_cuenta_saldo_actual` está **limpio**: 5 cuentas, una fila por cuenta (Monex $128.7M 12-jun, BBVA $1.37M 12-jun, Finamex $5M 11-jun, BBVA USD **$0** 07-jun, Afirme **$9.5K stale 31-may**). El "hay 2" que reportó Beto = **dos superficies de captura** (`cuenta_saldos` diario, de `tesoreria` — lo que lee el correo; y `estados_cuenta`, de `conciliacion-bancaria`), por diseño, **no un duplicado**. El correo no double-cuenta.
 - **Margen vivo** — `v_margen_prototipo ⋈ v_inventario_prototipo` por `prototipo_id`, filtro `inventario_disponible>0 OR inventario_construccion>0`. Solo 5/11 prototipos vivos. **Utilidad potencial ~$103M** concentrada en LDLE-ISC ($75.2M / 153 casas) y LDS-RMC ($16M). FACTIBLE.
@@ -135,13 +135,15 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 ## Métricas de éxito
 
 - El Consejo entiende el día en un vistazo móvil; el correo se mantiene verde L–S (paridad de contenido, nada perdido).
-- La cobranza vencida ($47.5M hoy) deja de ser invisible.
+- La cobranza vencida ($8.2M hoy, cifra real) deja de ser invisible.
 - Cero quejas por números que se contradicen entre secciones.
 - 100% de envíos trazables en `core.notification_log` (heredado de v1).
 
 ## Bitácora
 
-- **2026-06-13 (Sprint 2 — reestructura visible, en preview)** — El correo pasa a 4 secciones dinero-arriba (① Tesorería → ② Ventas → ③ Proyectos → ④ Construcción), títulos sin "Resumen", Margen+Inventario fusionados en una tabla por prototipo vivo + utilidad potencial, tubería partida en pipeline vivo vs línea de histórico, contratistas a línea de excepción. **Hecho en JS sin tocar la DB** (fusión/split desde las vistas existentes), así el preview de Vercel renderiza contra prod de inmediato. Verificado con datos reales (DRY): 5 prototipos vivos, utilidad potencial total **$102.3M**, histórico **1,093 / $1,060M**, 12 casas en obra — cuadra con la auditoría de factibilidad. PR pendiente de revisión de Beto en preview antes de mergear (D6). 20 tests del módulo. La tarjeta ejecutiva + asunto dinámico + alertas + CxC van en Sprint 3.
+- **2026-06-13 (Sprint 3 — cerebro del correo, en preview)** — Tarjeta ejecutiva "Hoy en DILESA" (6 cifras: ventas/escrituras/cobrado/liquidez/CxC/obra) con delta ▲▼ vs el snapshot previo; **asunto dinámico** (titular del día, reemplaza el template estático); **franja de alertas por excepción** (cap 3: cobranza vencida, saldo stale, obra vencida — vacía no se imprime); **semáforo de frescura** en saldos (verde ≤2d / ámbar ≤7 / rojo >7, el stale se marca); **línea de Cobranza (CxC)** en Tesorería (abierto/cobrado mes/vencido/CxP). El cron computa la cabecera (reusa `computeKpisDelDia` + `fetchSnapshotPrevio` + 2 queries de mes/CxP) y la pasa al render. **Corrección de datos:** la cobranza vencida real es **$8.2M** (no $47.5M — el audit incluía cargos `cancelado`); abierto **$87.5M**. 11 tests nuevos del módulo. Pendiente menor de S3: deep-links por sección + "número del día" (polish, no bloquea). PR pendiente de revisión de Beto en preview (D6). Los deltas ▲▼ salen sin flecha el día 1 (snapshot previo aún no existe) y se activan desde el 2026-06-14.
+
+- **2026-06-13 (Sprint 2 — reestructura visible, mergeada #886)** — El correo pasa a 4 secciones dinero-arriba (① Tesorería → ② Ventas → ③ Proyectos → ④ Construcción), títulos sin "Resumen", Margen+Inventario fusionados en una tabla por prototipo vivo + utilidad potencial, tubería partida en pipeline vivo vs línea de histórico, contratistas a línea de excepción. **Hecho en JS sin tocar la DB** (fusión/split desde las vistas existentes), así el preview de Vercel renderiza contra prod de inmediato. Verificado con datos reales (DRY): 5 prototipos vivos, utilidad potencial total **$102.3M**, histórico **1,093 / $1,060M**, 12 casas en obra — cuadra con la auditoría de factibilidad. PR pendiente de revisión de Beto en preview antes de mergear (D6). 20 tests del módulo. La tarjeta ejecutiva + asunto dinámico + alertas + CxC van en Sprint 3.
 
 - **2026-06-13 (Sprint 1 — snapshot diario, #884)** — Tabla `dilesa.kpi_snapshot` (flujos del día + stocks de cierre) + el cron escribe el cierre al enviar (upsert idempotente, no-fatal). Base de los deltas ▲▼. Migración aplicada a prod con OK de Beto (vía MCP); `SCHEMA_REF`/`types` regenerados (#885). El primer snapshot se captura el 2026-06-13 a las 20:00. 14 tests. No cambia el correo visible.
 
