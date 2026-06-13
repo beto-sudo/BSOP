@@ -1,13 +1,18 @@
 /**
- * Resumen Diario Operación DILESA — correo al Consejo (cutover Coda → BSOP).
+ * Resumen Diario Operación DILESA — correo al Consejo.
  *
- * Recrea el correo "Resumen Diario Operación Dilesa 🏘️" que Coda enviaba a
- * `consejo@dilesa.mx`. Iniciativa `dilesa-resumen-consejo`.
+ * Iniciativa `dilesa-resumen-consejo-rediseno` (Sprint 2): el correo pasa de 7
+ * tablas planas (réplica de Coda) a 4 SECCIONES con el dinero arriba —
+ * ① Tesorería · ② Ventas · ③ Proyectos · ④ Construcción. Consolidaciones:
+ *   - Margen + Inventario se fusionan en una tabla por prototipo VIVO (con
+ *     inventario o en obra) + utilidad potencial (utilidad × disponible).
+ *   - La tubería se parte en pipeline VIVO (ventas activas) vs una línea de
+ *     histórico acumulado (que antes aplastaba el funnel 10×).
+ *   - Contratistas baja a una línea de excepción (casas en obra · vencidas).
  *
- * Diseño: las funciones de render son PURAS (reciben data, devuelven HTML) para
- * testearlas sin DB. `fetchResumenConsejoData` arma la data desde las vistas.
- * El bloque de Saldos Bancos (#1) es opcional — se enchufa cuando la iniciativa
- * `tesoreria` tenga saldos capturados (vista `erp.v_cuenta_saldo_actual`).
+ * Diseño: las funciones de render y de armado son PURAS (reciben data, devuelven
+ * HTML/estructuras) para testearlas sin DB. `fetchResumenConsejoData` arma la
+ * data desde las vistas. La tarjeta ejecutiva + deltas + CxC llegan en Sprint 3.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -33,21 +38,14 @@ export type AvanceRow = {
   ticket_promedio: number | null;
 };
 
-export type MargenRow = {
+/** Fila fusionada Margen + Inventario, solo prototipos vivos. */
+export type PrototipoVivoRow = {
   nombre: string;
+  disponible: number;
+  en_obra: number;
   valor_comercial: number | null;
-  costo_total: number | null;
-  utilidad: number | null;
   margen_pct: number | null;
-};
-
-export type InventarioRow = {
-  nombre: string;
-  inventario_construccion: number;
-  inventario_terminado: number;
-  en_inventario: number;
-  inventario_asignado: number;
-  inventario_disponible: number;
+  utilidad_potencial: number;
 };
 
 export type TuberiaRow = {
@@ -63,27 +61,31 @@ export type VentaTuberiaInput = {
 };
 
 /**
- * Tubería del correo: ventas VIVAS (activas + terminadas) agrupadas por fase,
- * en el orden del catálogo, + una fila final "Sin fase asignada" si hay vivas
- * con fase NULL o con una grafía que no existe en el catálogo — así la tubería
- * nunca pierde clientes en silencio (2026-06-11: 4 ventas "Solicitud de
- * Dictaminacion" sin tilde + 50 sin fase eran invisibles en el correo). Las
- * 'terminada' cuentan porque la fila "Operación Terminada" es la estación
- * final de la tubería (sin ellas el acumulado histórico desaparecería del
- * correo). Las desasignadas/expiradas no cuentan aunque conserven fase: son
- * ventas caídas.
+ * Parte la tubería en pipeline VIVO vs histórico. El histórico (ventas
+ * 'terminada', ~1,090 ops / ~$1,000M) sale del funnel a una sola línea — antes
+ * lo aplastaba 10×. El pipeline vivo son las ventas 'activa' agrupadas por fase
+ * (solo las fases con clientes, en orden de catálogo) + una fila "Sin fase
+ * asignada" para las activas con fase NULL o con grafía fuera de catálogo (así
+ * la tubería nunca pierde clientes en silencio). Las desasignadas/expiradas no
+ * cuentan: son ventas caídas.
  */
-export function armarTuberia(
+export function armarTuberiaSplit(
   fasesCat: { nombre: string; posicion: number }[],
   ventas: VentaTuberiaInput[]
-): TuberiaRow[] {
+): { viva: TuberiaRow[]; historico: { clientes: number; valor: number } } {
   const orden = [...fasesCat].sort((a, b) => a.posicion - b.posicion);
   const conocidas = new Set(orden.map((f) => f.nombre));
   const porFase = new Map<string, { clientes: number; valor: number }>();
   const sinFase = { clientes: 0, valor: 0 };
+  const historico = { clientes: 0, valor: 0 };
   for (const v of ventas) {
-    if (v.estado !== 'activa' && v.estado !== 'terminada') continue;
     const valor = Number(v.valor_escrituracion ?? 0);
+    if (v.estado === 'terminada') {
+      historico.clientes += 1;
+      historico.valor += valor;
+      continue;
+    }
+    if (v.estado !== 'activa') continue;
     if (v.fase_actual && conocidas.has(v.fase_actual)) {
       const acc = porFase.get(v.fase_actual) ?? { clientes: 0, valor: 0 };
       acc.clientes += 1;
@@ -94,15 +96,19 @@ export function armarTuberia(
       sinFase.valor += valor;
     }
   }
-  const rows: TuberiaRow[] = orden.map((f) => ({
-    fase: f.nombre,
-    clientes: porFase.get(f.nombre)?.clientes ?? 0,
-    valor: porFase.get(f.nombre)?.valor ?? 0,
-  }));
+  const viva: TuberiaRow[] = orden
+    .map((f) => ({
+      fase: f.nombre,
+      clientes: porFase.get(f.nombre)?.clientes ?? 0,
+      valor: porFase.get(f.nombre)?.valor ?? 0,
+    }))
+    // Solo fases con clientes vivos — el funnel muestra dónde están las ventas,
+    // no las 17 etapas en cero.
+    .filter((r) => r.clientes > 0);
   if (sinFase.clientes > 0) {
-    rows.push({ fase: 'Sin fase asignada', clientes: sinFase.clientes, valor: sinFase.valor });
+    viva.push({ fase: 'Sin fase asignada', clientes: sinFase.clientes, valor: sinFase.valor });
   }
-  return rows;
+  return { viva, historico };
 }
 
 export type AsignacionRow = {
@@ -113,25 +119,69 @@ export type AsignacionRow = {
   monto_escrituras: number;
 };
 
-export type ContratistaRow = {
-  contratista: string;
-  viviendas: number;
-  mo_contratado: number | null;
-  mo_ejecutado: number | null;
-  pct_ejecutado: number | null;
-  avance_real: number | null;
-  efectividad_pct: number | null;
+/** Resumen de obra (línea de excepción de la sección Construcción). */
+export type ConstruccionResumen = {
+  casas_en_obra: number;
   vencidas: number;
+  mo_por_ejecutar: number | null;
 };
 
+export type MargenRaw = {
+  prototipo_id: string;
+  nombre: string | null;
+  valor_comercial: number | null;
+  utilidad: number | null;
+  margen_pct: number | null;
+};
+
+export type InventarioRaw = {
+  prototipo_id: string;
+  inventario_disponible: number | null;
+  inventario_construccion: number | null;
+};
+
+/**
+ * Fusiona Margen + Inventario por prototipo y deja solo los VIVOS (con
+ * inventario disponible o casas en obra). Agrega utilidad potencial = utilidad
+ * unitaria × unidades disponibles (dónde está el dinero por capturar). Ordena
+ * por utilidad potencial desc.
+ */
+export function armarPrototiposVivos(
+  margen: MargenRaw[],
+  inventario: InventarioRaw[],
+  protoNombre: Map<string, string>
+): PrototipoVivoRow[] {
+  const invPorProto = new Map(inventario.map((i) => [i.prototipo_id, i]));
+  const rows: PrototipoVivoRow[] = [];
+  for (const m of margen) {
+    const inv = invPorProto.get(m.prototipo_id);
+    const disponible = Number(inv?.inventario_disponible ?? 0);
+    const en_obra = Number(inv?.inventario_construccion ?? 0);
+    if (disponible <= 0 && en_obra <= 0) continue; // prototipo muerto → fuera
+    rows.push({
+      nombre: m.nombre ?? protoNombre.get(m.prototipo_id) ?? '—',
+      disponible,
+      en_obra,
+      valor_comercial: m.valor_comercial,
+      margen_pct: m.margen_pct,
+      utilidad_potencial: Number(m.utilidad ?? 0) * disponible,
+    });
+  }
+  return rows.sort((a, b) => b.utilidad_potencial - a.utilidad_potencial);
+}
+
 export type ResumenConsejoData = {
+  // ① Tesorería
   saldos: SaldoBancoRow[]; // vacío hasta que tesoreria capture saldos
-  avances: AvanceRow[];
-  margen: MargenRow[];
-  inventario: InventarioRow[];
-  tuberia: TuberiaRow[];
+  // ② Ventas
+  tuberiaViva: TuberiaRow[];
+  tuberiaHistorico: { clientes: number; valor: number };
   asignaciones: AsignacionRow[];
-  contratistas: ContratistaRow[];
+  // ③ Proyectos
+  avances: AvanceRow[];
+  prototipos: PrototipoVivoRow[];
+  // ④ Construcción
+  construccion: ConstruccionResumen;
 };
 
 // ── Formato ─────────────────────────────────────────────────────────────────
@@ -173,12 +223,20 @@ const TD_NUM = `${TD}text-align:right;white-space:nowrap;`;
 
 type Col = { label: string; align?: 'left' | 'right' };
 
-/** Tabla genérica con encabezado de sección. `rows` ya vienen formateadas. */
+/** Banda de encabezado de una de las 4 secciones. */
+export function renderSectionBand(label: string): string {
+  return `
+    <div style="padding:18px 32px 2px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a2e;border-bottom:2px solid #1a1a2e;padding-bottom:6px;">${label}</div>
+    </div>`;
+}
+
+/** Tabla genérica con título. `rows` ya vienen formateadas. */
 export function renderSection(title: string, cols: Col[], rows: string[][]): string {
   if (rows.length === 0) {
     return `
-    <div style="padding:16px 32px 4px;">
-      <h2 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#1a1a2e;">${title}</h2>
+    <div style="padding:12px 32px 4px;">
+      <h2 style="margin:0 0 4px;font-size:14px;font-weight:700;color:#1a1a2e;">${title}</h2>
       <p style="margin:0;font-size:12px;color:#94a3b8;">Sin datos.</p>
     </div>`;
   }
@@ -196,8 +254,8 @@ export function renderSection(title: string, cols: Col[], rows: string[][]): str
     )
     .join('');
   return `
-    <div style="padding:16px 32px 4px;">
-      <h2 style="margin:0 0 8px;font-size:15px;font-weight:700;color:#1a1a2e;">${title}</h2>
+    <div style="padding:12px 32px 4px;">
+      <h2 style="margin:0 0 8px;font-size:14px;font-weight:700;color:#1a1a2e;">${title}</h2>
       <table style="width:100%;border-collapse:collapse;">
         <tr style="background:#f1f5f9;">${headCells}</tr>
         ${bodyRows}
@@ -207,7 +265,7 @@ export function renderSection(title: string, cols: Col[], rows: string[][]): str
 
 function renderSaldos(rows: SaldoBancoRow[]): string {
   return renderSection(
-    'Resumen Saldos Bancos',
+    'Saldos en Bancos',
     [
       { label: 'Banco' },
       { label: 'Saldo', align: 'right' },
@@ -217,9 +275,50 @@ function renderSaldos(rows: SaldoBancoRow[]): string {
   );
 }
 
+function renderTuberiaViva(rows: TuberiaRow[]): string {
+  return renderSection(
+    'Pipeline de Ventas (vivo)',
+    [
+      { label: 'Fase' },
+      { label: 'Clientes', align: 'right' },
+      { label: 'Valor de escrituración', align: 'right' },
+    ],
+    rows.map((r) => [r.fase, fmtInt(r.clientes), fmtMoney(r.valor)])
+  );
+}
+
+/** Una línea con el acumulado histórico (fuera del funnel vivo). */
+function renderHistoricoLinea(h: { clientes: number; valor: number }): string {
+  if (h.clientes === 0) return '';
+  return `
+    <div style="padding:2px 32px 8px;">
+      <p style="margin:0;font-size:12px;color:#64748b;">Histórico acumulado: ${h.clientes.toLocaleString('es-MX')} operaciones · ${fmtMoney(h.valor)}</p>
+    </div>`;
+}
+
+function renderAsignaciones(rows: AsignacionRow[]): string {
+  return renderSection(
+    'Asignaciones y Escrituras del Mes',
+    [
+      { label: 'Prototipo' },
+      { label: 'Asignaciones', align: 'right' },
+      { label: 'Monto', align: 'right' },
+      { label: 'Escrituras', align: 'right' },
+      { label: 'Monto', align: 'right' },
+    ],
+    rows.map((r) => [
+      r.nombre,
+      fmtInt(r.asignaciones_mes),
+      fmtMoney(r.monto_asignaciones),
+      fmtInt(r.escrituras_mes),
+      fmtMoney(r.monto_escrituras),
+    ])
+  );
+}
+
 function renderAvances(rows: AvanceRow[]): string {
   return renderSection(
-    'Resumen Avances Proyectos',
+    'Avance por Desarrollo',
     [
       { label: 'Proyecto' },
       { label: 'Urb. %', align: 'right' },
@@ -245,122 +344,74 @@ function renderAvances(rows: AvanceRow[]): string {
   );
 }
 
-function renderMargen(rows: MargenRow[]): string {
-  return renderSection(
-    'Análisis de Margen',
+function renderPrototipos(rows: PrototipoVivoRow[]): string {
+  const tabla = renderSection(
+    'Inventario y Margen por Prototipo',
     [
       { label: 'Prototipo' },
-      { label: 'Valor comercial', align: 'right' },
-      { label: 'Costo total', align: 'right' },
-      { label: 'Utilidad', align: 'right' },
-      { label: 'Margen', align: 'right' },
-    ],
-    rows.map((r) => [
-      r.nombre,
-      fmtMoney(r.valor_comercial),
-      fmtMoney(r.costo_total),
-      fmtMoney(r.utilidad),
-      fmtPct(r.margen_pct),
-    ])
-  );
-}
-
-function renderInventario(rows: InventarioRow[]): string {
-  return renderSection(
-    'Inventario por Prototipo',
-    [
-      { label: 'Prototipo' },
-      { label: 'En constr.', align: 'right' },
-      { label: 'Terminado', align: 'right' },
-      { label: 'En inventario', align: 'right' },
-      { label: 'Asignado', align: 'right' },
       { label: 'Disponible', align: 'right' },
+      { label: 'En obra', align: 'right' },
+      { label: 'Valor comercial', align: 'right' },
+      { label: 'Margen', align: 'right' },
+      { label: 'Utilidad potencial', align: 'right' },
     ],
     rows.map((r) => [
       r.nombre,
-      fmtInt(r.inventario_construccion),
-      fmtInt(r.inventario_terminado),
-      fmtInt(r.en_inventario),
-      fmtInt(r.inventario_asignado),
-      fmtInt(r.inventario_disponible),
+      fmtInt(r.disponible),
+      fmtInt(r.en_obra),
+      fmtMoney(r.valor_comercial),
+      fmtPct(r.margen_pct),
+      fmtMoney(r.utilidad_potencial),
     ])
   );
+  if (rows.length === 0) return tabla;
+  const total = rows.reduce((s, r) => s + r.utilidad_potencial, 0);
+  const totalLinea = `
+    <div style="padding:0 32px 6px;">
+      <p style="margin:0;font-size:12px;color:#1a1a2e;font-weight:600;">Utilidad potencial total en inventario: ${fmtMoney(total)}</p>
+      <p style="margin:2px 0 0;font-size:11px;color:#94a3b8;">Solo prototipos con inventario o casas en obra.</p>
+    </div>`;
+  return tabla + totalLinea;
 }
 
-function renderTuberia(rows: TuberiaRow[]): string {
-  return renderSection(
-    'Tubería',
-    [
-      { label: 'Fase' },
-      { label: 'Clientes', align: 'right' },
-      { label: 'Valor de escrituración', align: 'right' },
-    ],
-    rows.map((r) => [r.fase, fmtInt(r.clientes), fmtMoney(r.valor)])
-  );
+function renderConstruccion(c: ConstruccionResumen): string {
+  const vencidas =
+    c.vencidas > 0
+      ? `<span style="color:#cf222e;font-weight:600;">${fmtInt(c.vencidas)} con hito vencido</span>`
+      : 'sin hitos vencidos';
+  const mo = c.mo_por_ejecutar != null ? ` · MO por ejecutar ${fmtMoney(c.mo_por_ejecutar)}` : '';
+  return `
+    <div style="padding:12px 32px 4px;">
+      <h2 style="margin:0 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">Obra en Construcción</h2>
+      <p style="margin:0;font-size:13px;color:#1e293b;">${fmtInt(c.casas_en_obra)} casas en obra · ${vencidas}${mo}</p>
+    </div>`;
 }
 
-function renderAsignaciones(rows: AsignacionRow[]): string {
-  return renderSection(
-    'Resumen de Asignaciones y Ventas (del mes)',
-    [
-      { label: 'Prototipo' },
-      { label: 'Asignaciones', align: 'right' },
-      { label: 'Monto', align: 'right' },
-      { label: 'Escrituras', align: 'right' },
-      { label: 'Monto', align: 'right' },
-    ],
-    rows.map((r) => [
-      r.nombre,
-      fmtInt(r.asignaciones_mes),
-      fmtMoney(r.monto_asignaciones),
-      fmtInt(r.escrituras_mes),
-      fmtMoney(r.monto_escrituras),
-    ])
-  );
-}
-
-function renderContratistas(rows: ContratistaRow[]): string {
-  return renderSection(
-    'Operación Contratistas (obra en construcción)',
-    [
-      { label: 'Contratista' },
-      { label: 'Viviendas', align: 'right' },
-      { label: 'Monto contrato (MO)', align: 'right' },
-      { label: 'Ejecutado', align: 'right' },
-      { label: 'Efectividad', align: 'right' },
-      { label: 'Vencidas', align: 'right' },
-    ],
-    rows.map((r) => [
-      r.contratista,
-      fmtInt(r.viviendas),
-      fmtMoney(r.mo_contratado),
-      `${fmtMoney(r.mo_ejecutado)} (${fmtPct(r.pct_ejecutado)})`,
-      fmtPct(r.efectividad_pct),
-      fmtInt(r.vencidas),
-    ])
-  );
-}
-
-/** Ensambla el correo completo. El bloque de saldos solo aparece si hay data. */
+/** Ensambla el correo completo en 4 secciones. */
 export function renderResumenConsejoHtml(
   data: ResumenConsejoData,
   opts: { headerImageUrl?: string | null; fechaTitulo: string }
 ): string {
-  const sections = [
-    data.saldos.length ? renderSaldos(data.saldos) : '',
-    renderAvances(data.avances),
-    renderMargen(data.margen),
-    renderInventario(data.inventario),
-    renderTuberia(data.tuberia),
-    renderAsignaciones(data.asignaciones),
-    renderContratistas(data.contratistas),
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const tesoreria = data.saldos.length
+    ? renderSectionBand('Tesorería') + renderSaldos(data.saldos)
+    : '';
+
+  const ventas =
+    renderSectionBand('Ventas') +
+    renderTuberiaViva(data.tuberiaViva) +
+    renderHistoricoLinea(data.tuberiaHistorico) +
+    renderAsignaciones(data.asignaciones);
+
+  const proyectos =
+    renderSectionBand('Proyectos') +
+    renderAvances(data.avances) +
+    renderPrototipos(data.prototipos);
+
+  const construccion = renderSectionBand('Construcción') + renderConstruccion(data.construccion);
+
+  const body = [tesoreria, ventas, proyectos, construccion].filter(Boolean).join('\n');
 
   // Layout full-width que se adapta al ancho de la pantalla (preferencia de Beto).
-  // El fix robusto del header para todos los clientes va en la estandarización de
-  // correos (iniciativa aparte).
   const header = opts.headerImageUrl
     ? `<div style="background:#1a1a2e;line-height:0;"><img src="${opts.headerImageUrl}" alt="DILESA" style="display:block;width:100%;height:auto;border:0;" /></div>`
     : '';
@@ -371,10 +422,10 @@ export function renderResumenConsejoHtml(
   <div style="width:100%;background:#ffffff;">
     ${header}
     <div style="background:#1a1a2e;padding:18px 32px 22px;">
-      <h1 style="margin:0;font-size:19px;font-weight:700;color:#ffffff;">Resumen Diario Operación Dilesa 🏘️</h1>
+      <h1 style="margin:0;font-size:19px;font-weight:700;color:#ffffff;">Operación DILESA 🏘️</h1>
       <p style="margin:6px 0 0;font-size:13px;color:#cbd5e1;">${opts.fechaTitulo}</p>
     </div>
-    ${sections}
+    ${body}
     <div style="padding:20px 32px 28px;">
       <p style="margin:0;font-size:11px;color:#94a3b8;">Generado por BSOP — sistema operativo DILESA.</p>
     </div>
@@ -416,8 +467,7 @@ export const HORA_ENVIO_LOCAL = 20;
  * invierno (CST, UTC-6) siguiendo a EE.UU.; por eso no usamos un offset fijo —
  * Intl resuelve el offset correcto según la fecha. El cron dispara en las dos
  * horas UTC candidatas (01:00 y 02:00) y este reloj deja pasar solo la corrida
- * que cae a las 20:00 locales, auto-ajustándose al cambio de horario sin tener
- * que editar el cron dos veces al año.
+ * que cae a las 20:00 locales, auto-ajustándose verano/invierno sin doble envío.
  */
 export function relojMatamoros(now: Date): { hora: number; esDomingo: boolean } {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -514,31 +564,15 @@ export async function fetchResumenConsejoData(
     }))
     .sort((x, y) => x.proyecto.localeCompare(y.proyecto));
 
-  const margen: MargenRow[] = (margenRes.data ?? [])
-    .map((m: Record<string, unknown>) => ({
-      nombre: m.nombre as string,
-      valor_comercial: m.valor_comercial as number | null,
-      costo_total: m.costo_total as number | null,
-      utilidad: m.utilidad as number | null,
-      margen_pct: m.margen_pct as number | null,
-    }))
-    .sort((x, y) => x.nombre.localeCompare(y.nombre));
+  // Prototipos vivos: fusión Margen + Inventario, solo con inventario o en obra.
+  const prototipos = armarPrototiposVivos(
+    (margenRes.data ?? []) as MargenRaw[],
+    (inventarioRes.data ?? []) as InventarioRaw[],
+    protoNombre
+  );
 
-  const inventario: InventarioRow[] = (inventarioRes.data ?? [])
-    .map((i: Record<string, unknown>) => ({
-      nombre: protoNombre.get(i.prototipo_id as string) ?? '—',
-      inventario_construccion: Number(i.inventario_construccion ?? 0),
-      inventario_terminado: Number(i.inventario_terminado ?? 0),
-      en_inventario: Number(i.en_inventario ?? 0),
-      inventario_asignado: Number(i.inventario_asignado ?? 0),
-      inventario_disponible: Number(i.inventario_disponible ?? 0),
-    }))
-    .filter((i) => i.en_inventario > 0)
-    .sort((x, y) => x.nombre.localeCompare(y.nombre));
-
-  // Tubería: count + sum(valor_escrituracion) por fase del catálogo + fila
-  // "Sin fase asignada" (lógica pura en armarTuberia).
-  const tuberia = armarTuberia(
+  // Tubería: pipeline vivo (activas por fase) + línea de histórico (terminadas).
+  const { viva: tuberiaViva, historico: tuberiaHistorico } = armarTuberiaSplit(
     (fasesCatRes.data ?? []) as { nombre: string; posicion: number }[],
     (ventasRes.data ?? []) as VentaTuberiaInput[]
   );
@@ -597,21 +631,18 @@ export async function fetchResumenConsejoData(
     asignaciones.push(...[...acc.values()].sort((x, y) => x.nombre.localeCompare(y.nombre)));
   }
 
-  // Contratistas con obra en construcción (vista dilesa.v_contratista_obra):
-  // viviendas activas, monto de contrato (MO), ejecutado, efectividad vs
-  // calendario y vencidas. Ordenado por número de viviendas.
-  const contratistas: ContratistaRow[] = (contratistaRes.data ?? [])
-    .map((c: Record<string, unknown>) => ({
-      contratista: (c.contratista as string | null) ?? '—',
-      viviendas: Number(c.viviendas ?? 0),
-      mo_contratado: c.mo_contratado as number | null,
-      mo_ejecutado: c.mo_ejecutado as number | null,
-      pct_ejecutado: c.pct_ejecutado as number | null,
-      avance_real: c.avance_real as number | null,
-      efectividad_pct: c.efectividad_pct as number | null,
-      vencidas: Number(c.vencidas ?? 0),
-    }))
-    .sort((x, y) => y.viviendas - x.viviendas);
+  // Construcción: línea de excepción (agregado de v_contratista_obra).
+  const contratistaRows = (contratistaRes.data ?? []) as Record<string, unknown>[];
+  const construccion: ConstruccionResumen = {
+    casas_en_obra: contratistaRows.reduce((s, c) => s + Number(c.viviendas ?? 0), 0),
+    vencidas: contratistaRows.reduce((s, c) => s + Number(c.vencidas ?? 0), 0),
+    mo_por_ejecutar: contratistaRows.length
+      ? contratistaRows.reduce(
+          (s, c) => s + (Number(c.mo_contratado ?? 0) - Number(c.mo_ejecutado ?? 0)),
+          0
+        )
+      : null,
+  };
 
   const saldos: SaldoBancoRow[] = (saldosRes.data ?? []).map((s: Record<string, unknown>) => ({
     nombre: s.nombre as string,
@@ -620,7 +651,7 @@ export async function fetchResumenConsejoData(
     fecha_saldo: s.fecha_saldo as string | null,
   }));
 
-  return { saldos, avances, margen, inventario, tuberia, asignaciones, contratistas };
+  return { saldos, tuberiaViva, tuberiaHistorico, asignaciones, avances, prototipos, construccion };
 }
 
 // ── Envío ────────────────────────────────────────────────────────────────────

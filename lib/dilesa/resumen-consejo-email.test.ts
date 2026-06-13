@@ -6,18 +6,21 @@ import {
   fechaTituloCST,
   relojMatamoros,
   renderResumenConsejoHtml,
-  armarTuberia,
+  armarTuberiaSplit,
+  armarPrototiposVivos,
   type ResumenConsejoData,
+  type MargenRaw,
+  type InventarioRaw,
 } from './resumen-consejo-email';
 
 const EMPTY: ResumenConsejoData = {
   saldos: [],
-  avances: [],
-  margen: [],
-  inventario: [],
-  tuberia: [],
+  tuberiaViva: [],
+  tuberiaHistorico: { clientes: 0, valor: 0 },
   asignaciones: [],
-  contratistas: [],
+  avances: [],
+  prototipos: [],
+  construccion: { casas_en_obra: 0, vencidas: 0, mo_por_ejecutar: null },
 };
 
 describe('formato', () => {
@@ -41,11 +44,7 @@ describe('formato', () => {
 });
 
 describe('relojMatamoros — envío 8pm local con DST real', () => {
-  // El cron dispara a las 01:00 y 02:00 UTC; solo la corrida que cae a las 20:00
-  // de Matamoros envía. Verano = CDT (UTC-5) → 01:00 UTC. Invierno = CST (UTC-6)
-  // → 02:00 UTC. Matamoros es frontera y sí observa horario de verano.
   it('verano (CDT): 01:00 UTC = 20:00 local → envía; 02:00 UTC = 21:00 → se salta', () => {
-    // Lunes 8-jun-2026 20:00 CDT = 9-jun 01:00 UTC
     expect(relojMatamoros(new Date('2026-06-09T01:00:00Z'))).toEqual({
       hora: 20,
       esDomingo: false,
@@ -54,42 +53,43 @@ describe('relojMatamoros — envío 8pm local con DST real', () => {
   });
 
   it('invierno (CST): 02:00 UTC = 20:00 local → envía; 01:00 UTC = 19:00 → se salta', () => {
-    // 15-ene-2026 20:00 CST = 16-ene 02:00 UTC
     expect(relojMatamoros(new Date('2026-01-16T02:00:00Z')).hora).toBe(20);
     expect(relojMatamoros(new Date('2026-01-16T01:00:00Z')).hora).toBe(19);
   });
 
   it('domingo a las 20:00 locales → esDomingo true (no se envía)', () => {
-    // Domingo 7-jun-2026 20:00 CDT = 8-jun 01:00 UTC
-    expect(relojMatamoros(new Date('2026-06-08T01:00:00Z'))).toEqual({
-      hora: 20,
-      esDomingo: true,
-    });
+    expect(relojMatamoros(new Date('2026-06-08T01:00:00Z'))).toEqual({ hora: 20, esDomingo: true });
   });
 });
 
 describe('fechaTituloCST', () => {
   it('aplica el offset CST (UTC-6) al título', () => {
-    // 2026-06-07T02:00:00Z → en CST (UTC-6) es 2026-06-06 20:00 → "6 de junio de 2026"
     expect(fechaTituloCST(new Date('2026-06-07T02:00:00Z'))).toBe('6 de junio de 2026');
-    // 2026-06-07T18:00:00Z → CST 12:00 mismo día → "7 de junio de 2026"
     expect(fechaTituloCST(new Date('2026-06-07T18:00:00Z'))).toBe('7 de junio de 2026');
   });
 });
 
-describe('renderResumenConsejoHtml', () => {
+describe('renderResumenConsejoHtml — 4 secciones', () => {
   it('renderiza el título y la fecha', () => {
     const html = renderResumenConsejoHtml(EMPTY, { fechaTitulo: '7 de junio de 2026' });
-    expect(html).toContain('Resumen Diario Operación Dilesa');
+    expect(html).toContain('Operación DILESA');
     expect(html).toContain('7 de junio de 2026');
   });
 
-  it('omite el bloque de Saldos Bancos cuando no hay saldos', () => {
+  it('siempre renderiza las bandas Ventas/Proyectos/Construcción', () => {
     const html = renderResumenConsejoHtml(EMPTY, { fechaTitulo: 'x' });
-    expect(html).not.toContain('Resumen Saldos Bancos');
+    expect(html).toContain('Ventas');
+    expect(html).toContain('Proyectos');
+    expect(html).toContain('Construcción');
   });
 
-  it('incluye el bloque de Saldos Bancos cuando hay saldos', () => {
+  it('omite la sección Tesorería cuando no hay saldos', () => {
+    const html = renderResumenConsejoHtml(EMPTY, { fechaTitulo: 'x' });
+    expect(html).not.toContain('Tesorería');
+    expect(html).not.toContain('Saldos en Bancos');
+  });
+
+  it('incluye Tesorería + Saldos en Bancos cuando hay saldos', () => {
     const html = renderResumenConsejoHtml(
       {
         ...EMPTY,
@@ -99,125 +99,157 @@ describe('renderResumenConsejoHtml', () => {
       },
       { fechaTitulo: 'x' }
     );
-    expect(html).toContain('Resumen Saldos Bancos');
+    expect(html).toContain('Tesorería');
+    expect(html).toContain('Saldos en Bancos');
     expect(html).toContain('BBVA Bancomer');
     expect(html).toContain('404,880.30');
     expect(html).toContain('07/06/2026');
   });
 
-  it('renderiza el margen con costo total y % formateados', () => {
+  it('fusiona inventario y margen por prototipo con utilidad potencial y total', () => {
     const html = renderResumenConsejoHtml(
       {
         ...EMPTY,
-        margen: [
+        prototipos: [
           {
-            nombre: 'LDV-RMA',
-            valor_comercial: 2094000,
-            costo_total: 829155.15,
-            utilidad: 1264844.85,
-            margen_pct: 60.4,
+            nombre: 'LDLE-ISC',
+            disponible: 153,
+            en_obra: 8,
+            valor_comercial: 2000000,
+            margen_pct: 31,
+            utilidad_potencial: 75200000,
           },
         ],
       },
       { fechaTitulo: 'x' }
     );
-    expect(html).toContain('Análisis de Margen');
-    expect(html).toContain('LDV-RMA');
-    expect(html).toContain('829,155.15');
-    expect(html).toContain('60.40%');
+    expect(html).toContain('Inventario y Margen por Prototipo');
+    expect(html).toContain('LDLE-ISC');
+    expect(html).toContain('75,200,000.00');
+    expect(html).toContain('Utilidad potencial total en inventario');
   });
 
-  it('renderiza la tubería con clientes y valor por fase', () => {
+  it('renderiza el pipeline vivo y la línea de histórico aparte', () => {
     const html = renderResumenConsejoHtml(
       {
         ...EMPTY,
-        tuberia: [
-          { fase: 'Entregada', clientes: 1080, valor: 1052158615 },
-          { fase: 'Asignada', clientes: 2, valor: 2789500 },
-        ],
+        tuberiaViva: [{ fase: 'Formalizada', clientes: 20, valor: 22000000 }],
+        tuberiaHistorico: { clientes: 1093, valor: 1060000000 },
       },
       { fechaTitulo: 'x' }
     );
-    expect(html).toContain('Tubería');
-    expect(html).toContain('Entregada');
-    expect(html).toContain('1,052,158,615.00');
+    expect(html).toContain('Pipeline de Ventas (vivo)');
+    expect(html).toContain('Formalizada');
+    expect(html).toContain('Histórico acumulado: 1,093 operaciones');
   });
 
-  it('muestra "Sin datos." en una sección vacía pero presente', () => {
+  it('la línea de Construcción marca los hitos vencidos en rojo', () => {
+    const html = renderResumenConsejoHtml(
+      { ...EMPTY, construccion: { casas_en_obra: 12, vencidas: 2, mo_por_ejecutar: 4100000 } },
+      { fechaTitulo: 'x' }
+    );
+    expect(html).toContain('Obra en Construcción');
+    expect(html).toContain('12 casas en obra');
+    expect(html).toContain('2 con hito vencido');
+    expect(html).toContain('#cf222e');
+    expect(html).toContain('MO por ejecutar');
+  });
+
+  it('muestra "Sin datos." en una tabla vacía pero presente', () => {
     const html = renderResumenConsejoHtml(EMPTY, { fechaTitulo: 'x' });
-    // Avances siempre se renderiza (no es opcional); sin filas muestra el placeholder
-    expect(html).toContain('Resumen Avances Proyectos');
+    expect(html).toContain('Avance por Desarrollo');
     expect(html).toContain('Sin datos.');
   });
 });
 
-describe('armarTuberia', () => {
+describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
   const CAT = [
     { nombre: 'Asignada', posicion: 2 },
     { nombre: 'Solicitud de Asignación', posicion: 1 },
     { nombre: 'Operación Terminada', posicion: 17 },
   ];
 
-  it('agrupa ventas activas por fase en el orden del catálogo', () => {
-    const rows = armarTuberia(CAT, [
+  it('agrupa activas por fase (solo con clientes) y manda terminadas al histórico', () => {
+    const { viva, historico } = armarTuberiaSplit(CAT, [
       { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 1000 },
       { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 500 },
-      { estado: 'activa', fase_actual: 'Operación Terminada', valor_escrituracion: 2000 },
-    ]);
-    expect(rows.map((r) => r.fase)).toEqual([
-      'Solicitud de Asignación',
-      'Asignada',
-      'Operación Terminada',
-    ]);
-    expect(rows[1]).toEqual({ fase: 'Asignada', clientes: 2, valor: 1500 });
-    expect(rows[0]).toEqual({ fase: 'Solicitud de Asignación', clientes: 0, valor: 0 });
-  });
-
-  it('excluye desasignadas aunque conserven fase', () => {
-    const rows = armarTuberia(CAT, [
-      { estado: 'desasignada', fase_actual: 'Asignada', valor_escrituracion: 999 },
-    ]);
-    expect(rows.find((r) => r.fase === 'Asignada')).toEqual({
-      fase: 'Asignada',
-      clientes: 0,
-      valor: 0,
-    });
-    expect(rows.find((r) => r.fase === 'Sin fase asignada')).toBeUndefined();
-  });
-
-  it('incluye terminadas — la fila "Operación Terminada" conserva el acumulado histórico', () => {
-    const rows = armarTuberia(CAT, [
       { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 2000 },
       { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 1000 },
-      { estado: 'expirada', fase_actual: 'Solicitud de Asignación', valor_escrituracion: 500 },
     ]);
-    expect(rows.find((r) => r.fase === 'Operación Terminada')).toEqual({
-      fase: 'Operación Terminada',
-      clientes: 2,
-      valor: 3000,
-    });
-    // expirada es venta caída: no cuenta en ninguna fila.
-    expect(rows.find((r) => r.fase === 'Solicitud de Asignación')).toEqual({
-      fase: 'Solicitud de Asignación',
-      clientes: 0,
-      valor: 0,
-    });
+    // Solo la fase con clientes vivos; las fases en 0 se filtran del funnel.
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 1500 }]);
+    expect(historico).toEqual({ clientes: 2, valor: 3000 });
   });
 
   it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
-    const rows = armarTuberia(CAT, [
+    const { viva } = armarTuberiaSplit(CAT, [
       { estado: 'activa', fase_actual: null, valor_escrituracion: null },
-      // grafía sin tilde — no existe en el catálogo
       { estado: 'activa', fase_actual: 'Solicitud de Asignacion', valor_escrituracion: 700 },
     ]);
-    const sinFase = rows[rows.length - 1];
-    expect(sinFase).toEqual({ fase: 'Sin fase asignada', clientes: 2, valor: 700 });
+    expect(viva[viva.length - 1]).toEqual({ fase: 'Sin fase asignada', clientes: 2, valor: 700 });
   });
 
-  it('sin huérfanas no agrega la fila extra', () => {
-    const rows = armarTuberia(CAT, [
-      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 0 },
+  it('excluye desasignadas/expiradas: no entran ni al funnel ni al histórico', () => {
+    const { viva, historico } = armarTuberiaSplit(CAT, [
+      { estado: 'desasignada', fase_actual: 'Asignada', valor_escrituracion: 999 },
+      { estado: 'expirada', fase_actual: 'Asignada', valor_escrituracion: 111 },
     ]);
-    expect(rows).toHaveLength(CAT.length);
+    expect(viva).toEqual([]);
+    expect(historico).toEqual({ clientes: 0, valor: 0 });
+  });
+});
+
+describe('armarPrototiposVivos — fusión + filtro de vivos', () => {
+  const protoNombre = new Map<string, string>([
+    ['p1', 'LDLE-ISC'],
+    ['p2', 'LDV-RMA'],
+    ['p3', 'LDS-RMC'],
+  ]);
+  const margen: MargenRaw[] = [
+    {
+      prototipo_id: 'p1',
+      nombre: 'LDLE-ISC',
+      valor_comercial: 2000000,
+      utilidad: 500000,
+      margen_pct: 25,
+    },
+    {
+      prototipo_id: 'p2',
+      nombre: 'LDV-RMA',
+      valor_comercial: 1500000,
+      utilidad: 300000,
+      margen_pct: 20,
+    },
+    {
+      prototipo_id: 'p3',
+      nombre: 'LDS-RMC',
+      valor_comercial: 1800000,
+      utilidad: 400000,
+      margen_pct: 22,
+    },
+  ];
+  const inventario: InventarioRaw[] = [
+    { prototipo_id: 'p1', inventario_disponible: 153, inventario_construccion: 8 },
+    { prototipo_id: 'p2', inventario_disponible: 0, inventario_construccion: 0 }, // muerto
+    { prototipo_id: 'p3', inventario_disponible: 40, inventario_construccion: 0 },
+  ];
+
+  it('excluye prototipos muertos y ordena por utilidad potencial desc', () => {
+    const rows = armarPrototiposVivos(margen, inventario, protoNombre);
+    expect(rows.map((r) => r.nombre)).toEqual(['LDLE-ISC', 'LDS-RMC']);
+    expect(rows[0].utilidad_potencial).toBe(76500000); // 500000 × 153
+    expect(rows[0].en_obra).toBe(8);
+    expect(rows[1].utilidad_potencial).toBe(16000000); // 400000 × 40
+  });
+
+  it('mantiene prototipos con casas en obra aunque no haya disponible (utilidad potencial 0)', () => {
+    const rows = armarPrototiposVivos(
+      [{ prototipo_id: 'p4', nombre: 'X', valor_comercial: 100, utilidad: 50, margen_pct: 10 }],
+      [{ prototipo_id: 'p4', inventario_disponible: 0, inventario_construccion: 3 }],
+      new Map()
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].en_obra).toBe(3);
+    expect(rows[0].utilidad_potencial).toBe(0);
   });
 });
