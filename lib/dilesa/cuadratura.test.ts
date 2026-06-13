@@ -36,6 +36,50 @@ describe('calcularCuadratura', () => {
     expect(c.comisionVendedor).toBe(8990); // 899,000 × 1.0% (no Loma Verde)
   });
 
+  // Con factura emitida (decisión Beto 2026-06-13): el Valor Facturado es el
+  // del CFDI real y la NC se deriva de él (facturado real − valor real), no del
+  // estimado de la fórmula. El estimado queda expuesto como *Sugerido.
+  it('toma el Valor Facturado del CFDI cuando se pasa y deriva la NC de él', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 899000,
+      montoCreditoTitular: 636328.45,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: 13378,
+      gastosEscrituracion: null,
+      valorFacturadoReal: 1150000, // total del CFDI de factura (≠ estimado)
+      depositos: [
+        { monto: 261049.55, directoCliente: true, tieneRecibo: true },
+        { monto: 636328.45, directoCliente: false, tieneRecibo: false },
+      ],
+      proyectoNombre: 'Lomas del Sol',
+    });
+    expect(c.valorFacturado).toBe(1150000); // del CFDI, no el estimado
+    expect(c.valorFacturadoSugerido).toBe(1160049.55); // estimado de la fórmula
+    expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378
+    expect(c.montoNotaCredito).toBe(266000); // 1,150,000 − 884,000 (facturado REAL)
+    expect(c.montoNotaCreditoSugerido).toBe(276049.55); // 1,160,049.55 − 884,000
+  });
+
+  // Sin `valorFacturadoReal`, el efectivo == el sugerido (estimado de la fórmula).
+  it('el efectivo iguala al sugerido cuando aún no hay factura', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 899000,
+      montoCreditoTitular: 636328.45,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: 13378,
+      gastosEscrituracion: null,
+      depositos: [
+        { monto: 261049.55, directoCliente: true, tieneRecibo: true },
+        { monto: 636328.45, directoCliente: false, tieneRecibo: false },
+      ],
+    });
+    expect(c.valorFacturado).toBe(c.valorFacturadoSugerido);
+    expect(c.montoNotaCredito).toBe(c.montoNotaCreditoSugerido);
+    expect(c.valorFacturado).toBe(1160049.55);
+  });
+
   // Regresión (caso Ahumada, 2026-06-13): la disposición del crédito de
   // institución traía un recibo de caja importado de Coda. La fórmula NO debe
   // facturarlo — solo los depósitos del cliente con recibo suman al Valor

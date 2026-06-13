@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-13 (post-cierre: la pestaña Cuadratura toma Valor Facturado / Nota de Crédito del CFDI cuando ya hay factura — fórmula = sugerido pre-factura — + blindaje de `fuente` contra doble conteo)
+**Última actualización:** 2026-06-13 (post-cierre: Valor Facturado del CFDI + NC derivada de «facturado real − valor real venta DILESA» en la Cuadratura y el control fiscal de F13; + blindaje de `fuente` contra doble conteo)
 
 ## Problema
 
@@ -372,6 +372,21 @@ expediente, copiloto), no reescritura.
   el doble conteo) ya no aparece en abonos `fuente='institucion'`. (FIX 4 del
   scope — pre-select de fuente + aviso inline en el drawer de abono — ya venía
   resuelto en #875.)
+- **2026-06-13 (post-cierre — NC derivada del facturado real):** Beto, revisando
+  #880, señaló que el Monto Nota de Crédito debe ser **Valor Facturado real −
+  Valor Real Venta DILESA**, no el total del CFDI de la NC (lo que #880 mostraba
+  cuando había `nota_credito_xml`), ni la resta con el facturado **estimado** (lo
+  que hacía el motor). Corrección: `calcularCuadratura` recibe `valorFacturadoReal`
+  y, cuando hay factura, usa el facturado real como `valorFacturado` y deriva de
+  él `montoNotaCredito`; expone `valorFacturadoSugerido`/`montoNotaCreditoSugerido`
+  (el estimado de la fórmula) para los hints. Wired en los 3 call-sites del motor:
+  panel (`page.tsx`), mini-cuadratura del header (`use-venta-resumen.ts`) y el
+  server-side de F13 (`cuadratura-server.ts`) — los tres ahora detectan el adjunto
+  `factura_xml` y pasan `valor_facturado` solo si existe. El control fiscal de F13
+  (`checksFacturacion` / cierre) exige y cuadra la NC contra el facturado real. La
+  fila «Monto nota de crédito» muestra la resta derivada («requerida» con factura,
+  «sugerido» antes); el total del CFDI de NC se sigue usando solo para validar.
+  Tests del motor agregados (efectivo vs sugerido). PR de lógica, auto-merge.
 
 - **2026-06-09:** Ir por rediseño completo (workspace "Expediente de
   Operación"), reusando los datos y formularios de las 13 fases ya
@@ -440,12 +455,22 @@ expediente, copiloto), no reescritura.
   (asignar/desasignar/expirar) y en el sync de rescate
   `import_dilesa_ventas.ts`.
 - **2026-06-13 (Cuadratura — el CFDI manda, la fórmula respalda — Beto):** Con
-  factura emitida, el Valor Facturado y la Nota de Crédito de la Cuadratura son
-  los del CFDI capturado en Fase 13 (persistidos en `dilesa.ventas`); la
-  fórmula reverse-engineered de Coda baja a «sugerido» y solo aplica antes de
-  facturar. La señal de "ya hay factura" es la presencia del adjunto del XML
-  (`factura_xml` / `nota_credito_xml`), no el valor persistido a secas (puede
-  ser un snapshot de Coda = valor de escrituración sin factura real).
+  factura emitida, el **Valor Facturado** de la Cuadratura es el del CFDI
+  capturado en Fase 13 (`dilesa.ventas.valor_facturado`); la fórmula
+  reverse-engineered de Coda baja a «sugerido» y solo aplica antes de facturar.
+  La señal de "ya hay factura" es la presencia del adjunto `factura_xml`, no el
+  valor persistido a secas (puede ser un snapshot de Coda = valor de
+  escrituración sin factura real).
+- **2026-06-13 (la Nota de Crédito es un DERIVADO, no el total del CFDI de NC —
+  Beto):** Beto, revisando, precisó la semántica: la NC se obtiene de **Valor
+  Facturado (real del CFDI) − Valor Real Venta DILESA**, no se lee del total del
+  XML de la NC. El motor (`cuadratura.ts`) recibe `valorFacturadoReal` y deriva
+  la NC de él; el total del CFDI de la NC se usa solo para **validar** (Fase 13
+  ya marca si el XML de NC no cuadra con esa resta, tolerancia 1 peso). Aplica a
+  los 3 call-sites del motor (panel, mini-cuadratura del header y el server-side
+  de F13), así el control fiscal que exige la NC ahora cuadra contra el
+  facturado real, no contra el estimado. Corrige un hueco introducido en #880,
+  donde la fila de NC mostraba el total del CFDI de NC en vez de la resta.
 - **2026-06-13 (la `fuente` del abono NO es solo etiqueta — durable):** Corrige
   la afirmación histórica de que en Coda el crédito de institución "nunca
   llevaba recibo": SÍ lo llevaba (34 importados con `coda_url`), pero la

@@ -22,6 +22,7 @@ type VentaCuadraturaRow = {
   unidad_id: string | null;
   precio_asignacion: number | null;
   valor_escrituracion: number | null;
+  valor_facturado: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   monto_credito_directo: number | null;
@@ -45,7 +46,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -103,6 +104,19 @@ export async function cargarCuadraturaVenta(
     );
   }
 
+  // ¿Ya hay CFDI de factura? Solo entonces `valor_facturado` es autoritativo
+  // (un snapshot de Coda = valor de escrituración no es una factura real). Con
+  // factura, la NC se deriva del facturado real — control fiscal de Fase 13.
+  const { data: facturaAdj } = await sb
+    .schema('erp')
+    .from('adjuntos')
+    .select('id')
+    .eq('entidad_tipo', 'venta')
+    .eq('entidad_id', ventaId)
+    .eq('rol', 'factura_xml')
+    .limit(1);
+  const hayFactura = ((facturaAdj ?? []) as { id: string }[]).length > 0;
+
   let proyectoNombre: string | null = null;
   const proyectoId = (unidadRes.data as { proyecto_id: string | null } | null)?.proyecto_id ?? null;
   if (proyectoId) {
@@ -131,6 +145,7 @@ export async function cargarCuadraturaVenta(
       (Number(venta.descuento_gastos_escrituracion) || 0) +
       (Number(venta.descuento_nota_credito) || 0),
     precioAsignacion: venta.precio_asignacion,
+    valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
     depositos: abonos.map((a) => ({
       monto: a.monto_total,
       directoCliente: a.fuente === 'cliente',
