@@ -40,10 +40,12 @@ describe('calcularCuadratura', () => {
     expect(c.comisionVendedor).toBe(8990); // 899,000 × 1.0% (no Loma Verde)
   });
 
-  // Con factura emitida (decisión Beto 2026-06-13): el Valor Facturado es el
-  // del CFDI real y la NC se deriva de él (facturado real − valor real), no del
-  // estimado de la fórmula. El estimado queda expuesto como *Sugerido.
-  it('toma el Valor Facturado del CFDI cuando se pasa y deriva la NC de él', () => {
+  // Modelo confirmado por Beto 2026-06-15: el enganche se factura con su propio
+  // recibo-CFDI y la operación se factura por la escrituración → el Valor
+  // Facturado SUMA ambos. La factura de escrituración usa el total del CFDI real
+  // cuando difiere del valor de escrituración; el estimado (con el valor de
+  // escrituración) queda como *Sugerido.
+  it('suma la factura de escrituración (CFDI) + el recibo-CFDI del enganche', () => {
     const c = calcularCuadratura({
       valorEscrituracion: 899000,
       montoCreditoTitular: 636328.45,
@@ -51,18 +53,39 @@ describe('calcularCuadratura', () => {
       montoCreditoDirecto: 0,
       montoChequeNotaria: 13378,
       gastosEscrituracion: null,
-      valorFacturadoReal: 1150000, // total del CFDI de factura (≠ estimado)
+      valorFacturadoReal: 900000, // CFDI de escrituración (≠ valor escritura, para probar que se usa)
+      depositos: [
+        { monto: 261049.55, directoCliente: true, tieneRecibo: true }, // enganche con recibo-CFDI
+        { monto: 636328.45, directoCliente: false, tieneRecibo: false }, // crédito: no factura
+      ],
+      proyectoNombre: 'Lomas del Sol',
+    });
+    expect(c.valorFacturado).toBe(1161049.55); // 900,000 (CFDI) + 261,049.55 (enganche)
+    expect(c.valorFacturadoSugerido).toBe(1160049.55); // 899,000 (escritura) + 261,049.55
+    expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378
+    expect(c.montoNotaCredito).toBe(277049.55); // 1,161,049.55 − 884,000
+    expect(c.montoNotaCreditoSugerido).toBe(276049.55); // 1,160,049.55 − 884,000
+  });
+
+  // Caso real Beto (Josue): el CFDI de escrituración coincide con la escritura,
+  // así que el facturado = escrituración + enganche = 1,160,049.55 y la NC =
+  // 276,049.55 (= enganche 261,049.55 + descuento 15,000).
+  it('caso Josue: NC = enganche + descuento cuando el CFDI coincide con la escritura', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 899000,
+      montoCreditoTitular: 636328.45,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: 13378,
+      gastosEscrituracion: null,
+      valorFacturadoReal: 899000, // el CFDI coincide con la escritura
       depositos: [
         { monto: 261049.55, directoCliente: true, tieneRecibo: true },
         { monto: 636328.45, directoCliente: false, tieneRecibo: false },
       ],
-      proyectoNombre: 'Lomas del Sol',
     });
-    expect(c.valorFacturado).toBe(1150000); // del CFDI, no el estimado
-    expect(c.valorFacturadoSugerido).toBe(1160049.55); // estimado de la fórmula
-    expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378
-    expect(c.montoNotaCredito).toBe(266000); // 1,150,000 − 884,000 (facturado REAL)
-    expect(c.montoNotaCreditoSugerido).toBe(276049.55); // 1,160,049.55 − 884,000
+    expect(c.valorFacturado).toBe(1160049.55);
+    expect(c.montoNotaCredito).toBe(276049.55); // 261,049.55 enganche + 15,000 descuento
   });
 
   // Sin `valorFacturadoReal`, el efectivo == el sugerido (estimado de la fórmula).
