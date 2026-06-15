@@ -30,12 +30,17 @@
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
  *   Valor Real Venta Dilesa   = Depósitos Recibidos − Cheque Notaría + Pagaré.
- *   Valor Facturado           = el del CFDI de factura cuando ya hay factura
- *                               (`valorFacturadoReal`); si no, el ESTIMADO de
- *                               respaldo = Valor Escrituración + Σ depósitos
- *                               del cliente (con recibo). El estimado se
- *                               expone como `valorFacturadoSugerido`.
+ *   Valor Facturado           = SUMA de los CFDIs timbrados: la factura de la
+ *                               escrituración (el CFDI real `valorFacturadoReal`
+ *                               si existe, si no el Valor Escrituración) + Σ
+ *                               depósitos del cliente con recibo (cada enganche
+ *                               se factura con su propio recibo-CFDI). El
+ *                               estimado de respaldo (con el valor de
+ *                               escrituración) se expone como
+ *                               `valorFacturadoSugerido`.
  *   Monto Nota de Crédito     = Valor Facturado − Valor Real Venta Dilesa.
+ *                               (acredita de vuelta el enganche facturado dos
+ *                               veces + el descuento.)
  *                               Es un DERIVADO, no el total del CFDI de NC: con
  *                               factura real usa el facturado real; la Fase 13
  *                               valida aparte que el CFDI de NC coincida.
@@ -89,13 +94,15 @@ export type CuadraturaInput = {
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
   /**
-   * Valor Facturado AUTORITATIVO del CFDI de factura (Fase 13,
-   * `dilesa.ventas.valor_facturado`). Cuando se pasa, el motor lo usa como
-   * `valorFacturado` y deriva de él el `montoNotaCredito` (NC = facturado real
-   * − valor real venta DILESA). null/undefined ⇒ aún no hay factura: el motor
-   * cae al estimado de la fórmula de Coda. Solo pasarlo cuando exista el
-   * adjunto `factura_xml` (un snapshot de Coda en `valor_facturado` = valor de
-   * escrituración NO es una factura real).
+   * Total del CFDI de la factura de ESCRITURACIÓN (Fase 13,
+   * `dilesa.ventas.valor_facturado`) — la factura de la operación que coincide
+   * con la escritura. El motor lo usa como el componente "factura de
+   * escrituración" del Valor Facturado y le SUMA los recibos-CFDI del enganche
+   * (depósitos del cliente con recibo). null/undefined ⇒ aún no hay factura: usa
+   * el valor de escrituración. Solo pasarlo cuando exista el adjunto
+   * `factura_xml` (un snapshot de Coda en `valor_facturado` = escrituración no
+   * es una factura real, pero como coincide con la escritura el resultado es el
+   * mismo).
    */
   valorFacturadoReal?: number | null;
   depositos: DepositoCuadratura[];
@@ -225,11 +232,21 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const valorRealVentaDilesa = round2(
     depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto
   );
-  // Estimado de la fórmula (respaldo pre-factura). Cuando ya hay CFDI de
-  // factura, el valor REAL del XML manda y la NC se deriva de él.
+  // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
+  // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
+  // del cliente con recibo se factura aparte). La factura de escrituración toma
+  // el total del CFDI real cuando existe (`valorFacturadoReal`), si no el valor
+  // de escrituración. El enganche se factura primero (su recibo-CFDI) y la
+  // factura de la operación coincide con la escritura; la NC acredita de vuelta
+  // el enganche + el descuento para que el neto cuadre con el Valor Real.
+  // (Modelo confirmado por Beto 2026-06-15. Antes se usaba SOLO el CFDI de la
+  // escrituración y se dejaba fuera el enganche → NC subvaluada.)
+  const facturaEscrituracion =
+    i.valorFacturadoReal != null ? round2(n(i.valorFacturadoReal)) : valorEscrituracion;
+  const valorFacturado = round2(facturaEscrituracion + depositosConRecibo);
+  // Estimado de respaldo: mismo cálculo con el valor de escrituración en vez del
+  // CFDI real. Igual al efectivo salvo que el CFDI de escrituración difiera.
   const valorFacturadoSugerido = round2(valorEscrituracion + depositosConRecibo);
-  const valorFacturado =
-    i.valorFacturadoReal != null ? round2(n(i.valorFacturadoReal)) : valorFacturadoSugerido;
   const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
   const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
   const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
