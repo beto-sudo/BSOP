@@ -65,6 +65,7 @@ type VentaRow = {
   descuento_equipamiento: number | null;
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
+  promocion_id: string | null;
   fecha_firma_programada: string | null;
   /** INE capturado en el KYC de la venta (fallback si la persona no lo trae). */
   ine_numero: string | null;
@@ -87,7 +88,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, fecha_firma_programada, ine_numero'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, fecha_firma_programada, ine_numero'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -111,7 +112,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         return;
       }
 
-      const [pRes, uRes, abonosRes, tcRes, vendRes, notRes] = await Promise.all([
+      const [pRes, uRes, abonosRes, tcRes, vendRes, notRes, promoRes] = await Promise.all([
         sb
           .schema('erp')
           .from('personas')
@@ -157,6 +158,15 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           : Promise.resolve({ data: null, error: null }),
         // Notaría desde el catálogo de proveedores (categoria='notaria').
         venta.notario_id ? getNotaria(sb, venta.notario_id) : Promise.resolve(null),
+        // Promoción de la solicitud → tope CONFIABLE de descuento autorizado.
+        venta.promocion_id
+          ? sb
+              .schema('dilesa')
+              .from('promociones')
+              .select('monto')
+              .eq('id', venta.promocion_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
       if (!activo) return;
 
@@ -253,6 +263,9 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           (Number(venta.descuento_equipamiento) || 0) +
           (Number(venta.descuento_gastos_escrituracion) || 0) +
           (Number(venta.descuento_nota_credito) || 0),
+        // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
+        descuentoMaximoAutorizado:
+          (promoRes.data as { monto: number | null } | null)?.monto ?? null,
         precioAsignacion: venta.precio_asignacion,
         valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
         depositos: abonos.map((a) => ({

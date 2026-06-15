@@ -279,6 +279,45 @@ describe('calcularCuadratura', () => {
       expect(c.cubierta).toBe(false);
     });
 
+    // Tope a lo autorizado (regla Beto 2026-06-15): si se otorga más que el
+    // máximo confiable (promo), solo el autorizado entra al saldo; el exceso
+    // queda como pendiente a revisar, no reduce el saldo.
+    it('topa el descuento aplicado al máximo autorizado confiable', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        apoyoInfonavit: 30000,
+        descuentoOtorgadoTotal: 30000, // se otorgó de más
+        descuentoMaximoAutorizado: 15000, // pero solo 15,000 autorizados
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.descuentoOtorgado).toBe(30000);
+      expect(c.descuentoAplicado).toBe(15000); // topado
+      expect(c.saldoCliente).toBe(0.45); // 1,622.45 − 15,000 + 13,378 (no 30,000)
+      expect(c.cubierta).toBe(true);
+    });
+
+    // Sin tope confiable (legacy), el descuento aplicado == el otorgado.
+    it('aplica el descuento completo cuando no hay tope confiable (legacy)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        descuentoOtorgadoTotal: 15000,
+        // descuentoMaximoAutorizado ausente ⇒ sin tope
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.descuentoAplicado).toBe(15000);
+      expect(c.saldoCliente).toBe(0.45);
+    });
+
     // La tolerancia absorbe el residual de centavos de captura (≤ 5 pesos).
     it('marca cubierta un residual de pocos pesos por redondeo de captura', () => {
       const c = calcularCuadratura({

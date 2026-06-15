@@ -164,10 +164,14 @@ expediente, copiloto), no reescritura.
   por redondeo de captura. Verificado vs prod (1,186 ventas): 248 pasan de
   «pendiente»→«cubierta» correctamente; ~17 cerradas surfacean como anomalía
   real (cheque a notaría girado sin descuento documentado / por encima del
-  autorizado). Revisión adversarial: H1 (el descuento es campo editable y ahora
-  carga el gate de cierre F17) queda como decisión de gobernanza de Beto — tope
-  por máximo autorizado descartado por ahora (159/315 ventas ya exceden su
-  máximo legacy). PR (TBD).
+  autorizado). Revisión adversarial encontró H1 (el descuento es campo editable
+  y ahora carga el gate de cierre F17). **Decisión Beto:** (a) el descuento que
+  entra al saldo se topa a lo autorizado desde el inicio — implementado SOLO
+  contra el tope confiable (monto de la promoción de la solicitud); el máximo
+  legacy de Coda NO topa (159/315 ventas lo exceden por mal dato, no por
+  sobre-descuento real); (b) los 4 buckets de descuento solo editables por
+  **Dirección** (admin global O rol Dirección en la empresa), antes era
+  admin/escritura-F13. PR #890.
 - **2026-06-09:** Promovida. Beto eligió el rediseño completo (opción B) sobre
   el parche incremental, tras notar que la captura por fase pierde el contexto
   de la operación.

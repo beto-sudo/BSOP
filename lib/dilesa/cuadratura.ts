@@ -77,6 +77,15 @@ export type CuadraturaInput = {
   apoyoInfonavit?: number | null;
   /** GAP: suma de los 4 buckets de descuento otorgado. */
   descuentoOtorgadoTotal?: number | null;
+  /**
+   * Tope CONFIABLE de descuento autorizado (regla Beto 2026-06-15: el descuento
+   * que entra al saldo está topado a lo autorizado desde el inicio). Pasar SOLO
+   * cuando la autorización es de fiar — el monto de la promoción de la Solicitud
+   * de Asignación. null/undefined ⇒ sin tope (ventas legacy de Coda cuyo
+   * `descuento_maximo_autorizado` no es confiable: 159/315 lo exceden por mal
+   * dato; ahí no se topa para no inventar pendientes falsos).
+   */
+  descuentoMaximoAutorizado?: number | null;
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
   /**
@@ -107,6 +116,9 @@ export type Cuadratura = {
   saldoCliente: number;
   /** Suma de los 4 buckets de descuento otorgado (eco del input, para la UI). */
   descuentoOtorgado: number;
+  /** Descuento efectivamente aplicado al saldo: `descuentoOtorgado` topado al
+   *  máximo autorizado confiable (= otorgado cuando no hay tope). */
+  descuentoAplicado: number;
   /** Cheque a notaría CAPTURADO (0 si aún no se gira). Distinto del calculado. */
   chequePagado: number;
   /** true si el descuento autorizado + el disponible cubren la escrituración
@@ -175,18 +187,26 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoCobranza = round2(valorEscrituracion - montoDisponible);
 
   const descuentoOtorgadoTotal = n(i.descuentoOtorgadoTotal);
+  // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento
+  // hasta el máximo CONFIABLE (promo de la solicitud). Sin tope confiable
+  // (legacy) se aplica el otorgado completo. El exceso sobre el tope NO reduce
+  // el saldo (queda como pendiente a revisar).
+  const descuentoAplicado =
+    i.descuentoMaximoAutorizado != null
+      ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
+      : descuentoOtorgadoTotal;
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
-  const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoOtorgadoTotal;
+  const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoAplicado;
   const chequeNotariaCalculado = round2(Math.min(gastosNetos, excedenteDisponible));
 
   // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
   // saldo efectivo usa este, no el calculado: mide un giro real contra el
   // descuento, no una sugerencia.
   const chequePagado = round2(n(i.montoChequeNotaria));
-  // Saldo efectivo: el descuento autorizado cubre el faltante de cobranza y el
+  // Saldo efectivo: el descuento aplicado cubre el faltante de cobranza y el
   // cheque girado se fondea de ese descuento (o del excedente). Equivale a
   // `chequePagado − excedenteDisponible`.
-  const saldoCliente = round2(saldoCobranza - descuentoOtorgadoTotal + chequePagado);
+  const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
   const cubierta = saldoCliente <= TOLERANCIA_SALDO;
 
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
@@ -228,6 +248,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     saldoCobranza,
     saldoCliente,
     descuentoOtorgado: round2(descuentoOtorgadoTotal),
+    descuentoAplicado: round2(descuentoAplicado),
     chequePagado,
     cubierta,
     chequeNotariaCalculado,

@@ -73,7 +73,15 @@ export function CuadraturaPanel({
         <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
         {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
           <>
-            <Fila label="(+) Descuento otorgado" value={money(c.descuentoOtorgado)} />
+            <Fila
+              label="(+) Descuento aplicado"
+              value={money(c.descuentoAplicado)}
+              hint={
+                c.descuentoAplicado < c.descuentoOtorgado
+                  ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
+                  : undefined
+              }
+            />
             {c.chequePagado > 0 ? (
               <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
             ) : null}
