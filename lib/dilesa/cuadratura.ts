@@ -10,9 +10,22 @@
  *   Depósitos Recibidos       = Σ todos los depósitos del cliente.
  *   Monto Disponible          = Σ depósitos(Directo Cliente) + crédito titular
  *                               + crédito co-titular + pagaré autorizado (CD).
- *   Saldo Cliente             = Valor de Escrituración − Monto Disponible.
- *                               (≤ 0 ⇒ operación cubierta — saldo cero vs
- *                                Valor de Escrituración, confirmado por Beto.)
+ *   Saldo Cobranza            = Valor de Escrituración − Monto Disponible
+ *                               (cobertura cruda: solo efectivo + crédito).
+ *   Saldo Cliente (efectivo)  = Saldo Cobranza − Descuento Otorgado
+ *                               + Cheque Notaría girado.
+ *                               El descuento AUTORIZADO cubre el faltante de
+ *                               cobranza; el cheque a notaría es un giro que se
+ *                               fondea de ese mismo descuento (o del excedente
+ *                               de cobranza). Equivale a: Cheque girado −
+ *                               (Disponible − Escrituración + Descuento) =
+ *                               Cheque girado − Excedente Disponible.
+ *                               ≤ TOLERANCIA_SALDO ⇒ operación cubierta.
+ *                               (Decisión Beto 2026-06-15: el descuento y el
+ *                               cheque entran al saldo; antes el saldo era ciego
+ *                               al descuento y un descuento perdonado se veía
+ *                               como deuda. El cheque usa el CAPTURADO, no el
+ *                               calculado: mide un giro real, no uno sugerido.)
  *   Cheque Notaría (cálculo)  = min(Gastos Escrituración − Apoyo Infonavit,
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
@@ -87,8 +100,17 @@ export type Cuadratura = {
   creditoInstitucion: number;
   montoCreditoDirecto: number;
   montoDisponible: number;
+  /** Saldo de cobranza cruda: Valor Escrituración − Monto Disponible (ciego al
+   *  descuento). Se conserva para auditoría — cuánto faltó de puro efectivo. */
+  saldoCobranza: number;
+  /** Saldo efectivo: cobranza − descuento otorgado + cheque a notaría girado. */
   saldoCliente: number;
-  /** true si el Monto Disponible cubre el Valor de Escrituración. */
+  /** Suma de los 4 buckets de descuento otorgado (eco del input, para la UI). */
+  descuentoOtorgado: number;
+  /** Cheque a notaría CAPTURADO (0 si aún no se gira). Distinto del calculado. */
+  chequePagado: number;
+  /** true si el descuento autorizado + el disponible cubren la escrituración
+   *  (saldo efectivo ≤ TOLERANCIA_SALDO). */
   cubierta: boolean;
   /** Cheque a notaría sugerido por la fórmula (vs el capturado). */
   chequeNotariaCalculado: number;
@@ -122,6 +144,15 @@ export type Cuadratura = {
  */
 const UMBRAL_DOBLE_CONTEO = 0.05;
 
+/**
+ * Tolerancia (pesos) del saldo efectivo para marcar "cubierta". Absorbe el
+ * redondeo de captura: el cheque a notaría se captura en pesos enteros mientras
+ * gastos y crédito traen centavos, así que una operación perfectamente saldada
+ * puede dar un residual de unos pocos pesos. Arriba de esto es un faltante real
+ * (o un cheque girado por encima del descuento autorizado) que hay que revisar.
+ */
+const TOLERANCIA_SALDO = 5;
+
 /** ¿El proyecto cae en la tasa alta de comisión (Loma Verde / Loma Verde 2)? */
 function esLomaVerde(proyecto: string | null | undefined): boolean {
   return /loma\s*verde/i.test(proyecto ?? '');
@@ -141,13 +172,22 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     .reduce((s, d) => s + n(d.monto), 0);
 
   const montoDisponible = depositosDirectoCliente + creditoInstitucion + montoCreditoDirecto;
-  const saldoCliente = round2(valorEscrituracion - montoDisponible);
-  const cubierta = saldoCliente <= 0.0049;
+  const saldoCobranza = round2(valorEscrituracion - montoDisponible);
 
   const descuentoOtorgadoTotal = n(i.descuentoOtorgadoTotal);
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
   const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoOtorgadoTotal;
   const chequeNotariaCalculado = round2(Math.min(gastosNetos, excedenteDisponible));
+
+  // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
+  // saldo efectivo usa este, no el calculado: mide un giro real contra el
+  // descuento, no una sugerencia.
+  const chequePagado = round2(n(i.montoChequeNotaria));
+  // Saldo efectivo: el descuento autorizado cubre el faltante de cobranza y el
+  // cheque girado se fondea de ese descuento (o del excedente). Equivale a
+  // `chequePagado − excedenteDisponible`.
+  const saldoCliente = round2(saldoCobranza - descuentoOtorgadoTotal + chequePagado);
+  const cubierta = saldoCliente <= TOLERANCIA_SALDO;
 
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
@@ -185,7 +225,10 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     creditoInstitucion: round2(creditoInstitucion),
     montoCreditoDirecto: round2(montoCreditoDirecto),
     montoDisponible: round2(montoDisponible),
+    saldoCobranza,
     saldoCliente,
+    descuentoOtorgado: round2(descuentoOtorgadoTotal),
+    chequePagado,
     cubierta,
     chequeNotariaCalculado,
     chequeNotariaUsado,
