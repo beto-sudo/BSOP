@@ -171,7 +171,10 @@ expediente, copiloto), no reescritura.
   legacy de Coda NO topa (159/315 ventas lo exceden por mal dato, no por
   sobre-descuento real); (b) los 4 buckets de descuento solo editables por
   **Dirección** (admin global O rol Dirección en la empresa), antes era
-  admin/escritura-F13. PR #890.
+  admin/escritura-F13. PR #890 (merged 2026-06-15). Pendientes derivados:
+  reconciliar el `descuento_maximo_autorizado` legacy (159 ventas) para que el
+  tope aplique también ahí; documentar el descuento en ~17 ventas con cheque a
+  notaría sin descuento registrado.
 - **2026-06-09:** Promovida. Beto eligió el rediseño completo (opción B) sobre
   el parche incremental, tras notar que la captura por fase pierde el contexto
   de la operación.
