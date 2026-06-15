@@ -67,7 +67,7 @@ import {
   type ColaItem,
   type HoldSnapshot,
 } from '@/lib/dilesa/hold-cola';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -354,6 +354,7 @@ function DetailInner() {
     'operacion'
   );
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   // Scope del rol Vendedor: solo sus propias ventas (pedido de Beto).
   const scopeVendedor = useScopeVendedorDilesa();
   const [cuadInputs, setCuadInputs] = useState<CuadraturaInputsStr>({
@@ -906,6 +907,9 @@ function DetailInner() {
           (Number(cuadInputs.descuentoEquipamiento) || 0) +
           (Number(cuadInputs.descuentoGastosEscr) || 0) +
           (Number(cuadInputs.descuentoNotaCredito) || 0),
+        // Tope confiable SOLO desde la promoción de la solicitud; el máximo
+        // legacy de Coda no es de fiar (159/315 ventas lo exceden por mal dato).
+        descuentoMaximoAutorizado: promo ? promo.monto : null,
         precioAsignacion: venta?.precio_asignacion ?? null,
         // Solo cuando ya hay CFDI de factura: su total es el Valor Facturado
         // autoritativo y la NC se deriva de él (NC = facturado real − valor
@@ -928,6 +932,7 @@ function DetailInner() {
       proyectoNombre,
       cuadInputs,
       apoyoInfonavit,
+      promo,
       comprobantesPorAbono,
       hayFacturaCfdi,
     ]
@@ -1187,8 +1192,10 @@ function DetailInner() {
                   : null
             }
             canWrite={
-              permissions.isAdmin ||
-              permissions.modulos.get('dilesa.ventas.fase13_facturada')?.write === true
+              // Buckets de descuento: solo Dirección (regla Beto 2026-06-15) —
+              // admin global O rol Dirección en la empresa de la venta.
+              !!effectiveUser?.isAdmin ||
+              (effectiveUser?.direccionEmpresaIds ?? []).includes(venta.empresa_id)
             }
           />
           <CuadraturaPanel

@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-13 (post-cierre: Valor Facturado del CFDI + NC derivada de «facturado real − valor real venta DILESA» en la Cuadratura y el control fiscal de F13; + blindaje de `fuente` contra doble conteo)
+**Última actualización:** 2026-06-15 (follow-up: Saldo efectivo — el descuento autorizado y el cheque a notaría girado entran al saldo de la cuadratura; antes el saldo era ciego al descuento y un descuento perdonado se veía como deuda)
 
 ## Problema
 
@@ -153,6 +153,25 @@ expediente, copiloto), no reescritura.
 
 ## Bitácora
 
+- **2026-06-15 (follow-up financiero):** **Saldo efectivo** — el saldo de la
+  cuadratura ahora considera el descuento autorizado y el cheque a notaría
+  girado, no solo efectivo+crédito. Antes el saldo era ciego al descuento, así
+  que un descuento perdonado (ej. caso JOSUE DANIEL CRUZ VALVERDE: $1,622 que
+  eran descuento, no deuda) se mostraba como pendiente y los 4 buckets de
+  descuento eran inertes (solo movían el cheque _sugerido_). Nueva fórmula:
+  `Saldo efectivo = Cobranza cruda − Descuento Otorgado + Cheque girado`
+  (= `Cheque girado − Excedente Disponible`), `cubierta` con tolerancia de $5
+  por redondeo de captura. Verificado vs prod (1,186 ventas): 248 pasan de
+  «pendiente»→«cubierta» correctamente; ~17 cerradas surfacean como anomalía
+  real (cheque a notaría girado sin descuento documentado / por encima del
+  autorizado). Revisión adversarial encontró H1 (el descuento es campo editable
+  y ahora carga el gate de cierre F17). **Decisión Beto:** (a) el descuento que
+  entra al saldo se topa a lo autorizado desde el inicio — implementado SOLO
+  contra el tope confiable (monto de la promoción de la solicitud); el máximo
+  legacy de Coda NO topa (159/315 ventas lo exceden por mal dato, no por
+  sobre-descuento real); (b) los 4 buckets de descuento solo editables por
+  **Dirección** (admin global O rol Dirección en la empresa), antes era
+  admin/escritura-F13. PR #890.
 - **2026-06-09:** Promovida. Beto eligió el rediseño completo (opción B) sobre
   el parche incremental, tras notar que la captura por fase pierde el contexto
   de la operación.

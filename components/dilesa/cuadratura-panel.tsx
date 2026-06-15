@@ -71,12 +71,33 @@ export function CuadraturaPanel({
         <Fila label="Crédito directo (pagaré)" value={money(c.montoCreditoDirecto)} />
         <Fila label="Depósitos directos del cliente" value={money(c.depositosDirectoCliente)} />
         <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
+        {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
+          <>
+            <Fila
+              label="(+) Descuento aplicado"
+              value={money(c.descuentoAplicado)}
+              hint={
+                c.descuentoAplicado < c.descuentoOtorgado
+                  ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
+                  : undefined
+              }
+            />
+            {c.chequePagado > 0 ? (
+              <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
+            ) : null}
+          </>
+        ) : null}
         <div className="my-1 border-t border-[var(--border)]" />
         <Fila
           label={c.cubierta ? 'Saldo (cubierta)' : 'Saldo pendiente'}
           value={money(c.saldoCliente)}
           strong
           tone={c.cubierta ? 'ok' : 'warn'}
+          hint={
+            c.descuentoOtorgado > 0 || c.chequePagado > 0
+              ? `Cobranza cruda: ${money(c.saldoCobranza)}`
+              : undefined
+          }
         />
       </Bloque>
 

@@ -7,8 +7,9 @@
  *   2. Expediente documental completo (roles requeridos de FASE_ROLES,
  *      descontando los opcionales que la venta no amerita — ver
  *      `rolesOpcionales`).
- *   3. Cuadratura cubierta (saldo del cliente ≤ 0 contra Valor de
- *      Escrituración).
+ *   3. Cuadratura cubierta (saldo EFECTIVO del cliente ≤ tolerancia: el
+ *      descuento autorizado + el disponible cubren la escrituración, neto del
+ *      cheque a notaría girado).
  *   4. Conformidad del cliente registrada (la propia Fase 16 — la encuesta
  *      respondida/capturada/sin-respuesta la cierra).
  *
@@ -33,9 +34,10 @@ export type CopilotoInput = {
   fases: CopilotoFase[];
   /** Docs requeridos que aún no están cargados (ya filtrados de opcionales). */
   docsFaltantes: CopilotoDocFaltante[];
-  /** Saldo del cliente (Valor Escrituración − disponible). null = sin datos. */
+  /** Saldo EFECTIVO del cliente (cobranza − descuento + cheque girado). null =
+   *  sin datos. */
   saldoCliente: number | null;
-  /** Cuadratura cubierta (saldo ≤ 0). null = sin datos para evaluar. */
+  /** Cuadratura cubierta (saldo efectivo ≤ tolerancia). null = sin datos. */
   cubierta: boolean | null;
 };
 

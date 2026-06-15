@@ -26,7 +26,11 @@ describe('calcularCuadratura', () => {
 
     expect(c.depositosRecibidos).toBe(897378);
     expect(c.montoDisponible).toBe(897378); // 261,049.55 directo + 636,328.45 crédito
-    expect(c.saldoCliente).toBe(1622); // 899,000 − 897,378
+    expect(c.saldoCobranza).toBe(1622); // 899,000 − 897,378 (cobranza cruda)
+    // Sin descuento registrado pero con un cheque de 13,378 girado: el saldo
+    // efectivo EXPONE el descuento no documentado (1,622 sin cobrar + 13,378 de
+    // cheque = 15,000). No cubierta hasta capturar el descuento en los buckets.
+    expect(c.saldoCliente).toBe(15000); // 1,622 − 0 + 13,378
     expect(c.cubierta).toBe(false);
     expect(c.valorFacturado).toBe(1160049.55); // 899,000 + 261,049.55 (con recibo)
     expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378 + 0
@@ -210,6 +214,124 @@ describe('calcularCuadratura', () => {
         depositos: [{ monto: 600000, directoCliente: true }],
       });
       expect(c.posibleDobleConteo).toBe(false);
+    });
+  });
+
+  // Saldo efectivo (decisión Beto 2026-06-15): el descuento autorizado y el
+  // cheque a notaría girado entran al saldo. Antes el saldo era ciego al
+  // descuento y un descuento perdonado se veía como deuda.
+  describe('saldo efectivo (descuento + cheque)', () => {
+    // Caso real Beto (JOSUE DANIEL CRUZ VALVERDE): descuento de 15,000 otorgado,
+    // 13,378 girados como cheque a notaría, 1,622 perdonados ⇒ operación saldada.
+    it('cuadra a ~0 cuando el descuento cubre el faltante (caso Beto)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328, // campo de crédito (prod = 636,328.00)
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        apoyoInfonavit: 30000,
+        descuentoOtorgadoTotal: 15000,
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.montoDisponible).toBe(897377.55); // 261,049.55 + 636,328
+      expect(c.saldoCobranza).toBe(1622.45); // cobranza cruda
+      expect(c.descuentoOtorgado).toBe(15000);
+      expect(c.chequePagado).toBe(13378);
+      expect(c.saldoCliente).toBe(0.45); // 1,622.45 − 15,000 + 13,378 (residual de campo)
+      expect(c.cubierta).toBe(true); // ≤ tolerancia
+    });
+
+    // Un cheque a notaría girado por encima del (excedente + descuento) deja un
+    // saldo positivo real: descuento no documentado o cheque excedido a revisar.
+    it('marca pendiente cuando el cheque excede el descuento autorizado', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 890000,
+        montoCreditoTitular: 900719, // disponible cubre la cobranza (saldo cobranza −10,719)
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 25720, // cheque grande SIN descuento registrado
+        gastosEscrituracion: 55720,
+        descuentoOtorgadoTotal: 0,
+        depositos: [],
+      });
+      expect(c.saldoCobranza).toBe(-10719); // cobranza cubierta
+      expect(c.saldoCliente).toBe(15001); // −10,719 − 0 + 25,720 → faltante real
+      expect(c.cubierta).toBe(false);
+    });
+
+    // Sin descuento ni cheque, el saldo efectivo == la cobranza cruda.
+    it('iguala la cobranza cruda cuando no hay descuento ni cheque', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 800000,
+        montoCreditoTitular: 700000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: null,
+        depositos: [{ monto: 50000, directoCliente: true }],
+      });
+      expect(c.saldoCobranza).toBe(50000);
+      expect(c.chequePagado).toBe(0);
+      expect(c.saldoCliente).toBe(50000);
+      expect(c.saldoCliente).toBe(c.saldoCobranza);
+      expect(c.cubierta).toBe(false);
+    });
+
+    // Tope a lo autorizado (regla Beto 2026-06-15): si se otorga más que el
+    // máximo confiable (promo), solo el autorizado entra al saldo; el exceso
+    // queda como pendiente a revisar, no reduce el saldo.
+    it('topa el descuento aplicado al máximo autorizado confiable', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        apoyoInfonavit: 30000,
+        descuentoOtorgadoTotal: 30000, // se otorgó de más
+        descuentoMaximoAutorizado: 15000, // pero solo 15,000 autorizados
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.descuentoOtorgado).toBe(30000);
+      expect(c.descuentoAplicado).toBe(15000); // topado
+      expect(c.saldoCliente).toBe(0.45); // 1,622.45 − 15,000 + 13,378 (no 30,000)
+      expect(c.cubierta).toBe(true);
+    });
+
+    // Sin tope confiable (legacy), el descuento aplicado == el otorgado.
+    it('aplica el descuento completo cuando no hay tope confiable (legacy)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        descuentoOtorgadoTotal: 15000,
+        // descuentoMaximoAutorizado ausente ⇒ sin tope
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.descuentoAplicado).toBe(15000);
+      expect(c.saldoCliente).toBe(0.45);
+    });
+
+    // La tolerancia absorbe el residual de centavos de captura (≤ 5 pesos).
+    it('marca cubierta un residual de pocos pesos por redondeo de captura', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 890000,
+        montoCreditoTitular: 890522, // saldo cobranza = −522
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 15524,
+        gastosEscrituracion: 45524,
+        descuentoOtorgadoTotal: 15000,
+        depositos: [],
+      });
+      expect(c.saldoCliente).toBe(2); // −522 − 15,000 + 15,524
+      expect(c.cubierta).toBe(true); // ≤ tolerancia
     });
   });
 });

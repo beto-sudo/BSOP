@@ -32,6 +32,7 @@ type VentaCuadraturaRow = {
   descuento_equipamiento: number | null;
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
+  promocion_id: string | null;
 };
 
 /**
@@ -46,7 +47,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -54,7 +55,7 @@ export async function cargarCuadraturaVenta(
   if (!vRow) return null;
   const venta = vRow as unknown as VentaCuadraturaRow;
 
-  const [abonosRes, tcRes, unidadRes] = await Promise.all([
+  const [abonosRes, tcRes, unidadRes, promoRes] = await Promise.all([
     sb
       .schema('erp')
       .from('cxc_pagos')
@@ -78,6 +79,15 @@ export async function cargarCuadraturaVenta(
           .from('unidades')
           .select('proyecto_id')
           .eq('id', venta.unidad_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Promoción de la solicitud → tope CONFIABLE de descuento autorizado.
+    venta.promocion_id
+      ? sb
+          .schema('dilesa')
+          .from('promociones')
+          .select('monto')
+          .eq('id', venta.promocion_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -144,6 +154,8 @@ export async function cargarCuadraturaVenta(
       (Number(venta.descuento_equipamiento) || 0) +
       (Number(venta.descuento_gastos_escrituracion) || 0) +
       (Number(venta.descuento_nota_credito) || 0),
+    // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
+    descuentoMaximoAutorizado: (promoRes.data as { monto: number | null } | null)?.monto ?? null,
     precioAsignacion: venta.precio_asignacion,
     valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
     depositos: abonos.map((a) => ({
