@@ -29,8 +29,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Download, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { Check, Download, Loader2, Lock, Plus, Save, Trash2 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
+import { useEffectiveUser } from '@/components/providers';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,7 @@ type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
 type VentaCtx = {
   id: string;
+  empresa_id: string;
   persona_id: string;
   unidad_id: string | null;
   precio_asignacion: number | null;
@@ -67,6 +69,7 @@ type VentaCtx = {
   notario_id: string | null;
   fecha_firma_programada: string | null;
   hora_firma_programada: string | null;
+  poliza_garantia_expedida_at: string | null;
   monto_credito_directo: number | null;
   cd_plan_pagos: PlanPagoJson[] | null;
   cd_tiie28_pct: number | null;
@@ -96,6 +99,28 @@ const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
 const hoy = () => new Date().toISOString().slice(0, 10);
 
+const MESES_LARGO = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+// Formatea un date 'YYYY-MM-DD' a "15 de junio de 2026" sin recorrerlo por TZ.
+const fechaFirmaLarga = (iso: string | null): string | null => {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return `${d} de ${MESES_LARGO[m - 1] ?? ''} de ${y}`;
+};
+
 export default function CapturarFase10Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.ventas.fase10_firmas_programadas" write>
@@ -109,6 +134,7 @@ function CapturarFase10Body() {
   const router = useRouter();
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
+  const { data: me } = useEffectiveUser();
   const ventaId = params.id;
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
@@ -122,6 +148,12 @@ function CapturarFase10Body() {
 
   const [fechaFirma, setFechaFirma] = useState<string>('');
   const [horaFirma, setHoraFirma] = useState<string>('');
+  // Auto-guardado de la fecha/hora de firma (sin cerrar la fase): persiste al
+  // capturar para encender la Póliza de Garantía con esa fecha. El candado se
+  // activa al expedir la póliza o cerrar la fase (solo Dirección reprograma).
+  const [savingFirma, setSavingFirma] = useState(false);
+  const [firmaGuardada, setFirmaGuardada] = useState(false);
+  const [polizaImpresaLocal, setPolizaImpresaLocal] = useState(false);
 
   // ── Crédito directo ──
   const [montoCD, setMontoCD] = useState<string>('');
@@ -151,7 +183,7 @@ function CapturarFase10Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, empresa_id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, poliza_garantia_expedida_at, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -287,6 +319,62 @@ function CapturarFase10Body() {
   const cobertura = creditoInstitucion + totalDepositos;
   const saldo = precio - cobertura;
   const aplicaCD = saldo > 0.0049;
+
+  // ── Candado de la fecha de firma ─────────────────────────────────
+  // Dirección/Admin (espejo de erp.fn_es_direccion) puede reprogramar aun
+  // congelada; los demás roles la editan solo antes de expedir/cerrar.
+  const esDireccion =
+    !!me?.isAdmin || (venta != null && (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id));
+  const polizaExpedida = venta?.poliza_garantia_expedida_at != null || polizaImpresaLocal;
+  const firmaCongelada = polizaExpedida || yaCerrada;
+  const fechaBloqueada = firmaCongelada && !esDireccion;
+  const tieneFechaPersistida = !!venta?.fecha_firma_programada;
+
+  // Persiste fecha/hora de firma sin cerrar la fase. Enciende la póliza con esa
+  // fecha. Si el trigger la rechaza (congelada + rol no Dirección), avisa.
+  const persistFirma = useCallback(
+    async (fecha: string, hora: string): Promise<boolean> => {
+      if (!venta) return false;
+      setSavingFirma(true);
+      setFirmaGuardada(false);
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          fecha_firma_programada: fecha || null,
+          hora_firma_programada: hora || null,
+        })
+        .eq('id', venta.id);
+      setSavingFirma(false);
+      if (upErr) {
+        toast.add({
+          title: 'No se pudo guardar la fecha de firma',
+          description: getSupabaseErrorMessage(upErr, 'Error desconocido.'),
+          type: 'error',
+        });
+        return false;
+      }
+      setVenta((v) =>
+        v ? { ...v, fecha_firma_programada: fecha || null, hora_firma_programada: hora || null } : v
+      );
+      setFirmaGuardada(true);
+      return true;
+    },
+    [sb, venta, toast]
+  );
+
+  // Auto-guardado (debounced) al capturar la fecha/hora — solo si la fecha no
+  // está bloqueada y realmente cambió respecto a lo persistido.
+  useEffect(() => {
+    if (!venta || fechaBloqueada || !fechaFirma) return;
+    const persistedFecha = venta.fecha_firma_programada ?? '';
+    const persistedHora = (venta.hora_firma_programada ?? '').slice(0, 5);
+    if (fechaFirma === persistedFecha && horaFirma === persistedHora) return;
+    const t = setTimeout(() => {
+      void persistFirma(fechaFirma, horaFirma);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [fechaFirma, horaFirma, venta, fechaBloqueada, persistFirma]);
 
   const sumaPlan = useMemo(
     () => planPagos.reduce((s, r) => s + (Number(r.monto) || 0), 0),
@@ -470,10 +558,15 @@ function CapturarFase10Body() {
         faseNombre: 'Firmas Programadas',
         faseposicion: 10,
         docs: [], // el pagaré (si se subió) ya vive en el expediente
-        camposVenta: {
-          fecha_firma_programada: fechaFirma,
-          hora_firma_programada: horaFirma,
-        },
+        // Si la fecha está bloqueada (póliza ya expedida y no eres Dirección)
+        // ya quedó persistida por el auto-guardado: no la reenviamos para no
+        // disparar el trigger de lock durante el cierre de la fase.
+        camposVenta: fechaBloqueada
+          ? {}
+          : {
+              fecha_firma_programada: fechaFirma,
+              hora_firma_programada: horaFirma,
+            },
         notas: null,
         registradoPor: userId,
       });
@@ -494,7 +587,7 @@ function CapturarFase10Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [aplicaCD, cdGuardado, fechaFirma, horaFirma, router, sb, toast, venta]
+    [aplicaCD, cdGuardado, fechaBloqueada, fechaFirma, horaFirma, router, sb, toast, venta]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -525,6 +618,38 @@ function CapturarFase10Body() {
     );
   }
 
+  const fechaFirmaLabel = fechaFirmaLarga(venta.fecha_firma_programada);
+
+  // Botón de la Póliza — solo activo con fecha persistida (el route la rechaza
+  // sin ella). Al abrirlo marcamos "impresa" localmente para reflejar el lock
+  // sin esperar el refetch del sello.
+  const polizaButton = tieneFechaPersistida ? (
+    <a
+      href={`/api/dilesa/ventas/${venta.id}/pdf/poliza-garantia`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => setPolizaImpresaLocal(true)}
+      className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
+    >
+      <Download className="h-3.5 w-3.5" />
+      Póliza de Garantía
+    </a>
+  ) : (
+    <p className="mt-2 text-[11px] text-[var(--text)]/50">
+      Captura la fecha de firma para generar la póliza con esa fecha.
+    </p>
+  );
+
+  const firmaSaveIndicator = savingFirma ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text)]/50">
+      <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
+    </span>
+  ) : firmaGuardada ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+      <Check className="h-3 w-3" /> Fecha guardada
+    </span>
+  ) : null;
+
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
@@ -537,11 +662,52 @@ function CapturarFase10Body() {
       />
 
       {yaCerrada ? (
-        <Banner
-          tone="success"
-          title="Fase 10 ya está cerrada"
-          body="Esta venta ya tiene la firma programada. La siguiente fase es Escriturada."
-        />
+        <div className="space-y-6">
+          <Banner
+            tone="success"
+            title="Fase 10 ya está cerrada"
+            body={
+              fechaFirmaLabel
+                ? `Firma programada para el ${fechaFirmaLabel}. La siguiente fase es Escriturada.`
+                : 'Esta venta ya tiene la firma programada. La siguiente fase es Escriturada.'
+            }
+          />
+
+          <Section title="Documento para el notario">
+            <p className="text-sm text-[var(--text)]/70">
+              La <span className="font-medium">Póliza de Garantía</span> sale con la fecha de la
+              firma. Vuelve a generarla cuando la necesites — saldrá con la misma fecha.
+            </p>
+            {polizaButton}
+          </Section>
+
+          {esDireccion ? (
+            <Section title="Reprogramar firma (Dirección)">
+              <p className="mb-3 flex items-center gap-1.5 text-xs text-[var(--text)]/60">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                La fecha está bloqueada porque la fase ya cerró. Como Dirección puedes
+                reprogramarla; la póliza saldrá con la nueva fecha.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Fecha de firma">
+                  <Input
+                    type="date"
+                    value={fechaFirma}
+                    onChange={(e) => setFechaFirma(e.target.value)}
+                  />
+                </Field>
+                <Field label="Hora de firma">
+                  <Input
+                    type="time"
+                    value={horaFirma}
+                    onChange={(e) => setHoraFirma(e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="mt-2 min-h-[1rem]">{firmaSaveIndicator}</div>
+            </Section>
+          ) : null}
+        </div>
       ) : fase9Cerrada === false ? (
         <Banner
           tone="warning"
@@ -582,6 +748,8 @@ function CapturarFase10Body() {
                   type="date"
                   value={fechaFirma}
                   onChange={(e) => setFechaFirma(e.target.value)}
+                  readOnly={fechaBloqueada}
+                  disabled={fechaBloqueada}
                   required
                 />
               </Field>
@@ -590,26 +758,36 @@ function CapturarFase10Body() {
                   type="time"
                   value={horaFirma}
                   onChange={(e) => setHoraFirma(e.target.value)}
+                  readOnly={fechaBloqueada}
+                  disabled={fechaBloqueada}
                   required
                 />
               </Field>
+            </div>
+            <div className="mt-2 min-h-[1rem]">
+              {fechaBloqueada ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text)]/50">
+                  <Lock className="h-3 w-3 shrink-0" /> La firma ya se expidió o la fase se cerró.
+                  Solo Dirección puede reprogramarla.
+                </span>
+              ) : (
+                firmaSaveIndicator
+              )}
             </div>
           </Section>
 
           <Section title="Documento para el notario">
             <p className="text-sm text-[var(--text)]/70">
               La <span className="font-medium">Póliza de Garantía</span> se genera como PDF para
-              llevarla al expediente del notario.
+              llevarla al expediente del notario, con la fecha de la firma como fecha del documento.
             </p>
-            <a
-              href={`/api/dilesa/ventas/${venta.id}/pdf/poliza-garantia`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Póliza de Garantía
-            </a>
+            {tieneFechaPersistida && !firmaCongelada ? (
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                Al generarla se fija esa fecha (la reimpresión saldrá igual). Después solo Dirección
+                puede reprogramarla.
+              </p>
+            ) : null}
+            {polizaButton}
           </Section>
 
           <Section title="Depósitos del cliente (referencia de cobertura)">

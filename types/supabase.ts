@@ -4975,6 +4975,7 @@ export type Database = {
           numero_escritura: string | null
           ocupacion: string | null
           persona_id: string
+          poliza_garantia_expedida_at: string | null
           precio_asignacion: number | null
           productos_adicionales: number
           promocion_id: string | null
@@ -5062,6 +5063,7 @@ export type Database = {
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id: string
+          poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
           productos_adicionales?: number
           promocion_id?: string | null
@@ -5149,6 +5151,7 @@ export type Database = {
           numero_escritura?: string | null
           ocupacion?: string | null
           persona_id?: string
+          poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
           productos_adicionales?: number
           promocion_id?: string | null

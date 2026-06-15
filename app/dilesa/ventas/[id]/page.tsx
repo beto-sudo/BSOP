@@ -1318,9 +1318,13 @@ function DetailInner() {
                 label="Solicitud de Dictaminación"
               />
             ) : null}
-            {/* La póliza se entrega ya con el crédito validado — desde que la
-                Validación Patronal (F9) quedó cerrada. */}
-            {venta.unidad_id && (venta.fase_posicion ?? 0) >= 9 ? (
+            {/* La póliza lleva la fecha de firma (Fase 10) como fecha del
+                documento, así que se expide una vez programada la firma. Las
+                ventas ya escrituradas (F11+) siempre la conservan accesible aun
+                sin fecha programada — el route cae a la fecha de escrituración
+                (expedientes históricos de Coda; LFPIORPI). */}
+            {venta.unidad_id &&
+            (venta.fecha_firma_programada || (venta.fase_posicion ?? 0) >= 11) ? (
               <PdfDownloadLink
                 ventaId={venta.id}
                 tipo="poliza-garantia"

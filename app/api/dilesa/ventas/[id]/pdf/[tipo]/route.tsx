@@ -105,7 +105,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -378,6 +378,42 @@ export async function GET(
   }
 
   if (tipo === 'poliza-garantia') {
+    // La fecha del documento ES la fecha de firma de la escritura (Fase 10),
+    // no la de impresión: la póliza se firma en la escrituración y debe llevar
+    // esa fecha. Sin fecha programada no se expide — el botón está deshabilitado
+    // en la UI; acá la defensa server-side (la reimpresión sale con la misma).
+    let fechaFirma = venta.fecha_firma_programada;
+
+    // Fallback histórico: las ventas escrituradas importadas de Coda no traen
+    // `fecha_firma_programada` (la columna venía vacía). No podemos negarles la
+    // póliza — LFPIORPI exige conservar el expediente accesible (ver arriba).
+    // Para esas (ya en Fase 11+) usamos la fecha de escrituración: la oficial
+    // `fecha_escritura`, o la fecha de cierre de la Fase 11, o la fase más
+    // temprana con fecha. NO se sella la expedición en este caso (no hay fecha
+    // de firma que congelar; la venta ya está consolidada).
+    if (!fechaFirma && (venta.fase_posicion ?? 0) >= 11) {
+      fechaFirma = venta.fecha_escritura ?? null;
+      if (!fechaFirma) {
+        const { data: fases } = await sb
+          .schema('dilesa')
+          .from('venta_fases')
+          .select('posicion, fecha')
+          .eq('venta_id', id)
+          .is('deleted_at', null)
+          .not('fecha', 'is', null)
+          .order('fecha', { ascending: true });
+        const f11 = fases?.find((f) => f.posicion === 11);
+        fechaFirma = f11?.fecha ?? fases?.[0]?.fecha ?? null;
+      }
+    }
+
+    if (!fechaFirma) {
+      return NextResponse.json(
+        { error: 'Programa la fecha de firma (Fase 10) antes de generar la Póliza de Garantía.' },
+        { status: 400 }
+      );
+    }
+
     // Datos del desarrollador (core.empresas). registro_infonavit/telefono/
     // email_contacto son columnas nuevas (Sprint 7h) — casteamos el row para
     // no depender de la regen de types antes del typecheck local.
@@ -399,15 +435,17 @@ export async function GET(
       email_contacto: string | null;
     } | null;
     const razonSocial = (empresa?.razon_social || empresa?.nombre || 'DILESA').toUpperCase();
-    // Fecha de expedición = hoy (la póliza se expide al imprimirla para el notario).
-    const fechaExpedicion = new Date().toLocaleDateString('es-MX', {
+    // Fecha de expedición = fecha de firma (date 'YYYY-MM-DD' → texto largo
+    // es-MX). Anclada a mediodía para que el corte de día por TZ no la recorra
+    // (Vercel corre en UTC; Matamoros es UTC-5/-6).
+    const fechaFirmaTexto = new Date(`${fechaFirma}T12:00:00`).toLocaleDateString('es-MX', {
       timeZone: 'America/Matamoros',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
     const data: PolizaGarantiaData = {
-      fechaTexto: fechaExpedicion,
+      fechaTexto: fechaFirmaTexto,
       desarrolladorRazonSocial: razonSocial,
       registroInfonavit: empresa?.registro_infonavit ?? null,
       // La póliza la firma `firmante_poliza` (Adalberto en DILESA); cae a
@@ -425,6 +463,41 @@ export async function GET(
       watermark: watermarkText,
     };
     const buf = await renderToBuffer(<PolizaGarantiaPDF data={data} />);
+
+    // Sella la 1.ª expedición. Solo cuando se expide con la fecha de firma REAL
+    // (`fecha_firma_programada`) y la venta sigue activa (una desasignada/
+    // expirada lleva watermark): el sello congela esa fecha (trigger
+    // fn_lock_fecha_firma_poliza) para que la reimpresión salga igual. NO se
+    // sella en el fallback histórico (no hay fecha de firma que congelar). Se
+    // marca con el admin client porque quien imprime puede ser un rol de solo
+    // lectura; best-effort, no bloquea la descarga si falla.
+    if (!watermarkText && venta.fecha_firma_programada) {
+      try {
+        const admin = getSupabaseAdminClient();
+        if (admin) {
+          const { data: pgRow } = await admin
+            .schema('dilesa')
+            .from('ventas')
+            .select('poliza_garantia_expedida_at')
+            .eq('id', id)
+            .maybeSingle();
+          if (!pgRow?.poliza_garantia_expedida_at) {
+            await admin
+              .schema('dilesa')
+              .from('ventas')
+              .update({ poliza_garantia_expedida_at: new Date().toISOString() })
+              .eq('id', id);
+          }
+        } else {
+          console.warn(
+            '[poliza-garantia] admin client no disponible; no se selló poliza_garantia_expedida_at (revisar SUPABASE_SERVICE_ROLE_KEY).'
+          );
+        }
+      } catch {
+        // El sello es best-effort: nunca debe impedir la entrega del PDF.
+      }
+    }
+
     return pdfResponse(buf, `poliza-garantia-${identificacionInventario || id}.pdf`);
   }
 
