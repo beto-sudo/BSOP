@@ -302,7 +302,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     fecha_escritura: string | null;
   };
 
-  const [{ data: empresa }, { data: persona }, { data: unidad }, notaria, { data: abonos }] =
+  const [{ data: empresa }, { data: persona }, { data: unidad }, notaria, { data: abonos }, cuad] =
     await Promise.all([
       admin.schema('core').from('empresas').select('rfc').eq('id', DILESA_EMPRESA_ID).maybeSingle(),
       admin
@@ -327,6 +327,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
         .eq('origen_tipo', 'venta_dilesa')
         .eq('origen_id', ventaId)
         .is('deleted_at', null),
+      // Cuadratura: alimenta el descuento perdonado del check liq_vs_pactado y
+      // el monto de la NC de los checks de facturación (se reusa abajo).
+      cargarCuadraturaVenta(admin, ventaId),
     ]);
 
   const empresaRfc = String((empresa as { rfc: string | null } | null)?.rfc ?? '');
@@ -352,6 +355,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
     depositos: ((abonos ?? []) as { monto_total: number | null }[]).map((a) =>
       Number(a.monto_total ?? 0)
     ),
+    // Descuento perdonado (no cobrado): el hueco legítimo entre liquidaciones y
+    // valor pactado. El cheque a notaría girado NO perdona (entró y salió).
+    descuentoPerdonado: Math.max(0, (cuad?.descuentoAplicado ?? 0) - (cuad?.chequePagado ?? 0)),
   };
 
   // ── PDFs del ciclo ───────────────────────────────────────────────
@@ -447,7 +453,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     //    sin IA). El monto se calcula server-side (control fiscal — no se
     //    confía en un snapshot del cliente). Cuando la operación factura más
     //    de lo que DILESA realmente recibe, exige el XML y PDF de la NC.
-    const cuad = await cargarCuadraturaVenta(admin, ventaId);
+    //    (`cuad` se cargó arriba, junto con el expediente.)
     const { data: factDocs } = await admin
       .schema('erp')
       .from('adjuntos')

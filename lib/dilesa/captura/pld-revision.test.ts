@@ -12,8 +12,10 @@ import {
 /**
  * Fixture basado en un Informe de Avisos SPPLD real (anonimizable): venta
  * de casa en Nava por $899,000, escritura 188 ante notario 25, avalúo
- * $1,021,000, liquidada en dos transferencias que suman $897,378 (la
- * diferencia de $1,622 vs el pactado es un caso real — warning, no error).
+ * $1,021,000, liquidada en dos transferencias que suman $897,378. La
+ * diferencia de $1,622 vs el pactado es el descuento PERDONADO (no cobrado):
+ * descuento aplicado $15,000 − cheque a notaría $13,378. Con eso el aviso
+ * cuadra (caso real de Beto).
  */
 function extraccion(partial: Partial<ExtraccionPld> = {}): ExtraccionPld {
   return {
@@ -64,6 +66,9 @@ function expediente(partial: Partial<ExpedientePld> = {}): ExpedientePld {
     unidadM2Terreno: 105,
     unidadM2Construccion: 56.58,
     depositos: [261049.55, 636328.45],
+    // Descuento $15,000 (gastos escrituración), $13,378 girados a notaría →
+    // $1,622 perdonados = el hueco exacto entre liquidaciones y pactado.
+    descuentoPerdonado: 1622,
     ...partial,
   };
 }
@@ -102,15 +107,20 @@ describe('cruzarPldConExpediente — caso real cuadrado', () => {
     }
   });
 
-  it('la diferencia liquidaciones vs pactado ($1,622) queda como warning visible', () => {
-    const c = porClave(checks, 'liq_vs_pactado');
+  it('liq_vs_pactado pasa: el descuento perdonado ($1,622) explica el hueco', () => {
+    expect(porClave(checks, 'liq_vs_pactado')?.ok).toBe(true);
+  });
+
+  it('un hueco SIN descuento que lo explique sí queda como warning', () => {
+    const sinDesc = cruzarPldConExpediente(extraccion(), expediente({ descuentoPerdonado: 0 }));
+    const c = porClave(sinDesc, 'liq_vs_pactado');
     expect(c?.ok).toBe(false);
     expect(c?.severidad).toBe('warning');
     expect(c?.detalle).toContain('897,378');
   });
 
-  it('veredicto: advertencias (ningún error, un warning)', () => {
-    expect(veredictoDe(checks)).toBe('advertencias');
+  it('veredicto: verde (el caso real cuadra con el descuento)', () => {
+    expect(veredictoDe(checks)).toBe('verde');
   });
 });
 
@@ -181,7 +191,7 @@ describe('veredictoDe', () => {
   it('verde cuando todo pasa', () => {
     const checks = cruzarPldConExpediente(
       extraccion({ valorPactado: 897378 }),
-      expediente({ valorEscrituracion: 897378 })
+      expediente({ valorEscrituracion: 897378, descuentoPerdonado: 0 })
     );
     expect(veredictoDe(checks)).toBe('verde');
   });
@@ -386,8 +396,8 @@ describe('separarChecks (flujo en dos pasos)', () => {
     expect(informe).toHaveLength(informeChecks.length);
     expect(soloAcuse).toHaveLength(acuseChecks.length);
     expect(soloAcuse.every((c) => c.clave.startsWith('acuse_'))).toBe(true);
-    // El informe puede estar en advertencias mientras el acuse está en rojo.
-    expect(veredictoDe(informe)).toBe('advertencias');
+    // El informe puede estar en verde mientras el acuse está en rojo.
+    expect(veredictoDe(informe)).toBe('verde');
     expect(veredictoDe(soloAcuse)).toBe('rojo');
   });
 
