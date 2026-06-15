@@ -102,6 +102,15 @@ export type ExpedientePld = {
   unidadM2Construccion: number | null;
   /** Montos de los depósitos registrados (erp.cxc_pagos de la venta). */
   depositos: number[];
+  /**
+   * Descuento "perdonado" (no cobrado) = descuento aplicado − cheque a notaría
+   * girado, ≥ 0 (del motor de cuadratura). Las liquidaciones del aviso quedan
+   * por debajo del valor pactado EXACTAMENTE en este monto — es el descuento
+   * que no entró como pago (el cheque a notaría sí entró y luego salió). Sin
+   * esto, una operación con descuento marca un falso descuadre por el monto del
+   * descuento perdonado. 0 cuando no hay descuento.
+   */
+  descuentoPerdonado: number;
 };
 
 // ── Normalización ───────────────────────────────────────────────────────
@@ -332,16 +341,23 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
         )
   );
 
-  // 8. Liquidaciones vs valor pactado y vs depósitos registrados (warnings).
+  // 8. Liquidaciones vs valor pactado (neto de descuento) y vs depósitos
+  //    registrados (warnings). El valor pactado es el de escrituración; las
+  //    liquidaciones (lo realmente pagado) quedan por debajo en el descuento
+  //    PERDONADO (no cobrado) — ese hueco es legítimo, no un descuadre.
   const totalLiquidaciones = ext.liquidaciones.reduce((s, l) => s + (l.monto || 0), 0);
+  const perdonado = Math.max(0, exp.descuentoPerdonado);
+  const liquidacionesEsperadas = ext.valorPactado - perdonado;
   checks.push(
-    montosIguales(totalLiquidaciones, ext.valorPactado, 1)
-      ? ok('liq_vs_pactado', 'Σ liquidaciones = valor pactado', 'warning')
+    montosIguales(totalLiquidaciones, liquidacionesEsperadas, 1)
+      ? ok('liq_vs_pactado', 'Σ liquidaciones = valor pactado − descuento', 'warning')
       : falla(
           'liq_vs_pactado',
-          'Σ liquidaciones = valor pactado',
+          'Σ liquidaciones = valor pactado − descuento',
           'warning',
-          `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (diferencia ${money(totalLiquidaciones - ext.valorPactado)}).`
+          perdonado > 0
+            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; con el descuento perdonado de ${money(perdonado)} se esperaban ${money(liquidacionesEsperadas)} (valor pactado ${money(ext.valorPactado)}). Diferencia ${money(totalLiquidaciones - liquidacionesEsperadas)}.`
+            : `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (diferencia ${money(totalLiquidaciones - ext.valorPactado)}).`
         )
   );
   const totalDepositos = exp.depositos.reduce((s, m) => s + (m || 0), 0);
