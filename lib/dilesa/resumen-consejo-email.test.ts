@@ -16,10 +16,13 @@ import {
   armarAsunto,
   armarTuberiaSplit,
   armarPrototiposVivos,
+  armarAbsorcion,
+  armarBacklog,
   type ResumenConsejoData,
   type Cabecera,
   type MargenRaw,
   type InventarioRaw,
+  type VentaBacklogInput,
 } from './resumen-consejo-email';
 import type { KpisDelDia } from './resumen-consejo-kpis';
 
@@ -64,7 +67,9 @@ const DATA_DEMO: ResumenConsejoData = {
   tuberiaViva: [],
   tuberiaHistorico: { clientes: 0, valor: 0 },
   asignaciones: [],
+  backlog: { comprometidas_n: 0, comprometido_monto: 0 },
   avances: [],
+  absorcion: [],
   prototipos: [],
   construccion: { casas_en_obra: 12, vencidas: 2, mo_por_ejecutar: 644988 },
 };
@@ -75,7 +80,9 @@ const EMPTY: ResumenConsejoData = {
   tuberiaViva: [],
   tuberiaHistorico: { clientes: 0, valor: 0 },
   asignaciones: [],
+  backlog: { comprometidas_n: 0, comprometido_monto: 0 },
   avances: [],
+  absorcion: [],
   prototipos: [],
   construccion: { casas_en_obra: 0, vencidas: 0, mo_por_ejecutar: null },
 };
@@ -308,6 +315,136 @@ describe('armarPrototiposVivos — fusión + filtro de vivos', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].en_obra).toBe(3);
     expect(rows[0].utilidad_potencial).toBe(0);
+  });
+});
+
+describe('armarAbsorcion — ritmo de venta y meses de inventario (Sprint 4)', () => {
+  const proyNombre = new Map([
+    ['d1', 'Lomas de los Encinos'],
+    ['d2', 'Lomas del Sol'],
+    ['d3', 'Lomas del Valle'],
+  ]);
+
+  it('calcula ritmo mensual (3M) y meses de inventario por desarrollo', () => {
+    const rows = armarAbsorcion(
+      [
+        { proyecto_id: 'd1', inventario_disponible_venta: 153 },
+        { proyecto_id: 'd2', inventario_disponible_venta: 18 },
+      ],
+      new Map([
+        ['d1', 58],
+        ['d2', 10],
+      ]),
+      proyNombre
+    );
+    expect(rows).toHaveLength(2);
+    const enc = rows.find((r) => r.desarrollo === 'Lomas de los Encinos')!;
+    expect(enc.ritmo_mensual).toBeCloseTo(19.33, 1); // 58 / 3
+    expect(enc.meses_inventario).toBeCloseTo(7.9, 1); // 153 / (58/3)
+  });
+
+  it('meses_inventario null cuando no hubo asignaciones (sin ritmo)', () => {
+    const rows = armarAbsorcion(
+      [{ proyecto_id: 'd3', inventario_disponible_venta: 2 }],
+      new Map(),
+      proyNombre
+    );
+    expect(rows[0].asignadas_3m).toBe(0);
+    expect(rows[0].meses_inventario).toBeNull();
+  });
+
+  it('excluye desarrollos sin inventario disponible y ordena por nombre', () => {
+    const rows = armarAbsorcion(
+      [
+        { proyecto_id: 'd2', inventario_disponible_venta: 18 },
+        { proyecto_id: 'd1', inventario_disponible_venta: 153 },
+        { proyecto_id: 'dx', inventario_disponible_venta: 0 }, // sin inventario → fuera
+      ],
+      new Map([
+        ['d1', 30],
+        ['d2', 6],
+      ]),
+      proyNombre
+    );
+    expect(rows.map((r) => r.desarrollo)).toEqual(['Lomas de los Encinos', 'Lomas del Sol']);
+  });
+});
+
+describe('armarBacklog — ingreso comprometido por escriturar (Sprint 4)', () => {
+  it('suma activas comprometidas (fase ≥ 2) sin fecha de escritura, con fallback de monto', () => {
+    const ventas: VentaBacklogInput[] = [
+      {
+        estado: 'activa',
+        fase_posicion: 3,
+        fecha_escritura: null,
+        valor_escrituracion: 1000000,
+        precio_asignacion: 900000,
+      },
+      {
+        estado: 'activa',
+        fase_posicion: 2,
+        fecha_escritura: null,
+        valor_escrituracion: null,
+        precio_asignacion: 500000,
+      },
+      {
+        estado: 'activa',
+        fase_posicion: 1,
+        fecha_escritura: null,
+        valor_escrituracion: 460000,
+        precio_asignacion: 460000,
+      }, // fase 1 tentativa → fuera
+      {
+        estado: 'activa',
+        fase_posicion: 11,
+        fecha_escritura: '2026-06-01',
+        valor_escrituracion: 800000,
+        precio_asignacion: 800000,
+      }, // ya escriturada → fuera
+      {
+        estado: 'terminada',
+        fase_posicion: 17,
+        fecha_escritura: null,
+        valor_escrituracion: 700000,
+        precio_asignacion: 700000,
+      }, // no viva → fuera
+    ];
+    const b = armarBacklog(ventas);
+    expect(b.comprometidas_n).toBe(2);
+    expect(b.comprometido_monto).toBe(1500000); // 1,000,000 (valor_escr) + 500,000 (fallback precio_asig)
+  });
+
+  it('sin comprometidas devuelve 0/0', () => {
+    expect(armarBacklog([])).toEqual({ comprometidas_n: 0, comprometido_monto: 0 });
+  });
+});
+
+describe('render Sprint 4 — absorción y backlog en el correo', () => {
+  it('incluye la tabla de Absorción y la línea de Backlog cuando hay datos', () => {
+    const data: ResumenConsejoData = {
+      ...EMPTY,
+      absorcion: [
+        {
+          desarrollo: 'Lomas de los Encinos',
+          inv_disponible: 153,
+          asignadas_3m: 58,
+          ritmo_mensual: 58 / 3,
+          meses_inventario: 153 / (58 / 3),
+        },
+      ],
+      backlog: { comprometidas_n: 67, comprometido_monto: 81000000 },
+    };
+    const html = renderResumenConsejoHtml(data, { fechaTitulo: '16 de junio' });
+    expect(html).toContain('Absorción y Meses de Inventario');
+    expect(html).toContain('Lomas de los Encinos');
+    expect(html).toContain('7.9 m');
+    expect(html).toContain('Backlog de Escrituración');
+    expect(html).toContain('67 operaciones comprometidas');
+  });
+
+  it('omite la línea de Backlog cuando no hay comprometidas', () => {
+    const html = renderResumenConsejoHtml(EMPTY, { fechaTitulo: 'x' });
+    expect(html).not.toContain('Backlog de Escrituración');
   });
 });
 
