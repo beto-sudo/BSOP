@@ -1,8 +1,8 @@
 ---
 titulo: 'CxP — Pagos'
 modulo: dilesa.cxp.pagos
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -32,6 +32,15 @@ por estado.
 
 Clic en un renglón abre el detalle: método, referencia, cuenta, fechas, y las
 **facturas aplicadas** a ese pago.
+
+### Control por partida
+
+Cuando las facturas del pago están ligadas a una **partida** de obra, el detalle
+muestra un bloque de **Control por partida**: para cada partida ves lo
+**contratado** (del contrato vigente, o el presupuesto aprobado si no hay
+contrato), lo **abonado antes**, **este pago** y **cómo queda** (total abonado y
+qué porcentaje del contratado representa), con el **historial** de abonos
+anteriores. Sirve para no pasarte de lo contratado en una partida.
 
 ## Estados
 

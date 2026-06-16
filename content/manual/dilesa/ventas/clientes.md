@@ -1,8 +1,8 @@
 ---
 titulo: 'Ventas — Clientes'
 modulo: dilesa.ventas.clientes
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -25,8 +25,10 @@ Cada renglón es un cliente: **Cliente** (nombre + email/teléfono), **# ventas*
 
 - **Buscar / filtrar** — por nombre, o por proyecto donde compró.
 - **Abrir un cliente** — clic en el renglón para ver su **detalle**: datos de
-  contacto y la línea de tiempo de **todas sus ventas** (con proyecto, fecha,
-  vendedor, fase, estado y monto). Desde ahí puedes entrar a cada venta.
+  contacto e identificación (**CURP** e **INE**) y la línea de tiempo de **todas
+  sus ventas** (con proyecto, fecha, vendedor, fase, estado y monto). Desde ahí
+  puedes entrar a cada venta. La cabecera del cliente —con su CURP e INE—
+  acompaña también a cada pantalla de la venta.
 
 ## Preguntas frecuentes
 
