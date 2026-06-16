@@ -34,6 +34,7 @@ import {
   Circle,
   ClipboardCheck,
   HardHat,
+  Lock,
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -902,14 +903,13 @@ function DetailInner() {
                 <ClipboardCheck className="h-4 w-4" /> Programar recepción
               </Button>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                title={`Faltan ${previas.pendientes} tarea(s) de construcción por terminar`}
+              <span
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1 text-[0.8rem] font-medium text-[var(--text)]/40"
+                title={`La recepción se habilita cuando termine la obra. Faltan ${previas.pendientes} tarea(s) de construcción.`}
               >
-                <ClipboardCheck className="h-4 w-4" /> Recibir obra
-              </Button>
+                <Lock className="h-3.5 w-3.5" /> Recepción ·{' '}
+                {previas.total === 0 ? 'sin plantilla' : `faltan ${previas.pendientes}`}
+              </span>
             )
           ) : null}
           <Badge tone={ESTADO_TONE[obra.estado] ?? 'neutral'}>
