@@ -358,6 +358,7 @@ function DetailInner() {
   // Scope del rol Vendedor: solo sus propias ventas (pedido de Beto).
   const scopeVendedor = useScopeVendedorDilesa();
   const [cuadInputs, setCuadInputs] = useState<CuadraturaInputsStr>({
+    descuentoTotal: '',
     descuentoPrecio: '',
     descuentoEquipamiento: '',
     descuentoGastosEscr: '',
@@ -446,6 +447,7 @@ function DetailInner() {
       setVenta(ventaRow);
       const numStr = (n: number | null): string => (n == null ? '' : String(n));
       setCuadInputs({
+        descuentoTotal: numStr(ventaRow.descuento_total),
         descuentoPrecio: numStr(ventaRow.descuento_precio),
         descuentoEquipamiento: numStr(ventaRow.descuento_equipamiento),
         descuentoGastosEscr: numStr(ventaRow.descuento_gastos_escrituracion),
@@ -902,11 +904,9 @@ function DetailInner() {
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
         // Derivado del catálogo de tipos de crédito (auto, no capturado).
         apoyoInfonavit,
-        descuentoOtorgadoTotal:
-          (Number(cuadInputs.descuentoPrecio) || 0) +
-          (Number(cuadInputs.descuentoEquipamiento) || 0) +
-          (Number(cuadInputs.descuentoGastosEscr) || 0) +
-          (Number(cuadInputs.descuentoNotaCredito) || 0),
+        // `descuento_total` autoritativo (amarre Sprint 1). Los buckets editados
+        // arriba reparten ese total; el guardado (RPC) valida sum=total.
+        descuentoOtorgadoTotal: Number(cuadInputs.descuentoTotal) || 0,
         // Tope confiable SOLO desde la promoción de la solicitud; el máximo
         // legacy de Coda no es de fiar (159/315 ventas lo exceden por mal dato).
         descuentoMaximoAutorizado: promo ? promo.monto : null,

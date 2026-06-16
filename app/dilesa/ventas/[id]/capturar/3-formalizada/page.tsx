@@ -222,6 +222,24 @@ function CapturarFase3Body() {
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
 
+      // El descuento va por la RPC auditada (no por marcarFase): registra el
+      // cambio en core.audit_log. Modo total-only (sin desglose) — el reparto
+      // en buckets lo hace Dirección en la pestaña Cuadratura.
+      const { error: descErr } = await sb.schema('dilesa').rpc('fn_actualizar_descuentos_venta', {
+        p_venta_id: venta.id,
+        p_descuento_total: descuento,
+        p_motivo: 'Captura en Formalizada (Fase 3)',
+      });
+      if (descErr) {
+        setSubmitting(false);
+        toast.add({
+          title: 'No se pudo guardar el descuento',
+          description: getSupabaseErrorMessage(descErr, 'Error desconocido.'),
+          type: 'error',
+        });
+        return;
+      }
+
       const result = await marcarFase(sb, {
         ventaId: venta.id,
         faseNombre: 'Formalizada',
@@ -229,7 +247,7 @@ function CapturarFase3Body() {
         docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {
           precio_asignacion: precio,
-          descuento_total: descuento,
+          // descuento_total se persiste por la RPC auditada (arriba), no aquí.
           // fecha del contrato — se guarda en venta_fases.fecha vía el override más abajo
         },
         notas:
