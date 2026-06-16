@@ -4401,6 +4401,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           empresa_id: string
+          hito_recepcion: string | null
           id: string
           nombre: string
           updated_at: string
@@ -4410,6 +4411,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
+          hito_recepcion?: string | null
           id?: string
           nombre: string
           updated_at?: string
@@ -4419,6 +4421,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
+          hito_recepcion?: string | null
           id?: string
           nombre?: string
           updated_at?: string
