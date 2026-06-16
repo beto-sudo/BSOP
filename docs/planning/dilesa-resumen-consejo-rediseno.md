@@ -141,6 +141,24 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 
 ## Bitácora
 
+- **2026-06-16 (auditoría de consistencia "casas en obra" + blindaje + fix de avance)** —
+  Beto detectó números distintos para los mismos conceptos comparando el módulo
+  Construcción con un preview del correo. Auditoría (workflow + queries a prod):
+  los datos REALES **cuadran** (12 casas en obra = 2 Lomas de los Encinos + 10
+  Lomas del Sol) y las 3 vistas derivan de la MISMA fuente física
+  `dilesa.construccion.estado='en_progreso'` (gracias al fix del 12-jun
+  `20260612025311` que antes daba 11 vs 12). La discrepancia que vio Beto era un
+  **preview MOCK con datos de relleno** que mandé sin rotular (error de
+  comunicación, no del correo). **Blindaje (en este PR):** la línea "N casas en
+  obra" del correo ahora cuenta **unidades distintas** (suma de
+  `v_proyecto_avances.casas_en_construccion`) en vez de **filas** de
+  `v_contratista_obra.viviendas` — elimina la fragilidad de doble conteo si una
+  casa tuviera 2 arranques (hoy 0 multi-módulo, verificado). Vencidas/MO siguen de
+  contratista. **Fix relacionado (PR aparte #913, aplicado a prod):** obras
+  terminadas/DTU quedaban en 97.53%/99.86% por desacople estado↔avance; corregido
+  por DB (invariante "estado post-obra ⇒ 100%" en `fn_calcular_avance_construccion`
+  - trigger) + backfill de 65 obras. Mejora de paso el `avance_const_pct` del correo.
+
 - **2026-06-16 (Sprint 4 — absorción + meses de inventario + backlog, en preview)** —
   ③ Proyectos suma **Absorción y Meses de Inventario** por desarrollo (ritmo =
   asignaciones de los últimos 3 meses ÷ 3; meses de inventario = disponible ÷

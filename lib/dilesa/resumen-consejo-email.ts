@@ -1025,10 +1025,19 @@ export async function fetchResumenConsejoData(
     asignaciones.push(...[...acc.values()].sort((x, y) => x.nombre.localeCompare(y.nombre)));
   }
 
-  // Construcción: línea de excepción (agregado de v_contratista_obra).
+  // Construcción: línea de excepción. "Casas en obra" cuenta UNIDADES distintas
+  // en obra física (suma de v_proyecto_avances.casas_en_construccion) — misma
+  // fuente y grano que Avance/Inventario, para que las tres secciones cuadren
+  // siempre. NO se suma v_contratista_obra.viviendas: esa vista cuenta FILAS de
+  // construcción (una casa con 2 arranques contaría doble). Vencidas y MO por
+  // ejecutar sí salen de contratista (son métricas de contrato).
   const contratistaRows = (contratistaRes.data ?? []) as Record<string, unknown>[];
+  const casasEnObra = (avancesRes.data ?? []).reduce(
+    (s: number, a: Record<string, unknown>) => s + Number(a.casas_en_construccion ?? 0),
+    0
+  );
   const construccion: ConstruccionResumen = {
-    casas_en_obra: contratistaRows.reduce((s, c) => s + Number(c.viviendas ?? 0), 0),
+    casas_en_obra: casasEnObra,
     vencidas: contratistaRows.reduce((s, c) => s + Number(c.vencidas ?? 0), 0),
     mo_por_ejecutar: contratistaRows.length
       ? contratistaRows.reduce(
