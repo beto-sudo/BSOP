@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 /**
  * Bandeja de Atención a Clientes (Ciori) — cola de trabajo por momento, como
  * VISTA sobre datos existentes (sin duplicar captura): cada tarjeta enlaza a
