@@ -3,11 +3,11 @@
 **Slug:** `dilesa-ventas-captura-colaborativa`
 **Empresas:** DILESA (el patrón de captura por documento es replicable a futuros pipelines de otras empresas)
 **Schemas afectados:** principalmente UI (Next.js); `erp.adjuntos` (reuso, ya tiene `uploaded_by`), `dilesa.ventas` / `dilesa.venta_fases` (reuso), posible tabla nueva `dilesa.venta_fase_revisiones` (Sprint 3, veredicto IA persistido)
-**Estado:** in_progress
-**Próximo hito:** merge S4c (flujo PLD en dos pasos, PR en revisión) → prueba en prod con PLD y acuse reales → cierre de iniciativa
+**Estado:** done
+**Próximo hito:** — (S1-S4c + estados-venta + fix NC entregados y en prod; prueba end-to-end en F13 con PLD y acuse reales validada por Beto)
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-06-13
+**Última actualización:** 2026-06-16 (CERRADA — prueba en prod OK con PLD + acuse reales; captura colaborativa, XML CFDI automático y revisión asistida PLD operando en las 17 fases de venta)
 
 ## Problema
 
@@ -220,8 +220,12 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
 
 - [x] ~~¿Exigir también el acuse de envío SPPLD?~~ → SÍ (decisión Beto
       2026-06-12, implementado en S4a como requerido)
-- [ ] ¿El override de Dirección se notifica (email al estilo resumen diario)
-      o basta el registro en audit?
+- [x] ~~¿El override de Dirección se notifica (email al estilo resumen diario)
+      o basta el registro en audit?~~ → Se cierra con **audit-only** (el
+      comportamiento entregado): cada override queda en `core.audit_log` con
+      motivo. La notificación por email del override queda como mejora futura
+      opcional (no bloqueante) — si Dirección la pide, es un follow-up suelto
+      sobre el catálogo de notificaciones existente.
 
 ## Métricas de éxito
 
@@ -231,6 +235,19 @@ Dirección, registrado. Cero trabajo perdido, cero captura a ciegas.
   cada cierre (S3).
 
 ## Bitácora
+
+- **2026-06-16** — **CERRADA.** Beto confirmó la prueba end-to-end en
+  producción (F13 de una venta real con su Aviso PLD + acuse SPPLD reales):
+  captura colaborativa con autoría/timestamp por documento, montos derivados
+  del XML CFDI sin captura manual, revisión asistida (determinista para CFDI +
+  IA con visión para el PLD), flujo PLD en dos pasos (revisar→congelar→
+  presentar→acuse) y gate de cierre con override de Dirección — todo
+  funcionando. Calibración del prompt del acuse validada contra documento real.
+  Todos los PRs de la iniciativa mergeados y en prod (S1 #860, S2 #862, S3 #864,
+  S4a #868, S4b #870, S4c #871, estados-venta #874, fix NC #879). La pregunta
+  abierta del override se resuelve audit-only (email queda como mejora futura
+  opcional). Sin pendientes de código ni de datos. Barrido de Reminders: sin
+  items que matcheen la iniciativa.
 
 - **2026-06-13** — Fix F13 (PR en revisión): la revisión asistida ahora
   considera la nota de crédito que exige la cuadratura. Nuevo grupo `fact_*`
