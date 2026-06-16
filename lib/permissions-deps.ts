@@ -83,6 +83,7 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.cxp.programacion': [],
   'dilesa.cxp.proveedores': [],
   'dilesa.manual': [],
+  'dilesa.atencion_clientes': [],
   'dilesa.portafolio': [],
   'dilesa.proveedores': [],
   'dilesa.ruv': [],

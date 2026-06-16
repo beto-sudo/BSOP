@@ -107,6 +107,9 @@ export const NAV_ITEMS: NavItem[] = [
           // RUV (Registro Único de Vivienda · INFONAVIT) — módulo propio,
           // operado por Asistente de Proyectos. Iniciativa `dilesa-ruv`.
           { label: 'RUV', href: '/dilesa/ruv' },
+          // Atención a Clientes — bandeja de Ciori (recepción de obra →
+          // pre-entrega → entrega → conformidad). Iniciativa `dilesa-atencion-clientes`.
+          { label: 'Atención a Clientes', href: '/dilesa/atencion-clientes' },
         ],
       },
     ],
