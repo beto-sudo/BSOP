@@ -171,6 +171,86 @@ export function armarPrototiposVivos(
   return rows.sort((a, b) => b.utilidad_potencial - a.utilidad_potencial);
 }
 
+/** Absorción y meses de inventario por desarrollo (Sprint 4 — tendencia, sin delta diario). */
+export type AbsorcionRow = {
+  desarrollo: string;
+  inv_disponible: number;
+  asignadas_3m: number;
+  ritmo_mensual: number;
+  /** inventario ÷ ritmo mensual; null si no hubo asignaciones en la ventana (sin ritmo). */
+  meses_inventario: number | null;
+};
+
+/** Ventana de absorción en meses (3M móvil). */
+export const ABSORCION_VENTANA_MESES = 3;
+
+/**
+ * Absorción = ritmo de venta (asignaciones) por desarrollo en los últimos
+ * `ABSORCION_VENTANA_MESES` meses; meses de inventario = inventario disponible ÷
+ * ritmo mensual. Solo desarrollos con inventario disponible (los agotados no
+ * informan). Es una TENDENCIA (3M móvil), no un delta diario — el doc fija que
+ * los ratios nunca llevan flecha ▲▼ del día. Ordena por desarrollo para cruzar
+ * con la tabla "Avance por Desarrollo" de arriba.
+ */
+export function armarAbsorcion(
+  avances: { proyecto_id: string; inventario_disponible_venta: number | null }[],
+  asignadas3mPorProyecto: Map<string, number>,
+  proyNombre: Map<string, string>
+): AbsorcionRow[] {
+  const rows: AbsorcionRow[] = [];
+  for (const a of avances) {
+    const inv = Number(a.inventario_disponible_venta ?? 0);
+    if (inv <= 0) continue; // desarrollo sin inventario disponible → fuera
+    const asignadas = asignadas3mPorProyecto.get(a.proyecto_id) ?? 0;
+    const ritmo = asignadas / ABSORCION_VENTANA_MESES;
+    rows.push({
+      desarrollo: proyNombre.get(a.proyecto_id) ?? '—',
+      inv_disponible: inv,
+      asignadas_3m: asignadas,
+      ritmo_mensual: ritmo,
+      meses_inventario: ritmo > 0 ? inv / ritmo : null,
+    });
+  }
+  return rows.sort((a, b) => a.desarrollo.localeCompare(b.desarrollo));
+}
+
+export type VentaBacklogInput = {
+  estado: string | null;
+  fase_posicion: number | null;
+  fecha_escritura: string | null;
+  valor_escrituracion: number | null;
+  precio_asignacion: number | null;
+};
+
+/** Backlog de escrituración: ingreso comprometido por cerrar (# y $). */
+export type BacklogEscrituracion = {
+  comprometidas_n: number;
+  comprometido_monto: number;
+};
+
+/** Fase mínima para considerar una venta "comprometida" (≥ Asignada; la fase 1
+ * "Solicitud de Asignación" aún es tentativa y no entra al backlog). */
+export const BACKLOG_FASE_MIN = 2;
+
+/**
+ * Backlog de escrituración = ventas vivas (estado 'activa'), comprometidas
+ * (fase ≥ Asignada) y aún sin escriturar (fecha_escritura NULL). Monto a
+ * valor de escrituración (o precio de asignación si aún no hay). Es el ingreso
+ * casi-seguro en camino. Tendencia, sin delta diario.
+ */
+export function armarBacklog(ventas: VentaBacklogInput[]): BacklogEscrituracion {
+  let n = 0;
+  let monto = 0;
+  for (const v of ventas) {
+    if (v.estado !== 'activa') continue;
+    if (v.fecha_escritura) continue; // ya escriturada → fuera del backlog
+    if ((v.fase_posicion ?? 0) < BACKLOG_FASE_MIN) continue; // tentativa → fuera
+    n += 1;
+    monto += Number(v.valor_escrituracion ?? v.precio_asignacion ?? 0);
+  }
+  return { comprometidas_n: n, comprometido_monto: monto };
+}
+
 export type ResumenConsejoData = {
   // ① Tesorería
   saldos: SaldoBancoRow[]; // vacío hasta que tesoreria capture saldos
@@ -178,8 +258,10 @@ export type ResumenConsejoData = {
   tuberiaViva: TuberiaRow[];
   tuberiaHistorico: { clientes: number; valor: number };
   asignaciones: AsignacionRow[];
+  backlog: BacklogEscrituracion;
   // ③ Proyectos
   avances: AvanceRow[];
+  absorcion: AbsorcionRow[];
   prototipos: PrototipoVivoRow[];
   // ④ Construcción
   construccion: ConstruccionResumen;
@@ -618,6 +700,42 @@ function renderPrototipos(rows: PrototipoVivoRow[]): string {
   return tabla + totalLinea;
 }
 
+function renderAbsorcion(rows: AbsorcionRow[]): string {
+  const tabla = renderSection(
+    'Absorción y Meses de Inventario',
+    [
+      { label: 'Desarrollo' },
+      { label: 'Disponible', align: 'right' },
+      { label: 'Asignadas 3M', align: 'right' },
+      { label: 'Ritmo/mes', align: 'right' },
+      { label: 'Meses inv.', align: 'right' },
+    ],
+    rows.map((r) => [
+      r.desarrollo,
+      fmtInt(r.inv_disponible),
+      fmtInt(r.asignadas_3m),
+      r.ritmo_mensual > 0 ? r.ritmo_mensual.toFixed(1) : '—',
+      r.meses_inventario != null ? `${r.meses_inventario.toFixed(1)} m` : '—',
+    ])
+  );
+  if (rows.length === 0) return tabla;
+  const nota = `
+    <div style="padding:0 32px 6px;">
+      <p style="margin:0;font-size:11px;color:#94a3b8;">Ritmo = asignaciones de los últimos 3 meses ÷ 3. Meses de inventario = disponible ÷ ritmo (a este paso de venta).</p>
+    </div>`;
+  return tabla + nota;
+}
+
+function renderBacklog(b: BacklogEscrituracion): string {
+  if (b.comprometidas_n === 0) return '';
+  return `
+    <div style="padding:12px 32px 4px;">
+      <h2 style="margin:0 0 6px;font-size:14px;font-weight:700;color:#1a1a2e;">Backlog de Escrituración</h2>
+      <p style="margin:0;font-size:13px;color:#1e293b;">${fmtInt(b.comprometidas_n)} operaciones comprometidas por escriturar · ${fmtMoney(b.comprometido_monto)}</p>
+      <p style="margin:2px 0 0;font-size:11px;color:#94a3b8;">Ventas vivas (asignadas en adelante) sin escritura — ingreso comprometido por cerrar.</p>
+    </div>`;
+}
+
 function renderConstruccion(c: ConstruccionResumen): string {
   const vencidas =
     c.vencidas > 0
@@ -658,11 +776,13 @@ export function renderResumenConsejoHtml(
     renderSectionBand('Ventas') +
     renderTuberiaViva(data.tuberiaViva) +
     renderHistoricoLinea(data.tuberiaHistorico) +
-    renderAsignaciones(data.asignaciones);
+    renderAsignaciones(data.asignaciones) +
+    renderBacklog(data.backlog);
 
   const proyectos =
     renderSectionBand('Proyectos') +
     renderAvances(data.avances) +
+    renderAbsorcion(data.absorcion) +
     renderPrototipos(data.prototipos);
 
   const construccion = renderSectionBand('Construcción') + renderConstruccion(data.construccion);
@@ -754,6 +874,12 @@ export async function fetchResumenConsejoData(
   const inicioMes = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     .toISOString()
     .slice(0, 10);
+  // Ventana de absorción: 3 meses móviles hasta hoy.
+  const inicio3m = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - ABSORCION_VENTANA_MESES, now.getUTCDate())
+  )
+    .toISOString()
+    .slice(0, 10);
 
   const [
     proyectosRes,
@@ -766,6 +892,7 @@ export async function fetchResumenConsejoData(
     fasesMesRes,
     contratistaRes,
     saldosRes,
+    asign3mRes,
   ] = await Promise.all([
     dilesa.from('proyectos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
     dilesa.from('v_proyecto_avances').select('*').eq('empresa_id', empresaId),
@@ -774,7 +901,9 @@ export async function fetchResumenConsejoData(
     dilesa.from('productos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
     dilesa
       .from('ventas')
-      .select('estado,fase_actual,fase_posicion,valor_escrituracion')
+      .select(
+        'estado,fase_actual,fase_posicion,valor_escrituracion,fecha_escritura,precio_asignacion'
+      )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null),
     dilesa
@@ -791,6 +920,13 @@ export async function fetchResumenConsejoData(
       .in('fase', ['Asignada', 'Escriturada']),
     dilesa.from('v_contratista_obra').select('*').eq('empresa_id', empresaId),
     erp.from('v_cuenta_saldo_actual').select('*').eq('empresa_id', empresaId),
+    dilesa
+      .from('venta_fases')
+      .select('venta_id')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .eq('fase', 'Asignada')
+      .gte('fecha', inicio3m),
   ]);
 
   const proyNombre = new Map<string, string>(
@@ -909,7 +1045,62 @@ export async function fetchResumenConsejoData(
     fecha_saldo: s.fecha_saldo as string | null,
   }));
 
-  return { saldos, tuberiaViva, tuberiaHistorico, asignaciones, avances, prototipos, construccion };
+  // Absorción 3M: # ventas DISTINTAS asignadas en los últimos 3 meses por
+  // desarrollo (cada venta cuenta 1 vez aunque tenga varias filas 'Asignada').
+  // Liga venta → unidad → proyecto; meses de inventario los arma armarAbsorcion.
+  const absorcionVentaIds = [
+    ...new Set((asign3mRes.data ?? []).map((f: { venta_id: string }) => f.venta_id)),
+  ];
+  const asignadas3mPorProyecto = new Map<string, number>();
+  if (absorcionVentaIds.length) {
+    const vtsAbs = await dilesa
+      .from('ventas')
+      .select('id,unidad_id')
+      .in('id', absorcionVentaIds)
+      .is('deleted_at', null);
+    const unidadIdsAbs = [
+      ...new Set(
+        (vtsAbs.data ?? []).map((v: { unidad_id: string | null }) => v.unidad_id).filter(Boolean)
+      ),
+    ] as string[];
+    const unidsAbs = unidadIdsAbs.length
+      ? await dilesa.from('unidades').select('id,proyecto_id').in('id', unidadIdsAbs)
+      : { data: [] };
+    const unidadProyecto = new Map<string, string>(
+      (unidsAbs.data ?? []).map((u: { id: string; proyecto_id: string | null }) => [
+        u.id,
+        u.proyecto_id ?? '',
+      ])
+    );
+    for (const v of vtsAbs.data ?? []) {
+      const proy = unidadProyecto.get((v as { unidad_id: string | null }).unidad_id ?? '');
+      if (!proy) continue;
+      asignadas3mPorProyecto.set(proy, (asignadas3mPorProyecto.get(proy) ?? 0) + 1);
+    }
+  }
+  const absorcion = armarAbsorcion(
+    (avancesRes.data ?? []) as {
+      proyecto_id: string;
+      inventario_disponible_venta: number | null;
+    }[],
+    asignadas3mPorProyecto,
+    proyNombre
+  );
+
+  // Backlog de escrituración: ventas vivas comprometidas sin escriturar (reusa ventasRes).
+  const backlog = armarBacklog((ventasRes.data ?? []) as VentaBacklogInput[]);
+
+  return {
+    saldos,
+    tuberiaViva,
+    tuberiaHistorico,
+    asignaciones,
+    backlog,
+    avances,
+    absorcion,
+    prototipos,
+    construccion,
+  };
 }
 
 // ── Envío ────────────────────────────────────────────────────────────────────

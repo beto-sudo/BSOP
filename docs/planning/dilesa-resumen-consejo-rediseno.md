@@ -2,12 +2,12 @@
 
 **Slug:** `dilesa-resumen-consejo-rediseno`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa` (tabla `kpi_snapshot` para deltas — ya creada; vista nueva `v_absorcion_desarrollo` en Sprint 4; lectura de `v_proyecto_avances`, `ventas`, `venta_fases`, `venta_fase_catalogo`, `v_inventario_prototipo`, `v_margen_prototipo`, `v_contratista_obra`, `v_unidad_hold_queue`), `erp` (lectura `v_cuenta_saldo_actual`, `cxc_cargos`, `cxc_pagos`, `cxp_pagos`), `core` (`notification_log`). Mayormente render del correo (`lib/dilesa/resumen-consejo-email.ts`) + el cron. La fusión Margen+Inventario y el split de tubería se hacen en JS (sin vista nueva).
+**Schemas afectados:** `dilesa` (tabla `kpi_snapshot` para deltas — ya creada; lectura de `v_proyecto_avances`, `ventas`, `venta_fases`, `venta_fase_catalogo`, `unidades`, `proyectos`, `v_inventario_prototipo`, `v_margen_prototipo`, `v_contratista_obra`, `v_unidad_hold_queue`), `erp` (lectura `v_cuenta_saldo_actual`, `cxc_cargos`, `cxc_pagos`, `cxp_pagos`), `core` (`notification_log`). Mayormente render del correo (`lib/dilesa/resumen-consejo-email.ts`) + el cron. La fusión Margen+Inventario, el split de tubería y **la absorción + meses de inventario + backlog (Sprint 4)** se hacen en JS (sin vista nueva).
 **Estado:** in_progress
-**Próximo hito:** Sprint 4 — KPIs de tendencia (absorción + meses de inventario por desarrollo + backlog de escrituración). Sprint 3 (tarjeta ejecutiva + asunto dinámico + alertas + CxC + frescura) en preview de revisión de Beto.
+**Próximo hito:** Sprint 5 — cutover + closeout (smoke E2E lado a lado + revisar preview con Beto + cerrar iniciativa). Sprint 4 (absorción + meses de inventario + backlog de escrituración) en preview de revisión de Beto.
 **Dueño:** Beto
 **Creada:** 2026-06-13
-**Última actualización:** 2026-06-13 (Sprint 3 en preview)
+**Última actualización:** 2026-06-16 (Sprint 4 en preview — absorción/meses de inventario/backlog en JS puro)
 
 > **Continuación de** [`dilesa-resumen-consejo`](dilesa-resumen-consejo.md) (cerrada 2026-06-08, v1 = paridad 1:1 con Coda). Aquella es la **referencia técnica** del correo (7 bloques, vistas, cron, guard de domingo, fechas DST). Esta iniciativa es la **Fase 2** que aquel doc dejó anotada: pasar de "réplica de Coda" a un reporte que el Consejo espere a diario.
 
@@ -141,6 +141,25 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 
 ## Bitácora
 
+- **2026-06-16 (Sprint 4 — absorción + meses de inventario + backlog, en preview)** —
+  ③ Proyectos suma **Absorción y Meses de Inventario** por desarrollo (ritmo =
+  asignaciones de los últimos 3 meses ÷ 3; meses de inventario = disponible ÷
+  ritmo) y ② Ventas suma la línea **Backlog de Escrituración** (ingreso
+  comprometido por cerrar = ventas vivas en fase ≥ Asignada sin escriturar,
+  valuadas a `valor_escrituracion`/`precio_asignacion`). Ambas como **tendencia,
+  sin delta diario ▲▼** (disciplina del CFO: los ratios no llevan flecha del
+  día). Funciones puras `armarAbsorcion`/`armarBacklog` + render
+  (`renderAbsorcion`/`renderBacklog`) + extensión de `fetchResumenConsejoData`
+  (query `venta_fases` fase='Asignada' 3M + liga venta→unidad→proyecto;
+  `ventas` extendida con `fecha_escritura`/`precio_asignacion`). **7 tests
+  nuevos** (41 del módulo verdes), typecheck/lint/format/coverage OK.
+  **Validado contra prod (DRY RUN 2026-06-16):** Lomas de los Encinos 153 disp /
+  58 asignadas 3M → 7.9 meses; Lomas del Sol 18 / 10 → 5.4 meses; Lomas del Valle
+  2 / 0 → sin ritmo. Backlog ~67 ops / ~$81M (corte fase ≥ 2 excluye "Solicitud
+  de Asignación" tentativa, evita inflar). PR **sin auto-merge** (D6, correo
+  consejo-facing) — revisión en preview de Vercel. Pendiente vivo: Sprint 5
+  (cutover + closeout). Ver decisión registrada 2026-06-16 (JS vs vista SQL).
+
 - **2026-06-13 (hotfix — CxC marcado PRELIMINAR + limpieza de cargo de prueba)** — Revisando el "vencido" con Beto: (1) un cargo huérfano de la venta de prueba "ADALBERTO PRUEBA PRUEBA" ($909K) seguía vivo aunque la venta ya estaba hard-borrada — soft-delete del cargo (`erp.cxc_cargos` `fea0755c…`, reversible, con nota de auditoría); el vencido bajó $8.2M → $7.31M. (2) Hallazgo de fondo: los cargos de CxC están completos (plan de pagos entero) pero **los pagos no están cargados** — sobre todo los desembolsos de crédito Infonavit/banco; muchas ventas muestran solo el enganche o $0 pagado, y hay ventas `terminada` con saldo abierto (imposible: no se entrega sin pago completo). O sea el "abierto/vencido" sobreestima — es backlog de la iniciativa `cxc` (in_progress), no cartera real. **Decisión de Beto:** marcar CxC como **"preliminar — en reconciliación"** en el correo (flag `cxc_preliminar`/`CXC_EN_RECONCILIACION`): muestra solo el abierto con la etiqueta, **no emite alerta ni asunto de cobranza vencida** (el vencido es mayormente fantasma). Apagar el flag cuando la reconciliación de pagos esté al día.
 
 - **2026-06-13 (Sprint 3 — cerebro del correo, en preview)** — Tarjeta ejecutiva "Hoy en DILESA" (6 cifras: ventas/escrituras/cobrado/liquidez/CxC/obra) con delta ▲▼ vs el snapshot previo; **asunto dinámico** (titular del día, reemplaza el template estático); **franja de alertas por excepción** (cap 3: cobranza vencida, saldo stale, obra vencida — vacía no se imprime); **semáforo de frescura** en saldos (verde ≤2d / ámbar ≤7 / rojo >7, el stale se marca); **línea de Cobranza (CxC)** en Tesorería (abierto/cobrado mes/vencido/CxP). El cron computa la cabecera (reusa `computeKpisDelDia` + `fetchSnapshotPrevio` + 2 queries de mes/CxP) y la pasa al render. **Corrección de datos:** la cobranza vencida real es **$8.2M** (no $47.5M — el audit incluía cargos `cancelado`); abierto **$87.5M**. 11 tests nuevos del módulo. Pendiente menor de S3: deep-links por sección + "número del día" (polish, no bloquea). PR pendiente de revisión de Beto en preview (D6). Los deltas ▲▼ salen sin flecha el día 1 (snapshot previo aún no existe) y se activan desde el 2026-06-14.
@@ -154,3 +173,5 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 ## Decisiones registradas
 
 - **2026-06-13 — D1 dinero arriba / D2 todo diario / D3 contratistas a excepción / D4 objetivos pendientes / D5 dos capas juntas / D6 preview antes de mergear el correo vivo.** Ver "Decisiones registradas (cierre de alcance)" arriba.
+
+- **2026-06-16 — Absorción/meses de inventario/backlog en JS, no como vista SQL.** El plan listaba una vista `dilesa.v_absorcion_desarrollo`; se implementa en JS puro (`armarAbsorcion`/`armarBacklog` + cómputo en `fetchResumenConsejoData`) por consistencia con S2 (Margen+Inventario y split de tubería también en JS), para evitar una migración a prod (menos fricción/riesgo) y para que el **preview de Vercel renderice contra prod de inmediato** — clave porque el correo es consejo-facing y se revisa en preview (D6). Mismo outcome. Si a futuro Analytics/BI necesita la absorción como vista, se crea aparte. La absorción cuenta **ventas distintas** asignadas en la ventana (no eventos de fase): una venta con varias filas 'Asignada' cuenta 1 vez.
