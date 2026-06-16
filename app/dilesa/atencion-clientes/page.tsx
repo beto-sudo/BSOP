@@ -18,6 +18,7 @@ import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 type Obra = {
@@ -46,6 +47,14 @@ type Encuesta = {
   intentos: number | null;
 };
 
+type Kpi = {
+  encuestas_respondidas: number | null;
+  encuestas_total: number | null;
+  nps_prom: number | null;
+  calif_vivienda_prom: number | null;
+  calif_proceso_prom: number | null;
+};
+
 export default function AtencionClientesPage() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.atencion_clientes">
@@ -58,6 +67,7 @@ function Body() {
   const [obras, setObras] = useState<Obra[]>([]);
   const [ventas, setVentas] = useState<VentaEntrega[]>([]);
   const [encuestas, setEncuestas] = useState<Encuesta[]>([]);
+  const [kpi, setKpi] = useState<Kpi | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,10 +75,11 @@ function Body() {
     let activo = true;
     (async () => {
       const sb = createSupabaseBrowserClient();
-      const [o, v, e] = await Promise.all([
+      const [o, v, e, k] = await Promise.all([
         sb.schema('dilesa').from('v_ac_obras_por_recibir').select('*'),
         sb.schema('dilesa').from('v_ac_ventas_entrega').select('*'),
         sb.schema('dilesa').from('v_ac_encuestas_pendientes').select('*'),
+        sb.schema('dilesa').from('v_ac_kpis').select('*').maybeSingle(),
       ]);
       if (!activo) return;
       const firstErr = o.error ?? v.error ?? e.error;
@@ -80,6 +91,7 @@ function Body() {
       setObras((o.data ?? []) as Obra[]);
       setVentas((v.data ?? []) as VentaEntrega[]);
       setEncuestas((e.data ?? []) as Encuesta[]);
+      setKpi((k.data as Kpi | null) ?? null);
       setLoading(false);
     })();
     return () => {
@@ -89,6 +101,36 @@ function Body() {
 
   const preEntrega = useMemo(() => ventas.filter((v) => v.cola === 'pre_entrega'), [ventas]);
   const entrega = useMemo(() => ventas.filter((v) => v.cola === 'entrega'), [ventas]);
+
+  const kpis: ModuleKpi[] = useMemo(() => {
+    const respondidas = kpi?.encuestas_respondidas ?? 0;
+    const nps = kpi?.nps_prom;
+    const calif = kpi?.calif_vivienda_prom;
+    return [
+      { key: 'obras', label: 'Obras por recibir', value: obras.length },
+      { key: 'entregar', label: 'Por entregar', value: preEntrega.length + entrega.length },
+      { key: 'encuestas', label: 'Encuestas pendientes', value: encuestas.length },
+      {
+        key: 'nps',
+        label: 'NPS',
+        value: nps != null ? `${nps}` : '—',
+        valueClassName:
+          nps == null
+            ? 'text-[var(--text)]/40'
+            : nps >= 9
+              ? 'text-emerald-500'
+              : nps >= 7
+                ? 'text-amber-500'
+                : 'text-red-500',
+      },
+      {
+        key: 'calif',
+        label: `Satisfacción vivienda${respondidas ? ` (${respondidas} resp.)` : ''}`,
+        value: calif != null ? `${calif}/5` : '—',
+        valueClassName: calif == null ? 'text-[var(--text)]/40' : undefined,
+      },
+    ];
+  }, [obras.length, preEntrega.length, entrega.length, encuestas.length, kpi]);
 
   if (loading) {
     return (
@@ -111,6 +153,8 @@ function Body() {
           cerrar la conformidad del cliente.
         </p>
       </header>
+
+      <ModuleKpiStrip stats={kpis} cols={5} />
 
       {error ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
