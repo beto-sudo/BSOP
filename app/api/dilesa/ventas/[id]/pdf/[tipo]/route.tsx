@@ -20,6 +20,7 @@
 import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { leerDesglose } from '@/lib/dilesa/desglose-precio';
 import { SolicitudAsignacionPDF, type SolicitudData } from '@/lib/dilesa/pdf/solicitud-asignacion';
 import { AvisoPrivacidadPDF, type AvisoPrivacidadData } from '@/lib/dilesa/pdf/aviso-privacidad';
 import { FicuPDF, type FicuData } from '@/lib/dilesa/pdf/ficu';
@@ -105,7 +106,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, desglose_precio, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -830,15 +831,12 @@ export async function GET(
     return pdfResponse(buf, `ficu-${identificacionInventario || id}.pdf`);
   }
 
-  // solicitud-asignacion
-  // Calcular precios via RPC
-  const { data: calc } = await sb.schema('dilesa').rpc('fn_calcular_precio_venta', {
-    p_unidad_id: venta.unidad_id ?? '00000000-0000-0000-0000-000000000000',
-    p_monto_credito_titular: Number(venta.monto_credito_titular ?? 0),
-    p_monto_credito_cotitular: Number(venta.monto_credito_cotitular ?? 0),
-    p_productos_adicionales: Number(venta.productos_adicionales ?? 0),
-  });
-  const c = calc as Record<string, number> | null;
+  // solicitud-asignacion — precio del SNAPSHOT congelado al asignar
+  // (dilesa.ventas.desglose_precio). NO recalcula en vivo: una solicitud ya
+  // asignada no se re-tarifa por reglas nuevas (exención ZCU, +6% del crédito).
+  // Regla Beto 2026-06-15. Fallback a precio_asignacion para históricas sin
+  // desglose detallado (los componentes finos salen en 0).
+  const c = leerDesglose(venta.desglose_precio);
 
   // Folio Coda-style: iniciales cliente - identificación - fechaHora
   const iniciales = clienteNombre
@@ -859,7 +857,7 @@ export async function GET(
     valorVentaFuturo: Number(c?.valor_venta_futuro ?? 0),
     costoCreditoAdicional: Number(c?.costo_credito_adicional ?? 0),
     productosAdicionales: Number(c?.productos_adicionales ?? venta.productos_adicionales ?? 0),
-    precioVenta: Number(c?.precio_venta_total ?? 0),
+    precioVenta: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),
     enganche1pct: Number(c?.enganche_1pct ?? 0),
     isai2pct: Number(c?.isai_2pct ?? 0),
     gastosNotariales6pct: Number(c?.gastos_notariales_6pct ?? 0),
@@ -867,7 +865,7 @@ export async function GET(
     pagoDirecto: Number(c?.pago_directo ?? 0) + Number(c?.apoyo_infonavit ?? 0),
     montoCreditoTitular: Number(venta.monto_credito_titular ?? 0),
     montoCreditoCotitular: Number(venta.monto_credito_cotitular ?? 0),
-    totalPagosDisponibles: Number(c?.precio_venta_total ?? 0),
+    totalPagosDisponibles: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),
     clienteNombre: `${clienteNombre} (${identificacionInventario})`,
     folio,
     fraccionamiento: '',

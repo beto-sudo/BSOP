@@ -4932,6 +4932,7 @@ export type Database = {
           descuento_nota_credito: number | null
           descuento_precio: number | null
           descuento_total: number | null
+          desglose_precio: Json | null
           empresa_id: string
           enganche_fecha_primer_pago: string | null
           enganche_num_parcialidades: number
@@ -5020,6 +5021,7 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          desglose_precio?: Json | null
           empresa_id: string
           enganche_fecha_primer_pago?: string | null
           enganche_num_parcialidades?: number
@@ -5108,6 +5110,7 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          desglose_precio?: Json | null
           empresa_id?: string
           enganche_fecha_primer_pago?: string | null
           enganche_num_parcialidades?: number

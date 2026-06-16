@@ -38,6 +38,7 @@ import {
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { buildAdjuntoPath } from '@/lib/storage/path';
+import { congelarDesglose } from '@/lib/dilesa/desglose-precio';
 
 type UnidadDisponible = {
   id: string;
@@ -584,6 +585,10 @@ function NuevaSolicitudForm() {
           tipo_credito: tipoCredito?.nombre ?? null,
           valor_comercial: calculo?.valor_comercial ?? null,
           precio_asignacion: calculo?.precio_venta_total ?? null,
+          // Snapshot del desglose completo: congela el cálculo al asignar para
+          // que el detalle y el PDF de solicitud no se re-tarifen en vivo si
+          // cambian reglas globales (exención ZCU, +6%). Regla Beto 2026-06-15.
+          desglose_precio: congelarDesglose(calculo),
           monto_credito_titular: Number(montoCreditoTitular) || null,
           monto_credito_cotitular: Number(montoCreditoCotitular) || null,
           productos_adicionales: Number(productosAdicionales) || 0,
