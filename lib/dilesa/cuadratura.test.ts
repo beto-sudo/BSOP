@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularCuadratura } from './cuadratura';
+import { calcularCuadratura, topeDescuentoAutorizado } from './cuadratura';
 
 describe('calcularCuadratura', () => {
   // Ejemplo real de Beto (pantalla de Coda):
@@ -355,6 +355,44 @@ describe('calcularCuadratura', () => {
       });
       expect(c.saldoCliente).toBe(2); // −522 − 15,000 + 15,524
       expect(c.cubierta).toBe(true); // ≤ tolerancia
+    });
+  });
+
+  // Tope estricto (Sprint 3): la autorización del descuento es por catálogo.
+  describe('topeDescuentoAutorizado', () => {
+    it('con promo → el monto de la promo (nativa o legacy)', () => {
+      expect(topeDescuentoAutorizado(15000, false)).toBe(15000);
+      expect(topeDescuentoAutorizado(15000, true)).toBe(15000);
+    });
+    it('nativa de BSOP sin promo → 0 (descuento solo vía catálogo)', () => {
+      expect(topeDescuentoAutorizado(null, false)).toBe(0);
+      expect(topeDescuentoAutorizado(undefined, false)).toBe(0);
+    });
+    it('legacy de Coda sin promo → null (sin tope, no inventar pendientes)', () => {
+      expect(topeDescuentoAutorizado(null, true)).toBe(null);
+    });
+  });
+
+  describe('tope estricto en el saldo (Sprint 3)', () => {
+    // Venta nativa sin promo (max=0): un descuento capturado NO se acredita al
+    // saldo — queda como pendiente hasta dar de alta la promo que lo respalde.
+    it('nativa sin promo: el descuento otorgado no reduce el saldo', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 899000,
+        montoCreditoTitular: 636328,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: 13378,
+        gastosEscrituracion: 43378,
+        apoyoInfonavit: 30000,
+        descuentoOtorgadoTotal: 15000,
+        descuentoMaximoAutorizado: 0, // nativa sin promo
+        depositos: [{ monto: 261049.55, directoCliente: true, tieneRecibo: true }],
+      });
+      expect(c.descuentoOtorgado).toBe(15000);
+      expect(c.descuentoAplicado).toBe(0); // topado a 0 — no autorizado
+      expect(c.saldoCliente).toBe(15000.45); // 1,622.45 − 0 + 13,378
+      expect(c.cubierta).toBe(false); // pendiente a revisar
     });
   });
 });

@@ -177,6 +177,25 @@ function esLomaVerde(proyecto: string | null | undefined): boolean {
   return /loma\s*verde/i.test(proyecto ?? '');
 }
 
+/**
+ * Tope de descuento autorizado que entra al saldo (`descuentoMaximoAutorizado`).
+ * Regla única (iniciativa `dilesa-descuentos-promos`, Sprint 3):
+ *  - Con promo en la solicitud → el monto de la promo (tope confiable).
+ *  - Venta nativa de BSOP sin promo → 0: el descuento solo se autoriza vía el
+ *    catálogo de promociones; un descuento sin promo no se acredita al saldo
+ *    (la vía para habilitarlo es dar de alta la promo).
+ *  - Venta legacy de Coda sin promo → null (sin tope): no inventar pendientes
+ *    falsos en histórico (el `descuento_maximo_autorizado` legacy no es de fiar).
+ * `esLegacy` = la venta vino de Coda (tiene `coda_row_id`).
+ */
+export function topeDescuentoAutorizado(
+  promoMonto: number | null | undefined,
+  esLegacy: boolean
+): number | null {
+  if (promoMonto != null) return promoMonto;
+  return esLegacy ? null : 0;
+}
+
 export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const valorEscrituracion = n(i.valorEscrituracion);
   const creditoInstitucion = n(i.montoCreditoTitular) + n(i.montoCreditoCotitular);

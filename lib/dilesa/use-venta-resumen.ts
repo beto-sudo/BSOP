@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
+import { calcularCuadratura, topeDescuentoAutorizado } from '@/lib/dilesa/cuadratura';
 import { FASES_PIPELINE } from '@/lib/dilesa/captura/marcar-fase';
 import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { getNotaria } from '@/lib/dilesa/notarios';
@@ -67,6 +67,7 @@ type VentaRow = {
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
   promocion_id: string | null;
+  coda_row_id: string | null;
   fecha_firma_programada: string | null;
   /** INE capturado en el KYC de la venta (fallback si la persona no lo trae). */
   ine_numero: string | null;
@@ -89,7 +90,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, fecha_firma_programada, ine_numero'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, fecha_firma_programada, ine_numero'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -263,9 +264,11 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         // desglose y suman al total vía la RPC. Leer el total evita que un
         // descuento capturado sin desglose (Formalizada) quede invisible.
         descuentoOtorgadoTotal: Number(venta.descuento_total) || 0,
-        // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
-        descuentoMaximoAutorizado:
-          (promoRes.data as { monto: number | null } | null)?.monto ?? null,
+        // Tope: promo si hay; nativa sin promo ⇒ 0; legacy sin promo ⇒ sin tope.
+        descuentoMaximoAutorizado: topeDescuentoAutorizado(
+          (promoRes.data as { monto: number | null } | null)?.monto,
+          !!venta.coda_row_id
+        ),
         precioAsignacion: venta.precio_asignacion,
         valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
         depositos: abonos.map((a) => ({
