@@ -5343,6 +5343,17 @@ export type Database = {
           },
         ]
       }
+      v_ac_kpis: {
+        Row: {
+          calif_proceso_prom: number | null
+          calif_vivienda_prom: number | null
+          empresa_id: string | null
+          encuestas_respondidas: number | null
+          encuestas_total: number | null
+          nps_prom: number | null
+        }
+        Relationships: []
+      }
       v_ac_obras_por_recibir: {
         Row: {
           avance_pct: number | null
