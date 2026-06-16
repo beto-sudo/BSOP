@@ -25,7 +25,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -41,6 +41,8 @@ import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -185,6 +187,10 @@ function DetailInner() {
   const puedeRecibirObra =
     permissions.isAdmin || permissions.modulos.get('dilesa.construccion.recepcion')?.write === true;
   const [recepcionOpen, setRecepcionOpen] = useState(false);
+  const [recepcionEstado, setRecepcionEstado] = useState<string | null>(null);
+  const [programarOpen, setProgramarOpen] = useState(false);
+  const [fechaProgInput, setFechaProgInput] = useState('');
+  const [programando, setProgramando] = useState(false);
 
   const [obra, setObra] = useState<Construccion | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -590,6 +596,57 @@ function DetailInner() {
   // — mismo principio que la vista `dilesa.v_construccion_tareas_terminadas_con_mo`
   // que es la fuente para estimaciones semanales a contratistas.
   const valorContratoMo = obra?.valor_contrato_mo ?? null;
+  // Avance previo: todas las tareas de obra (NO hito de recepción) terminadas.
+  // Es el candado para programar/recibir — espeja dilesa.fn_construccion_previas_completas.
+  const previas = useMemo(() => {
+    const terminadasSet = new Set(terminadas.map((t) => t.plantilla_tarea_id));
+    const prev = plantilla.filter((p) => !tareasCat.get(p.tarea_id)?.hito_recepcion);
+    const pendientes = prev.filter((p) => !terminadasSet.has(p.id)).length;
+    return { total: prev.length, pendientes, completas: prev.length > 0 && pendientes === 0 };
+  }, [plantilla, terminadas, tareasCat]);
+
+  const reloadRecepcion = useCallback(async () => {
+    const sb = createSupabaseBrowserClient();
+    const { data } = await sb
+      .schema('dilesa')
+      .from('recepcion_obra')
+      .select('estado')
+      .eq('construccion_id', id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    setRecepcionEstado((data?.estado as string | null) ?? null);
+  }, [id]);
+
+  useEffect(() => {
+    void reloadRecepcion();
+  }, [reloadRecepcion]);
+
+  async function programarRecepcion() {
+    if (!fechaProgInput) {
+      toast.add({ title: 'Indica la fecha de recepción', type: 'error' });
+      return;
+    }
+    setProgramando(true);
+    const sb = createSupabaseBrowserClient();
+    const { error } = await sb.schema('dilesa').rpc('fn_recepcion_programar', {
+      p_construccion_id: id,
+      p_fecha_programada: fechaProgInput,
+    });
+    setProgramando(false);
+    if (error) {
+      toast.add({
+        title: 'No se pudo programar la recepción',
+        description: getSupabaseErrorMessage(error, 'Error al programar.'),
+        type: 'error',
+      });
+      return;
+    }
+    setProgramarOpen(false);
+    toast.add({ title: 'Recepción programada', type: 'success' });
+    await reloadRecepcion();
+    setRecepcionOpen(true);
+  }
+
   const etapasConTareas = useMemo(() => {
     const terminadasByPlantilla = new Map<string, Terminada>();
     for (const t of terminadas) terminadasByPlantilla.set(t.plantilla_tarea_id, t);
@@ -615,6 +672,9 @@ function DetailInner() {
             porcentajeCosto,
             manoObraCalculada,
             terminada,
+            // Los hitos de recepción NO se palomean a mano: se cierran por el
+            // flujo "Recibir obra" (con su checklist + acta). Ver S1d.
+            esHito: !!tareaInfo?.hito_recepcion,
           };
         })
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -822,9 +882,35 @@ function DetailInner() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {puedeRecibirObra ? (
-            <Button size="sm" variant="outline" onClick={() => setRecepcionOpen(true)}>
-              <ClipboardCheck className="h-4 w-4" /> Recibir obra
-            </Button>
+            recepcionEstado === 'recibida' ? (
+              <Button size="sm" variant="outline" onClick={() => setRecepcionOpen(true)}>
+                <ClipboardCheck className="h-4 w-4" /> Ver recepción
+              </Button>
+            ) : recepcionEstado === 'programada' || recepcionEstado === 'con_observaciones' ? (
+              <Button size="sm" variant="outline" onClick={() => setRecepcionOpen(true)}>
+                <ClipboardCheck className="h-4 w-4" /> Continuar recepción
+              </Button>
+            ) : previas.completas ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setFechaProgInput(new Date().toISOString().slice(0, 10));
+                  setProgramarOpen(true);
+                }}
+              >
+                <ClipboardCheck className="h-4 w-4" /> Programar recepción
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled
+                title={`Faltan ${previas.pendientes} tarea(s) de construcción por terminar`}
+              >
+                <ClipboardCheck className="h-4 w-4" /> Recibir obra
+              </Button>
+            )
           ) : null}
           <Badge tone={ESTADO_TONE[obra.estado] ?? 'neutral'}>
             {ESTADO_LABEL[obra.estado] ?? obra.estado}
@@ -966,10 +1052,48 @@ function DetailInner() {
         construccionId={obra.id}
         codigo={identificadorCompleto}
         onDone={() => {
-          setRecepcionOpen(false);
           void refetchObra();
+          void reloadRecepcion();
         }}
       />
+
+      <DetailDrawer
+        open={programarOpen}
+        onOpenChange={setProgramarOpen}
+        size="sm"
+        title="Programar recepción"
+        description={identificadorCompleto}
+      >
+        <DetailDrawerContent>
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--text)]/70">
+              Todas las tareas de construcción están terminadas. Agenda la fecha de recepción para
+              abrir el checklist de revisión.
+            </p>
+            <label className="block text-xs font-medium text-[var(--text)]">
+              Fecha de recepción
+              <Input
+                type="date"
+                value={fechaProgInput}
+                onChange={(e) => setFechaProgInput(e.target.value)}
+                className="mt-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </label>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setProgramarOpen(false)}
+                className="text-sm text-muted-foreground hover:text-[var(--text)]"
+              >
+                Cancelar
+              </button>
+              <Button onClick={() => void programarRecepcion()} disabled={programando}>
+                {programando ? 'Programando…' : 'Programar y abrir checklist'}
+              </Button>
+            </div>
+          </div>
+        </DetailDrawerContent>
+      </DetailDrawer>
     </div>
   );
 }
@@ -1006,6 +1130,7 @@ function EtapaBlock({
       porcentajeCosto: number;
       manoObraCalculada: number | null;
       terminada: Terminada | null;
+      esHito: boolean;
     }>;
     total: number;
     completas: number;
@@ -1063,11 +1188,12 @@ function EtapaBlock({
                 : null;
             const inFlight = palomeoInFlight === it.plantillaId;
             const onClick = () => {
-              if (!puedePalomear || inFlight) return;
+              // Los hitos de recepción se cierran SOLO por el flujo "Recibir obra".
+              if (!puedePalomear || inFlight || it.esHito) return;
               if (t) onDesPalomear(it.plantillaId, t.id);
               else onPalomear(it.plantillaId);
             };
-            const clickable = puedePalomear && !inFlight;
+            const clickable = puedePalomear && !inFlight && !it.esHito;
             return (
               <li
                 key={it.plantillaId}
@@ -1083,11 +1209,13 @@ function EtapaBlock({
                       : 'cursor-not-allowed opacity-60'
                   }`}
                   title={
-                    !puedePalomear
-                      ? 'Sin permiso para palomear tareas'
-                      : t
-                        ? 'Click para quitar el registro'
-                        : 'Click para marcar como terminada'
+                    it.esHito
+                      ? 'Se cierra desde «Recibir obra»'
+                      : !puedePalomear
+                        ? 'Sin permiso para palomear tareas'
+                        : t
+                          ? 'Click para quitar el registro'
+                          : 'Click para marcar como terminada'
                   }
                   aria-label={t ? `Quitar palomeo de ${it.nombre}` : `Palomear ${it.nombre}`}
                 >
@@ -1098,7 +1226,14 @@ function EtapaBlock({
                   )}
                 </button>
                 <div className="flex-1">
-                  <div className="text-sm text-[var(--text)]">{it.nombre}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-sm text-[var(--text)]">
+                    {it.nombre}
+                    {it.esHito ? (
+                      <span className="rounded border border-[var(--accent)]/40 px-1 text-[10px] font-medium text-[var(--accent)]">
+                        Recibir obra
+                      </span>
+                    ) : null}
+                  </div>
                   {t ? (
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text)]/55">
                       {t.fecha_terminada ? (

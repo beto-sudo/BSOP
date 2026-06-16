@@ -4236,6 +4236,7 @@ export type Database = {
           deleted_at: string | null
           empresa_id: string
           estado: string
+          fecha_programada: string | null
           fecha_recepcion: string
           id: string
           notas: string | null
@@ -4249,6 +4250,7 @@ export type Database = {
           deleted_at?: string | null
           empresa_id: string
           estado?: string
+          fecha_programada?: string | null
           fecha_recepcion?: string
           id?: string
           notas?: string | null
@@ -4262,6 +4264,7 @@ export type Database = {
           deleted_at?: string | null
           empresa_id?: string
           estado?: string
+          fecha_programada?: string | null
           fecha_recepcion?: string
           id?: string
           notas?: string | null
@@ -5599,6 +5602,10 @@ export type Database = {
         Args: { p_construccion_id: string; p_costo: number }
         Returns: undefined
       }
+      fn_construccion_previas_completas: {
+        Args: { p_construccion_id: string }
+        Returns: boolean
+      }
       fn_copiar_comprobante_detonacion: {
         Args: { p_pago_id: string }
         Returns: undefined
@@ -5655,6 +5662,10 @@ export type Database = {
           p_fecha?: string
           p_notas?: string
         }
+        Returns: string
+      }
+      fn_recepcion_programar: {
+        Args: { p_construccion_id: string; p_fecha_programada: string }
         Returns: string
       }
       fn_regresar_unidad_proyecto: {

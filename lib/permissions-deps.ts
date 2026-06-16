@@ -74,6 +74,9 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.construccion.costeo': [],
   'dilesa.construccion.estimaciones': [],
   'dilesa.construccion.prototipos': [],
+  // Form de captura "Recepción de obra" (S1d): la vista del acta vive bajo
+  // construccion/[id], así que depende del slug del ancestro (.obras).
+  'dilesa.construccion.recepcion': ['dilesa.construccion.obras'],
   'dilesa.cxp.facturas': [],
   'dilesa.cxp.aging': [],
   'dilesa.cxp.pagos': [],
