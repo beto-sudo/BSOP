@@ -26,16 +26,27 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Circle, HardHat } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  ClipboardCheck,
+  HardHat,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { RecepcionObraDrawer } from '@/components/dilesa/recepcion-obra-drawer';
+import { HITO_RECEPCION_LABEL } from '@/lib/dilesa/recepcion-checklist';
 
 type Construccion = {
   id: string;
@@ -68,7 +79,7 @@ type UnidadInfo = {
 };
 
 type Etapa = { id: string; nombre: string; orden: number };
-type Tarea = { id: string; nombre: string };
+type Tarea = { id: string; nombre: string; hito_recepcion: string | null };
 type Plantilla = {
   id: string;
   tarea_id: string;
@@ -168,6 +179,12 @@ function DetailInner() {
   const toast = useToast();
   const puedePalomearTareas =
     permissions.isAdmin || permissions.modulos.get('dilesa.construccion.tareas')?.write === true;
+  // Solo Atención a Clientes (+ Dirección/admin) recibe la obra — sub-slug
+  // `dilesa.construccion.recepcion` (ADR-014). El gate real vive además en la
+  // RPC y el trigger; esto solo decide si se muestra el botón.
+  const puedeRecibirObra =
+    permissions.isAdmin || permissions.modulos.get('dilesa.construccion.recepcion')?.write === true;
+  const [recepcionOpen, setRecepcionOpen] = useState(false);
 
   const [obra, setObra] = useState<Construccion | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -313,7 +330,11 @@ function DetailInner() {
           .select('id, nombre, orden')
           .is('deleted_at', null)
           .order('orden', { ascending: true }),
-        sb.schema('dilesa').from('tareas_construccion').select('id, nombre').is('deleted_at', null),
+        sb
+          .schema('dilesa')
+          .from('tareas_construccion')
+          .select('id, nombre, hito_recepcion')
+          .is('deleted_at', null),
         sb
           .schema('dilesa')
           .from('construccion_tareas_terminadas')
@@ -335,7 +356,12 @@ function DetailInner() {
       setPlantilla(plantillaArr);
       setEtapas((etRes.data ?? []) as Etapa[]);
       const tMap = new Map<string, Tarea>();
-      for (const t of taRes.data ?? []) tMap.set(t.id as string, { id: t.id, nombre: t.nombre });
+      for (const t of taRes.data ?? [])
+        tMap.set(t.id as string, {
+          id: t.id,
+          nombre: t.nombre,
+          hito_recepcion: (t as { hito_recepcion: string | null }).hito_recepcion ?? null,
+        });
       setTareasCat(tMap);
       const terminadasArr = (ttRes.data ?? []) as Terminada[];
       setTerminadas(terminadasArr);
@@ -577,9 +603,15 @@ function DetailInner() {
           const porcentajeCosto = Number(p.porcentaje_costo ?? 0);
           const manoObraCalculada =
             valorContratoMo != null ? porcentajeCosto * valorContratoMo : null;
+          // Las tareas de cierre se muestran con su nombre canónico (derivado de
+          // la marca hito_recepcion), parejo en los 14 prototipos pese a que el
+          // texto crudo difiera entre familias. Ver dilesa-atencion-clientes S1a.
+          const nombre = tareaInfo?.hito_recepcion
+            ? (HITO_RECEPCION_LABEL[tareaInfo.hito_recepcion] ?? tareaInfo.nombre)
+            : (tareaInfo?.nombre ?? '(tarea desconocida)');
           return {
             plantillaId: p.id,
-            nombre: tareaInfo?.nombre ?? '(tarea desconocida)',
+            nombre,
             porcentajeCosto,
             manoObraCalculada,
             terminada,
@@ -789,6 +821,11 @@ function DetailInner() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {puedeRecibirObra ? (
+            <Button size="sm" variant="outline" onClick={() => setRecepcionOpen(true)}>
+              <ClipboardCheck className="h-4 w-4" /> Recibir obra
+            </Button>
+          ) : null}
           <Badge tone={ESTADO_TONE[obra.estado] ?? 'neutral'}>
             {ESTADO_LABEL[obra.estado] ?? obra.estado}
           </Badge>
@@ -922,6 +959,17 @@ function DetailInner() {
           </ul>
         )}
       </Section>
+
+      <RecepcionObraDrawer
+        open={recepcionOpen}
+        onOpenChange={setRecepcionOpen}
+        construccionId={obra.id}
+        codigo={identificadorCompleto}
+        onDone={() => {
+          setRecepcionOpen(false);
+          void refetchObra();
+        }}
+      />
     </div>
   );
 }
