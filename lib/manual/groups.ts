@@ -32,6 +32,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
   { key: 'ventas', label: 'Ventas' },
   { key: 'construccion', label: 'Construcción' },
   { key: 'ruv', label: 'RUV' },
+  { key: 'atencion_clientes', label: 'Atención a Clientes' },
 ];
 
 const GROUP_ORDER = new Map(MANUAL_GROUPS.map((g, i) => [g.key, i]));

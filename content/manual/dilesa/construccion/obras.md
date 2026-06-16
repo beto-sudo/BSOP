@@ -1,8 +1,8 @@
 ---
 titulo: 'Construcción — Obras'
 modulo: dilesa.construccion.obras
-version: 1.0.0
-actualizado: 2026-06-07
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -62,6 +62,33 @@ Abajo, un contador te dice **"X de Y obras"** (cuántas quedaron tras filtrar).
 | **Seguro calidad** | Pasó la inspección de seguro de calidad.        |
 | **Extraída**       | Unidad ya liberada (venta completada).          |
 | **Cancelada**      | Obra cancelada.                                 |
+
+## Recepción de obra (Atención a Clientes)
+
+Una obra al **100% de avance no pasa sola a entrega**: primero hay que
+**recibirla al contratista**. Eso lo hace Atención a Clientes desde el **detalle
+de la obra**, con un botón que cambia según en qué punto va la recepción:
+
+1. **Programar recepción** — agenda la fecha de la cita con el contratista.
+   (Mientras la obra no llega al 100%, el botón aparece bloqueado e indica
+   cuántas tareas faltan.)
+2. **Continuar recepción** — abre el recorrido: un **checklist** por zonas
+   (exterior, planta baja, planta alta, azotea, patio) donde marcas cada punto
+   como _cumple_, _con observación_ o _no aplica_, con notas. **Guardar avance**
+   lo deja a medias sin cerrar; si hay observaciones, la obra queda **"con
+   observaciones"** hasta que el contratista corrija.
+3. **Recibir obra** — solo se habilita cuando el checklist está todo en verde y
+   ya subiste el **acta de recepción firmada**. Al recibir, la obra se libera
+   para la entrega.
+
+El **acta de recepción** se imprime desde el mismo recorrido (sale con el
+membrete de DILESA, los datos de la unidad, el checklist lleno y los espacios de
+firma de Supervisor, Contratista y Atención a Clientes); se firma en papel, se
+escanea y se sube.
+
+Los pendientes de recepción también aparecen en la bandeja de **Atención a
+Clientes** (cola "Obras por recibir"), con el badge _sin programar_ /
+_programada_ / _con observaciones_.
 
 ## Preguntas frecuentes
 

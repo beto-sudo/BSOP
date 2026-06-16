@@ -1,8 +1,8 @@
 ---
 titulo: 'Ventas — Expediente de Operación'
 modulo: dilesa.ventas
-version: '1.0.0'
-actualizado: '2026-06-11'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -19,31 +19,63 @@ lista (o desde Clientes → el cliente → su venta).
 
 ## Las partes de la pantalla
 
-- **Cabecera (siempre visible)** — cliente, vivienda (proyecto · manzana/lote ·
-  prototipo), datos comerciales (precio, vendedor) y la **mini-cuadratura**:
-  Precio | Crédito | Depósitos | Crédito directo | **Saldo**. El semáforo verde
-  significa que el dinero ya cubre el valor de la operación.
+- **Cabecera (siempre visible)** — cliente (con CURP e **INE**), vivienda
+  (proyecto · manzana/lote · prototipo), datos comerciales (precio, vendedor) y
+  la **mini-cuadratura**: Precio | Crédito | Depósitos | Crédito directo |
+  **Saldo**. El semáforo verde significa que el dinero ya cubre el valor de la
+  operación. Cuando la operación cierra (Fase 17), la cabecera muestra el badge
+  **Terminada**.
 - **Línea de tiempo (las 17 fases)** — agrupadas en 5 etapas: **Comercial**
   (1-3), **Crédito** (4-9), **Cierre legal** (10-12), **Administrativo** (13) y
   **Entrega** (14-17). Cada fase muestra ✓ si ya se cerró y su fecha.
 - **Pestañas**:
   - **Operación** — datos del cliente y de la venta + el pipeline con sus
     documentos (los chips grises son documentos que faltan).
-  - **Cuadratura** — todo el dinero de la operación reconciliado.
+  - **Cuadratura** — todo el dinero de la operación reconciliado (ver abajo).
   - **Documentos** — el expediente digital agrupado por etapa.
   - **Bitácora** — quién cerró cada fase y cuándo.
+
+## La Cuadratura (cómo se lee el saldo)
+
+La Cuadratura concilia el dinero contra el **valor de escrituración**. El número
+que importa es el **saldo efectivo**: lo que realmente falta por cubrir.
+
+- **Saldo de cobranza** — valor de escrituración menos lo recibido (depósitos +
+  crédito + crédito directo). Es el saldo "en crudo", para auditoría.
+- **Descuento aplicado** — el descuento otorgado al cliente, **topado al máximo
+  de la promoción**. Lo que se perdona ya no cuenta como deuda.
+- **Cheque a notaría** — el cheque realmente girado (capturado en la Fase 11).
+
+El **saldo efectivo** es el saldo de cobranza menos el descuento aplicado más el
+cheque girado. Si queda en cero (con una pequeña tolerancia que absorbe
+redondeos), la operación está **cubierta**.
+
+> **Editar los descuentos es solo de Dirección.** Los montos de descuento se
+> ajustan desde la pestaña Cuadratura; el cambio queda auditado. Cuando una
+> venta tiene factura, la Cuadratura toma el **valor facturado** y la **nota de
+> crédito del CFDI** (no de una estimación).
 
 ## Cómo avanzo una venta de fase
 
 1. En el pipeline, ubica la **fase actual** (la primera sin ✓).
-2. Clic en **Capturar** — se abre la pantalla de esa fase con sus campos y
+2. Clic en **Capturar fase** — se abre la pantalla de esa fase con sus campos y
    documentos. (Cada fase tiene su propia ayuda: abre el "?" estando ahí.)
-3. Llena lo requerido, sube el PDF si la fase lo pide y **guarda**: la fase se
-   cierra con fecha y tu nombre queda en la Bitácora.
+3. Llena lo requerido y sube los documentos: **cada documento se guarda en el
+   expediente en cuanto lo subes** (no se pierde si sales sin cerrar, y queda
+   registrado quién lo subió). Cuando la fase tiene todo, **guarda**: se cierra
+   con fecha y tu nombre en la Bitácora.
 
-Las fases se cierran **en orden**. Si el botón Capturar no aparece, o la fase
-anterior sigue abierta, o tu perfil no captura esa fase (cada fase tiene su
+Como los documentos se guardan al subirse, **varias personas pueden ir
+aportando** a una misma fase en momentos distintos antes de cerrarla.
+
+Las fases se cierran **en orden**. Si el botón Capturar no aparece, es porque la
+fase anterior sigue abierta, o tu perfil no captura esa fase (cada fase tiene su
 responsable — ver la tabla de abajo).
+
+**Ver o corregir una fase cerrada.** Las fases ya cerradas muestran el botón
+**"Ver / corregir"**: puedes consultarlas y, en las que lo permiten (por
+ejemplo el número de escritura en la Fase 11), corregir un dato sin reabrir el
+proceso. La corrección queda registrada.
 
 ## ¿Qué fase le toca a quién?
 

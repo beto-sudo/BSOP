@@ -1,8 +1,8 @@
 ---
 titulo: 'CxC — Pagos'
 modulo: dilesa.cobranza.pagos
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -23,6 +23,17 @@ aplica solo a los **cargos abiertos** de esa venta.
    Institución), y opcionalmente **forma de pago**, **referencia**, **notas** y el
    **comprobante**.
 4. **Registrar abono** — queda aplicado a los cargos abiertos de esa venta.
+
+## El recibo de caja (XML del SAT)
+
+Si el abono tiene su **recibo de caja en XML** (CFDI de pago), súbelo: el sistema
+lo lee y **llena solos** la fecha, el monto, la forma de pago y la referencia
+—solo confirmas o corriges lo que haga falta—, y guarda el folio fiscal (UUID)
+para que no se registre dos veces. Los campos que vienen del XML quedan
+bloqueados para evitar errores de captura.
+
+Si el receptor del recibo no es exactamente el cliente de la venta (por ejemplo
+un coacreditado), el sistema pide que lo confirmes y deja constancia.
 
 ## La "fuente" del abono
 
