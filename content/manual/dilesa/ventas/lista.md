@@ -1,8 +1,8 @@
 ---
 titulo: 'Ventas — Lista'
 modulo: dilesa.ventas.lista
-version: 1.0.0
-actualizado: 2026-06-07
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -35,6 +35,9 @@ pestañas de arriba.
 
 - **Buscador** (arriba) — escribe nombre del comprador, unidad o proyecto para
   filtrar al instante.
+- **Filtro de estado** — por defecto la lista muestra las ventas **Activas** (el
+  pipeline vivo). Cámbialo a **Terminadas** (operaciones cerradas en Fase 17),
+  **Desasignadas**, **Expiradas** o **Todos** para ver el histórico.
 - **Rango de fechas** — acota la lista a un periodo (desde / hasta). Los
   indicadores de arriba (los KPIs) se recalculan solos con lo que dejes
   filtrado.

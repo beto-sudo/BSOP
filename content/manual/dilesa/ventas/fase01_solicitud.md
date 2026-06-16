@@ -1,8 +1,8 @@
 ---
 titulo: 'Fase 1 — Solicitud de Asignación'
 modulo: dilesa.ventas.fase01_solicitud
-version: '1.0.0'
-actualizado: '2026-06-11'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es esta fase?
@@ -20,7 +20,9 @@ vivienda disponible).
 ## Qué se captura
 
 - **El cliente** — datos personales y de contacto. Si ya existe, el sistema lo
-  encuentra por CURP y no lo duplica. Se llena también el cuestionario de
+  encuentra por CURP y no lo duplica; al seleccionarlo se despliega una **ficha
+  informativa** con su nombre, teléfono, email, CURP e **INE**, para que
+  confirmes que es la persona correcta. Se llena también el cuestionario de
   conocimiento del cliente (FICU/PLD): forma de pago, ocupación, estado civil.
 - **La vivienda** — se elige de las disponibles; el sistema calcula el precio
   con el tipo de crédito (los costos del crédito se suman solos; en casas con
@@ -45,3 +47,8 @@ el lugar. La autorización (F2) solo procede para el líder de la cola.
 **¿El precio lo puedo cambiar?**
 El precio sale del sistema (lista + cargos del crédito). Los descuentos se
 manejan aparte y con autorización — habla con tu gerente.
+
+**¿De dónde sale el tope de descuento de la venta?**
+De la **promoción** que aplica a la solicitud: su monto es el máximo de descuento
+autorizado que después respeta la Cuadratura. (El catálogo de promociones lo
+administra Dirección en la pestaña **Promociones** de Ventas.)
