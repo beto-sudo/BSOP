@@ -51,6 +51,8 @@ import {
   type CuadraturaInputsStr,
 } from '@/components/dilesa/cuadratura-ajustes';
 import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
+import { leerDesglose, type DesglosePrecioSnapshot } from '@/lib/dilesa/desglose-precio';
+import type { Json } from '@/types/supabase';
 import { camposCapturadosPorFase } from '@/lib/dilesa/captura/campos-capturados';
 import { FASE_ROLES, ROL_LABEL, rolesOpcionales } from '@/lib/dilesa/captura/fase-roles';
 import { evaluarCierre } from '@/lib/dilesa/copiloto-cierre';
@@ -143,6 +145,9 @@ type Venta = {
   conocimiento_dueno_beneficiario: string | null;
   motivo_desasignacion: string | null;
   notas: string | null;
+  // Snapshot del desglose de precio (regla Beto 2026-06-15) — congelado al
+  // asignar; el detalle NO recalcula en vivo. Ver lib/dilesa/desglose-precio.
+  desglose_precio: Json | null;
 };
 
 type Persona = {
@@ -180,24 +185,6 @@ type UnidadInfo = {
   identificador: string;
   proyecto_id: string | null;
   producto_id: string | null;
-};
-type DesgloseCalculo = {
-  valor_comercial: number;
-  metros_excedentes: number;
-  valor_excedente_terreno: number;
-  valor_frente_verde: number;
-  valor_esquina: number;
-  pct_esquina_aplicado: number;
-  valor_venta_futuro: number;
-  costo_credito_adicional: number;
-  zcu_exento?: boolean;
-  productos_adicionales: number;
-  precio_venta_total: number;
-  apoyo_infonavit: number;
-  pago_directo: number;
-  enganche_1pct: number;
-  isai_2pct: number;
-  gastos_notariales_6pct: number;
 };
 type Fase = {
   id: string;
@@ -319,7 +306,7 @@ const MACRO_ETAPAS: Array<{ nombre: string; desde: number; hasta: number }> = [
   { nombre: 'Entrega', desde: 14, hasta: 17 },
 ];
 
-function fmtMoney(n: number | null): string | null {
+function fmtMoney(n: number | null | undefined): string | null {
   return n == null ? null : moneyFmt.format(n);
 }
 
@@ -384,7 +371,7 @@ function DetailInner() {
     new Map()
   );
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
-  const [calculo, setCalculo] = useState<DesgloseCalculo | null>(null);
+  const [calculo, setCalculo] = useState<DesglosePrecioSnapshot | null>(null);
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null);
   // Nombre por usuario que registró cada fase (bitácora: "quién cerró qué").
   const [registradoresPorId, setRegistradoresPorId] = useState<Map<string, string>>(new Map());
@@ -470,23 +457,19 @@ function DetailInner() {
         setPromo(null);
       }
 
-      // Resolver el tipo de crédito → id + apoyo Infonavit del catálogo
-      // `dilesa.tipos_credito`. El apoyo se deriva (no se captura) y el id se
-      // pasa al RPC para que el desglose calcule apoyo + costo adicional (ej.
-      // Fovissste +6%) de la misma fuente. Match por empresa + nombre.
-      let tipoCreditoId: string | null = null;
+      // Apoyo Infonavit derivado del catálogo `dilesa.tipos_credito` (auto, no
+      // se captura) — alimenta la cuadratura. Match por empresa + nombre.
       let apoyoDerivado = 0;
       if (ventaRow.tipo_credito) {
         const { data: tcRow } = await sb
           .schema('dilesa')
           .from('tipos_credito')
-          .select('id, apoyo_infonavit_monto')
+          .select('apoyo_infonavit_monto')
           .eq('empresa_id', ventaRow.empresa_id)
           .eq('nombre', ventaRow.tipo_credito)
           .is('deleted_at', null)
           .maybeSingle();
         if (tcRow) {
-          tipoCreditoId = (tcRow as { id: string }).id;
           apoyoDerivado = Number(
             (tcRow as { apoyo_infonavit_monto: number | null }).apoyo_infonavit_monto ?? 0
           );
@@ -694,21 +677,13 @@ function DetailInner() {
         setHoldSnapshot(null);
       }
 
-      // Desglose del cálculo — se recalcula con los datos snapshot de la venta
-      // para mostrar TODOS los componentes (excedente, frente verde, esquina,
-      // productos adicionales, ISAI, gastos notariales). No persistimos cada
-      // componente en `dilesa.ventas`; la RPC los recompone en runtime.
-      if (ventaRow.unidad_id) {
-        const { data: calcRow } = await sb.schema('dilesa').rpc('fn_calcular_precio_venta', {
-          p_unidad_id: ventaRow.unidad_id,
-          p_tipo_credito_id: tipoCreditoId ?? undefined,
-          p_monto_credito_titular: Number(ventaRow.monto_credito_titular ?? 0),
-          p_monto_credito_cotitular: Number(ventaRow.monto_credito_cotitular ?? 0),
-          p_productos_adicionales: Number(ventaRow.productos_adicionales ?? 0),
-        });
-        if (activo && calcRow && typeof calcRow === 'object' && !('error' in calcRow)) {
-          setCalculo(calcRow as unknown as DesgloseCalculo);
-        }
+      // Desglose del precio: SNAPSHOT congelado al asignar (regla Beto
+      // 2026-06-15). Una venta ya asignada NO se re-tarifa en vivo — leemos
+      // `dilesa.ventas.desglose_precio` en vez de llamar fn_calcular_precio_venta
+      // (que aplicaría exención ZCU / +6% retroactivamente). Sin snapshot
+      // (histórica sin precio de asignación) no se muestra desglose.
+      if (activo) {
+        setCalculo(leerDesglose(ventaRow.desglose_precio));
       }
 
       setLoading(false);
@@ -1387,46 +1362,71 @@ function DetailInner() {
             {calculo ? (
               <div className="mt-5 border-t border-[var(--border)] pt-5">
                 <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-                  Desglose del cálculo
+                  Desglose del precio
                 </h3>
-                <FichaGrid
-                  rows={[
-                    { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
-                    {
-                      label: `Excedente terreno (${calculo.metros_excedentes.toFixed(1)} m²)`,
-                      value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
-                    },
-                    { label: 'Frente verde', value: fmtMoney(calculo.valor_frente_verde) ?? '—' },
-                    {
-                      label: `Esquina (${(calculo.pct_esquina_aplicado * 100).toFixed(1)}%)`,
-                      value: fmtMoney(calculo.valor_esquina) ?? '—',
-                    },
-                    { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
-                    {
-                      label: calculo.zcu_exento
-                        ? 'Costo crédito adicional (exento — problema ZCU)'
-                        : 'Costo crédito adicional',
-                      value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
-                    },
-                    {
-                      label: 'Productos adicionales',
-                      value: fmtMoney(calculo.productos_adicionales) ?? '—',
-                    },
-                    {
-                      label: 'Precio de venta total',
-                      value: fmtMoney(calculo.precio_venta_total) ?? '—',
-                    },
-                    { label: 'Apoyo Infonavit', value: fmtMoney(calculo.apoyo_infonavit) ?? '—' },
-                    { label: 'Pago directo cliente', value: fmtMoney(calculo.pago_directo) ?? '—' },
-                    { label: 'Enganche 1%', value: fmtMoney(calculo.enganche_1pct) ?? '—' },
-                    { label: 'ISAI 2%', value: fmtMoney(calculo.isai_2pct) ?? '—' },
-                    {
-                      label: 'Gastos notariales 6%',
-                      value: fmtMoney(calculo.gastos_notariales_6pct) ?? '—',
-                    },
-                  ]}
-                  cols={3}
-                />
+                {calculo.componentes_detallados ? (
+                  <FichaGrid
+                    rows={[
+                      { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
+                      {
+                        label: `Excedente terreno (${(calculo.metros_excedentes ?? 0).toFixed(1)} m²)`,
+                        value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
+                      },
+                      { label: 'Frente verde', value: fmtMoney(calculo.valor_frente_verde) ?? '—' },
+                      {
+                        label: `Esquina (${((calculo.pct_esquina_aplicado ?? 0) * 100).toFixed(1)}%)`,
+                        value: fmtMoney(calculo.valor_esquina) ?? '—',
+                      },
+                      { label: 'Venta futuro', value: fmtMoney(calculo.valor_venta_futuro) ?? '—' },
+                      {
+                        label: calculo.zcu_exento
+                          ? 'Costo crédito adicional (exento — problema ZCU)'
+                          : 'Costo crédito adicional',
+                        value: fmtMoney(calculo.costo_credito_adicional) ?? '—',
+                      },
+                      {
+                        label: 'Productos adicionales',
+                        value: fmtMoney(calculo.productos_adicionales) ?? '—',
+                      },
+                      {
+                        label: 'Precio de venta total',
+                        value: fmtMoney(calculo.precio_venta_total) ?? '—',
+                      },
+                      { label: 'Apoyo Infonavit', value: fmtMoney(calculo.apoyo_infonavit) ?? '—' },
+                      {
+                        label: 'Pago directo cliente',
+                        value: fmtMoney(calculo.pago_directo) ?? '—',
+                      },
+                      { label: 'Enganche 1%', value: fmtMoney(calculo.enganche_1pct) ?? '—' },
+                      { label: 'ISAI 2%', value: fmtMoney(calculo.isai_2pct) ?? '—' },
+                      {
+                        label: 'Gastos notariales 6%',
+                        value: fmtMoney(calculo.gastos_notariales_6pct) ?? '—',
+                      },
+                    ]}
+                    cols={3}
+                  />
+                ) : (
+                  <>
+                    <FichaGrid
+                      rows={[
+                        {
+                          label: 'Valor comercial',
+                          value: fmtMoney(calculo.valor_comercial) ?? '—',
+                        },
+                        {
+                          label: 'Precio de venta (contrato)',
+                          value: fmtMoney(calculo.precio_venta_total) ?? '—',
+                        },
+                      ]}
+                      cols={3}
+                    />
+                    <p className="mt-2 text-xs text-[var(--text)]/50">
+                      Precio congelado del contrato. Venta anterior al desglose por componente — no
+                      se re-tarifa.
+                    </p>
+                  </>
+                )}
               </div>
             ) : null}
             {venta.motivo_desasignacion ? (
