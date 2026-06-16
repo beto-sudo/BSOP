@@ -349,6 +349,13 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // Vista de CapEx: presupuesto vs gasto real (obra_presupuesto) + saldo de
   // contratos de obra. Migración 20260602030000_modulos_dilesa_construccion_costeo.sql.
   'dilesa.construccion.costeo',
+  // Sub-slug del form de captura "Recepción de obra" (iniciativa
+  // dilesa-atencion-clientes · Sprint 1 S1c). Gobierna el botón "Recibir obra"
+  // en el detalle de construcción; write = quién puede recibirle al contratista
+  // (Atención a Clientes + Dirección). El gate real del cierre vive además en
+  // la RPC dilesa.fn_recepcion_cerrar + trigger tg_recepcion_gate.
+  // Migración 20260616020032_dilesa_recepcion_obra.sql.
+  'dilesa.construccion.recepcion',
   // Hub de Compras (P2P) — umbrella + 3 sub-slugs por tab (iniciativa
   // dilesa-compras · Sprint 2, ADR-030). Modelo constructora-first.
   // Migración 20260605040000_modulos_dilesa_compras.sql.
