@@ -408,6 +408,15 @@ function NuevaSolicitudForm() {
     );
   }, [promociones, unidadId, unidades]);
 
+  // Auto-asigna la promo cuando hay exactamente 1 aplicable al prototipo y el
+  // vendedor aún no eligió. Editable (puede cambiarla o quitarla); deja el tope
+  // de descuento definido desde la solicitud (iniciativa dilesa-descuentos-promos).
+  useEffect(() => {
+    if (promocionesAplicables.length === 1 && !promocionId) {
+      setPromocionId(promocionesAplicables[0].id);
+    }
+  }, [promocionesAplicables, promocionId]);
+
   // ── Personas filtradas por búsqueda ─────────────────────────────────────────
   // Sin búsqueda mostramos el catálogo completo (sort por apellido en la query).
   // Con búsqueda filtramos client-side por nombre completo o CURP — sin cap, los
@@ -974,7 +983,13 @@ function NuevaSolicitudForm() {
               ))}
             </select>
           </Field>
-          <Field label="Promoción (si aplica)">
+          <Field
+            label={
+              promocionesAplicables.length === 1
+                ? 'Promoción (auto-asignada)'
+                : 'Promoción (si aplica)'
+            }
+          >
             <select
               className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
               value={promocionId}

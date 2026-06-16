@@ -57,6 +57,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/ventas/fases': 'dilesa.ventas.fases',
   '/dilesa/ventas/clientes': 'dilesa.ventas.clientes',
   '/dilesa/ventas/vendedores': 'dilesa.ventas.vendedores',
+  '/dilesa/ventas/promociones': 'dilesa.ventas.promociones',
   // Cobranza (CxC) es un hub con 2 tabs. La URL default mapea al sub-slug
   // del primer tab (`.pagos`). ADR-030 SS2.
   '/dilesa/cobranza': 'dilesa.cobranza.pagos',
