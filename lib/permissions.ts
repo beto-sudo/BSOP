@@ -122,6 +122,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // para todo miembro de DILESA; la ayuda contextual por pantalla hereda el
   // gate de cada módulo. Ver docs/planning/manual-usuario.md.
   '/dilesa/manual': 'dilesa.manual',
+  // Atención a Clientes — bandeja de trabajo (iniciativa dilesa-atencion-clientes
+  // Sprint 2). Página única (cola por momento); sin sub-slugs.
+  '/dilesa/atencion-clientes': 'dilesa.atencion_clientes',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',

@@ -2269,6 +2269,13 @@ export type Database = {
             foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
             columns: ["construccion_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_obras_por_recibir"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
             referencedRelation: "v_tareas_pendientes_de_pago"
             referencedColumns: ["construccion_id"]
           },
@@ -2376,6 +2383,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "construccion"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_lotes_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_obras_por_recibir"
+            referencedColumns: ["construccion_id"]
           },
           {
             foreignKeyName: "contrato_lotes_construccion_id_fkey"
@@ -2549,6 +2563,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "construccion"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimacion_tareas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_obras_por_recibir"
+            referencedColumns: ["construccion_id"]
           },
           {
             foreignKeyName: "estimacion_tareas_construccion_id_fkey"
@@ -4283,6 +4304,13 @@ export type Database = {
             foreignKeyName: "recepcion_obra_construccion_id_fkey"
             columns: ["construccion_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_obras_por_recibir"
+            referencedColumns: ["construccion_id"]
+          },
+          {
+            foreignKeyName: "recepcion_obra_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
             referencedRelation: "v_tareas_pendientes_de_pago"
             referencedColumns: ["construccion_id"]
           },
@@ -4737,6 +4765,13 @@ export type Database = {
             foreignKeyName: "venta_encuestas_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: true
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
             referencedRelation: "v_unidad_hold_queue"
             referencedColumns: ["venta_id"]
           },
@@ -4839,6 +4874,13 @@ export type Database = {
             foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "v_unidad_hold_queue"
             referencedColumns: ["venta_id"]
           },
@@ -4896,6 +4938,13 @@ export type Database = {
             foreignKeyName: "venta_fases_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "v_unidad_hold_queue"
             referencedColumns: ["venta_id"]
           },
@@ -4949,6 +4998,13 @@ export type Database = {
           venta_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
           {
             foreignKeyName: "venta_pagos_venta_id_fkey"
             columns: ["venta_id"]
@@ -5252,6 +5308,68 @@ export type Database = {
       }
     }
     Views: {
+      v_ac_encuestas_pendientes: {
+        Row: {
+          cliente: string | null
+          empresa_id: string | null
+          encuesta_id: string | null
+          estado: string | null
+          intentos: number | null
+          programada_para: string | null
+          unidad: string | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_ac_obras_por_recibir: {
+        Row: {
+          avance_pct: number | null
+          codigo: string | null
+          construccion_id: string | null
+          empresa_id: string | null
+          estado: string | null
+          fecha_programada: string | null
+          proyecto: string | null
+          recepcion_estado: string | null
+          unidad: string | null
+        }
+        Relationships: []
+      }
+      v_ac_ventas_entrega: {
+        Row: {
+          cliente: string | null
+          cola: string | null
+          empresa_id: string | null
+          fase_actual: string | null
+          fase_posicion: number | null
+          proyecto: string | null
+          unidad: string | null
+          venta_id: string | null
+        }
+        Relationships: []
+      }
       v_construccion_tareas_terminadas_con_mo: {
         Row: {
           construccion_id: string | null
@@ -5275,6 +5393,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "construccion"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_obras_por_recibir"
+            referencedColumns: ["construccion_id"]
           },
           {
             foreignKeyName: "construccion_tareas_terminadas_construccion_id_fkey"
