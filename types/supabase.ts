@@ -5562,6 +5562,18 @@ export type Database = {
         Args: { p_contrato_id: string; p_motivo: string }
         Returns: undefined
       }
+      fn_actualizar_descuentos_venta: {
+        Args: {
+          p_descuento_equipamiento?: number
+          p_descuento_gastos_escrituracion?: number
+          p_descuento_nota_credito?: number
+          p_descuento_precio?: number
+          p_descuento_total: number
+          p_motivo?: string
+          p_venta_id: string
+        }
+        Returns: Json
+      }
       fn_backfill_cxc: {
         Args: never
         Returns: {
@@ -5652,6 +5664,16 @@ export type Database = {
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
         Returns: boolean
+      }
+      fn_venta_auditar_descuentos: {
+        Args: {
+          p_accion: string
+          p_datos_anteriores: Json
+          p_datos_nuevos: Json
+          p_empresa_id: string
+          p_venta_id: string
+        }
+        Returns: undefined
       }
       obra_estimacion_autorizar: {
         Args: { p_estimacion_id: string }

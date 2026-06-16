@@ -28,6 +28,7 @@ type VentaCuadraturaRow = {
   monto_credito_directo: number | null;
   monto_cheque_notaria: number | null;
   gastos_escrituracion: number | null;
+  descuento_total: number | null;
   descuento_precio: number | null;
   descuento_equipamiento: number | null;
   descuento_gastos_escrituracion: number | null;
@@ -47,7 +48,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -149,11 +150,11 @@ export async function cargarCuadraturaVenta(
     apoyoInfonavit: Number(
       (tcRes.data as { apoyo_infonavit_monto: number | null } | null)?.apoyo_infonavit_monto ?? 0
     ),
-    descuentoOtorgadoTotal:
-      (Number(venta.descuento_precio) || 0) +
-      (Number(venta.descuento_equipamiento) || 0) +
-      (Number(venta.descuento_gastos_escrituracion) || 0) +
-      (Number(venta.descuento_nota_credito) || 0),
+    // `descuento_total` es el monto autoritativo (amarre Sprint 1: los 4
+    // buckets son desglose y suman al total vía la RPC). Leer el total — y no
+    // la suma de buckets — evita que un descuento capturado en Formalizada
+    // (total sin desglose) quede invisible al saldo.
+    descuentoOtorgadoTotal: Number(venta.descuento_total) || 0,
     // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
     descuentoMaximoAutorizado: (promoRes.data as { monto: number | null } | null)?.monto ?? null,
     precioAsignacion: venta.precio_asignacion,

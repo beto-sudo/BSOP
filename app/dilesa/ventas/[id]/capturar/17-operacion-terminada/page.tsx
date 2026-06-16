@@ -41,6 +41,7 @@ type VentaCtx = {
   monto_cheque_notaria: number | null;
   gastos_escrituracion: number | null;
   monto_nota_credito: number | null;
+  descuento_total: number | null;
   descuento_precio: number | null;
   descuento_equipamiento: number | null;
   descuento_gastos_escrituracion: number | null;
@@ -90,7 +91,7 @@ function CapturarFase17Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, tipo_credito, valor_escrituracion, precio_asignacion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, monto_nota_credito, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
+          'id, empresa_id, persona_id, unidad_id, tipo_credito, valor_escrituracion, precio_asignacion, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, monto_nota_credito, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -181,11 +182,8 @@ function CapturarFase17Body() {
         montoChequeNotaria: v.monto_cheque_notaria,
         gastosEscrituracion: v.gastos_escrituracion,
         apoyoInfonavit: apoyo,
-        descuentoOtorgadoTotal:
-          Number(v.descuento_precio ?? 0) +
-          Number(v.descuento_equipamiento ?? 0) +
-          Number(v.descuento_gastos_escrituracion ?? 0) +
-          Number(v.descuento_nota_credito ?? 0),
+        // `descuento_total` autoritativo (amarre Sprint 1).
+        descuentoOtorgadoTotal: Number(v.descuento_total ?? 0),
         precioAsignacion: v.precio_asignacion,
         depositos: ((abonosRes.data ?? []) as { monto_total: number; fuente: string }[]).map(
           (a) => ({ monto: a.monto_total, directoCliente: a.fuente === 'cliente' })

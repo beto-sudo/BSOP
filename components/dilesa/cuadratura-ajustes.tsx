@@ -27,6 +27,8 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 
 export type CuadraturaInputsStr = {
+  /** El "cuánto" autoritativo del descuento. Los buckets lo reparten. */
+  descuentoTotal: string;
   descuentoPrecio: string;
   descuentoEquipamiento: string;
   descuentoGastosEscr: string;
@@ -38,7 +40,7 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
   currency: 'MXN',
   maximumFractionDigits: 2,
 });
-const numOrNull = (s: string): number | null => (s.trim() === '' ? null : Number(s));
+const round2 = (v: number): number => Math.round(v * 100);
 
 export function CuadraturaAjustes({
   ventaId,
@@ -66,29 +68,47 @@ export function CuadraturaAjustes({
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
-  const descTotal =
+  // `total` es el "cuánto" autoritativo. Los buckets son el reparto.
+  const total = Number(values.descuentoTotal) || 0;
+  const sumBuckets =
     (Number(values.descuentoPrecio) || 0) +
     (Number(values.descuentoEquipamiento) || 0) +
     (Number(values.descuentoGastosEscr) || 0) +
     (Number(values.descuentoNotaCredito) || 0);
+  const hasBuckets =
+    values.descuentoPrecio.trim() !== '' ||
+    values.descuentoEquipamiento.trim() !== '' ||
+    values.descuentoGastosEscr.trim() !== '' ||
+    values.descuentoNotaCredito.trim() !== '';
+  // Amarre: si hay reparto, su suma debe cuadrar con el total.
+  const desgloseCuadra = !hasBuckets || round2(sumBuckets) === round2(total);
 
   async function guardar() {
+    if (hasBuckets && !desgloseCuadra) {
+      toast.add({
+        title: 'El desglose no cuadra',
+        description: `La suma de los buckets (${moneyFmt.format(sumBuckets)}) debe ser igual al descuento total (${moneyFmt.format(total)}).`,
+        type: 'error',
+      });
+      return;
+    }
     setSaving(true);
     const sb = createSupabaseBrowserClient();
-    const { error } = await sb
-      .schema('dilesa')
-      .from('ventas')
-      .update({
-        descuento_precio: numOrNull(values.descuentoPrecio),
-        descuento_equipamiento: numOrNull(values.descuentoEquipamiento),
-        descuento_gastos_escrituracion: numOrNull(values.descuentoGastosEscr),
-        descuento_nota_credito: numOrNull(values.descuentoNotaCredito),
-        // El total se mantiene en sync con la suma de los buckets. El tope
-        // (descuento_maximo_autorizado) ya no se captura: se deriva de la
-        // promoción de la solicitud (solo queda poblado en legacy Coda).
-        descuento_total: descTotal,
-      })
-      .eq('id', ventaId);
+    // Vía RPC auditada (amarre + core.audit_log). Sin desglose → modo
+    // total-only (la RPC no toca los buckets). Con desglose → exige sum=total.
+    // Sin desglose ⇒ se omiten los buckets (la función usa DEFAULT NULL =
+    // modo total-only, no toca el reparto). Con desglose ⇒ números (la
+    // función exige sum=total).
+    const { error } = await sb.schema('dilesa').rpc('fn_actualizar_descuentos_venta', {
+      p_venta_id: ventaId,
+      p_descuento_total: total,
+      p_descuento_precio: hasBuckets ? Number(values.descuentoPrecio) || 0 : undefined,
+      p_descuento_equipamiento: hasBuckets ? Number(values.descuentoEquipamiento) || 0 : undefined,
+      p_descuento_gastos_escrituracion: hasBuckets
+        ? Number(values.descuentoGastosEscr) || 0
+        : undefined,
+      p_descuento_nota_credito: hasBuckets ? Number(values.descuentoNotaCredito) || 0 : undefined,
+    });
     setSaving(false);
     if (error) {
       toast.add({
@@ -126,6 +146,19 @@ export function CuadraturaAjustes({
         ) : null}
       </div>
 
+      <div className="mb-3">
+        <Campo label="Descuento total (cuánto)">
+          <NumInput
+            value={values.descuentoTotal}
+            onChange={(v) => onPatch({ descuentoTotal: v })}
+            disabled={!canWrite}
+          />
+        </Campo>
+      </div>
+
+      <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/40">
+        Reparto · en qué se aplica (opcional; debe sumar el total)
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo label="Descuento al precio">
           <NumInput
@@ -181,16 +214,24 @@ export function CuadraturaAjustes({
         </span>
       </div>
 
+      {hasBuckets && !desgloseCuadra ? (
+        <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
+          El reparto suma <span className="font-semibold">{moneyFmt.format(sumBuckets)}</span> pero
+          el descuento total es <span className="font-semibold">{moneyFmt.format(total)}</span> — no
+          cuadran. Ajusta los buckets o el total antes de guardar.
+        </p>
+      ) : null}
+
       <p
         className={`mt-2 text-[11px] ${
-          descTotal > descuentoMaximo
+          total > descuentoMaximo
             ? 'font-medium text-red-600 dark:text-red-400'
             : 'text-[var(--text)]/55'
         }`}
       >
-        Descuento otorgado total:{' '}
-        <span className="font-semibold">{moneyFmt.format(descTotal)}</span> (suma de los 4 buckets)
-        {descTotal > descuentoMaximo
+        Descuento total: <span className="font-semibold">{moneyFmt.format(total)}</span>
+        {hasBuckets ? ` · repartido ${moneyFmt.format(sumBuckets)}` : ' · sin desglose'}
+        {total > descuentoMaximo
           ? ` — EXCEDE el máximo autorizado ${moneyFmt.format(descuentoMaximo)}`
           : ` de un máximo autorizado de ${moneyFmt.format(descuentoMaximo)}`}
         . El tope viene de la promoción elegida en la solicitud; el apoyo Infonavit, del catálogo de
