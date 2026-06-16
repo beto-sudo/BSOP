@@ -134,6 +134,15 @@ export const RECEPCION_CHECKLIST: readonly RecepcionChecklistSeccion[] = [
       { clave: 'pat_hidrosanitarias', etiqueta: 'Pruebas hidrosanitarias a municipal' },
     ],
   },
+  {
+    clave: 'pruebas_servicios',
+    titulo: 'Pruebas de servicios',
+    items: [
+      { clave: 'srv_agua', etiqueta: 'Prueba de agua — presión y sin fugas en toda la red' },
+      { clave: 'srv_luz', etiqueta: 'Prueba de luz — energización, medidor y centro de carga' },
+      { clave: 'srv_gas', etiqueta: 'Prueba de gas — hermeticidad de la instalación y suministro' },
+    ],
+  },
 ] as const;
 
 /** Total de ítems no opcionales (para el contador de avance del recorrido). */

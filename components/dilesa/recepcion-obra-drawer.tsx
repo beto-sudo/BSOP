@@ -445,7 +445,8 @@ export function RecepcionObraDrawer({
               />
             </div>
 
-            {/* Acta firmada: solo cuando el checklist está en verde */}
+            {/* Acta: imprimible en cualquier momento (para llevarla al recorrido o
+                recabar firmas); la recepción solo se cierra con el acta subida + verde. */}
             {!yaRecibida ? (
               <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)]/30 p-3">
                 <div className="flex items-center justify-between">
@@ -456,30 +457,24 @@ export function RecepcionObraDrawer({
                     href={`/dilesa/construccion/${construccionId}/acta-recepcion`}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-1 text-xs font-medium ${
-                      todoVerde
-                        ? 'text-[var(--accent)] underline'
-                        : 'pointer-events-none text-[var(--text)]/30'
-                    }`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)] underline"
                   >
                     <Printer className="h-3.5 w-3.5" /> Imprimir acta
                   </a>
                 </div>
-                {!todoVerde ? (
-                  <p className="text-[11px] text-[var(--text)]/50">
-                    Disponible cuando el checklist esté todo en verde (sin observaciones).
-                  </p>
-                ) : (
-                  <WizardFileSlot
-                    role="acta_recepcion"
-                    label={
-                      actaSubida ? 'Acta firmada adjuntada — reemplazar' : 'Sube el acta firmada'
-                    }
-                    file={actaFile}
-                    onChange={(f) => void subirActa(f)}
-                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
-                  />
-                )}
+                <p className="text-[11px] text-[var(--text)]/50">
+                  Imprime el acta (sale con lo capturado), recábala firmada por Supervisor de Obra,
+                  Contratista y Atención a Clientes, y súbela aquí. Es obligatoria para recibir.
+                </p>
+                <WizardFileSlot
+                  role="acta_recepcion"
+                  label={
+                    actaSubida ? 'Acta firmada adjuntada — reemplazar' : 'Sube el acta firmada'
+                  }
+                  file={actaFile}
+                  onChange={(f) => void subirActa(f)}
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                />
               </div>
             ) : null}
 
