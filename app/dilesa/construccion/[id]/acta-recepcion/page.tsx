@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 /**
  * Acta de recepción de obra — vista imprimible (formato "CHECK LIST PRE-ENTREGA
  * VIVIENDA" de DILESA, LLENA con lo capturado). Se imprime, se firma
