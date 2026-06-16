@@ -50,7 +50,7 @@ import {
   CuadraturaAjustes,
   type CuadraturaInputsStr,
 } from '@/components/dilesa/cuadratura-ajustes';
-import { calcularCuadratura } from '@/lib/dilesa/cuadratura';
+import { calcularCuadratura, topeDescuentoAutorizado } from '@/lib/dilesa/cuadratura';
 import { camposCapturadosPorFase } from '@/lib/dilesa/captura/campos-capturados';
 import { FASE_ROLES, ROL_LABEL, rolesOpcionales } from '@/lib/dilesa/captura/fase-roles';
 import { evaluarCierre } from '@/lib/dilesa/copiloto-cierre';
@@ -114,6 +114,7 @@ type Venta = {
   descuento_nota_credito: number | null;
   descuento_maximo_autorizado: number | null;
   promocion_id: string | null;
+  coda_row_id: string | null;
   monto_detonado: number | null;
   numero_escritura: string | null;
   fecha_escritura: string | null;
@@ -909,7 +910,7 @@ function DetailInner() {
         descuentoOtorgadoTotal: Number(cuadInputs.descuentoTotal) || 0,
         // Tope confiable SOLO desde la promoción de la solicitud; el máximo
         // legacy de Coda no es de fiar (159/315 ventas lo exceden por mal dato).
-        descuentoMaximoAutorizado: promo ? promo.monto : null,
+        descuentoMaximoAutorizado: topeDescuentoAutorizado(promo?.monto, !!venta?.coda_row_id),
         precioAsignacion: venta?.precio_asignacion ?? null,
         // Solo cuando ya hay CFDI de factura: su total es el Valor Facturado
         // autoritativo y la NC se deriva de él (NC = facturado real − valor

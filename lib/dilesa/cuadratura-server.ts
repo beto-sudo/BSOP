@@ -14,7 +14,11 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { calcularCuadratura, type Cuadratura } from '@/lib/dilesa/cuadratura';
+import {
+  calcularCuadratura,
+  topeDescuentoAutorizado,
+  type Cuadratura,
+} from '@/lib/dilesa/cuadratura';
 
 type VentaCuadraturaRow = {
   empresa_id: string;
@@ -34,6 +38,7 @@ type VentaCuadraturaRow = {
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
   promocion_id: string | null;
+  coda_row_id: string | null;
 };
 
 /**
@@ -48,7 +53,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -155,8 +160,11 @@ export async function cargarCuadraturaVenta(
     // la suma de buckets — evita que un descuento capturado en Formalizada
     // (total sin desglose) quede invisible al saldo.
     descuentoOtorgadoTotal: Number(venta.descuento_total) || 0,
-    // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
-    descuentoMaximoAutorizado: (promoRes.data as { monto: number | null } | null)?.monto ?? null,
+    // Tope: promo si hay; nativa sin promo ⇒ 0; legacy sin promo ⇒ sin tope.
+    descuentoMaximoAutorizado: topeDescuentoAutorizado(
+      (promoRes.data as { monto: number | null } | null)?.monto,
+      !!venta.coda_row_id
+    ),
     precioAsignacion: venta.precio_asignacion,
     valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
     depositos: abonos.map((a) => ({
