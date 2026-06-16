@@ -414,7 +414,6 @@ function NuevaSolicitudForm() {
     if (promocionesAplicables.length === 1 && !promocionId) {
       setPromocionId(promocionesAplicables[0].id);
     }
-     
   }, [promocionesAplicables, promocionId]);
 
   // ── Personas filtradas por búsqueda ─────────────────────────────────────────
