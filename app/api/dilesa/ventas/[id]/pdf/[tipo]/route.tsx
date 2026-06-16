@@ -862,7 +862,15 @@ export async function GET(
     isai2pct: Number(c?.isai_2pct ?? 0),
     gastosNotariales6pct: Number(c?.gastos_notariales_6pct ?? 0),
     tipoCredito: venta.tipo_credito ?? '',
-    pagoDirecto: Number(c?.pago_directo ?? 0) + Number(c?.apoyo_infonavit ?? 0),
+    // Nuevas: pago_directo del snapshot + apoyo (= precio − créditos).
+    // Históricas (sin pago_directo congelado): derivar precio − créditos para
+    // no mostrar $0. Ambas rutas dan el mismo número.
+    pagoDirecto:
+      typeof c?.pago_directo === 'number'
+        ? Number(c.pago_directo) + Number(c.apoyo_infonavit ?? 0)
+        : Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0) -
+          Number(venta.monto_credito_titular ?? 0) -
+          Number(venta.monto_credito_cotitular ?? 0),
     montoCreditoTitular: Number(venta.monto_credito_titular ?? 0),
     montoCreditoCotitular: Number(venta.monto_credito_cotitular ?? 0),
     totalPagosDisponibles: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),

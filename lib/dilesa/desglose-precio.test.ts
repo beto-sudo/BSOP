@@ -71,6 +71,24 @@ describe('leerDesglose', () => {
     expect(snap?.origen).toBe('backfill_contrato');
     expect(snap?.precio_venta_total).toBe(1021000);
     expect(snap?.costo_credito_adicional).toBeUndefined();
+    // Enganche/ISAI/gastos se derivan del total (no estaban en el backfill) —
+    // si no, la solicitud/PDF los mostraba en $0.
+    expect(snap?.enganche_1pct).toBe(10210);
+    expect(snap?.isai_2pct).toBe(20420);
+    expect(snap?.gastos_notariales_6pct).toBe(61260);
+  });
+
+  it('preserva enganche/ISAI/gastos guardados (no re-deriva en ventas nuevas)', () => {
+    const snap = leerDesglose({
+      precio_venta_total: 1000000,
+      enganche_1pct: 5,
+      isai_2pct: 7,
+      gastos_notariales_6pct: 9,
+      componentes_detallados: true,
+    });
+    expect(snap?.enganche_1pct).toBe(5);
+    expect(snap?.isai_2pct).toBe(7);
+    expect(snap?.gastos_notariales_6pct).toBe(9);
   });
 
   it('round-trip: congelar y luego leer preserva el total y marca detallado', () => {

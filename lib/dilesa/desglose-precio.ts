@@ -71,9 +71,20 @@ export function leerDesglose(json: unknown): DesglosePrecioSnapshot | null {
   if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
   const obj = json as Record<string, unknown>;
   if (typeof obj.precio_venta_total !== 'number') return null;
+  const total = obj.precio_venta_total;
+  const num = (k: string, factor: number): number =>
+    typeof obj[k] === 'number' ? (obj[k] as number) : total * factor;
   return {
     ...obj,
-    precio_venta_total: obj.precio_venta_total,
+    precio_venta_total: total,
+    // Enganche 1% / ISAI 2% / gastos notariales 6% son % FIJOS del total
+    // congelado — derivaciones puras, no dependen de reglas (ZCU/+6%). Se
+    // computan del total cuando faltan para que las históricas (backfill sin
+    // componentes) no muestren $0 en la solicitud/PDF. En ventas nuevas el
+    // valor guardado ya es total×%, así que el resultado es idéntico.
+    enganche_1pct: num('enganche_1pct', 0.01),
+    isai_2pct: num('isai_2pct', 0.02),
+    gastos_notariales_6pct: num('gastos_notariales_6pct', 0.06),
     componentes_detallados: obj.componentes_detallados === true,
     origen: obj.origen === 'asignacion' ? 'asignacion' : 'backfill_contrato',
   } as DesglosePrecioSnapshot;
