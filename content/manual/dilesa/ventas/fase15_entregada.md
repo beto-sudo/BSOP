@@ -1,8 +1,8 @@
 ---
 titulo: 'Fase 15 — Entregada'
 modulo: dilesa.ventas.fase15_entregada
-version: '1.0.0'
-actualizado: '2026-06-11'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es esta fase?
@@ -16,6 +16,9 @@ Atención a Clientes, y se sube el documento firmado.
 ## Requisitos
 
 Fase 14 (Preparada para Entrega) cerrada.
+
+> Este pendiente aparece en la bandeja de **Atención a Clientes** (cola
+> "Entrega"), que te trae directo a esta pantalla.
 
 ## Cómo se trabaja
 

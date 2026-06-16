@@ -377,6 +377,9 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // read-only visible para todo miembro de DILESA. Migración
   // 20260607170000_modulo_dilesa_manual.sql.
   'dilesa.manual',
+  // Bandeja de Atención a Clientes (iniciativa dilesa-atencion-clientes Sprint 2).
+  // Módulo top-level; cola de Ciori sobre datos existentes.
+  'dilesa.atencion_clientes',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',

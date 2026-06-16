@@ -1,8 +1,8 @@
 ---
 titulo: 'Fase 2 — Asignada (autorización)'
 modulo: dilesa.ventas.autorizar
-version: '1.0.0'
-actualizado: '2026-06-11'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es esta fase?
@@ -24,6 +24,14 @@ formalmente asignada al cliente.
 
 Se revisan los 4 documentos (se pueden abrir y también subir aquí si falta
 alguno) y se pulsa **Autorizar asignación**. La venta pasa a fase Asignada.
+
+## El precio se congela al autorizar
+
+Al autorizar la asignación, el **desglose de precio queda congelado** en la
+venta (valor comercial, excedentes, extras, costos del crédito y total). A
+partir de ahí el detalle y el PDF de la solicitud muestran **ese** desglose: si
+después cambian las reglas de tarifación o una promoción, **no se re-tarifan**
+las ventas ya asignadas — los cambios solo aplican a ventas nuevas.
 
 ## Al cerrar
 

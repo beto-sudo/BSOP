@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada; el rollout a RDB/ANSA/COAGAN/Nigropetense se promoverá como iniciativa propia cuando Beto lo decida, con `content/manual/README.md` como receta)
 **Dueño:** Beto
 **Creada:** 2026-06-07
-**Última actualización:** 2026-06-12 (hardening en #854: ayuda filtrada por permisos D9 + PDF solo Dirección con marca de confidencialidad D10)
+**Última actualización:** 2026-06-16 (refresh de contenido bajo la regla M6: docs al día con los cambios de DILESA del 11-16 jun + 2 superficies nuevas — Atención a Clientes y Promociones)
 
 ## Problema
 
@@ -256,3 +256,21 @@ cero `manual|ayuda|help` en `app/` o `components/`).
   drawer del "?" (la portada era URL-only; Beto no la encontraba). Decisiones
   D9 (RBAC por doc) y D10 (export solo Dirección + watermark) registradas;
   ADR-043 M4/M8 enmendados.
+- **2026-06-16** — **Refresh de contenido (regla M6).** El contenido quedó
+  congelado el 11-jun mientras DILESA shippeaba mucho del 11 al 16; los PRs de
+  feature no actualizaron su `.md`, así que se barrió el drift de un jalón.
+  **2 docs nuevos** para superficies sin ayuda: `atencion_clientes.md` (bandeja
+  de Atención a Clientes — recepción de obra/pre-entrega/entrega/encuesta, grupo
+  nuevo `atencion_clientes` en `lib/manual/groups.ts`) y `ventas/promociones.md`
+  (catálogo de topes de descuento). **13 docs actualizados** por cambios de
+  negocio: cuadratura con saldo efectivo (descuento topado + cheque) y
+  Valor Facturado/Nota de Crédito del CFDI (`expediente`, `fase13` reescrita,
+  `fase12` cierre solo Dirección), captura colaborativa + ciclo PLD en dos pasos
+  (`expediente`, `fase13`), recibo de caja XML en CxC (`cobranza/pagos`),
+  desglose de precio congelado al asignar (`fase02`), ficha informativa + INE
+  (`fase01`, `clientes`), instrumento público del notario + corrección
+  post-cierre (`fase11`), estado `terminada` fuera del pipeline vivo (`fases`,
+  `lista`, `fase17`), flujo de recepción de obra (`construccion/obras`, `fase14`,
+  `fase15`) y control por partida en el pago (`cxp/pagos`). Ya estaban al día:
+  `fase10` (póliza con fecha de firma) y `saldos-bancos` (rename "Bancos").
+  Borradores generados leyendo el código vivo + los diffs de cada PR.

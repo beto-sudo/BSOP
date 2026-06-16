@@ -1,8 +1,8 @@
 ---
 titulo: 'Ventas — Fases'
 modulo: dilesa.ventas.fases
-version: '1.0.0'
-actualizado: '2026-06-07'
+version: '1.1.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -35,8 +35,11 @@ recalculan con los filtros.
 ## Preguntas frecuentes
 
 **¿Por qué una venta no aparece en ninguna fase?**
-Solo se cuentan las ventas **activas**. Y si a una venta le falta su fase actual,
-no se ubica en ninguna tarjeta (aparece un aviso de dato faltante).
+Solo se cuentan las ventas en estado **Activa** (el pipeline vivo). Las
+operaciones **Terminadas** (con la Fase 17 cerrada) salen del conteo — para
+verlas, usa la lista de Ventas con el filtro de estado en "Terminadas" o
+"Todos". Y si a una venta activa le falta su fase actual, no se ubica en ninguna
+tarjeta (aparece un aviso de dato faltante).
 
 **El filtro de "mes" ¿es por avance de fase?**
 No: es por el **mes en que se creó** la venta. Sirve para ver cohortes de ventas

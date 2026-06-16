@@ -1,8 +1,8 @@
 ---
 titulo: 'Fase 12 — Detonada'
 modulo: dilesa.ventas.fase12_detonada
-version: '1.1.0'
-actualizado: '2026-06-11'
+version: '1.2.0'
+actualizado: '2026-06-16'
 ---
 
 ## ¿Qué es esta fase?
@@ -28,6 +28,10 @@ el comprobante se copia al expediente.
 Es el **respaldo manual** para casos fuera del camino normal (igual que la
 captura manual del dictamen en F8). Requiere Fase 11 cerrada y captura fecha,
 monto y comprobante a mano.
+
+El cierre manual es **solo de Dirección** (es una salida de excepción, no el
+flujo normal). Si no eres Dirección, la pantalla te guía a registrar el abono en
+**Cobranza** —que es lo que detona la venta sola— en vez de cerrar a mano.
 
 ## Preguntas frecuentes
 
