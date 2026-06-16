@@ -4228,6 +4228,63 @@ export type Database = {
         }
         Relationships: []
       }
+      recepcion_obra: {
+        Row: {
+          checklist: Json
+          construccion_id: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estado: string
+          fecha_recepcion: string
+          id: string
+          notas: string | null
+          recibido_por_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          checklist?: Json
+          construccion_id: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estado?: string
+          fecha_recepcion?: string
+          id?: string
+          notas?: string | null
+          recibido_por_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          checklist?: Json
+          construccion_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estado?: string
+          fecha_recepcion?: string
+          id?: string
+          notas?: string | null
+          recibido_por_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recepcion_obra_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "construccion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recepcion_obra_construccion_id_fkey"
+            columns: ["construccion_id"]
+            isOneToOne: false
+            referencedRelation: "v_tareas_pendientes_de_pago"
+            referencedColumns: ["construccion_id"]
+          },
+        ]
+      }
       ruv_documentos_catalogo: {
         Row: {
           activo: boolean
@@ -4401,6 +4458,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           empresa_id: string
+          hito_recepcion: string | null
           id: string
           nombre: string
           updated_at: string
@@ -4410,6 +4468,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
+          hito_recepcion?: string | null
           id?: string
           nombre: string
           updated_at?: string
@@ -4419,6 +4478,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
+          hito_recepcion?: string | null
           id?: string
           nombre?: string
           updated_at?: string
@@ -4929,6 +4989,7 @@ export type Database = {
           descuento_nota_credito: number | null
           descuento_precio: number | null
           descuento_total: number | null
+          desglose_precio: Json | null
           empresa_id: string
           enganche_fecha_primer_pago: string | null
           enganche_num_parcialidades: number
@@ -5017,6 +5078,7 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          desglose_precio?: Json | null
           empresa_id: string
           enganche_fecha_primer_pago?: string | null
           enganche_num_parcialidades?: number
@@ -5105,6 +5167,7 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          desglose_precio?: Json | null
           empresa_id?: string
           enganche_fecha_primer_pago?: string | null
           enganche_num_parcialidades?: number
@@ -5499,6 +5562,18 @@ export type Database = {
         Args: { p_contrato_id: string; p_motivo: string }
         Returns: undefined
       }
+      fn_actualizar_descuentos_venta: {
+        Args: {
+          p_descuento_equipamiento?: number
+          p_descuento_gastos_escrituracion?: number
+          p_descuento_nota_credito?: number
+          p_descuento_precio?: number
+          p_descuento_total: number
+          p_motivo?: string
+          p_venta_id: string
+        }
+        Returns: Json
+      }
       fn_backfill_cxc: {
         Args: never
         Returns: {
@@ -5572,6 +5647,16 @@ export type Database = {
         Args: { p_anteproyecto_id: string }
         Returns: string
       }
+      fn_recepcion_cerrar: {
+        Args: {
+          p_checklist?: Json
+          p_construccion_id: string
+          p_estado?: string
+          p_fecha?: string
+          p_notas?: string
+        }
+        Returns: string
+      }
       fn_regresar_unidad_proyecto: {
         Args: { p_unidad_id: string }
         Returns: undefined
@@ -5579,6 +5664,16 @@ export type Database = {
       fn_tarea_terminada_esta_pagada: {
         Args: { p_tarea_id: string }
         Returns: boolean
+      }
+      fn_venta_auditar_descuentos: {
+        Args: {
+          p_accion: string
+          p_datos_anteriores: Json
+          p_datos_nuevos: Json
+          p_empresa_id: string
+          p_venta_id: string
+        }
+        Returns: undefined
       }
       obra_estimacion_autorizar: {
         Args: { p_estimacion_id: string }

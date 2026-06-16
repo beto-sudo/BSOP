@@ -61,6 +61,7 @@ type VentaRow = {
   monto_credito_directo: number | null;
   monto_cheque_notaria: number | null;
   gastos_escrituracion: number | null;
+  descuento_total: number | null;
   descuento_precio: number | null;
   descuento_equipamiento: number | null;
   descuento_gastos_escrituracion: number | null;
@@ -88,7 +89,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, fecha_firma_programada, ine_numero'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, fecha_firma_programada, ine_numero'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -258,11 +259,10 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           (tcRes.data as { apoyo_infonavit_monto: number | null } | null)?.apoyo_infonavit_monto ??
             0
         ),
-        descuentoOtorgadoTotal:
-          (Number(venta.descuento_precio) || 0) +
-          (Number(venta.descuento_equipamiento) || 0) +
-          (Number(venta.descuento_gastos_escrituracion) || 0) +
-          (Number(venta.descuento_nota_credito) || 0),
+        // `descuento_total` autoritativo (amarre Sprint 1): los buckets son
+        // desglose y suman al total vía la RPC. Leer el total evita que un
+        // descuento capturado sin desglose (Formalizada) quede invisible.
+        descuentoOtorgadoTotal: Number(venta.descuento_total) || 0,
         // Tope confiable solo desde la promo (el máximo legacy no es de fiar).
         descuentoMaximoAutorizado:
           (promoRes.data as { monto: number | null } | null)?.monto ?? null,
