@@ -51,6 +51,7 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.ventas.fases': [],
   'dilesa.ventas.inventario': [],
   'dilesa.ventas.vendedores': [],
+  'dilesa.ventas.promociones': [],
 
   // ── DILESA · Proyectos ─────────────────────────────────────────────────────
   // El tab Gasto vive bajo el detalle del proyecto (/dilesa/proyectos/[id]/gasto),

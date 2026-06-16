@@ -296,6 +296,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.ventas.fases',
   'dilesa.ventas.clientes',
   'dilesa.ventas.vendedores',
+  'dilesa.ventas.promociones',
   // Cobranza (CxC) — hub con 2 tabs. Migración
   // 20260601192607_modulo_dilesa_cobranza.sql.
   'dilesa.cobranza',
