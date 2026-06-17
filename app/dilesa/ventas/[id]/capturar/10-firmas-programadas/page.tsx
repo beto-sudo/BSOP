@@ -19,7 +19,9 @@
  * Captura:
  *   - `fecha_firma_programada` + `hora_firma_programada`
  *   - Crédito directo (si aplica): monto, plan de pagos (jsonb), tasas, aval.
- *   - Doc opcional: pagaré firmado (rol `pagare_credito_directo`).
+ *   - Doc opcional: pagaré firmado (rol `pagare`, el mismo que reconoce la fase
+ *     Escriturada y `rolesOpcionales` — así el pagaré subido aquí aparece como
+ *     cargado en el pipeline y no se pide de nuevo).
  *
  * Enforcement: Fase 9 (Validación Patronal) cerrada. Si hay saldo, el crédito
  * directo debe estar configurado para cerrar la fase.
@@ -48,7 +50,7 @@ import {
 
 const SLOTS_FASE: SlotColaborativo[] = [
   {
-    rol: 'pagare_credito_directo',
+    rol: 'pagare',
     label: 'Pagaré firmado (súbelo cuando lo tengas)',
     requerido: false,
   },

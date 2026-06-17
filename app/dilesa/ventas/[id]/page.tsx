@@ -808,6 +808,24 @@ function DetailInner() {
     [adjuntosPorRolMap]
   );
 
+  // Roles documentales que esta venta NO amerita (pagaré sin crédito directo,
+  // constancia de co-titular sin co-titular, nota de crédito sin monto, anexo
+  // de condiciones financieras fuera de INFONAVIT). El pipeline y el copiloto
+  // los excluyen de "faltantes" para no exhibir un doc fantasma que la
+  // operación no requiere.
+  const rolesOpc = useMemo(
+    () =>
+      venta
+        ? rolesOpcionales({
+            monto_credito_cotitular: venta.monto_credito_cotitular,
+            monto_credito_directo: venta.monto_credito_directo,
+            monto_nota_credito: venta.monto_nota_credito,
+            tipo_credito: venta.tipo_credito,
+          })
+        : new Set<string>(),
+    [venta]
+  );
+
   // Pipeline combinado: una fila por cada una de las 17 fases, con su
   // fecha (si alcanzada), docs cargados (clickeables) y docs faltantes
   // (chip outline gris). Es el "lugar donde se avanza fase por fase
@@ -825,7 +843,10 @@ function DetailInner() {
         (adjuntosPorRolMap.get(r) ?? []).map((a) => ({ ...a, rol: r }))
       );
       const rolesCargados = new Set(cargados.map((a) => a.rol));
-      const faltantes = roles.filter((r) => !rolesCargados.has(r));
+      // Un rol es faltante solo si la venta lo amerita (no está en `rolesOpc`):
+      // así el pipeline no pinta el chip "Pagaré" en una venta sin crédito
+      // directo, etc. — mismo criterio que el copiloto de cierre.
+      const faltantes = roles.filter((r) => !rolesCargados.has(r) && !rolesOpc.has(r));
       const slugCaptura = CAPTURAR_SLUG_BY_POSICION[pos];
       const previaCerrada =
         pos === 1 || posicionesAlcanzadas.has(GATE_PREVIA_OVERRIDE[pos] ?? pos - 1);
@@ -847,7 +868,7 @@ function DetailInner() {
         previaCerrada,
       };
     });
-  }, [fases, adjuntosPorRolMap, venta?.estado]);
+  }, [fases, adjuntosPorRolMap, venta?.estado, rolesOpc]);
 
   const pipelineAlcanzadas = useMemo(
     () => pipelineRows.filter((r) => r.alcanzada).length,
@@ -916,17 +937,11 @@ function DetailInner() {
 
   // Copiloto de cierre (S4): qué falta para Operación Terminada.
   const copiloto = useMemo(() => {
-    const opcionales = venta
-      ? rolesOpcionales({
-          monto_credito_cotitular: venta.monto_credito_cotitular,
-          monto_credito_directo: venta.monto_credito_directo,
-          monto_nota_credito: venta.monto_nota_credito,
-          tipo_credito: venta.tipo_credito,
-        })
-      : new Set<string>();
+    // `pipelineRows.faltantes` ya excluye `rolesOpc`; el filtro aquí es
+    // defensivo (un rol opcional nunca debe contar como pendiente de cierre).
     const docsFaltantes = pipelineRows.flatMap((r) =>
       r.faltantes
-        .filter((rol) => !opcionales.has(rol))
+        .filter((rol) => !rolesOpc.has(rol))
         .map((rol) => ({ fase: r.nombre, rol, label: ROL_LABEL[rol] ?? rol }))
     );
     return evaluarCierre(
@@ -938,7 +953,7 @@ function DetailInner() {
       },
       (n) => moneyFmt.format(n)
     );
-  }, [venta, pipelineRows, cuadratura]);
+  }, [venta, pipelineRows, cuadratura, rolesOpc]);
 
   if (loading) {
     return (
