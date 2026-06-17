@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import {
-  inferActivoTipo,
-  puedeLiberarse,
-  isActivoTipo,
-  isActivoModalidad,
-  ACTIVO_TIPOS,
-  ACTIVO_MODALIDADES,
-} from './portafolio';
+import { inferActivoTipo, puedeLiberarse, isActivoTipo, ACTIVO_TIPOS } from './portafolio';
 
 describe('inferActivoTipo', () => {
   it('comercial → lote', () => {
@@ -32,22 +25,18 @@ describe('inferActivoTipo', () => {
 });
 
 describe('puedeLiberarse', () => {
-  it('permite estados con pieza física', () => {
-    for (const e of [
-      'lote_urbanizado',
-      'terminada',
-      'asignada',
-      'vendida',
-      'escriturada',
-      'entregada',
-    ]) {
+  // dilesa-portafolio-destinos: se libera desde cualquier estado de obra
+  // (incl. en construcción) — el portafolio es el marcador de "fuera de ventas".
+  it('permite cualquier estado de obra no comprometido', () => {
+    for (const e of ['planeada', 'lote_urbanizado', 'en_construccion', 'terminada']) {
       expect(puedeLiberarse(e)).toBe(true);
     }
   });
 
-  it('bloquea estados sin pieza física', () => {
-    expect(puedeLiberarse('planeada')).toBe(false);
-    expect(puedeLiberarse('en_construccion')).toBe(false);
+  it('bloquea estados comprometidos con un cliente (requieren desasignar)', () => {
+    for (const e of ['asignada', 'vendida', 'escriturada', 'entregada']) {
+      expect(puedeLiberarse(e)).toBe(false);
+    }
   });
 });
 
@@ -56,11 +45,5 @@ describe('guards de catálogo', () => {
     for (const t of ACTIVO_TIPOS) expect(isActivoTipo(t)).toBe(true);
     expect(isActivoTipo('plaza_gigante')).toBe(false);
     expect(isActivoTipo('')).toBe(false);
-  });
-
-  it('isActivoModalidad valida contra el catálogo', () => {
-    for (const m of ACTIVO_MODALIDADES) expect(isActivoModalidad(m)).toBe(true);
-    expect(isActivoModalidad('regalo')).toBe(false);
-    expect(isActivoModalidad('')).toBe(false);
   });
 });
