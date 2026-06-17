@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { inferActivoTipo, puedeLiberarse, isActivoTipo, ACTIVO_TIPOS } from './portafolio';
+import {
+  inferActivoTipo,
+  puedeLiberarse,
+  isActivoTipo,
+  slugifyDestino,
+  ACTIVO_TIPOS,
+} from './portafolio';
 
 describe('inferActivoTipo', () => {
   it('comercial → lote', () => {
@@ -45,5 +51,25 @@ describe('guards de catálogo', () => {
     for (const t of ACTIVO_TIPOS) expect(isActivoTipo(t)).toBe(true);
     expect(isActivoTipo('plaza_gigante')).toBe(false);
     expect(isActivoTipo('')).toBe(false);
+  });
+});
+
+describe('slugifyDestino', () => {
+  it('deriva slug kebab/snake sin acentos', () => {
+    expect(slugifyDestino('Demo / Show House')).toBe('demo_show_house');
+    expect(slugifyDestino('Arrendamiento')).toBe('arrendamiento');
+    expect(slugifyDestino('Renta de Temporada')).toBe('renta_de_temporada');
+    expect(slugifyDestino('Oficina (propia)')).toBe('oficina_propia');
+  });
+
+  it('quita acentos y recorta separadores de los extremos', () => {
+    expect(slugifyDestino('  Bodega ')).toBe('bodega');
+    expect(slugifyDestino('Exhibición')).toBe('exhibicion');
+    expect(slugifyDestino('Área común')).toBe('area_comun');
+  });
+
+  it('devuelve cadena vacía si no hay caracteres usables', () => {
+    expect(slugifyDestino('   ')).toBe('');
+    expect(slugifyDestino('—/—')).toBe('');
   });
 });
