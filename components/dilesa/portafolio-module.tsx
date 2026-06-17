@@ -65,7 +65,15 @@ const ESTADO_LABEL: Record<string, string> = {
   desincorporado: 'Desincorporado',
 };
 
-export function PortafolioModule({ empresaId }: { empresaId: string }) {
+export function PortafolioModule({
+  empresaId,
+  vista = 'inventario',
+}: {
+  empresaId: string;
+  /** 'evaluacion' filtra a activos en evaluación de compra (estado prospecto). */
+  vista?: 'inventario' | 'evaluacion';
+}) {
+  const esEvaluacion = vista === 'evaluacion';
   const [activos, setActivos] = useState<Activo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +139,7 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const filtrados = useMemo(() => {
     const q = search.trim().toLowerCase();
     return activos.filter((a) => {
+      if (esEvaluacion && a.estado !== 'prospecto') return false;
       if (tipoFiltro && a.tipo !== tipoFiltro) return false;
       if (estadoFiltro && a.estado !== estadoFiltro) return false;
       if (destinoFiltro && (a.destino?.label ?? '') !== destinoFiltro) return false;
@@ -138,7 +147,7 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
       if (q && !a.nombre.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [activos, search, tipoFiltro, estadoFiltro, destinoFiltro, municipioFiltro]);
+  }, [activos, search, tipoFiltro, estadoFiltro, destinoFiltro, municipioFiltro, esEvaluacion]);
 
   // KPIs sobre el conjunto filtrado (la foto de lo que se está viendo).
   const kpis = useMemo<ModuleKpi[]>(() => {
@@ -213,9 +222,13 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
           <Building2 className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Portafolio</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
+            {esEvaluacion ? 'Evaluación de compra' : 'Portafolio'}
+          </h1>
           <p className="text-sm text-[var(--text)]/60">
-            Activos de DILESA — terrenos, lotes, locales, plazas, espectaculares y demás.
+            {esEvaluacion
+              ? 'Terrenos y activos en evaluación de compra (pipeline de adquisición).'
+              : 'Activos de DILESA — terrenos, lotes, locales, plazas, espectaculares y demás.'}
           </p>
         </div>
       </header>

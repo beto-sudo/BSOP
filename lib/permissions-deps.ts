@@ -85,6 +85,9 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.manual': [],
   'dilesa.atencion_clientes': [],
   'dilesa.portafolio': [],
+  // Hub Portafolio (ADR-030): tabs Inventario / Evaluación.
+  'dilesa.portafolio.inventario': [],
+  'dilesa.portafolio.evaluacion': [],
   'dilesa.proveedores': [],
   'dilesa.ruv': [],
   'dilesa.saldos-bancos': [],
