@@ -61,6 +61,8 @@ cubierta            = promoción + enganche + sobreprecio + pagaré ≈ gastos_n
 
 **D6 — La promoción de gastos viene del módulo `dilesa.promociones`** (decisión Beto 2026-06-17), no hardcodeada ni mezclada en `descuento`. Aplica por prototipo (`promociones.productos_aplicables`), vigente al asignar; el `monto` se **congela** en `ventas.promocion_gastos_monto` (vinculado por `promocion_id`, que ya existe). Puede variar por prototipo/temporada según el catálogo.
 
+**D7 — El motor distingue por presencia del desglose (fallback).** Si la venta tiene las columnas nuevas pobladas (es nueva o se está operando) → usa el **modelo desglosado**. Si están en `null` (ventas ya cerradas / legacy) → usa el **modelo viejo** (`descuento_total`) tal cual. Garantiza que **ninguna venta histórica cambia su cuadratura**; el rediseño solo aplica de aquí en adelante. No hay backfill masivo (ver Alcance).
+
 ## Spec de campos
 
 | Concepto                                | Hogar de datos                                                             | Captura / Deriva                             | Estado hoy                                                                               |
@@ -79,12 +81,15 @@ cubierta            = promoción + enganche + sobreprecio + pagaré ≈ gastos_n
 
 Constraint sugerido (trigger/app): `valor_escrituracion = precio_base + incremento_credito + sobreprecio_adicionales`. El **panel de cuadratura** muestra dos bloques — "Formación del precio de escrituración" (la cadena) y "Cobertura del presupuesto notarial" (las 4 fuentes etiquetadas por quién paga: cliente / crédito / DILESA) — más un resumen "quién financia los gastos" que separa el costo real de DILESA (solo la promoción) del pass-through del crédito.
 
-## Migración de datos legacy
+## Alcance del poblado (acotado — decisión Beto 2026-06-17)
 
-1. **Separar el `descuento` mezclado:** la promoción (`promocion_gastos_monto`) sale del catálogo `dilesa.promociones` por prototipo (15,000 estándar); el excedente que estaba en `descuento_*` → `sobreprecio_adicionales`. `descuento_total` queda solo con descuento comercial real (típicamente 0).
-2. **Poblar las columnas nuevas** (`precio_base`, `incremento_credito`, `sobreprecio_adicionales`) en las legacy. El `precio_base` debe ser el **real al asignar**, no el genérico del prototipo — revisar cuántas legacy de Coda tienen el base desactualizado (deberían ser pocas; caso por caso con Beto).
-3. **Sin tocar el saldo de las que ya cuadran** sin verificación adversarial contra las ~230 escrituradas.
-4. **Caso MAYRA:** `precio_base` 899,000, `incremento_credito` 55,419, `sobreprecio_adicionales` 24,651, `promocion_gastos_monto` 15,000, `descuento_total` 0, pagaré 9,387, cheque 84,038. (El descuento **no** se sube a 39,651 — eso era el workaround del modelo viejo.)
+**NO hay backfill masivo.** Las ventas **ya cerradas** (escrituradas fase ≥ 11, terminadas, desasignadas) **se quedan como están** — ya cuadraron en su momento; reescribir su desglose retroactivamente no aporta y sí arriesga. El desglose nuevo se pobla solo donde aporta:
+
+1. **Nuevas asignaciones** — el flujo de asignación guarda las 4 columnas desde el inicio (código en el server action de asignación + `fn_calcular_precio_venta`; no es migración de datos). Es lo importante a futuro.
+2. **Las ~70 ventas activas en proceso** (estado `activa`, fase < 11) — se pueblan conforme se operan / escrituran, empezando por las que están por firmar. No es un barrido automático: se asiste caso por caso (la promoción sale del catálogo por prototipo; el `precio_base` real al asignar puede diferir del genérico — son pocas).
+3. **Caso MAYRA:** `precio_base` 899,000, `incremento_credito` 55,419, `sobreprecio_adicionales` 24,651, `promocion_gastos_monto` 15,000, `descuento_total` 0, pagaré 9,387, cheque 84,038. (El descuento **no** se sube a 39,651 — eso era el workaround del modelo viejo.)
+
+Las cerradas y legacy quedan con las columnas nuevas en `null` — el motor las maneja con fallback (D7).
 
 ## Alternativas consideradas
 
@@ -96,7 +101,7 @@ Constraint sugerido (trigger/app): `valor_escrituracion = precio_base + incremen
 
 - **Utilidad/participación DILESA correcta:** ingreso = precio interno (954,419 en MAYRA), del que solo resta la promoción (15,000) + costo + comisiones; el sobreprecio deja de castigarla.
 - **El pagaré sale al monto real** (9,387 en MAYRA, no 34,038) porque el motor reconoce el sobreprecio como fuente.
-- **Migración delicada:** separar promoción/sobreprecio/descuento en el histórico requiere criterio y OK de Beto caso por caso.
-- **Toca superficies sensibles** (correo al Consejo, copiloto de cierre, nota de crédito, utilidad). Verificación adversarial contra las 230 escrituradas obligatoria antes de mergear el motor.
+- **Sin riesgo al histórico:** las ventas cerradas/legacy no se tocan (columnas en `null` → fallback al modelo viejo). No hay backfill masivo. El alcance es ~70 activas en proceso + nuevas asignaciones.
+- **Verificación obligatoria del fallback** antes de mergear el motor: confirmar contra una muestra de las ~230 escrituradas que su cuadratura sigue **idéntica** (el fallback no debe alterar ni un peso de lo cerrado).
 - El `valor_facturado` y la nota de crédito (modelo total + NC, confirmado por Beto) no cambian su lógica; sí se corrige el `valorRealVentaDilesa` que hoy sale negativo.
 - **Captura nueva:** las nuevas asignaciones guardan todo el desglose congelado desde el inicio (cierra el gap que dejó MAYRA).
