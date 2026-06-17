@@ -38,7 +38,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/rh/puestos': 'dilesa.rh.puestos',
   '/dilesa/rh/departamentos': 'dilesa.rh.departamentos',
   '/dilesa/proveedores': 'dilesa.proveedores',
-  '/dilesa/portafolio': 'dilesa.portafolio',
+  // Portafolio es un hub con 2 tabs (Inventario / Evaluación) — ADR-030.
+  '/dilesa/portafolio': 'dilesa.portafolio.inventario',
+  '/dilesa/portafolio/evaluacion': 'dilesa.portafolio.evaluacion',
   // Proyectos es un hub con 2 tabs (Activos / Anteproyectos) — iniciativa
   // `dilesa-proyectos-anteproyectos` Sprint 1. El padre `dilesa.proyectos`
   // queda como umbrella; cada tab tiene su sub-slug (ADR-030 SS2). La URL
@@ -185,6 +187,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
  */
 export const HUB_PARENT_BY_ROUTE: Record<string, string> = {
   '/dilesa/proyectos': 'dilesa.proyectos',
+  '/dilesa/portafolio': 'dilesa.portafolio',
   '/dilesa/ventas': 'dilesa.ventas',
   '/dilesa/cobranza': 'dilesa.cobranza',
   '/dilesa/cxp': 'dilesa.cxp',
