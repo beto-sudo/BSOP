@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (escritura en `activos` + satélites vía alta/edición; restaurar columnas de documento en `activo_terreno`; `activo_espectacular` + scoring/dueño-terreno; nueva tabla puente `activo_documentos` 1:N a `erp.documentos`; posible `v_portafolio_*` para filtros/KPIs; RPCs de alta/transición). `erp` (lectura `documentos` para ligar escrituras; `adjuntos` para planos/escrituras/KMZ como archivos). UI: `portafolio-module`, `activo-detail-drawer` + nuevo drawer de captura, hub de tabs ADR-030.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — drawer de alta/edición de activos (desbloqueo: hoy el módulo es read-only) + filtros ricos + KPI strip + adjuntos (planos/escrituras/KMZ como archivos) en la ficha.
+**Próximo hito:** Beto decide 2 pendientes: (a) **grano de espectaculares** (1 activo con sus 2 caras vs 2 activos por panel) → cargar los 52 del doc Coda; (b) **hub de tabs** (RBAC sub-slugs) sí/no. El resto del módulo (captura, filtros, KPIs, documentos, análisis de compra, escrituras 1:N) ya en prod.
 **Dueño:** Beto
 **Creada:** 2026-06-16
-**Última actualización:** 2026-06-16 (promovida; arranca Sprint 1)
+**Última actualización:** 2026-06-17 (tramo autónomo: 5 PRs en prod #918-#922)
 
 > **Sucede a** [`dilesa-portafolio-destinos`](dilesa-portafolio-destinos.md) (cerrada) y [`dilesa-portafolio-activos`](dilesa-portafolio-activos.md) (v1 del schema). El **módulo de arrendamiento** y los **mapas interactivos** ([`mapas-interactivos`](mapas-interactivos.md)) son iniciativas hermanas separadas.
 
@@ -63,3 +63,10 @@ El Portafolio deja de ser una lista y se vuelve el **expediente operable de cada
 ## Bitácora
 
 - **2026-06-16** — Promovida tras análisis multi-lente del módulo (5 lentes: datos, adquisición, UX/IA, geo-docs, espectaculares). Hallazgo raíz: el módulo es read-only y el schema ya soporta evaluación de terrenos. Arranca por el desbloqueo (captura + filtros + KPIs + adjuntos).
+- **2026-06-17 — Tramo autónomo (5 PRs en prod):**
+  - **#918** Captura/alta de activos: RPCs atómicas `fn_alta_activo`/`fn_actualizar_activo` (master + satélite vía `jsonb_populate_record`) + `<ActivoCaptureDrawer>` (config en `lib/dilesa/activo-form-fields.ts`) + botones "Nuevo activo"/"Editar".
+  - **#919** Filtros ricos (estado/destino/municipio) + KPI strip + columna Destino.
+  - **#920** Documentos en la ficha (`<FileAttachments>` sobre `erp.adjuntos`, entidad `activos`): planos/KMZ/fotos.
+  - **#921** Análisis de compra del terreno: `computeTerrenoSnapshot` ($/m² aprovechable, brecha de negociación) en la ficha.
+  - **#922** Escrituras 1:N: tabla puente `dilesa.activo_documentos` → `erp.documentos` + `<ActivoEscrituras>` (liga a las 57 escrituras legales existentes).
+- **Pendiente de decisión de Beto** (fuera del modo autónomo por riesgo/decisión): **espectaculares** (grano + carga masiva de 52) y **hub de tabs** (RBAC sub-slugs).
