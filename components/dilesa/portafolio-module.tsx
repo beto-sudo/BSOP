@@ -14,9 +14,10 @@ import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Building2, RefreshCw, Search, Tags } from 'lucide-react';
+import { Building2, Plus, RefreshCw, Search, Tags } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ActivoDetailDrawer } from '@/components/dilesa/activo-detail-drawer';
+import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
 import { DestinosCatalogoDialog } from '@/components/dilesa/destinos-catalogo-dialog';
 import { useEffectiveUser } from '@/components/providers';
 
@@ -69,8 +70,10 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
   const [detalle, setDetalle] = useState<{ id: string; tipo: string } | null>(null);
   const [destinosOpen, setDestinosOpen] = useState(false);
+  // false = cerrado · null = alta · string = edición de ese activo.
+  const [captura, setCaptura] = useState<string | null | false>(false);
   const { data: effectiveUser } = useEffectiveUser();
-  const puedeAdminDestinos =
+  const puedeAdmin =
     !!effectiveUser?.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const fetchActivos = useCallback(
@@ -198,15 +201,25 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </button>
-        {puedeAdminDestinos ? (
-          <button
-            type="button"
-            onClick={() => setDestinosOpen(true)}
-            className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
-          >
-            <Tags className="h-3.5 w-3.5" />
-            Destinos
-          </button>
+        {puedeAdmin ? (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCaptura(null)}
+              className="flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nuevo activo
+            </button>
+            <button
+              type="button"
+              onClick={() => setDestinosOpen(true)}
+              className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+            >
+              <Tags className="h-3.5 w-3.5" />
+              Destinos
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -232,14 +245,34 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
           if (!o) setDetalle(null);
         }}
         onChanged={() => void cargar()}
+        onEdit={
+          puedeAdmin
+            ? (id) => {
+                setDetalle(null);
+                setCaptura(id);
+              }
+            : undefined
+        }
       />
 
-      {puedeAdminDestinos ? (
-        <DestinosCatalogoDialog
-          empresaId={empresaId}
-          open={destinosOpen}
-          onOpenChange={setDestinosOpen}
-        />
+      {puedeAdmin ? (
+        <>
+          <ActivoCaptureDrawer
+            key={captura === false ? 'closed' : (captura ?? 'nuevo')}
+            empresaId={empresaId}
+            activoId={captura === false ? null : captura}
+            open={captura !== false}
+            onOpenChange={(o) => {
+              if (!o) setCaptura(false);
+            }}
+            onSaved={() => void cargar()}
+          />
+          <DestinosCatalogoDialog
+            empresaId={empresaId}
+            open={destinosOpen}
+            onOpenChange={setDestinosOpen}
+          />
+        </>
       ) : null}
     </div>
   );

@@ -145,6 +145,7 @@ export function ActivoDetailDrawer({
   open,
   onOpenChange,
   onChanged,
+  onEdit,
 }: {
   activoId: string | null;
   /** Tipo del activo (de la fila) para resolver el satélite sin un round-trip extra. */
@@ -153,6 +154,8 @@ export function ActivoDetailDrawer({
   onOpenChange: (open: boolean) => void;
   /** Se llama tras regresar la unidad a ventas, para que el caller refresque. */
   onChanged?: () => void;
+  /** Si se provee (admin/Dirección), muestra el botón Editar → abre el form de captura. */
+  onEdit?: (activoId: string) => void;
 }) {
   const { data: effectiveUser } = useEffectiveUser();
   const isAdmin = !!effectiveUser?.isAdmin;
@@ -323,11 +326,18 @@ export function ActivoDetailDrawer({
           ) : null
         }
         actions={
-          isAdmin && origen ? (
-            <Button size="sm" variant="outline" onClick={() => setRegresarOpen(true)}>
-              Regresar a ventas
-            </Button>
-          ) : null
+          <>
+            {onEdit && activoId ? (
+              <Button size="sm" variant="outline" onClick={() => onEdit(activoId)}>
+                Editar
+              </Button>
+            ) : null}
+            {isAdmin && origen ? (
+              <Button size="sm" variant="outline" onClick={() => setRegresarOpen(true)}>
+                Regresar a ventas
+              </Button>
+            ) : null}
+          </>
         }
       >
         <DetailDrawerContent>
