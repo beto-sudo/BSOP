@@ -94,6 +94,18 @@ export type CuadraturaInput = {
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
   /**
+   * Desglose nuevo (ADR-045). Cuando vienen poblados (venta nueva o en proceso),
+   * el motor usa el MODELO DESGLOSADO: el "descuento" que cubre gastos =
+   * `promocionGastos` (bono, costo DILESA) + `sobreprecioAdicionales` (lo paga el
+   * crédito). Si son null/undefined (ventas cerradas/legacy), el motor cae al
+   * modelo viejo (`descuentoOtorgadoTotal` topado) — fallback que NO altera nada
+   * histórico. `precioBase`/`incrementoCredito` son para el panel de precio.
+   */
+  precioBase?: number | null;
+  incrementoCredito?: number | null;
+  sobreprecioAdicionales?: number | null;
+  promocionGastos?: number | null;
+  /**
    * Total del CFDI de la factura de ESCRITURACIÓN (Fase 13,
    * `dilesa.ventas.valor_facturado`) — la factura de la operación que coincide
    * con la escritura. El motor lo usa como el componente "factura de
@@ -147,6 +159,28 @@ export type Cuadratura = {
   descuentoReal: number;
   comisionVendedor: number;
   comisionGerencia: number;
+  /**
+   * ADR-045: true si la venta trae el desglose nuevo poblado (modelo
+   * desglosado). false ⇒ se usó el modelo viejo (fallback legacy/cerradas).
+   */
+  tieneDesglose: boolean;
+  /**
+   * Desglose de la cobertura del presupuesto notarial (las 4 fuentes), solo
+   * cuando `tieneDesglose`. `null` en ventas legacy/cerradas. Para el panel.
+   */
+  coberturaGastos: {
+    /** Gastos de escrituración netos del apoyo Infonavit (= cheque a notaría). */
+    gastosNetos: number;
+    apoyoInfonavit: number;
+    /** Promoción/bono de gastos (costo de DILESA). */
+    promocion: number;
+    /** Enganche/depósitos del cliente. */
+    engancheCliente: number;
+    /** Sobreprecio (productos adicionales) — lo paga el crédito. */
+    sobreprecio: number;
+    /** Pagaré necesario = faltante tras promoción + enganche + sobreprecio. */
+    pagareNecesario: number;
+  } | null;
   /**
    * Señal de doble conteo: depósitos fuente-cliente + crédito institución
    * exceden el valor de escrituración (+ gastos netos legítimos) por más del
@@ -213,12 +247,21 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoCobranza = round2(valorEscrituracion - montoDisponible);
 
   const descuentoOtorgadoTotal = n(i.descuentoOtorgadoTotal);
+  // ADR-045: con el desglose poblado (venta nueva o en proceso), el "descuento"
+  // que reduce el saldo = promoción (bono, costo DILESA) + sobreprecio (lo paga
+  // el crédito). Sin desglose (ventas cerradas/legacy) → modelo viejo:
+  // descuento_total topado al máximo autorizado. Fallback que NO altera nada
+  // histórico (los campos del desglose llegan null y el cálculo queda idéntico).
+  const tieneDesglose = i.promocionGastos != null || i.sobreprecioAdicionales != null;
+  const promocionGastos = n(i.promocionGastos);
+  const sobreprecioAdicionales = n(i.sobreprecioAdicionales);
   // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento
   // hasta el máximo CONFIABLE (promo de la solicitud). Sin tope confiable
   // (legacy) se aplica el otorgado completo. El exceso sobre el tope NO reduce
   // el saldo (queda como pendiente a revisar).
-  const descuentoAplicado =
-    i.descuentoMaximoAutorizado != null
+  const descuentoAplicado = tieneDesglose
+    ? round2(promocionGastos + sobreprecioAdicionales)
+    : i.descuentoMaximoAutorizado != null
       ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
       : descuentoOtorgadoTotal;
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
@@ -234,6 +277,29 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // `chequePagado − excedenteDisponible`.
   const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
   const cubierta = saldoCliente <= TOLERANCIA_SALDO;
+
+  // ADR-045: desglose de las 4 fuentes que cubren el presupuesto notarial
+  // (gastos netos). Solo con desglose poblado; el pagaré es el faltante tras
+  // promoción + enganche del cliente + sobreprecio.
+  const gastosNetosR = round2(gastosNetos);
+  const pagareNecesario = tieneDesglose
+    ? round2(
+        Math.max(
+          0,
+          gastosNetosR - promocionGastos - depositosDirectoCliente - sobreprecioAdicionales
+        )
+      )
+    : 0;
+  const coberturaGastos = tieneDesglose
+    ? {
+        gastosNetos: gastosNetosR,
+        apoyoInfonavit: round2(n(i.apoyoInfonavit)),
+        promocion: round2(promocionGastos),
+        engancheCliente: round2(depositosDirectoCliente),
+        sobreprecio: round2(sobreprecioAdicionales),
+        pagareNecesario,
+      }
+    : null;
 
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
@@ -297,6 +363,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     descuentoReal,
     comisionVendedor,
     comisionGerencia,
+    tieneDesglose,
+    coberturaGastos,
     posibleDobleConteo,
   };
 }

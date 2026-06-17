@@ -395,4 +395,72 @@ describe('calcularCuadratura', () => {
       expect(c.cubierta).toBe(false); // pendiente a revisar
     });
   });
+
+  // ADR-045: modelo desglosado (venta nueva o en proceso). El "descuento" que
+  // reduce el saldo = promoción + sobreprecio; el desglose de cobertura de
+  // gastos sale en `coberturaGastos`. Caso MAYRA (FOVISSSTE, apoyo 0).
+  describe('modelo desglosado (ADR-045)', () => {
+    const mayra = (over = {}) =>
+      calcularCuadratura({
+        valorEscrituracion: 979070,
+        montoCreditoTitular: 979070,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 9387, // pagaré
+        montoChequeNotaria: 84038, // gastos completos (FOVISSSTE sin apoyo)
+        gastosEscrituracion: 84038,
+        apoyoInfonavit: 0,
+        precioBase: 899000,
+        incrementoCredito: 55419,
+        sobreprecioAdicionales: 24651,
+        promocionGastos: 15000,
+        depositos: [{ monto: 35000, directoCliente: true, tieneRecibo: true }],
+        proyectoNombre: 'Lomas de la Loma Este',
+        ...over,
+      });
+
+    it('MAYRA cuadra en 0 con el desglose (promoción + sobreprecio = descuento aplicado)', () => {
+      const c = mayra();
+      expect(c.tieneDesglose).toBe(true);
+      expect(c.descuentoAplicado).toBe(39651); // 15,000 promo + 24,651 sobreprecio
+      expect(c.montoDisponible).toBe(1023457); // 35,000 + 979,070 + 9,387
+      expect(c.saldoCobranza).toBe(-44387); // 979,070 − 1,023,457
+      expect(c.saldoCliente).toBe(0); // −44,387 − 39,651 + 84,038
+      expect(c.cubierta).toBe(true);
+    });
+
+    it('desglosa las 4 fuentes de cobertura de gastos', () => {
+      const c = mayra();
+      expect(c.coberturaGastos).toEqual({
+        gastosNetos: 84038,
+        apoyoInfonavit: 0,
+        promocion: 15000,
+        engancheCliente: 35000,
+        sobreprecio: 24651,
+        pagareNecesario: 9387, // 84,038 − 15,000 − 35,000 − 24,651
+      });
+    });
+
+    it('calcula el pagaré necesario aunque aún no se capture el crédito directo', () => {
+      // Antes de capturar el pagaré (CD=0) y el cheque: el faltante sigue siendo 9,387.
+      const c = mayra({ montoCreditoDirecto: 0, montoChequeNotaria: 0 });
+      expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
+    });
+
+    it('FALLBACK: sin desglose, el mismo escenario usa descuento_total (idéntico al modelo viejo)', () => {
+      // Cerradas/legacy: sin promocionGastos/sobreprecioAdicionales, con el
+      // descuento mezclado en descuento_total. Debe dar el mismo saldo y NO
+      // exponer coberturaGastos.
+      const c = mayra({
+        promocionGastos: null,
+        sobreprecioAdicionales: null,
+        precioBase: null,
+        incrementoCredito: null,
+        descuentoOtorgadoTotal: 39651, // promoción + sobreprecio mezclados (modelo viejo)
+      });
+      expect(c.tieneDesglose).toBe(false);
+      expect(c.coberturaGastos).toBe(null);
+      expect(c.descuentoAplicado).toBe(39651);
+      expect(c.saldoCliente).toBe(0); // mismo resultado que el desglosado
+    });
+  });
 });
