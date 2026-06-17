@@ -150,6 +150,37 @@ export function CuadraturaPanel({
         </Bloque>
       ) : null}
 
+      {/* Facturación de la venta — desglose (ADR-045) */}
+      {c.desgloseFacturacion ? (
+        <Bloque titulo="Facturación de la venta">
+          <Fila
+            label="Factura de la venta (escrituración)"
+            value={money(c.desgloseFacturacion.facturaVenta)}
+          />
+          <Fila
+            label="(+) Factura de enganche (recibo CFDI)"
+            value={money(c.desgloseFacturacion.facturaEnganche)}
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="(=) Total facturado"
+            value={money(c.desgloseFacturacion.totalFacturado)}
+            strong
+          />
+          <Fila
+            label="(−) Nota de crédito (acredita el enganche)"
+            value={money(c.desgloseFacturacion.notaCredito)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Neto facturado (= escrituración)"
+            value={money(c.desgloseFacturacion.netoFacturado)}
+            strong
+            tone="ok"
+          />
+        </Bloque>
+      ) : null}
+
       {/* Derivados de cierre */}
       <Bloque titulo="Cierre (valores derivados)">
         <Fila

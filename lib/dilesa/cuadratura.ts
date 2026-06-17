@@ -200,6 +200,18 @@ export type Cuadratura = {
     valorEscrituracion: number;
   } | null;
   /**
+   * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
+   * (escrituración) + factura de enganche = total facturado; − NC = neto (=
+   * escritura). `null` en legacy/cerradas.
+   */
+  desgloseFacturacion: {
+    facturaVenta: number;
+    facturaEnganche: number;
+    totalFacturado: number;
+    notaCredito: number;
+    netoFacturado: number;
+  } | null;
+  /**
    * Señal de doble conteo: depósitos fuente-cliente + crédito institución
    * exceden el valor de escrituración (+ gastos netos legítimos) por más del
    * umbral. Típico cuando la disposición del crédito se capturó como abono
@@ -381,14 +393,36 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // Estimado de respaldo: mismo cálculo con el valor de escrituración en vez del
   // CFDI real. Igual al efectivo salvo que el CFDI de escrituración difiera.
   const valorFacturadoSugerido = round2(valorEscrituracion + depositosConRecibo);
-  const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
-  const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
+  // Con desglose: la NC acredita el enganche facturado dos veces (está en la
+  // escritura Y en su recibo-CFDI), para que el neto facturado = valor de
+  // escritura. El sobreprecio NO se acredita (es parte de la escritura). Sin
+  // desglose: la NC de Coda = facturado − valor real (fallback intacto).
+  const montoNotaCredito = tieneDesglose
+    ? round2(depositosConRecibo)
+    : round2(valorFacturado - valorRealVentaDilesa);
+  const montoNotaCreditoSugerido = tieneDesglose
+    ? round2(depositosConRecibo)
+    : round2(valorFacturadoSugerido - valorRealVentaDilesa);
   const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
+  // Desglose de facturación (ADR-045): factura de venta (escrituración) +
+  // factura de enganche = total facturado; − NC = neto (= escritura). Cuadra
+  // "todo suma el valor de la escritura". Solo con desglose.
+  const desgloseFacturacion = tieneDesglose
+    ? {
+        facturaVenta: round2(valorEscrituracion),
+        facturaEnganche: round2(depositosConRecibo),
+        totalFacturado: round2(valorFacturado),
+        notaCredito: round2(depositosConRecibo),
+        netoFacturado: round2(valorFacturado - depositosConRecibo),
+      }
+    : null;
 
-  const comisionVendedor = round2(
-    valorEscrituracion * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01)
-  );
-  const comisionGerencia = round2(valorEscrituracion * 0.005);
+  // Con desglose, las comisiones se calculan sobre el PRECIO INTERNO (la venta
+  // real de DILESA), no sobre el escriturado con sobreprecio (decisión Beto
+  // 2026-06-17). Sin desglose, sobre el valor de escrituración (fallback).
+  const baseComision = tieneDesglose ? precioInterno : valorEscrituracion;
+  const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
+  const comisionGerencia = round2(baseComision * 0.005);
 
   return {
     depositosRecibidos: round2(depositosRecibidos),
@@ -415,6 +449,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     tieneDesglose,
     coberturaGastos,
     formacionPrecio,
+    desgloseFacturacion,
     posibleDobleConteo,
   };
 }

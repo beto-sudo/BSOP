@@ -462,10 +462,24 @@ describe('calcularCuadratura', () => {
       expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
       expect(c.valorRealVentaDilesa).toBe(954419); // precio interno, NO la fórmula negativa vieja
       expect(c.descuentoReal).toBe(24651); // 979,070 − 954,419 (el sobreprecio)
-      // Factura escrituración 979,070 + enganche con recibo 35,000 = 1,014,070;
-      // NC = facturado − valor real = 1,014,070 − 954,419.
-      expect(c.valorFacturado).toBe(1014070);
-      expect(c.montoNotaCredito).toBe(59651);
+    });
+
+    it('desglosa la facturación: total suma la escritura (factura venta + enganche − NC = neto)', () => {
+      const c = mayra();
+      expect(c.desgloseFacturacion).toEqual({
+        facturaVenta: 979070, // escrituración
+        facturaEnganche: 35000, // enganche con recibo CFDI
+        totalFacturado: 1014070,
+        notaCredito: 35000, // acredita el enganche facturado dos veces
+        netoFacturado: 979070, // = escrituración ✓
+      });
+      expect(c.montoNotaCredito).toBe(35000); // NC = enganche, no el valor real
+    });
+
+    it('comisiones sobre el precio interno (no el escriturado con sobreprecio)', () => {
+      const c = mayra();
+      expect(c.comisionVendedor).toBe(9544.19); // 954,419 × 1.0%
+      expect(c.comisionGerencia).toBe(4772.1); // 954,419 × 0.5%
     });
 
     it('FALLBACK: el cierre NO se toca sin desglose (formacionPrecio null, fórmula vieja)', () => {
