@@ -7,7 +7,7 @@
 **Próximo hito:** Contabilidad registra los 2 abonos de la venta Ahumada (con XML y comprobante c/u — ya con FIFO sin fuente, saldan ambos cargos y los comprobantes caen al expediente). Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-12 (guard-rails de fuente en captura de abono: pre-selección por cargo FIFO + aviso inline + flag de doble conteo en Cuadratura — caso Maribel/Infonavit)
+**Última actualización:** 2026-06-17 (auto-generación del plan de pagos en el ciclo de vida de la venta: trigger en `dilesa.ventas` que genera el plan al alistarse — fase 2-11 + valor>0 + sin plan previo, create-once, fail-open — + backfill de 6 ventas vivas. Elimina el paso manual que dejó flotar el abono de Arizpe Luna)
 
 ## Problema
 
@@ -329,6 +329,46 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-17 — Auto-generación del plan de pagos en el ciclo de vida de la venta
+
+Cierra el origen del incidente Arizpe Luna (ver también
+[dilesa-ventas-expediente] / PR #930): registrar un abono en una venta sin
+plan de pagos dejaba el pago flotando sin aplicar y la venta clavada en
+Fase 11. El PR #930 lo blindó en UI; este cambio elimina el paso manual de
+raíz. La generación del plan (`dilesa.fn_generar_plan_pagos`) era manual —
+herencia del cutover (se agregó como botón suelto, nunca enganchada al ciclo
+de vida de la venta).
+
+**Migración `20260617215750_cxc_auto_generar_plan_pagos_venta.sql`:** trigger
+`trg_venta_auto_plan_pagos` AFTER INSERT/UPDATE sobre `dilesa.ventas` que
+llama `fn_generar_plan_pagos` cuando la venta se alista, con guardas
+validadas contra prod:
+
+- `valor_escrituracion` (o `precio_asignacion`) **> 0** → salta los 112
+  cascarones vacíos sin economía.
+- **fase 2-11** (Asignada → Escriturada): el precio se congela al asignar
+  (snapshot PR #900) y paramos antes de Detonada (12) para no crear cargos
+  fantasma en ventas cerradas/migradas. Las de fase 1 se auto-generan al
+  pasar a Asignada.
+- **create-once**: si ya hay plan, NO se toca (la regeneración sigue siendo
+  manual por botón). `fn_generar_plan_pagos` además se congela tras el 1er
+  abono aplicado.
+- **fail-open**: si la función falla, WARNING y el guardado de la venta nunca
+  se aborta.
+
+**Backfill** (mismo criterio, idempotente): genera el plan de **6 ventas**
+vivas en pipeline que hoy no lo tenían (todas institucionales, enganche +
+disposición). Diagnóstico previo (read-only): de las ventas sin plan, el
+único caso "flotando" era Arizpe (ya corregido), 0 clavadas, 1 sobrepago
+nativo (Nancy Villarreal $33,076 — conciliación aparte), y 185 saldos a
+favor legacy del cutover (los ~$2.0M del Próximo hito, limpieza con regla
+masiva aparte).
+
+Decisión sostenida: **NO** auto-generar dentro de `cxc_pago_registrar`
+(acopla originación a un RPC financiero y esconde errores de datos); el
+disparador correcto es el ciclo de vida de la venta. Migración construida en
+PR; aplicación a prod con OK de Beto (crea cargos = datos financieros).
 
 ### 2026-06-12 — Guard-rails de fuente en captura de abono (doble conteo en cuadratura)
 
