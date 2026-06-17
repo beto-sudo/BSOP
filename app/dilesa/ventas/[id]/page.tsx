@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
   Circle,
@@ -1656,6 +1657,21 @@ function DetailInner() {
               </p>
             ) : (
               <div className="space-y-6">
+                {saldoFavor > 0 ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium">
+                        Hay {moneyFmt.format(saldoFavor)} en abonos sin aplicar (saldo a favor).
+                      </p>
+                      <p>
+                        {cargos.length === 0
+                          ? 'La venta no tiene plan de pagos, así que los abonos quedaron flotando: no bajaron saldo ni avanzaron la fase. Genera el plan de pagos; los abonos ya registrados deben re-aplicarse manualmente (revísalo con quien lleva CxC).'
+                          : 'El monto excede los cargos abiertos. Verifica el plan de pagos o el monto capturado.'}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-x-8 gap-y-3">
                   <ResumenItem label="A cobrar" value={moneyFmt.format(totalACobrar)} />
                   <ResumenItem label="Cobrado" value={moneyFmt.format(totalCobrado)} />

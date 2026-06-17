@@ -7,7 +7,7 @@
 **Próximo hito:** — (cerrada: cutover Coda de ventas completado 2026-06-11 — paridad certificada, daily apagado, equipo de ventas con usuarios/perfiles activos. Coda queda read-only de consulta)
 **Dueño:** Beto
 **Creada:** 2026-06-09
-**Última actualización:** 2026-06-15 (follow-up: Saldo efectivo — el descuento autorizado y el cheque a notaría girado entran al saldo de la cuadratura; antes el saldo era ciego al descuento y un descuento perdonado se veía como deuda)
+**Última actualización:** 2026-06-17 (follow-up UX: el drawer de abono bloquea el registro cuando la venta no tiene plan de pagos y lo ofrece generar ahí mismo; aviso fuerte si un abono queda 100% sin aplicar; banner de saldo a favor en Estado de cuenta. Cierra el hueco que dejó depósitos flotando + duplicados en la venta Arizpe Luna)
 
 ## Problema
 
@@ -153,6 +153,30 @@ expediente, copiloto), no reescritura.
 
 ## Bitácora
 
+- **2026-06-17 (follow-up UX — abono sin plan de pagos):** Cerrado el hueco que
+  permitía registrar un abono en una venta **sin plan de pagos** (cero cargos en
+  `erp.cxc_cargos`): el FIFO de `erp.cxc_pago_registrar` no encontraba qué
+  cubrir y el abono quedaba 100% flotando (saldo a favor) sin avanzar la fase —
+  y se podía repetir, duplicando depósitos en silencio. Incidente real: venta de
+  **Luis Gerardo Arizpe Luna** — Cobranza capturó el depósito Infonavit dos veces
+  (16 y 17-jun, $908,999.71 c/u, fuente institución); ambos flotaron y la venta
+  se quedó clavada en **Fase 11** porque la detonación (F12) solo dispara al
+  insertar en `erp.cxc_pago_aplicaciones`, que sin cargos nunca ocurrió.
+  Corrección, todo en UI (sin tocar el RPC ni la DB): (1) el drawer de abono
+  bloquea el submit cuando la venta no tiene cargos y ofrece **generar el plan
+  ahí mismo** (`dilesa.fn_generar_plan_pagos`) — al generarlo antes de registrar,
+  el FIFO aplica y la detonación dispara normal; (2) aviso fuerte (toast) si un
+  abono recién registrado quedó 100% sin aplicar (plan ya saldado); (3) banner en
+  Estado de cuenta cuando hay saldo a favor, con texto distinto si la venta no
+  tiene plan. Helper puro `abonoQuedariaSinAplicar` + tests
+  (`lib/dilesa/cxc/fuente-abono.ts`). Archivos:
+  `components/dilesa/abono-capture-drawer.tsx`, `app/dilesa/ventas/[id]/page.tsx`.
+  Decisión: **NO** auto-generar el plan dentro de `cxc_pago_registrar` (opción 3
+  evaluada y descartada) — acoplar la originación del plan a un RPC financiero
+  SECURITY DEFINER esconde errores de datos (venta sin `valor_escrituracion`,
+  fecha de escritura nula) y genera cargos de forma implícita; el gate explícito
+  en UI mantiene al humano en el lazo y surfacea los errores del RPC. (PR
+  pendiente de merge.)
 - **2026-06-15 (follow-up financiero):** **Saldo efectivo** — el saldo de la
   cuadratura ahora considera el descuento autorizado y el cheque a notaría
   girado, no solo efectivo+crédito. Antes el saldo era ciego al descuento, así
