@@ -10,10 +10,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { DataTable, type Column } from '@/components/module-page';
+import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { formatCurrency } from '@/lib/format';
 import { Building2, Plus, RefreshCw, Search, Tags } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ActivoDetailDrawer } from '@/components/dilesa/activo-detail-drawer';
@@ -30,6 +31,8 @@ type Activo = {
   area_m2: number | null;
   valor_estimado: number | null;
   activo_padre_id: string | null;
+  destino_id: string | null;
+  destino: { label: string } | null;
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -68,6 +71,9 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
+  const [estadoFiltro, setEstadoFiltro] = useState<string>('');
+  const [destinoFiltro, setDestinoFiltro] = useState<string>('');
+  const [municipioFiltro, setMunicipioFiltro] = useState<string>('');
   const [detalle, setDetalle] = useState<{ id: string; tipo: string } | null>(null);
   const [destinosOpen, setDestinosOpen] = useState(false);
   // false = cerrado · null = alta · string = edición de ese activo.
@@ -81,7 +87,9 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
       createSupabaseBrowserClient()
         .schema('dilesa')
         .from('activos')
-        .select('id, tipo, nombre, estado, municipio, area_m2, valor_estimado, activo_padre_id')
+        .select(
+          'id, tipo, nombre, estado, municipio, area_m2, valor_estimado, activo_padre_id, destino_id, destino:portafolio_destinos(label)'
+        )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null)
         .order('nombre'),
@@ -124,10 +132,40 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
     const q = search.trim().toLowerCase();
     return activos.filter((a) => {
       if (tipoFiltro && a.tipo !== tipoFiltro) return false;
+      if (estadoFiltro && a.estado !== estadoFiltro) return false;
+      if (destinoFiltro && (a.destino?.label ?? '') !== destinoFiltro) return false;
+      if (municipioFiltro && (a.municipio ?? '') !== municipioFiltro) return false;
       if (q && !a.nombre.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [activos, search, tipoFiltro]);
+  }, [activos, search, tipoFiltro, estadoFiltro, destinoFiltro, municipioFiltro]);
+
+  // KPIs sobre el conjunto filtrado (la foto de lo que se está viendo).
+  const kpis = useMemo<ModuleKpi[]>(() => {
+    const valor = filtrados.reduce((acc, a) => acc + (a.valor_estimado ?? 0), 0);
+    const enEval = filtrados.filter((a) => a.estado === 'prospecto').length;
+    const operando = filtrados.filter((a) => a.estado === 'operando').length;
+    return [
+      { key: 'valor', label: 'Valor estimado', value: formatCurrency(valor) },
+      { key: 'total', label: 'Activos', value: String(filtrados.length) },
+      { key: 'evaluacion', label: 'En evaluación', value: String(enEval) },
+      { key: 'operando', label: 'Operando', value: String(operando) },
+    ];
+  }, [filtrados]);
+
+  const destinosPresentes = useMemo(
+    () =>
+      Array.from(new Set(activos.map((a) => a.destino?.label).filter(Boolean) as string[])).sort(),
+    [activos]
+  );
+  const municipiosPresentes = useMemo(
+    () => Array.from(new Set(activos.map((a) => a.municipio).filter(Boolean) as string[])).sort(),
+    [activos]
+  );
+  const estadosPresentes = useMemo(
+    () => Array.from(new Set(activos.map((a) => a.estado))).sort(),
+    [activos]
+  );
 
   const columns: Column<Activo>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
@@ -146,6 +184,17 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
           {ESTADO_LABEL[a.estado] ?? a.estado}
         </Badge>
       ),
+    },
+    {
+      key: 'destino',
+      label: 'Destino',
+      type: 'custom',
+      render: (a) =>
+        a.destino ? (
+          <Badge tone="accent">{a.destino.label}</Badge>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
     },
     { key: 'municipio', label: 'Municipio', type: 'text' },
     { key: 'area_m2', label: 'Área (m²)', type: 'number' },
@@ -171,6 +220,8 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
         </div>
       </header>
 
+      <ModuleKpiStrip stats={kpis} cols={4} />
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
@@ -193,6 +244,46 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value)}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+        >
+          <option value="">Todos los estados</option>
+          {estadosPresentes.map((e) => (
+            <option key={e} value={e}>
+              {ESTADO_LABEL[e] ?? e}
+            </option>
+          ))}
+        </select>
+        {destinosPresentes.length > 0 ? (
+          <select
+            value={destinoFiltro}
+            onChange={(e) => setDestinoFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los destinos</option>
+            {destinosPresentes.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {municipiosPresentes.length > 0 ? (
+          <select
+            value={municipioFiltro}
+            onChange={(e) => setMunicipioFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todos los municipios</option>
+            {municipiosPresentes.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <button
           type="button"
           onClick={() => void cargar()}
