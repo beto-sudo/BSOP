@@ -5,16 +5,18 @@
  * portafolio de activos (captura tipo de activo + destino + valor estimado y
  * llama la server action `liberarUnidadAlPortafolio`).
  *
- * Iniciativa dilesa-portafolio-activos. Lo usan `<ProyectoDetalle>` (tabla de
- * unidades) y `<UnidadDetailDrawer>` (inventario de ventas). El gate de
- * "solo admin" lo aplican los callers (botón) Y la server action (enforcement).
+ * Iniciativa dilesa-portafolio-destinos. El "destino" se carga del catálogo
+ * `dilesa.portafolio_destinos` (Demo/Show House, Arrendamiento, Oficina, Bodega,
+ * Venta, …) — extensible sin migración. Lo usan `<ProyectoDetalle>` (tabla de
+ * unidades) y `<UnidadDetailDrawer>` (inventario de ventas). El gate "solo
+ * admin" lo aplican los callers (botón) Y la server action (enforcement).
  *
  * Se monta condicionalmente por unidad (`{unidad ? <…/> : null}`), así los
  * defaults se computan con `useState` initializers — sin efecto que sincronice
  * estado con props.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,14 +27,14 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import {
   ACTIVO_TIPOS,
   ACTIVO_TIPO_LABEL,
-  ACTIVO_MODALIDADES,
-  ACTIVO_MODALIDAD_LABEL,
   inferActivoTipo,
   type ActivoTipo,
-  type ActivoModalidad,
+  type PortafolioDestino,
 } from '@/lib/dilesa/portafolio';
 import { liberarUnidadAlPortafolio } from '@/app/dilesa/proyectos/actions';
 
@@ -45,29 +47,64 @@ export type UnidadLiberable = {
 
 export function LiberarPortafolioDialog({
   unidad,
+  empresaId,
   onOpenChange,
   onLiberated,
 }: {
   /** Unidad a liberar. El caller monta el dialog solo cuando hay una. */
   unidad: UnidadLiberable;
+  /** Empresa de la unidad — filtra el catálogo de destinos. */
+  empresaId: string;
   onOpenChange: (open: boolean) => void;
   /** Se llama tras liberar con éxito (para que el caller refresque/cierre). */
   onLiberated: (unidadId: string) => void;
 }) {
   const [tipo, setTipo] = useState<ActivoTipo>(() => inferActivoTipo(unidad.tipo_lote));
-  const [modalidad, setModalidad] = useState<ActivoModalidad>('venta');
+  const [destinos, setDestinos] = useState<PortafolioDestino[]>([]);
+  const [destinoId, setDestinoId] = useState<string>('');
   const [valor, setValor] = useState(() => (unidad.precio != null ? String(unidad.precio) : ''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data, error: e } = await sb
+        .schema('dilesa')
+        .from('portafolio_destinos')
+        .select('id, slug, label, cuenta_renta, cuenta_venta')
+        .eq('empresa_id', empresaId)
+        .eq('activo', true)
+        .is('deleted_at', null)
+        .order('orden');
+      if (!alive) return;
+      if (e) {
+        setError(getSupabaseErrorMessage(e, 'No se pudieron cargar los destinos.'));
+        return;
+      }
+      const rows = (data ?? []) as PortafolioDestino[];
+      setDestinos(rows);
+      // Default: 'demo' si existe (caso más común al liberar una muestra), si no el primero.
+      setDestinoId(rows.find((d) => d.slug === 'demo')?.id ?? rows[0]?.id ?? '');
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [empresaId]);
+
   const handleConfirmar = () => {
+    if (!destinoId) {
+      setError('Elige un destino para el activo.');
+      return;
+    }
     setBusy(true);
     setError(null);
     const trimmed = valor.trim();
     const valorNum = trimmed === '' ? null : Number(trimmed);
     void liberarUnidadAlPortafolio(unidad.id, {
       tipo,
-      modalidad,
+      destinoId,
       valorEstimado: valorNum,
     }).then((r) => {
       setBusy(false);
@@ -112,13 +149,15 @@ export function LiberarPortafolioDialog({
           <label className="grid gap-1 text-sm">
             <span className="text-[var(--text)]/70">Destino</span>
             <select
-              value={modalidad}
-              onChange={(e) => setModalidad(e.target.value as ActivoModalidad)}
+              value={destinoId}
+              onChange={(e) => setDestinoId(e.target.value)}
+              disabled={destinos.length === 0}
               className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
             >
-              {ACTIVO_MODALIDADES.map((m) => (
-                <option key={m} value={m}>
-                  {ACTIVO_MODALIDAD_LABEL[m]}
+              {destinos.length === 0 ? <option value="">Cargando…</option> : null}
+              {destinos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
                 </option>
               ))}
             </select>
@@ -139,7 +178,7 @@ export function LiberarPortafolioDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirmar} disabled={busy}>
+          <Button onClick={handleConfirmar} disabled={busy || !destinoId}>
             {busy ? 'Traspasando…' : 'Traspasar al portafolio'}
           </Button>
         </DialogFooter>

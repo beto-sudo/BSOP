@@ -27,14 +27,15 @@ import { Button } from '@/components/ui/button';
 import { useEffectiveUser } from '@/components/providers';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
-import { ACTIVO_MODALIDAD_LABEL, ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
+import { ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
 
 type ActivoFull = {
   id: string;
   tipo: string;
   nombre: string;
   estado: string;
-  modalidad: string | null;
+  /** Destino del portafolio (catálogo `portafolio_destinos`), vía embed. */
+  destino: { label: string } | null;
   clave_interna: string | null;
   municipio: string | null;
   estado_geo: string | null;
@@ -163,7 +164,7 @@ export function ActivoDetailDrawer({
         .schema('dilesa')
         .from('activos')
         .select(
-          'id, tipo, nombre, estado, modalidad, clave_interna, municipio, estado_geo, direccion_referencia, area_m2, valor_estimado, situacion_legal, numero_escritura, clave_catastral, notas'
+          'id, tipo, nombre, estado, destino:portafolio_destinos(label), clave_interna, municipio, estado_geo, direccion_referencia, area_m2, valor_estimado, situacion_legal, numero_escritura, clave_catastral, notas'
         )
         .eq('id', activoId)
         .is('deleted_at', null)
@@ -276,11 +277,7 @@ export function ActivoDetailDrawer({
               <Badge tone={ESTADO_TONE[activo.estado] ?? 'neutral'}>
                 {ESTADO_LABEL[activo.estado] ?? activo.estado}
               </Badge>
-              {activo.modalidad ? (
-                <Badge tone="accent">
-                  {ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad}
-                </Badge>
-              ) : null}
+              {activo.destino ? <Badge tone="accent">{activo.destino.label}</Badge> : null}
             </>
           ) : null
         }
@@ -304,14 +301,7 @@ export function ActivoDetailDrawer({
                   label="Tipo"
                   value={ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo}
                 />
-                <Field
-                  label="Destino"
-                  value={
-                    activo.modalidad
-                      ? (ACTIVO_MODALIDAD_LABEL[activo.modalidad as never] ?? activo.modalidad)
-                      : '—'
-                  }
-                />
+                <Field label="Destino" value={activo.destino?.label ?? '—'} />
                 <Field label="Clave interna" value={activo.clave_interna} />
               </DetailDrawerSection>
 

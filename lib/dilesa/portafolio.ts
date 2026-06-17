@@ -36,31 +36,24 @@ export const ACTIVO_TIPO_LABEL: Record<ActivoTipo, string> = {
   nave: 'Nave industrial',
 };
 
-/** Destino del activo en el portafolio. Ortogonal al `estado` (ciclo de vida). */
-export const ACTIVO_MODALIDADES = [
-  'venta',
-  'renta',
-  'uso_propio',
-  'renta_venta',
-  'sin_definir',
-] as const;
-
-export type ActivoModalidad = (typeof ACTIVO_MODALIDADES)[number];
-
-export const ACTIVO_MODALIDAD_LABEL: Record<ActivoModalidad, string> = {
-  venta: 'En venta',
-  renta: 'En renta',
-  uso_propio: 'Uso propio',
-  renta_venta: 'Renta o venta',
-  sin_definir: 'Sin definir',
+/**
+ * Destino del activo en el portafolio. Desde la iniciativa
+ * `dilesa-portafolio-destinos` es un CATÁLOGO EN TABLA (`dilesa.portafolio_destinos`),
+ * no un enum fijo: el operador agrega destinos sin migración (Demo/Show House,
+ * Arrendamiento, Oficina, Bodega, Venta, …). La UI los carga de la DB; aquí solo
+ * vive el shape de una fila del catálogo. `modalidad` (el CHECK legacy de
+ * `dilesa.activos`) se deriva del destino en el RPC y queda en retiro.
+ */
+export type PortafolioDestino = {
+  id: string;
+  slug: string;
+  label: string;
+  cuenta_renta: boolean;
+  cuenta_venta: boolean;
 };
 
 export function isActivoTipo(v: string): v is ActivoTipo {
   return (ACTIVO_TIPOS as readonly string[]).includes(v);
-}
-
-export function isActivoModalidad(v: string): v is ActivoModalidad {
-  return (ACTIVO_MODALIDADES as readonly string[]).includes(v);
 }
 
 /**
@@ -78,18 +71,16 @@ export function inferActivoTipo(tipoLote: string | null | undefined): ActivoTipo
 }
 
 /**
- * Estados de unidad desde los que tiene sentido liberar al portafolio: la pieza
- * ya es física (urbanizada o construida). No se libera algo `planeada` o
- * `en_construccion`.
+ * Estados de unidad desde los que tiene sentido liberar al portafolio. Decisión
+ * Beto 2026-06-16 (`dilesa-portafolio-destinos`): el portafolio es el marcador
+ * de "fuera del programa de venta de vivienda", así que se libera desde
+ * CUALQUIER estado de obra — no hace falta que esté terminada (el avance se
+ * muestra en el portafolio). Se excluyen los estados comprometidos con un
+ * cliente (`asignada`/`vendida`/`escriturada`/`entregada`): esos requieren
+ * desasignar la venta primero. El RPC `fn_liberar_unidad_portafolio` refuerza
+ * esto con un guard de venta viva (con override de admin auditado).
  */
-const ESTADOS_LIBERABLES = new Set([
-  'lote_urbanizado',
-  'terminada',
-  'asignada',
-  'vendida',
-  'escriturada',
-  'entregada',
-]);
+const ESTADOS_LIBERABLES = new Set(['planeada', 'lote_urbanizado', 'en_construccion', 'terminada']);
 
 export function puedeLiberarse(estadoUnidad: string): boolean {
   return ESTADOS_LIBERABLES.has(estadoUnidad);

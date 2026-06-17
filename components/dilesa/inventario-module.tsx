@@ -192,8 +192,10 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
-      // Excluye las liberadas al portafolio: ya no son inventario de venta.
+      // Excluye las liberadas al portafolio (marcador canónico de "fuera de
+      // ventas") y las marcadas como casa muestra (defensa adicional).
       .is('activo_id', null)
+      .eq('es_muestra', false)
       .in('estado', ['en_construccion', 'terminada']);
     if (uErr) return { error: getSupabaseErrorMessage(uErr, 'No se pudo cargar el inventario.') };
     const unidadesArr = (uns ?? []) as UnidadRow[];

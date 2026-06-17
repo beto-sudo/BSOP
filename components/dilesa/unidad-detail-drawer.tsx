@@ -26,7 +26,8 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { useEffectiveUser } from '@/components/providers';
 import { LiberarPortafolioDialog } from '@/components/dilesa/liberar-portafolio-dialog';
-import { ACTIVO_MODALIDAD_LABEL, ACTIVO_TIPO_LABEL, puedeLiberarse } from '@/lib/dilesa/portafolio';
+import { ACTIVO_TIPO_LABEL, puedeLiberarse } from '@/lib/dilesa/portafolio';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 
 type UnidadFull = {
   id: string;
@@ -48,7 +49,12 @@ type UnidadFull = {
   producto_id: string | null;
 };
 
-type ActivoLite = { id: string; nombre: string; tipo: string; modalidad: string | null };
+type ActivoLite = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  destino: { label: string } | null;
+};
 type VentaLite = {
   id: string;
   valor_escrituracion: number | null;
@@ -170,7 +176,7 @@ export function UnidadDetailDrawer({
           ? sb
               .schema('dilesa')
               .from('activos')
-              .select('id, nombre, tipo, modalidad')
+              .select('id, nombre, tipo, destino:portafolio_destinos(label)')
               .eq('id', unidad.activo_id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
@@ -341,15 +347,7 @@ export function UnidadDetailDrawer({
                     label="Tipo"
                     value={ACTIVO_TIPO_LABEL[data.activo.tipo as never] ?? data.activo.tipo}
                   />
-                  <Field
-                    label="Destino"
-                    value={
-                      data.activo.modalidad
-                        ? (ACTIVO_MODALIDAD_LABEL[data.activo.modalidad as never] ??
-                          data.activo.modalidad)
-                        : '—'
-                    }
-                  />
+                  <Field label="Destino" value={data.activo.destino?.label ?? '—'} />
                   <p className="pt-1 text-xs text-[var(--text)]/50">
                     Esta unidad fue traspasada al portafolio: no aparece en el inventario de ventas.
                   </p>
@@ -385,6 +383,7 @@ export function UnidadDetailDrawer({
             tipo_lote: u.tipo_lote,
             precio: u.precio,
           }}
+          empresaId={DILESA_EMPRESA_ID}
           onOpenChange={(o) => {
             if (!o) setLiberarOpen(false);
           }}

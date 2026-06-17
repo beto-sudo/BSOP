@@ -2012,6 +2012,7 @@ export type Database = {
           clave_interna: string | null
           created_at: string
           deleted_at: string | null
+          destino_id: string | null
           direccion_referencia: string | null
           documentos: Json
           empresa_id: string
@@ -2037,6 +2038,7 @@ export type Database = {
           clave_interna?: string | null
           created_at?: string
           deleted_at?: string | null
+          destino_id?: string | null
           direccion_referencia?: string | null
           documentos?: Json
           empresa_id: string
@@ -2062,6 +2064,7 @@ export type Database = {
           clave_interna?: string | null
           created_at?: string
           deleted_at?: string | null
+          destino_id?: string | null
           direccion_referencia?: string | null
           documentos?: Json
           empresa_id?: string
@@ -2086,6 +2089,13 @@ export type Database = {
             columns: ["activo_padre_id"]
             isOneToOne: false
             referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activos_destino_id_fkey"
+            columns: ["destino_id"]
+            isOneToOne: false
+            referencedRelation: "portafolio_destinos"
             referencedColumns: ["id"]
           },
         ]
@@ -3147,6 +3157,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      portafolio_destinos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          cuenta_renta: boolean
+          cuenta_venta: boolean
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          label: string
+          orden: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          cuenta_renta?: boolean
+          cuenta_venta?: boolean
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          label: string
+          orden?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          cuenta_renta?: boolean
+          cuenta_venta?: boolean
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          label?: string
+          orden?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       productos: {
         Row: {
@@ -5775,7 +5827,7 @@ export type Database = {
       fn_generar_plan_pagos: { Args: { p_venta_id: string }; Returns: number }
       fn_liberar_unidad_portafolio: {
         Args: {
-          p_modalidad: string
+          p_destino_id: string
           p_tipo: string
           p_unidad_id: string
           p_valor?: number

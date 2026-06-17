@@ -1031,6 +1031,7 @@ export function ProyectoDetalle({
           {liberando ? (
             <LiberarPortafolioDialog
               unidad={liberando}
+              empresaId={DILESA_EMPRESA_ID}
               onOpenChange={(o) => {
                 if (!o) setLiberando(null);
               }}

@@ -223,6 +223,10 @@ function NuevaSolicitudForm() {
         )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .is('deleted_at', null)
+        // Fuera del programa de venta de vivienda: lo liberado al portafolio
+        // (`activo_id`) es el marcador canónico; `es_muestra` es defensa extra.
+        .is('activo_id', null)
+        .eq('es_muestra', false)
         .in('estado', ['en_construccion', 'terminada']),
       sb
         .schema('dilesa')

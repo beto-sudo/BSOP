@@ -19,7 +19,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { isActivoModalidad, isActivoTipo } from '@/lib/dilesa/portafolio';
+import { isActivoTipo } from '@/lib/dilesa/portafolio';
 import { getEffectiveUser } from '@/lib/auth/effective-user';
 import type { Database } from '@/types/supabase';
 
@@ -153,7 +153,8 @@ export async function setUnidadMuestra(unidadId: string, esMuestra: boolean): Pr
 
 type LiberarUnidadInput = {
   tipo: string;
-  modalidad: string;
+  /** Id de un destino del catálogo `dilesa.portafolio_destinos`. */
+  destinoId: string;
   valorEstimado?: number | null;
 };
 
@@ -162,6 +163,8 @@ type LiberarUnidadInput = {
  * activos: crea el activo + su satélite y liga `unidades.activo_id`. La unidad
  * sale del canal de ventas del proyecto (queda excluida del avance de vivienda
  * y del inventario disponible). Atómico vía RPC `fn_liberar_unidad_portafolio`.
+ * El destino (Demo/Show House, Arrendamiento, …) viene del catálogo; el RPC
+ * valida que exista y esté activo para la empresa de la unidad.
  */
 export async function liberarUnidadAlPortafolio(
   unidadId: string,
@@ -169,7 +172,7 @@ export async function liberarUnidadAlPortafolio(
 ): Promise<Result> {
   if (!unidadId) return { ok: false, error: 'unidadId requerido' };
   if (!isActivoTipo(input.tipo)) return { ok: false, error: 'Tipo de activo no válido' };
-  if (!isActivoModalidad(input.modalidad)) return { ok: false, error: 'Modalidad no válida' };
+  if (!input.destinoId) return { ok: false, error: 'Destino requerido' };
   const valor = input.valorEstimado;
   if (valor != null && (!Number.isFinite(valor) || valor < 0)) {
     return { ok: false, error: 'El valor estimado debe ser un número ≥ 0' };
@@ -183,7 +186,7 @@ export async function liberarUnidadAlPortafolio(
   const { error } = await supabase.schema('dilesa').rpc('fn_liberar_unidad_portafolio', {
     p_unidad_id: unidadId,
     p_tipo: input.tipo,
-    p_modalidad: input.modalidad,
+    p_destino_id: input.destinoId,
     p_valor: valor ?? undefined,
   });
 
