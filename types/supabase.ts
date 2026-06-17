@@ -1476,6 +1476,53 @@ export type Database = {
           },
         ]
       }
+      activo_documentos: {
+        Row: {
+          activo_id: string
+          created_at: string
+          deleted_at: string | null
+          documento_id: string
+          empresa_id: string
+          es_principal: boolean
+          id: string
+          notas: string | null
+          rol: string
+          updated_at: string
+        }
+        Insert: {
+          activo_id: string
+          created_at?: string
+          deleted_at?: string | null
+          documento_id: string
+          empresa_id: string
+          es_principal?: boolean
+          id?: string
+          notas?: string | null
+          rol?: string
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          documento_id?: string
+          empresa_id?: string
+          es_principal?: boolean
+          id?: string
+          notas?: string | null
+          rol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_documentos_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activo_edificio: {
         Row: {
           activo_id: string

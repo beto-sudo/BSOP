@@ -227,3 +227,63 @@ export async function actualizarActivo(
   revalidatePath('/dilesa/portafolio');
   return { ok: true };
 }
+
+// ── Escrituras / documentos legales del activo (1:N a erp.documentos) ─────────
+
+const ROLES_DOC_ACTIVO = ['escritura', 'avaluo', 'contrato', 'otro'] as const;
+
+/** Liga un documento legal existente (erp.documentos) a un activo. */
+export async function ligarDocumentoActivo(
+  activoId: string,
+  documentoId: string,
+  rol: string
+): Promise<Result> {
+  if (!activoId || !documentoId) return { ok: false, error: 'activoId y documentoId requeridos' };
+  const rolFinal = (ROLES_DOC_ACTIVO as readonly string[]).includes(rol) ? rol : 'escritura';
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede ligar documentos.' };
+  }
+
+  const { error } = await supabase.schema('dilesa').from('activo_documentos').insert({
+    empresa_id: DILESA_EMPRESA_ID,
+    activo_id: activoId,
+    documento_id: documentoId,
+    rol: rolFinal,
+  });
+  if (error) {
+    if (error.code === '23505')
+      return { ok: false, error: 'Ese documento ya está ligado al activo.' };
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo ligar el documento.') };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  return { ok: true };
+}
+
+/** Desliga (soft-delete) un documento de un activo. */
+export async function desligarDocumentoActivo(id: string): Promise<Result> {
+  if (!id) return { ok: false, error: 'id requerido' };
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede desligar documentos.' };
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('activo_documentos')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+  if (error) {
+    return {
+      ok: false,
+      error: getSupabaseErrorMessage(error, 'No se pudo desligar el documento.'),
+    };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  return { ok: true };
+}

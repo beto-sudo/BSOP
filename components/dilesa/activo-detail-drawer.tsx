@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { useEffectiveUser } from '@/components/providers';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { FileAttachments } from '@/components/file-attachments';
+import { ActivoEscrituras } from '@/components/dilesa/activo-escrituras';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
@@ -170,6 +171,8 @@ export function ActivoDetailDrawer({
 }) {
   const { data: effectiveUser } = useEffectiveUser();
   const isAdmin = !!effectiveUser?.isAdmin;
+  const puedeAdmin =
+    isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const [activo, setActivo] = useState<ActivoFull | null>(null);
   const [satelite, setSatelite] = useState<Record<string, unknown> | null>(null);
   const [origen, setOrigen] = useState<Origen | null>(null);
@@ -508,9 +511,17 @@ export function ActivoDetailDrawer({
                   defaultUploadRole="plano"
                 />
                 <p className="pt-2 text-xs text-[var(--text)]/50">
-                  Planos, escrituras escaneadas, KMZ de ubicación y fotos del activo. (Las
-                  escrituras se ligarán al expediente legal en una fase posterior.)
+                  Planos, KMZ de ubicación y fotos del activo (archivos sueltos). Las escrituras
+                  estructuradas se ligan abajo.
                 </p>
+              </DetailDrawerSection>
+
+              <DetailDrawerSection title="Escrituras (expediente legal)">
+                <ActivoEscrituras
+                  activoId={activo.id}
+                  empresaId={DILESA_EMPRESA_ID}
+                  puedeAdmin={puedeAdmin}
+                />
               </DetailDrawerSection>
             </>
           ) : null}
