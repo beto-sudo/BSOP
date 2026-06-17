@@ -107,7 +107,16 @@ const SAT_OMIT = new Set([
   'created_at',
   'updated_at',
   'deleted_at',
+  'caras_detalle', // se renderiza en su propia sección, no como JSON crudo
 ]);
+
+type CaraDetalle = {
+  cara: string | null;
+  alias: string | null;
+  iluminado: boolean | null;
+  renta_mensual: number | null;
+  scoring?: { puntos?: number | null; demanda?: number | null } | null;
+};
 
 const SAT_LABEL: Record<string, string> = {
   recamaras: 'Recámaras',
@@ -323,6 +332,12 @@ export function ActivoDetailDrawer({
         })
       : null;
 
+  // Caras de un espectacular (jsonb caras_detalle).
+  const caras: CaraDetalle[] =
+    activo?.tipo === 'espectacular' && Array.isArray(satelite?.caras_detalle)
+      ? (satelite!.caras_detalle as CaraDetalle[])
+      : [];
+
   const handleRegresar = async () => {
     if (!origen) return;
     const r = await regresarUnidadAlProyecto(origen.id);
@@ -444,6 +459,36 @@ export function ActivoDetailDrawer({
                 <DetailDrawerSection title="Detalle del inmueble">
                   {satEntries.map(([k, v]) => (
                     <Field key={k} label={satLabel(k)} value={fmtSatValue(v)} />
+                  ))}
+                </DetailDrawerSection>
+              ) : null}
+
+              {caras.length > 0 ? (
+                <DetailDrawerSection title={`Caras (${caras.length})`}>
+                  {caras.map((c, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between gap-3 border-b border-[var(--border)]/50 py-1.5 text-sm last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-[var(--text)]">
+                          {c.cara ?? `Cara ${i + 1}`}
+                        </span>
+                        {c.alias ? (
+                          <span className="text-[var(--text)]/60"> · {c.alias}</span>
+                        ) : null}
+                        {c.scoring?.puntos != null ? (
+                          <span className="text-xs text-[var(--text)]/50">
+                            {' '}
+                            · {c.scoring.puntos} pts
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="tabular-nums text-[var(--text)]/80">
+                        {c.renta_mensual != null ? formatCurrency(c.renta_mensual) : '—'}
+                        {c.iluminado ? ' · 💡' : ''}
+                      </span>
+                    </div>
                   ))}
                 </DetailDrawerSection>
               ) : null}
