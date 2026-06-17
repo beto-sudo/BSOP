@@ -82,6 +82,7 @@ Además, el análisis empírico (230 ventas escrituradas con cheque > 0) mostró
 ## Bitácora
 
 - **2026-06-17** — Promovida. Detonante: venta MAYRA. Análisis multi-agente (workflow `dilesa-cuadratura-sobreprecio`, 7 agentes + verificación adversarial) confirmó el modelo de sobreprecio/cheque y corrigió la hipótesis inicial (el +6% sí está aplicado en MAYRA; no era dato faltante). En paralelo se entregó [PR #927](https://github.com/beto-sudo/BSOP/pull/927) (chip "Pagaré" fantasma + rol del pagaré en fase 10), que resolvió la confusión que originó el reporte. Modelo guardado en memoria `reference_dilesa_sobreprecio_cheque_notaria`.
+- **2026-06-17** — Beto confirmó (con su expediente) que MAYRA **sí lleva pagaré de 9,387**: la cuadratura cierra en 0 con descuento/sobreprecio-absorbido 39,651 + pagaré 9,387 + cheque a notaría 84,038. El descuento estaba bajado a 15,000 por error (debe ser 39,651). Adelanto del alcance de la pantalla de captura (no esperaba a v2 por urgencia operativa): la fase 10 ya ofrece el crédito directo cuando el faltante es de **gastos**, no solo de precio — `saldo = (valor escr. + gastos netos) − (crédito + depósitos + sobreprecio absorbido)`, espejo de `saldoCliente` del motor. Impacto medido en prod: de 11 ventas activas en fase 9-10, 4 nuevas mostrarán el campo (todas con faltante de gastos legítimo). PR de código aparte (UI visible, sin auto-merge).
 
 ## Decisiones registradas
 

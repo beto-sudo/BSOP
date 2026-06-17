@@ -8,9 +8,12 @@
  * totalizan los depósitos del cliente (CxC `erp.cxc_pagos`) como
  * referencia de cobertura.
  *
- * PR2 — Crédito directo: si crédito institución + depósitos < precio, DILESA
- * puede financiar el saldo. Se configura el monto + plan de pagos + tasas y
- * se genera el Pagaré PDF para imprimir, firmar y subir.
+ * PR2 — Crédito directo: si la cobertura (crédito institución + depósitos +
+ * sobreprecio absorbido) no alcanza el total a cubrir (valor de escrituración +
+ * gastos netos de escrituración), DILESA financia el faltante — sea de precio o
+ * de gastos. Se configura el monto + plan de pagos + tasas y se genera el Pagaré
+ * PDF para imprimir, firmar y subir. El faltante es espejo de `saldoCliente` de
+ * lib/dilesa/cuadratura.ts (con el cheque a notaría = gastos netos).
  *
  * Tasas (regla Beto 2026-06-11): interés ORDINARIO = TIIE 28d + spread
  * (mínimo 4 puntos); interés MORATORIO = 3× el ordinario. Ambos se derivan
@@ -66,8 +69,12 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   precio_asignacion: number | null;
+  valor_escrituracion: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
+  gastos_escrituracion: number | null;
+  descuento_total: number | null;
+  tipo_credito: string | null;
   notario_id: string | null;
   fecha_firma_programada: string | null;
   hora_firma_programada: string | null;
@@ -145,6 +152,9 @@ function CapturarFase10Body() {
   const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
+  // Apoyo Infonavit a gastos de escrituración (por tipo de crédito; 0 en
+  // FOVISSSTE/IMSS). El cheque a notaría cubre los gastos NETOS de este apoyo.
+  const [apoyoInfonavit, setApoyoInfonavit] = useState(0);
   const [fase9Cerrada, setFase9Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
@@ -185,7 +195,7 @@ function CapturarFase10Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, precio_asignacion, monto_credito_titular, monto_credito_cotitular, notario_id, fecha_firma_programada, hora_firma_programada, poliza_garantia_expedida_at, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, empresa_id, persona_id, unidad_id, precio_asignacion, valor_escrituracion, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, descuento_total, tipo_credito, notario_id, fecha_firma_programada, hora_firma_programada, poliza_garantia_expedida_at, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_interes_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -206,7 +216,7 @@ function CapturarFase10Body() {
       if (v.fecha_firma_programada) setFechaFirma(v.fecha_firma_programada);
       if (v.hora_firma_programada) setHoraFirma(v.hora_firma_programada.slice(0, 5));
 
-      const [pRes, uRes, fRes, nRes, dRes] = await Promise.all([
+      const [pRes, uRes, fRes, nRes, dRes, tcRes] = await Promise.all([
         sb
           .schema('erp')
           .from('personas')
@@ -237,6 +247,17 @@ function CapturarFase10Body() {
           .eq('origen_id', v.id)
           .is('deleted_at', null)
           .order('fecha', { ascending: true }),
+        // Apoyo Infonavit del tipo de crédito (catálogo) — netea los gastos de
+        // escrituración que cubre el cheque a notaría (0 en FOVISSSTE/IMSS).
+        v.tipo_credito
+          ? sb
+              .schema('dilesa')
+              .from('tipos_credito')
+              .select('apoyo_infonavit_monto')
+              .eq('nombre', v.tipo_credito)
+              .is('deleted_at', null)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ]);
       if (!activo) return;
 
@@ -271,16 +292,26 @@ function CapturarFase10Body() {
       }
       const deps = (dRes.data ?? []) as unknown as Deposito[];
       setDepositos(deps);
+      const apoyo = Number(
+        (tcRes.data as { apoyo_infonavit_monto: number | null } | null)?.apoyo_infonavit_monto ?? 0
+      );
+      setApoyoInfonavit(apoyo);
       const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
       setFase9Cerrada(posiciones.includes(9));
       setYaCerrada(posiciones.includes(10));
 
-      // Prefill crédito directo: desde lo persistido, o desde el saldo si aún
-      // no se configura.
+      // Prefill crédito directo: desde lo persistido, o desde el faltante si aún
+      // no se configura. El faltante considera precio Y gastos de escrituración
+      // (el pagaré financia lo que el cliente no alcanza a cubrir, sea de precio
+      // o de gastos): (valor escr. + gastos netos) − (crédito + depósitos +
+      // descuento/sobreprecio absorbido). Alineado con lib/dilesa/cuadratura.ts.
       const totalDep = deps.reduce((s, d) => s + Number(d.monto_total ?? 0), 0);
       const credInst =
         Number(v.monto_credito_titular ?? 0) + Number(v.monto_credito_cotitular ?? 0);
-      const saldoLocal = Number(v.precio_asignacion ?? 0) - credInst - totalDep;
+      const valorACubrir = Number(v.valor_escrituracion ?? v.precio_asignacion ?? 0);
+      const gastosNetosLocal = Math.max(0, Number(v.gastos_escrituracion ?? 0) - apoyo);
+      const saldoLocal =
+        valorACubrir + gastosNetosLocal - credInst - totalDep - Number(v.descuento_total ?? 0);
 
       if (v.monto_credito_directo != null) {
         setMontoCD(String(v.monto_credito_directo));
@@ -317,9 +348,21 @@ function CapturarFase10Body() {
   );
   const creditoInstitucion =
     Number(venta?.monto_credito_titular ?? 0) + Number(venta?.monto_credito_cotitular ?? 0);
-  const precio = Number(venta?.precio_asignacion ?? 0);
-  const cobertura = creditoInstitucion + totalDepositos;
-  const saldo = precio - cobertura;
+  // Valor que el cliente debe cubrir: el de escrituración (ya con sobreprecio
+  // embebido) o el precio si aún no se captura.
+  const valorACubrir = Number(venta?.valor_escrituracion ?? venta?.precio_asignacion ?? 0);
+  // Gastos de escrituración que paga el cheque a notaría, netos del apoyo
+  // Infonavit (0 en FOVISSSTE/IMSS → el cheque cubre los gastos completos).
+  const gastosNetos = Math.max(0, Number(venta?.gastos_escrituracion ?? 0) - apoyoInfonavit);
+  // Sobreprecio que DILESA absorbe para fondear gastos (capturado como descuento).
+  const descuentoAbsorbido = Number(venta?.descuento_total ?? 0);
+  // Total a cubrir = valor de escrituración + gastos netos. Cobertura = crédito
+  // institución + depósitos del cliente + sobreprecio absorbido. El faltante se
+  // financia con crédito directo (pagaré), sea de precio o de gastos. Espejo de
+  // `saldoCliente` de lib/dilesa/cuadratura.ts (con el cheque = gastos netos).
+  const totalACubrir = valorACubrir + gastosNetos;
+  const cobertura = creditoInstitucion + totalDepositos + descuentoAbsorbido;
+  const saldo = totalACubrir - cobertura;
   const aplicaCD = saldo > 0.0049;
 
   // ── Candado de la fecha de firma ─────────────────────────────────
@@ -833,16 +876,34 @@ function CapturarFase10Body() {
             )}
 
             <div className="mt-4 space-y-1 rounded-md border border-[var(--border)] bg-[var(--bg)]/20 p-3 text-sm">
-              <CoberturaRow label="Precio de asignación" value={money(precio)} />
+              <CoberturaRow label="Valor de escrituración" value={money(valorACubrir)} />
+              {gastosNetos > 0 ? (
+                <CoberturaRow
+                  label={
+                    apoyoInfonavit > 0
+                      ? '(+) Gastos de escrituración (netos de apoyo Infonavit)'
+                      : '(+) Gastos de escrituración'
+                  }
+                  value={money(gastosNetos)}
+                />
+              ) : null}
+              <CoberturaRow label="Total a cubrir" value={money(totalACubrir)} strong />
+              <div className="my-1 border-t border-[var(--border)]" />
               <CoberturaRow
                 label="Crédito institución (titular + co-titular)"
                 value={money(creditoInstitucion)}
               />
               <CoberturaRow label="Depósitos del cliente" value={money(totalDepositos)} />
+              {descuentoAbsorbido > 0 ? (
+                <CoberturaRow
+                  label="(+) Sobreprecio absorbido (descuento)"
+                  value={money(descuentoAbsorbido)}
+                />
+              ) : null}
+              <CoberturaRow label="Cobertura total" value={money(cobertura)} strong />
               <div className="my-1 border-t border-[var(--border)]" />
-              <CoberturaRow label="Cobertura total" value={money(cobertura)} />
               <CoberturaRow
-                label={aplicaCD ? 'Saldo pendiente' : 'Saldo'}
+                label={aplicaCD ? 'Saldo pendiente (crédito directo)' : 'Saldo'}
                 value={money(saldo)}
                 strong
                 tone={aplicaCD ? 'warn' : 'ok'}
