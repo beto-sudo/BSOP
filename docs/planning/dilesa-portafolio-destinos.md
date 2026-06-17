@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (nueva tabla catálogo `portafolio_destinos`; `activos.destino_id` FK + backfill desde `modalidad`; RPC `fn_liberar_unidad_portafolio` v2 — destino + liberar-desde-cualquier-estado + guard de venta activa; `unidades.es_muestra` data-fix de paridad con Coda; lectura `construccion.avance_pct` para la cápsula; lectura `ventas` para el guard). UI: `liberar-portafolio-dialog`, `portafolio-module`, `inventario-module`, form de nueva venta (`app/dilesa/ventas/nueva`).
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — catálogo de destinos + liberar-desde-cualquier-estado + fix de filtros de ventas + data-fix de las 21 demos (LDLE+LDS) al portafolio. Migración de schema y data-fix se aplican a prod con OK explícito de Beto.
+**Próximo hito:** Sprint 2 — cápsula de avance de obra en el detalle del activo + UI de administración del catálogo de destinos. (Sprint 1 cerrado: schema + data-fix en prod, PR #915.)
 **Dueño:** Beto
 **Creada:** 2026-06-16
-**Última actualización:** 2026-06-16 (promovida; arranca Sprint 1)
+**Última actualización:** 2026-06-16 (Sprint 1 cerrado; 23 demos en portafolio)
 
 > **Continuación conceptual de** [`dilesa-portafolio-activos`](dilesa-portafolio-activos.md) (cerrada 2026-06-08, v1 = schema de activos + import Coda + UI lectura + RPC liberar↔portafolio). Aquella dejó el mecanismo bidireccional; ésta lo vuelve el **marcador canónico de "fuera del programa de venta de vivienda"** y le da un catálogo de destinos rico.
 
@@ -57,6 +57,7 @@ El **portafolio es el lugar canónico** donde una unidad sale del programa de ve
 ## Bitácora
 
 - **2026-06-16** — Promovida. Verificación previa: 23 demos en Coda (`Demo=true`), 0 marcadas en BSOP; cruce 100% por identificador (LDLE 10 terminadas / LDS 11 = 9 en obra + 2 terminadas / LDV 2 ya en portafolio). Confirmado gap en el form de nueva venta (no filtra `activo_id`/`es_muestra`).
+- **2026-06-16 — Sprint 1 entregado (PR #915).** Migraciones `20260616234057` (catálogo + `destino_id` + backfill), `20260616234205` (RPC v2) y `20260616235032` (data-fix) aplicadas a prod. Verificación final: 23/23 demos marcadas `es_muestra`, 23/23 en portafolio con destino Demo, **0 demos siguen visibles para ventas**. Código: dialog carga destinos del catálogo, drawers muestran el destino real, form de captura + Inventario excluyen `activo_id`/`es_muestra`. 6 checks CI verdes localmente.
 
 ## Decisiones registradas
 
