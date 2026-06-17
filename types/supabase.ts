@@ -5207,7 +5207,6 @@ export type Database = {
           productos_adicionales: number
           promocion_gastos_monto: number | null
           promocion_id: string | null
-          sobreprecio_adicionales: number | null
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -5300,7 +5299,6 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
-          sobreprecio_adicionales?: number | null
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -5393,7 +5391,6 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
-          sobreprecio_adicionales?: number | null
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string

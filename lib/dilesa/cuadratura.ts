@@ -94,12 +94,17 @@ export type CuadraturaInput = {
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
   /**
-   * Desglose nuevo (ADR-045). Cuando vienen poblados (venta nueva o en proceso),
-   * el motor usa el MODELO DESGLOSADO: el "descuento" que cubre gastos =
-   * `promocionGastos` (bono, costo DILESA) + `sobreprecioAdicionales` (lo paga el
-   * crédito). Si son null/undefined (ventas cerradas/legacy), el motor cae al
-   * modelo viejo (`descuentoOtorgadoTotal` topado) — fallback que NO altera nada
-   * histórico. `precioBase`/`incrementoCredito` son para el panel de precio.
+   * Desglose nuevo (ADR-045). El motor usa el MODELO DESGLOSADO cuando hay
+   * marcador del desglose nuevo (`promocionGastos` o `precioBase` poblado): el
+   * "descuento" que cubre gastos = `promocionGastos` (bono, costo DILESA) +
+   * `sobreprecioAdicionales` (lo paga el crédito). Sin marcador (cerradas/legacy)
+   * → modelo viejo (`descuentoOtorgadoTotal` topado), fallback que NO altera nada
+   * histórico. `precioBase`/`incrementoCredito` alimentan el panel de precio.
+   *
+   * OJO: `sobreprecioAdicionales` se alimenta de `dilesa.ventas.productos_adicionales`,
+   * que YA estaba poblado en TODAS las ventas — por eso NO es marcador del
+   * desglose (lo sería todo el histórico). Solo entra al saldo cuando el desglose
+   * ya está activo por `promocionGastos`/`precioBase`.
    */
   precioBase?: number | null;
   incrementoCredito?: number | null;
@@ -251,8 +256,14 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // que reduce el saldo = promoción (bono, costo DILESA) + sobreprecio (lo paga
   // el crédito). Sin desglose (ventas cerradas/legacy) → modelo viejo:
   // descuento_total topado al máximo autorizado. Fallback que NO altera nada
-  // histórico (los campos del desglose llegan null y el cálculo queda idéntico).
-  const tieneDesglose = i.promocionGastos != null || i.sobreprecioAdicionales != null;
+  // histórico.
+  //
+  // La detección usa los marcadores del desglose NUEVO (`promocionGastos` /
+  // `precioBase`), que solo se pueblan al migrar/asignar. NO usa
+  // `sobreprecioAdicionales`: ese viene de `productos_adicionales`, que ya estaba
+  // poblado en TODAS las ventas (legacy incluido) — usarlo activaría el modelo
+  // nuevo en todo el histórico y le movería el saldo.
+  const tieneDesglose = i.promocionGastos != null || i.precioBase != null;
   const promocionGastos = n(i.promocionGastos);
   const sobreprecioAdicionales = n(i.sobreprecioAdicionales);
   // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento

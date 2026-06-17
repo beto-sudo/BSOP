@@ -462,5 +462,22 @@ describe('calcularCuadratura', () => {
       expect(c.descuentoAplicado).toBe(39651);
       expect(c.saldoCliente).toBe(0); // mismo resultado que el desglosado
     });
+
+    // Blindaje: `productos_adicionales` (→ sobreprecioAdicionales) está poblado
+    // en TODAS las ventas (legacy incluido). Por sí solo NO debe activar el
+    // modelo desglosado — si lo hiciera, le movería el saldo a todo el histórico.
+    it('NO activa el desglose si solo viene sobreprecioAdicionales (sin promoción/base)', () => {
+      const c = mayra({
+        promocionGastos: null,
+        precioBase: null,
+        incrementoCredito: null,
+        sobreprecioAdicionales: 24651, // poblado (productos_adicionales legacy)
+        descuentoOtorgadoTotal: 0,
+        descuentoMaximoAutorizado: null,
+      });
+      expect(c.tieneDesglose).toBe(false); // ← clave: NO se activa
+      expect(c.coberturaGastos).toBe(null);
+      expect(c.descuentoAplicado).toBe(0); // usa descuento_total (0), no el sobreprecio
+    });
   });
 });

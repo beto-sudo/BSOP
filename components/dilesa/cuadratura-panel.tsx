@@ -101,6 +101,31 @@ export function CuadraturaPanel({
         />
       </Bloque>
 
+      {/* Cobertura del presupuesto notarial — las 4 fuentes (ADR-045) */}
+      {c.tieneDesglose && c.coberturaGastos ? (
+        <Bloque titulo="Cobertura del presupuesto notarial">
+          <Fila
+            label="Presupuesto notarial (neto de apoyo Infonavit)"
+            value={money(c.coberturaGastos.gastosNetos)}
+            strong
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila label="(−) Promoción DILESA (bono)" value={money(c.coberturaGastos.promocion)} />
+          <Fila label="(−) Enganche del cliente" value={money(c.coberturaGastos.engancheCliente)} />
+          <Fila
+            label="(−) Sobreprecio (productos adicionales)"
+            value={money(c.coberturaGastos.sobreprecio)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Pagaré necesario del cliente"
+            value={money(c.coberturaGastos.pagareNecesario)}
+            strong
+            tone={c.coberturaGastos.pagareNecesario > 0 ? 'warn' : 'ok'}
+          />
+        </Bloque>
+      ) : null}
+
       {/* Derivados de cierre */}
       <Bloque titulo="Cierre (valores derivados)">
         <Fila
