@@ -1580,8 +1580,10 @@ export type Database = {
           ancho_m: number | null
           anunciante_actual: string | null
           caras: number | null
+          caras_detalle: Json
           contrato_vigente_hasta: string | null
           created_at: string
+          dueno_terreno: string | null
           empresa_id: string
           iluminado: boolean | null
           notas: string | null
@@ -1597,8 +1599,10 @@ export type Database = {
           ancho_m?: number | null
           anunciante_actual?: string | null
           caras?: number | null
+          caras_detalle?: Json
           contrato_vigente_hasta?: string | null
           created_at?: string
+          dueno_terreno?: string | null
           empresa_id: string
           iluminado?: boolean | null
           notas?: string | null
@@ -1614,8 +1618,10 @@ export type Database = {
           ancho_m?: number | null
           anunciante_actual?: string | null
           caras?: number | null
+          caras_detalle?: Json
           contrato_vigente_hasta?: string | null
           created_at?: string
+          dueno_terreno?: string | null
           empresa_id?: string
           iluminado?: boolean | null
           notas?: string | null
