@@ -1,13 +1,15 @@
 'use server';
 
 /**
- * Server actions del catálogo de destinos del portafolio (DILESA).
+ * Server actions del módulo Portafolio (DILESA).
  *
- * Iniciativa `dilesa-portafolio-destinos` · Sprint 2. CRUD de
- * `dilesa.portafolio_destinos` — administrable sin migración. El gate
- * (admin global o Dirección DILESA) se aplica aquí; la UI solo muestra el
- * botón a esos roles. El slug es identidad estable: se deriva del label al
- * crear y NO cambia al editar.
+ * - Catálogo de destinos (`dilesa-portafolio-destinos` · Sprint 2): CRUD de
+ *   `dilesa.portafolio_destinos`.
+ * - Alta/edición de activos (`dilesa-portafolio-expediente` · Sprint 1): crea o
+ *   actualiza `dilesa.activos` + su satélite vía RPC atómica.
+ *
+ * El gate (admin global o Dirección DILESA) se aplica aquí; la UI solo muestra
+ * los controles a esos roles.
  */
 
 import { createServerClient } from '@supabase/ssr';
@@ -134,6 +136,92 @@ export async function actualizarDestino(
       ok: false,
       error: getSupabaseErrorMessage(error, 'No se pudo actualizar el destino.'),
     };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  return { ok: true };
+}
+
+// ── Alta / edición de activos (dilesa-portafolio-expediente · Sprint 1) ───────
+
+/** Campos del form (strings/numbers/booleans); el RPC castea desde jsonb. */
+type ActivoFields = Record<string, string | number | boolean | null>;
+
+const TIPOS_ACTIVO = [
+  'casa',
+  'lote',
+  'local',
+  'terreno',
+  'departamento',
+  'edificio',
+  'nave',
+  'plaza',
+  'espectacular',
+  'unipolar',
+  'infraestructura',
+] as const;
+
+/**
+ * Alta de un activo: crea el master `dilesa.activos` + su satélite por tipo en
+ * una transacción (RPC `fn_alta_activo`). Devuelve nada — el caller refresca.
+ */
+export async function crearActivo(
+  tipo: string,
+  master: ActivoFields,
+  satelite: ActivoFields = {}
+): Promise<Result> {
+  if (!(TIPOS_ACTIVO as readonly string[]).includes(tipo)) {
+    return { ok: false, error: 'Tipo de activo no válido' };
+  }
+  if (!String(master.nombre ?? '').trim()) {
+    return { ok: false, error: 'El nombre del activo es obligatorio' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede dar de alta activos.' };
+  }
+
+  const { error } = await supabase.schema('dilesa').rpc('fn_alta_activo', {
+    p_empresa_id: DILESA_EMPRESA_ID,
+    p_tipo: tipo,
+    p_master: master,
+    p_satelite: satelite,
+  });
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo crear el activo.') };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  return { ok: true };
+}
+
+/**
+ * Edición de un activo: actualiza master + satélite (RPC `fn_actualizar_activo`).
+ * El satélite se recrea desde el jsonb completo del form.
+ */
+export async function actualizarActivo(
+  activoId: string,
+  master: ActivoFields,
+  satelite: ActivoFields = {}
+): Promise<Result> {
+  if (!activoId) return { ok: false, error: 'activoId requerido' };
+  if (!String(master.nombre ?? '').trim()) {
+    return { ok: false, error: 'El nombre del activo es obligatorio' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede editar activos.' };
+  }
+
+  const { error } = await supabase.schema('dilesa').rpc('fn_actualizar_activo', {
+    p_activo_id: activoId,
+    p_master: master,
+    p_satelite: satelite,
+  });
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo actualizar el activo.') };
   }
 
   revalidatePath('/dilesa/portafolio');

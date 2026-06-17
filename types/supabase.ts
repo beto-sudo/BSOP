@@ -5749,8 +5749,21 @@ export type Database = {
       }
     }
     Functions: {
+      _activo_upsert_satelite: {
+        Args: {
+          p_activo_id: string
+          p_empresa_id: string
+          p_sat: Json
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       contrato_obra_cancelar: {
         Args: { p_contrato_id: string; p_motivo: string }
+        Returns: undefined
+      }
+      fn_actualizar_activo: {
+        Args: { p_activo_id: string; p_master: Json; p_satelite?: Json }
         Returns: undefined
       }
       fn_actualizar_descuentos_venta: {
@@ -5764,6 +5777,15 @@ export type Database = {
           p_venta_id: string
         }
         Returns: Json
+      }
+      fn_alta_activo: {
+        Args: {
+          p_empresa_id: string
+          p_master: Json
+          p_satelite?: Json
+          p_tipo: string
+        }
+        Returns: string
       }
       fn_backfill_cxc: {
         Args: never
