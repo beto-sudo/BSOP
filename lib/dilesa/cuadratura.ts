@@ -403,7 +403,12 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const montoNotaCreditoSugerido = tieneDesglose
     ? round2(depositosConRecibo)
     : round2(valorFacturadoSugerido - valorRealVentaDilesa);
-  const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
+  // Con desglose, el "descuento real" = la promoción (lo que DILESA efectivamente
+  // regala al cliente). El sobreprecio NO es descuento (es lo contrario: DILESA
+  // cobra de más). Sin desglose: la fórmula de Coda (escrituración − valor real).
+  const descuentoReal = tieneDesglose
+    ? round2(promocionGastos)
+    : round2(valorEscrituracion - valorRealVentaDilesa);
   // Desglose de facturación (ADR-045): factura de venta (escrituración) +
   // factura de enganche = total facturado; − NC = neto (= escritura). Cuadra
   // "todo suma el valor de la escritura". Solo con desglose.

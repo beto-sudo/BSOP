@@ -84,46 +84,75 @@ export function CuadraturaPanel({
         </Bloque>
       ) : null}
 
-      {/* Cobertura */}
-      <Bloque titulo="Cobertura de la operación">
-        <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
-        <div className="my-1 border-t border-dashed border-[var(--border)]" />
-        <Fila
-          label="Crédito institución (titular + co-titular)"
-          value={money(c.creditoInstitucion)}
-        />
-        <Fila label="Crédito directo (pagaré)" value={money(c.montoCreditoDirecto)} />
-        <Fila label="Depósitos directos del cliente" value={money(c.depositosDirectoCliente)} />
-        <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
-        {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
-          <>
-            <Fila
-              label="(+) Descuento aplicado"
-              value={money(c.descuentoAplicado)}
-              hint={
-                c.descuentoAplicado < c.descuentoOtorgado
-                  ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
-                  : undefined
-              }
-            />
-            {c.chequePagado > 0 ? (
-              <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
-            ) : null}
-          </>
-        ) : null}
-        <div className="my-1 border-t border-[var(--border)]" />
-        <Fila
-          label={c.cubierta ? 'Saldo (cubierta)' : 'Saldo pendiente'}
-          value={money(c.saldoCliente)}
-          strong
-          tone={c.cubierta ? 'ok' : 'warn'}
-          hint={
-            c.descuentoOtorgado > 0 || c.chequePagado > 0
-              ? `Cobranza cruda: ${money(c.saldoCobranza)}`
-              : undefined
-          }
-        />
-      </Bloque>
+      {/* Cobertura del precio. Con desglose: simple (el precio lo cubre el
+          crédito; los gastos van en su propia card). Sin desglose: fórmula vieja. */}
+      {c.tieneDesglose ? (
+        <Bloque titulo="Cobertura del precio de escrituración">
+          <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
+          <Fila
+            label="(−) Crédito institución (titular + co-titular)"
+            value={money(c.creditoInstitucion)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          {(() => {
+            const saldoPrecio =
+              Math.round((Number(valorEscrituracion ?? 0) - c.creditoInstitucion) * 100) / 100;
+            return (
+              <Fila
+                label={
+                  saldoPrecio <= 0 ? '(=) Saldo del precio (cubierto)' : '(=) Saldo del precio'
+                }
+                value={money(saldoPrecio)}
+                strong
+                tone={saldoPrecio <= 0 ? 'ok' : 'warn'}
+              />
+            );
+          })()}
+          <p className="mt-1 text-[11px] text-[var(--text)]/45">
+            El precio lo cubre el crédito; los gastos de escrituración se desglosan abajo.
+          </p>
+        </Bloque>
+      ) : (
+        <Bloque titulo="Cobertura de la operación">
+          <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="Crédito institución (titular + co-titular)"
+            value={money(c.creditoInstitucion)}
+          />
+          <Fila label="Crédito directo (pagaré)" value={money(c.montoCreditoDirecto)} />
+          <Fila label="Depósitos directos del cliente" value={money(c.depositosDirectoCliente)} />
+          <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
+          {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
+            <>
+              <Fila
+                label="(+) Descuento aplicado"
+                value={money(c.descuentoAplicado)}
+                hint={
+                  c.descuentoAplicado < c.descuentoOtorgado
+                    ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
+                    : undefined
+                }
+              />
+              {c.chequePagado > 0 ? (
+                <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
+              ) : null}
+            </>
+          ) : null}
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label={c.cubierta ? 'Saldo (cubierta)' : 'Saldo pendiente'}
+            value={money(c.saldoCliente)}
+            strong
+            tone={c.cubierta ? 'ok' : 'warn'}
+            hint={
+              c.descuentoOtorgado > 0 || c.chequePagado > 0
+                ? `Cobranza cruda: ${money(c.saldoCobranza)}`
+                : undefined
+            }
+          />
+        </Bloque>
+      )}
 
       {/* Cobertura del presupuesto notarial — las 4 fuentes (ADR-045) */}
       {c.tieneDesglose && c.coberturaGastos ? (

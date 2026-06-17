@@ -461,7 +461,7 @@ describe('calcularCuadratura', () => {
       const c = mayra();
       expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
       expect(c.valorRealVentaDilesa).toBe(954419); // precio interno, NO la fórmula negativa vieja
-      expect(c.descuentoReal).toBe(24651); // 979,070 − 954,419 (el sobreprecio)
+      expect(c.descuentoReal).toBe(15000); // la promoción (lo que DILESA regala), NO el sobreprecio
     });
 
     it('desglosa la facturación: total suma la escritura (factura venta + enganche − NC = neto)', () => {
