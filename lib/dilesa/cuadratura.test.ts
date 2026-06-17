@@ -446,6 +446,35 @@ describe('calcularCuadratura', () => {
       expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
     });
 
+    it('expone la formación del precio (cadena base → incremento → interno → adicionales)', () => {
+      const c = mayra();
+      expect(c.formacionPrecio).toEqual({
+        precioBase: 899000,
+        incrementoCredito: 55419,
+        precioInterno: 954419, // 899,000 + 55,419
+        adicionales: 24651,
+        valorEscrituracion: 979070, // 954,419 + 24,651
+      });
+    });
+
+    it('deriva el cierre con el modelo desglosado (cheque = gastos, valor real = precio interno)', () => {
+      const c = mayra();
+      expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
+      expect(c.valorRealVentaDilesa).toBe(954419); // precio interno, NO la fórmula negativa vieja
+      expect(c.descuentoReal).toBe(24651); // 979,070 − 954,419 (el sobreprecio)
+      // Factura escrituración 979,070 + enganche con recibo 35,000 = 1,014,070;
+      // NC = facturado − valor real = 1,014,070 − 954,419.
+      expect(c.valorFacturado).toBe(1014070);
+      expect(c.montoNotaCredito).toBe(59651);
+    });
+
+    it('FALLBACK: el cierre NO se toca sin desglose (formacionPrecio null, fórmula vieja)', () => {
+      const c = mayra({ promocionGastos: null, precioBase: null, incrementoCredito: null });
+      expect(c.formacionPrecio).toBe(null);
+      // Con la fórmula vieja: depósitos 35,000 − cheque calc + CD.
+      expect(c.valorRealVentaDilesa).not.toBe(954419);
+    });
+
     it('FALLBACK: sin desglose, el mismo escenario usa descuento_total (idéntico al modelo viejo)', () => {
       // Cerradas/legacy: sin promocionGastos/sobreprecioAdicionales, con el
       // descuento mezclado en descuento_total. Debe dar el mismo saldo y NO

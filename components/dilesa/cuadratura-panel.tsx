@@ -60,6 +60,30 @@ export function CuadraturaPanel({
         </div>
       ) : null}
 
+      {/* Formación del precio de escrituración (ADR-045) */}
+      {c.formacionPrecio ? (
+        <Bloque titulo="Formación del precio de escrituración">
+          <Fila label="Precio base asignación (Coda)" value={money(c.formacionPrecio.precioBase)} />
+          <Fila
+            label="(+) Incremento por crédito (FOVISSSTE/IMSS)"
+            value={money(c.formacionPrecio.incrementoCredito)}
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="(=) Precio interno DILESA"
+            value={money(c.formacionPrecio.precioInterno)}
+            strong
+          />
+          <Fila label="(+) Adicionales (productos)" value={money(c.formacionPrecio.adicionales)} />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Precio de escrituración"
+            value={money(c.formacionPrecio.valorEscrituracion)}
+            strong
+          />
+        </Bloque>
+      ) : null}
+
       {/* Cobertura */}
       <Bloque titulo="Cobertura de la operación">
         <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />

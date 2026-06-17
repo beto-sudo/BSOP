@@ -187,6 +187,19 @@ export type Cuadratura = {
     pagareNecesario: number;
   } | null;
   /**
+   * Formación del precio de escrituración (ADR-045), solo con desglose. La
+   * cadena: precioBase + incrementoCredito = precioInterno; + adicionales =
+   * valorEscrituracion. `null` en legacy/cerradas.
+   */
+  formacionPrecio: {
+    precioBase: number;
+    incrementoCredito: number;
+    /** Precio interno DILESA = base + incremento (su venta real). */
+    precioInterno: number;
+    adicionales: number;
+    valorEscrituracion: number;
+  } | null;
+  /**
    * Señal de doble conteo: depósitos fuente-cliente + crédito institución
    * exceden el valor de escrituración (+ gastos netos legítimos) por más del
    * umbral. Típico cuando la disposición del crédito se capturó como abono
@@ -277,7 +290,12 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       : descuentoOtorgadoTotal;
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
   const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoAplicado;
-  const chequeNotariaCalculado = round2(Math.min(gastosNetos, excedenteDisponible));
+  // Con desglose, el cheque a notaría cubre los gastos netos COMPLETOS (las 4
+  // fuentes los fondean; ADR-045). Sin desglose, la fórmula vieja de Coda
+  // (capeada al excedente disponible) — fallback intacto.
+  const chequeNotariaCalculado = tieneDesglose
+    ? round2(gastosNetos)
+    : round2(Math.min(gastosNetos, excedenteDisponible));
 
   // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
   // saldo efectivo usa este, no el calculado: mide un giro real contra el
@@ -312,6 +330,21 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       }
     : null;
 
+  // ADR-045: formación del precio de escrituración (cadena congelada al asignar).
+  // precio_base + incremento_credito = precio interno DILESA (su venta real);
+  // + sobreprecio (productos adicionales) = valor de escrituración. Solo con
+  // desglose poblado.
+  const precioInterno = tieneDesglose ? round2(n(i.precioBase) + n(i.incrementoCredito)) : 0;
+  const formacionPrecio = tieneDesglose
+    ? {
+        precioBase: round2(n(i.precioBase)),
+        incrementoCredito: round2(n(i.incrementoCredito)),
+        precioInterno,
+        adicionales: round2(sobreprecioAdicionales),
+        valorEscrituracion: round2(valorEscrituracion),
+      }
+    : null;
+
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
     valorEscrituracion > 0 &&
@@ -325,9 +358,14 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     i.montoChequeNotaria != null ? n(i.montoChequeNotaria) : chequeNotariaCalculado
   );
 
-  const valorRealVentaDilesa = round2(
-    depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto
-  );
+  // Con desglose, el valor real de venta de DILESA = precio interno (base +
+  // incremento): lo que DILESA cobra de la unidad, sin el sobreprecio (que es
+  // pass-through a gastos vía el cheque). La fórmula vieja de Coda (depósitos −
+  // cheque + pagaré) solo vale cuando el crédito se capturó como depósito, no en
+  // columna — en FOVISSSTE sale negativa. Fallback sin desglose intacto.
+  const valorRealVentaDilesa = tieneDesglose
+    ? precioInterno
+    : round2(depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto);
   // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
   // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
   // del cliente con recibo se factura aparte). La factura de escrituración toma
@@ -376,6 +414,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     comisionGerencia,
     tieneDesglose,
     coberturaGastos,
+    formacionPrecio,
     posibleDobleConteo,
   };
 }
