@@ -3,11 +3,11 @@
 **Slug:** `dilesa-portafolio-expediente`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (escritura en `activos` + satélites vía alta/edición; restaurar columnas de documento en `activo_terreno`; `activo_espectacular` + scoring/dueño-terreno; nueva tabla puente `activo_documentos` 1:N a `erp.documentos`; posible `v_portafolio_*` para filtros/KPIs; RPCs de alta/transición). `erp` (lectura `documentos` para ligar escrituras; `adjuntos` para planos/escrituras/KMZ como archivos). UI: `portafolio-module`, `activo-detail-drawer` + nuevo drawer de captura, hub de tabs ADR-030.
-**Estado:** in_progress
-**Próximo hito:** Beto decide 2 pendientes: (a) **grano de espectaculares** (1 activo con sus 2 caras vs 2 activos por panel) → cargar los 52 del doc Coda; (b) **hub de tabs** (RBAC sub-slugs) sí/no. El resto del módulo (captura, filtros, KPIs, documentos, análisis de compra, escrituras 1:N) ya en prod.
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-06-16
-**Última actualización:** 2026-06-17 (tramo autónomo: 5 PRs en prod #918-#922)
+**Última actualización:** 2026-06-17 (roadmap completo, 8 PRs #918-#925; refinamientos opcionales quedan como backlog)
 
 > **Sucede a** [`dilesa-portafolio-destinos`](dilesa-portafolio-destinos.md) (cerrada) y [`dilesa-portafolio-activos`](dilesa-portafolio-activos.md) (v1 del schema). El **módulo de arrendamiento** y los **mapas interactivos** ([`mapas-interactivos`](mapas-interactivos.md)) son iniciativas hermanas separadas.
 
@@ -69,4 +69,7 @@ El Portafolio deja de ser una lista y se vuelve el **expediente operable de cada
   - **#920** Documentos en la ficha (`<FileAttachments>` sobre `erp.adjuntos`, entidad `activos`): planos/KMZ/fotos.
   - **#921** Análisis de compra del terreno: `computeTerrenoSnapshot` ($/m² aprovechable, brecha de negociación) en la ficha.
   - **#922** Escrituras 1:N: tabla puente `dilesa.activo_documentos` → `erp.documentos` + `<ActivoEscrituras>` (liga a las 57 escrituras legales existentes).
-- **Pendiente de decisión de Beto** (fuera del modo autónomo por riesgo/decisión): **espectaculares** (grano + carga masiva de 52) y **hub de tabs** (RBAC sub-slugs).
+- **2026-06-17 — Cierre (Beto confirmó las 2 decisiones):**
+  - **#924 Espectaculares** (grano "1 activo por panel"): `activo_espectacular` + `caras_detalle` jsonb + `dueno_terreno`; loader idempotente cargó **26 estructuras** (16 espectaculares + 10 padel de RDB, confirmados DILESA) con sus 2 caras/scoring/precio, destino Arrendamiento (renta potencial $374,660). Sección "Caras" en la ficha.
+  - **#925 Hub de tabs** (ADR-030): `/dilesa/portafolio` → tabs Inventario / Evaluación; sub-slugs `dilesa.portafolio.inventario`/`.evaluacion` con backfill defensivo de permisos (verificado en prod: 3 roles del padre → ven los 2 hijos). RBAC en los 5 lugares.
+- **Roadmap completo (8 PRs #918-#925).** Backlog opcional (del análisis multi-lente, no comprometido): bitácora append-only del embudo de compra, due-diligence como checklist-gate, vista kanban, comparables/alertas de estancamiento. Se retoman si Beto los prioriza.
