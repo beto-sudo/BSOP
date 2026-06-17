@@ -26,8 +26,19 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { useEffectiveUser } from '@/components/providers';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { FileAttachments } from '@/components/file-attachments';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { FileText, Image as ImageIcon, Map as MapIcon, MapPin, Paperclip } from 'lucide-react';
+
+const ACTIVO_DOC_ROLES = [
+  { id: 'plano', label: 'Plano', icon: <MapIcon className="h-3 w-3" /> },
+  { id: 'escritura', label: 'Escritura', icon: <FileText className="h-3 w-3" /> },
+  { id: 'kmz', label: 'KMZ / ubicación', icon: <MapPin className="h-3 w-3" /> },
+  { id: 'foto', label: 'Foto', icon: <ImageIcon className="h-3 w-3" /> },
+  { id: 'otro', label: 'Otro', icon: <Paperclip className="h-3 w-3" /> },
+];
 
 type ActivoFull = {
   id: string;
@@ -438,6 +449,21 @@ export function ActivoDetailDrawer({
                   <p className="text-sm text-[var(--text)]/80">{activo.notas}</p>
                 </DetailDrawerSection>
               ) : null}
+
+              <DetailDrawerSection title="Documentos">
+                <FileAttachments
+                  empresaId={DILESA_EMPRESA_ID}
+                  empresaSlug="dilesa"
+                  entidad="activos"
+                  entidadId={activo.id}
+                  roles={ACTIVO_DOC_ROLES}
+                  defaultUploadRole="plano"
+                />
+                <p className="pt-2 text-xs text-[var(--text)]/50">
+                  Planos, escrituras escaneadas, KMZ de ubicación y fotos del activo. (Las
+                  escrituras se ligarán al expediente legal en una fase posterior.)
+                </p>
+              </DetailDrawerSection>
             </>
           ) : null}
         </DetailDrawerContent>
