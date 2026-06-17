@@ -2,87 +2,94 @@
 
 **Slug:** `dilesa-cuadratura-sobreprecio`
 **Empresas:** DILESA
-**Schemas afectados:** principalmente lógica en `lib/dilesa/cuadratura.ts` (motor puro) + UI `components/dilesa/cuadratura-panel.tsx` y armado de inputs en `app/dilesa/ventas/[id]/page.tsx`. Lectura de `dilesa` (`ventas` incl. `desglose_precio`, `tipos_credito`, `productos.valor_comercial_referencia`, `unidades`) y `erp` (`cxc_pagos` como depósitos). Posible saneamiento de datos legacy en `dilesa.ventas.descuento_total`. Sin schema nuevo previsto en v1.
-**Estado:** proposed
-**Próximo hito:** Beto decide D1–D4 (modelo del excedente, semántica del cheque pre-F11, saneamiento del descuento legacy, alcance v1) → arrancar Sprint 1 (ajustes seguros de presentación, sin tocar el saldo)
+**Schemas afectados:** `dilesa.ventas` — **campos nuevos de desglose** (promoción de gastos de escrituración, sobreprecio para gastos / productos adicionales, aportación Dilesa, enganche aplicado a gastos) separados del actual `descuento_total` que hoy los mezcla; motor `lib/dilesa/cuadratura.ts` + UI `components/dilesa/cuadratura-panel.tsx` + armado de inputs en `app/dilesa/ventas/[id]/page.tsx` y la captura de fase 10 (`.../capturar/10-firmas-programadas/page.tsx`). Lectura de `tipos_credito` (apoyo Infonavit, costo_venta_adicional), `productos.valor_comercial_referencia`, `desglose_precio`, `erp.cxc_pagos`. Posible ADR del modelo financiero.
+**Estado:** in_progress
+**Próximo hito:** Sprint 1 — **diseñar** el modelo de datos desglosado (las 4 fuentes de cobertura de gastos) + el panel de cuadratura que las muestre, y **traer el diseño a Beto antes de tocar el motor**.
 **Dueño:** Beto
 **Creada:** 2026-06-17
-**Última actualización:** 2026-06-17 (promovida tras el análisis multi-agente detonado por la venta MAYRA)
+**Última actualización:** 2026-06-17 (modelo de Coda validado contra el Excel maestro; iniciativa a in_progress; rediseño con campos desglosados arrancando)
 
-> Detonante operativo: la venta **MAYRA ALEJANDRA GOMEZ TERRAZAS** (FOVISSSTE Tradicional) se regresó de fase buscando "capturar un pagaré para cuadrar". El pagaré era una pista falsa (ver [PR #927](https://github.com/beto-sudo/BSOP/pull/927), chip fantasma); el problema de fondo es que la **cuadratura no refleja bien el modelo de sobreprecio**. Modelo confirmado en memoria `reference_dilesa_sobreprecio_cheque_notaria`. Hermana de las iniciativas de cuadratura previas (ver `reference_dilesa_cuadratura_valor_facturado`, `reference_dilesa_cuadratura_saldo_efectivo`).
+> Detonante operativo: la venta **MAYRA ALEJANDRA GOMEZ TERRAZAS** (FOVISSSTE Tradicional) se regresó de fase buscando "capturar un pagaré para cuadrar". El pagaré era una pista falsa al inicio (ver [PR #927](https://github.com/beto-sudo/BSOP/pull/927), chip fantasma) pero **resultó real** (9,387). El problema de fondo: la cuadratura mezcla en `descuento` cosas que son conceptualmente distintas (promoción vs sobreprecio), y eso descuadra la utilidad. Modelo en memoria `reference_dilesa_sobreprecio_cheque_notaria`.
 
 ## Problema
 
-DILESA usa un **sobreprecio** para que el crédito hipotecario fondee los gastos de escrituración del cliente. El motor de cuadratura (`lib/dilesa/cuadratura.ts`, réplica del modelo de Coda) no representa bien ese mecanismo, y eso produce dos síntomas:
+La cuadratura de gastos de escrituración tiene **cuatro fuentes de fondeo** que el modelo de BSOP NO separa: hoy las mete todas en `descuento_total`. Eso (a) hace cuadrar el saldo pero (b) **subestima la utilidad/participación de DILESA** (parece que regaló dinero que en realidad pagó el cliente vía el crédito), y (c) confunde al operador (caso MAYRA). El motor además distorsiona los derivados antes de escriturar (`chequeNotariaCalculado = min(gastosNetos, excedenteDisponible)` en [`cuadratura.ts:226`](../../lib/dilesa/cuadratura.ts) → `valorRealVentaDilesa` negativo, `montoNotaCredito` inflada).
 
-1. **Derivados absurdos antes de escriturar (bug real, acotado).** El cheque a notaría se captura hasta la **fase 11 (Escriturada)**. Antes de eso, el motor cae a un `chequeNotariaCalculado = min(gastosNetos, excedenteDisponible)` ([`cuadratura.ts:226`](../../lib/dilesa/cuadratura.ts)). Cuando el crédito ≈ valor de escrituración (el caso normal de FOVISSSTE, porque el sobreprecio está embebido en ambos y se cancela en `montoDisponible − valorEscrituracion`), el excedente colapsa y los derivados que dependen del cheque salen sin sentido: en MAYRA, `valorRealVentaDilesa = −39,651` y `montoNotaCredito = 1,018,721`. Eso es lo que el operador ve "descuadrado".
+## Modelo de Coda (validado con el Excel maestro "Relación Gastos Escrituración y Participación Dilesa", 2026-06-17)
 
-2. **El sobreprecio no aparece como fuente de fondeo (tensión de modelo, decisión de negocio).** La cuadratura toma `valor_escrituracion` (que **ya incluye** el sobreprecio +6%) como el valor a cubrir. Como el crédito también lo incluye, el sobreprecio (~59k en MAYRA) se cancela y no se contabiliza como el dinero del que realmente sale el cheque a notaría. Económicamente el sobreprecio sí paga los gastos; el motor no lo refleja, así que proyecta faltantes donde no necesariamente los hay.
+Fórmulas reales de la hoja LDLE (columnas):
 
-Además, el análisis empírico (230 ventas escrituradas con cheque > 0) mostró un **descuadre multifactorial**: datos legacy de Coda contaminan (descuento "15,000 plano" en ~129/230, outliers de captura), y no hay distinción entre "enganche a la unidad" y "aportación del cliente a gastos" (ambos llegan como `cxc_pagos.fuente='cliente'` y pueden contarse dos veces). **Ningún ajuste de fórmula único cierra todo**: hay que separar bug, gap de modelo y dato malo.
+| Col | Concepto                                                       | Fórmula Coda                           |
+| --- | -------------------------------------------------------------- | -------------------------------------- |
+| M   | Saldo Cliente Dilesa                                           | `Precio − Crédito − Enganche`          |
+| Q   | A pagar a Notaría                                              | `Gastos Esc. − Apoyo Infonavit`        |
+| R   | Máxima Aportación Dilesa a Notaría (= **promoción** de gastos) | **15,000 fijo**                        |
+| S   | Disponible Dilesa + enganche                                   | `−M + R`                               |
+| L   | **Pagaré**                                                     | `Q − S` (el faltante)                  |
+| T   | Cheque a notaría                                               | `= Q` (siempre cubre los gastos netos) |
+| V   | Saldo cliente a notaría                                        | `Q − T = 0` ✓                          |
 
-## Modelo confirmado (validado contra prod, 2026-06-17)
+**Las 4 fuentes que cubren los gastos de escrituración** (ejemplo MAYRA, gastos 84,038):
 
-- **Sobreprecio (+6%)** vive **dentro del precio** vía `fn_calcular_precio_venta` (= `productos.valor_comercial_referencia × costo_venta_adicional_pct`), inflando `precio_asignacion` y `valor_escrituracion` a la vez. Tipos con +6%: **Fovissste Tradicional, Fovissste para Todos, IMSS, Infonavit/Fovissste**. Snapshot en `dilesa.ventas.desglose_precio`.
-- **Cheque a notaría = `gastos_escrituracion − apoyo_infonavit`** (~92% de los casos). `apoyo_infonavit_monto` = 30,000 solo en los 3 Infonavit; FOVISSSTE/IMSS = 0 → cheque = gastos completos. El "patrón cheque ≈ gastos − 30k" es el **apoyo del INFONAVIT, no aporte del cliente**.
-- Sobreprecio y apoyo son **mutuamente excluyentes** por tipo de crédito.
-- **MAYRA:** el sobreprecio SÍ está aplicado (`desglose_precio = {920000, 979070}`, +6.42%). No es dato faltante. El descuadre es el bug de presentación (#1) + un posible faltante real al girar el cheque (gastos 84,038 vs excedente de depósitos+descuento ~74,651), sensible a cuánto del descuento de 39,651 es real vs legacy.
+| Fuente                              |      Monto | Naturaleza                                | Le cuesta a                |
+| ----------------------------------- | ---------: | ----------------------------------------- | -------------------------- |
+| Promoción DILESA (gastos esc.)      |     15,000 | Descuento comercial real                  | **DILESA** (baja utilidad) |
+| Enganche / depósitos del cliente    |     35,000 | Pago del cliente                          | Cliente                    |
+| Sobreprecio (productos adicionales) |     24,651 | Inflado en el precio → lo paga el crédito | Cliente (vía crédito)      |
+| Pagaré del cliente                  |      9,387 | Deuda firmada a DILESA                    | Cliente                    |
+| **Total = cheque a notaría**        | **84,038** |                                           |                            |
+
+Regla (Beto): los **15,000 son la promoción estándar** de gastos de escrituración; cuando los gastos exceden promoción + enganche, el faltante se cubre **subiendo el precio con sobreprecio (productos adicionales)** para que lo pague el crédito de la institución, y el residual queda como **pagaré** del cliente. El apoyo Infonavit (30,000, solo créditos Infonavit) y el sobreprecio +6% (solo FOVISSSTE/IMSS) son **mutuamente excluyentes**.
+
+**Mapeo Coda → BSOP (estado actual):**
+
+- Coda `R` (promoción 15,000) **+** sobreprecio para gastos → hoy **ambos** caen en `descuento_total`/`descuento_gastos_escrituracion`. ⚠️ Hay que **separarlos**.
+- Coda `L` (pagaré) → `monto_credito_directo`. ✓
+- Coda `T` (cheque = gastos − apoyo) → `monto_cheque_notaria` (captura fase 11). ✓
+- Coda `Q` apoyo → `tipos_credito.apoyo_infonavit_monto`. ✓
+
+**Inconsistencias detectadas en el Excel de Coda:** la fórmula de `M` varía entre filas (a veces `−Enganche`, a veces `−Pagaré`, a veces ambos) — captura manual con errores. BSOP debe ser consistente.
 
 ## Outcome esperado
 
-1. La cuadratura **deja de mostrar números absurdos** antes de escriturar (los derivados pendientes del cheque se marcan "estimado / pendiente de escriturar", no se inventan).
-2. Cuando el sobreprecio no alcanza a fondear los gastos, el sistema lo **señala como alerta accionable** ("faltan $X o falta documentar descuento"), no como un derivado sin sentido.
-3. El modelo de cuadratura **reconoce explícitamente el sobreprecio** como fuente de fondeo de gastos (decisión de Beto sobre la fórmula).
-4. Los datos legacy que contaminan el cuadre (descuento plano de Coda, outliers) quedan **identificados y saneables** caso por caso, sin romper las ventas que hoy cuadran.
+La cuadratura **desglosa completamente** las fuentes de cobertura de gastos (promoción, enganche, sobreprecio, apoyo, pagaré), de modo que: el saldo cuadra, **la utilidad/participación de DILESA sale correcta** (solo la promoción le cuesta, no el sobreprecio), y el operador identifica fácilmente "qué es de qué". Se acaban los derivados absurdos pre-escrituración.
 
 ## Alcance
 
-**Dentro (v1, propuesto):**
+**Sprint 1 — Diseño (sin código de motor):**
 
-- Ajustes seguros de **presentación** en el motor + panel: no derivar `valorRealVentaDilesa`/`montoNotaCredito`/`descuentoReal` del cheque calculado cuando `monto_cheque_notaria` es null (marcar estimado/null); bandera `gastosNoFondeados` cuando el excedente no cubre los gastos. No tocan `saldoCliente`/`cubierta`.
-- Tests del motor para los huecos: cheque null, `excedente < gastosNetos`.
+- Modelo de datos: campos nuevos en `dilesa.ventas` (o tabla de cuadratura) — `promocion_gastos_escrituracion`, `sobreprecio_gastos`, `aportacion_dilesa_gastos`, y la separación clara vs `descuento_total` (descuento comercial al precio, distinto de la promoción de gastos). Mapeo de migración desde lo legacy.
+- Diseño del panel de cuadratura con el bloque "Cobertura de gastos de escrituración" mostrando las 4 fuentes.
+- Fórmula del pagaré (faltante) y del cheque (= gastos − apoyo) alineadas con Coda.
+- **Entregable: documento de diseño + ADR del modelo financiero, revisado por Beto antes de codear.**
 
-**Dentro (v2, requiere decisión de negocio):**
+**Sprint 2 — Motor + UI** (tras OK del diseño): implementar los campos, el motor desglosado y el panel; recálculo de utilidad/participación correcto.
 
-- Reformular de dónde sale el dinero del cheque (¿medir excedente contra `valor_comercial` en vez de `valor_escrituracion`?). Candidato a **ADR** (cruza el modelo financiero de toda venta).
-- Distinguir "enganche a la unidad" vs "aportación a gastos" en `cxc_pagos` (gap de modelo de datos — alto riesgo, ver Riesgos).
+**Sprint 3 — Migración de datos legacy:** repartir el `descuento_total` mezclado en promoción vs sobreprecio para las ventas existentes (con OK caso por caso; el "15,000 plano" es la promoción estándar).
 
-**Fuera / aparte:**
-
-- Saneamiento masivo de datos legacy de Coda (descuento plano). Es limpieza de datos con OK caso por caso, no código de este módulo.
-
-## Decisiones pendientes (Beto)
-
-- **D1 — Modelo del excedente:** ¿la cuadratura debe reconocer el sobreprecio embebido como fuente de fondeo de gastos (excedente contra `valor_comercial`), o se mantiene contra `valor_escrituracion`?
-- **D2 — Cheque pre-F11:** ¿el cheque proyectado antes de escriturar se asume optimista (`gastos − apoyo`) o se deja capeado al excedente (muestra faltante)? (El Ajuste 2 hace esta decisión menos urgente: la bandera surface el faltante de cualquier modo.)
-- **D3 — Aportación del cliente a gastos:** ¿se captura por separado del enganche? (raíz del posible doble conteo).
-- **D4 — Descuento legacy "15,000 plano":** ¿se sanea el dato de Coda o se deja y solo se documenta?
-- **MAYRA puntual:** ¿el crédito FOVISSSTE autorizado fue 979,070 (operación no cuadra del todo, faltan ~9,387) o el descuento de 39,651 es real y cubre la diferencia? Requiere ver la autorización del crédito; no es inferible desde la DB.
+**Sprint 4 — Cerrar MAYRA** con el modelo desglosado (en pausa hasta entonces, por decisión de Beto: no cerrarla con el descuento mezclado para que la utilidad salga bien).
 
 ## Riesgos
 
-- **Tocar el saldo rompe ventas que hoy cuadran.** Validado: quitar el depósito-cliente del disponible rompería decenas de ventas correctas. Cualquier cambio a `saldoCliente`/`cubierta` exige verificación adversarial contra las ~230 escrituradas antes de mergear. Los ajustes v1 evitan esto por diseño (solo presentación).
-- **Números macro no confiables aún.** Los conteos agregados de "cuántas cuadran" salieron inconsistentes entre agentes (confusión `saldoCobranza` vs `saldoCliente`). Antes de cualquier saneamiento masivo hace falta una pasada de medición cuidadosa con la definición exacta del motor.
-- **Modelo financiero sensible.** Cambios al motor afectan correo al Consejo, copiloto de cierre y nota de crédito. Regla dura: nada de cambios financieros sin confirmación explícita de Beto.
+- **Tocar el saldo rompe ventas que hoy cuadran.** Cualquier cambio a `saldoCliente`/`cubierta` exige verificación adversarial contra las ~230 escrituradas antes de mergear.
+- **Migración de datos legacy delicada:** separar promoción/sobreprecio en el histórico requiere criterio (el 15,000 es la promoción; el resto del descuento mezclado puede ser sobreprecio). OK de Beto caso por caso.
+- **Modelo financiero sensible.** Afecta correo al Consejo, copiloto de cierre, nota de crédito, utilidad Dilesa. Nada al motor sin diseño aprobado por Beto.
 
 ## Métricas de éxito
 
-- 0 ventas mostrando derivados absurdos (valor real negativo / NC inflada) antes de escriturar.
-- Toda venta con sobreprecio insuficiente muestra una alerta accionable cuantificada, no un número sin sentido.
-- Las ventas que hoy cuadran siguen cuadrando tras cada ajuste (verificación adversarial verde).
-
-## Sprints / hitos (propuestos)
-
-- **Sprint 0 — Decisiones (Beto):** resolver D1–D4 + el caso MAYRA. Bloqueante de todo lo demás.
-- **Sprint 1 — Ajustes seguros (presentación):** derivados estimados/null pre-F11 + bandera `gastosNoFondeados` + tests. Sin tocar el saldo. (Listo para arrancar apenas Beto fije alcance v1.)
-- **Sprint 2 — Medición confiable:** reproducir el cuadre con la definición exacta del motor sobre las 230 escrituradas; caracterizar cuántas descuadran y por qué (bug vs gap vs dato).
-- **Sprint 3 — Modelo del excedente (si D1 lo pide):** ADR + reformular el fondeo del cheque; verificación adversarial obligatoria.
-- **Sprint 4 — Saneamiento de datos legacy (si D4 lo pide):** limpieza del descuento plano caso por caso con OK de Beto.
+- Las 4 fuentes de cobertura de gastos visibles y sumando al cheque a notaría en cada venta.
+- Utilidad/participación de DILESA correcta (solo la promoción le cuesta, no el sobreprecio).
+- 0 derivados absurdos pre-escrituración.
+- Las ventas que hoy cuadran siguen cuadrando.
 
 ## Bitácora
 
-- **2026-06-17** — Promovida. Detonante: venta MAYRA. Análisis multi-agente (workflow `dilesa-cuadratura-sobreprecio`, 7 agentes + verificación adversarial) confirmó el modelo de sobreprecio/cheque y corrigió la hipótesis inicial (el +6% sí está aplicado en MAYRA; no era dato faltante). En paralelo se entregó [PR #927](https://github.com/beto-sudo/BSOP/pull/927) (chip "Pagaré" fantasma + rol del pagaré en fase 10), que resolvió la confusión que originó el reporte. Modelo guardado en memoria `reference_dilesa_sobreprecio_cheque_notaria`.
+- **2026-06-17** — Promovida. Detonante: venta MAYRA. Análisis multi-agente confirmó el modelo de sobreprecio/cheque. [PR #927](https://github.com/beto-sudo/BSOP/pull/927) (chip fantasma + rol del pagaré) mergeado. [PR #928](https://github.com/beto-sudo/BSOP/pull/928) (promoción de la iniciativa) mergeado. Memoria `reference_dilesa_sobreprecio_cheque_notaria`.
+- **2026-06-17** — Beto pasó el **Excel maestro de cuadraturas de Coda** ("Relación Gastos Escrituración y Participación Dilesa"). Validadas las fórmulas (hoja LDLE, 302 ventas): el modelo gira en torno a los gastos de notaría, el cheque = gastos − apoyo, el pagaré = faltante. **Hallazgo clave:** el "descuento" de BSOP mezcla la **promoción** (15,000, costo de DILESA) con el **sobreprecio** (productos adicionales, lo paga el crédito) — hay que desglosarlos para que la utilidad salga bien. MAYRA: 84,038 gastos = promoción 15,000 + enganche 35,000 + sobreprecio 24,651 + pagaré 9,387.
+- **2026-06-17** — Beto: **arrancar rediseño** (iniciativa a `in_progress`, diseño antes de código) y **no cerrar MAYRA** hasta tener los campos desglosados. El PR #929 (fix rápido de fase 10 que metía el sobreprecio en el descuento) se **cerró** y se pliega al rediseño con la fórmula desglosada correcta.
 
 ## Decisiones registradas
 
-- **2026-06-17** — El descuadre es **multifactorial**; v1 se limita a ajustes de **presentación** (no tocar `saldoCliente`/`cubierta`) porque cualquier cambio al saldo rompe ventas que hoy cuadran. El cambio del modelo del excedente (D1) se trata como v2 con ADR, no se mete a la fuerza en v1.
+- **2026-06-17** — El "descuento" se **desglosa** en conceptos separados: promoción de gastos (costo de DILESA) vs sobreprecio/productos adicionales (lo paga el crédito) vs descuento comercial al precio. Es la raíz de la subestimación de utilidad.
+- **2026-06-17** — **Diseño antes de código** para el motor (decisión de Beto): Sprint 1 entrega documento + ADR revisable; nada al motor de cuadratura sin su OK.
+- **2026-06-17** — MAYRA **en pausa** hasta el rediseño (no cerrarla con el descuento mezclado, para que la utilidad/participación salga correcta desde el inicio).
