@@ -3,11 +3,11 @@
 **Slug:** `dilesa-portafolio-destinos`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (nueva tabla catálogo `portafolio_destinos`; `activos.destino_id` FK + backfill desde `modalidad`; RPC `fn_liberar_unidad_portafolio` v2 — destino + liberar-desde-cualquier-estado + guard de venta activa; `unidades.es_muestra` data-fix de paridad con Coda; lectura `construccion.avance_pct` para la cápsula; lectura `ventas` para el guard). UI: `liberar-portafolio-dialog`, `portafolio-module`, `inventario-module`, form de nueva venta (`app/dilesa/ventas/nueva`).
-**Estado:** in_progress
-**Próximo hito:** Sprint 3 — módulo de arrendamiento (consumidor de activos con destino `cuenta_renta=true`). (Sprints 1-2 en prod.)
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-06-16
-**Última actualización:** 2026-06-16 (Sprint 2: cápsula de avance + admin de catálogo)
+**Última actualización:** 2026-06-16 (cerrada; Sprints 1-2 en prod. El módulo de arrendamiento se separó a iniciativa propia, futura.)
 
 > **Continuación conceptual de** [`dilesa-portafolio-activos`](dilesa-portafolio-activos.md) (cerrada 2026-06-08, v1 = schema de activos + import Coda + UI lectura + RPC liberar↔portafolio). Aquella dejó el mecanismo bidireccional; ésta lo vuelve el **marcador canónico de "fuera del programa de venta de vivienda"** y le da un catálogo de destinos rico.
 
