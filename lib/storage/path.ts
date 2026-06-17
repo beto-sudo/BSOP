@@ -32,6 +32,7 @@ export type AdjuntoEntidad =
   | 'proyectos'
   | 'prototipos'
   | 'terrenos'
+  | 'activos'
   | 'anteproyectos'
   | 'empresa'
   | 'ventas'
