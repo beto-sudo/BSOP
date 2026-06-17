@@ -28,7 +28,7 @@ import { useEffectiveUser } from '@/components/providers';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { FileAttachments } from '@/components/file-attachments';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
-import { ACTIVO_TIPO_LABEL } from '@/lib/dilesa/portafolio';
+import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { FileText, Image as ImageIcon, Map as MapIcon, MapPin, Paperclip } from 'lucide-react';
 
@@ -307,6 +307,19 @@ export function ActivoDetailDrawer({
     ? Object.entries(satelite).filter(([k, v]) => !SAT_OMIT.has(k) && v != null && v !== '')
     : [];
 
+  // Snapshot financiero de compra (solo terrenos con datos de negociación).
+  const numOrNull = (v: unknown) => (v == null || v === '' ? null : Number(v));
+  const compra =
+    activo?.tipo === 'terreno' && satelite
+      ? computeTerrenoSnapshot({
+          areaM2: activo.area_m2,
+          areasAfectacionM2: numOrNull(satelite.areas_afectacion_m2),
+          precioSolicitadoM2: numOrNull(satelite.precio_solicitado_m2),
+          precioOfertadoM2: numOrNull(satelite.precio_ofertado_m2),
+          valorObjetivoCompra: numOrNull(satelite.valor_objetivo_compra),
+        })
+      : null;
+
   const handleRegresar = async () => {
     if (!origen) return;
     const r = await regresarUnidadAlProyecto(origen.id);
@@ -388,6 +401,41 @@ export function ActivoDetailDrawer({
                 <Field label="Número de escritura" value={activo.numero_escritura} />
                 <Field label="Clave catastral" value={activo.clave_catastral} />
               </DetailDrawerSection>
+
+              {compra ? (
+                <DetailDrawerSection title="Análisis de compra">
+                  <Field
+                    label="Área aprovechable"
+                    value={
+                      compra.aprovechableM2 != null ? `${compra.aprovechableM2.toFixed(2)} m²` : '—'
+                    }
+                  />
+                  <Field
+                    label="Valor solicitado"
+                    value={
+                      compra.valorSolicitado != null ? formatCurrency(compra.valorSolicitado) : '—'
+                    }
+                  />
+                  <Field
+                    label="Valor ofertado"
+                    value={
+                      compra.valorOfertado != null ? formatCurrency(compra.valorOfertado) : '—'
+                    }
+                  />
+                  <Field
+                    label="$/m² aprovechable"
+                    value={
+                      compra.precioM2Aprovechable != null
+                        ? formatCurrency(compra.precioM2Aprovechable)
+                        : '—'
+                    }
+                  />
+                  <Field
+                    label="Brecha de negociación"
+                    value={compra.brechaPct != null ? `${compra.brechaPct.toFixed(1)}%` : '—'}
+                  />
+                </DetailDrawerSection>
+              ) : null}
 
               {satEntries.length > 0 ? (
                 <DetailDrawerSection title="Detalle del inmueble">

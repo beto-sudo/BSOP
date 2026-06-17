@@ -100,3 +100,48 @@ export function slugifyDestino(label: string): string {
     .replace(/[^a-z0-9]+/g, '_') // no alfanumérico → _
     .replace(/^_+|_+$/g, ''); // recorta _ de los extremos
 }
+
+/**
+ * Snapshot financiero de un terreno en evaluación de compra. Deriva las métricas
+ * que el comité usa para decidir: área aprovechable (área − afectaciones), valor
+ * solicitado vs ofertado, $/m² aprovechable (la métrica real para comparar
+ * terrenos) y la brecha de negociación. Devuelve `null` si no hay datos mínimos
+ * (ni precio solicitado ni valor objetivo). Recrea las columnas generadas que la
+ * vieja `dilesa.terrenos` de Coda tenía y se perdieron al plegar al satélite.
+ */
+export type TerrenoSnapshot = {
+  aprovechableM2: number | null;
+  valorSolicitado: number | null;
+  valorOfertado: number | null;
+  precioM2Aprovechable: number | null;
+  brechaPct: number | null;
+};
+
+export function computeTerrenoSnapshot(input: {
+  areaM2: number | null;
+  areasAfectacionM2: number | null;
+  precioSolicitadoM2: number | null;
+  precioOfertadoM2: number | null;
+  valorObjetivoCompra: number | null;
+}): TerrenoSnapshot | null {
+  const { areaM2, areasAfectacionM2, precioSolicitadoM2, precioOfertadoM2, valorObjetivoCompra } =
+    input;
+  // Sin nada de la negociación no hay snapshot que mostrar.
+  if (precioSolicitadoM2 == null && precioOfertadoM2 == null && valorObjetivoCompra == null) {
+    return null;
+  }
+  const aprovechableM2 = areaM2 != null ? Math.max(0, areaM2 - (areasAfectacionM2 ?? 0)) : null;
+  const valorSolicitado =
+    areaM2 != null && precioSolicitadoM2 != null ? areaM2 * precioSolicitadoM2 : null;
+  const valorOfertado =
+    areaM2 != null && precioOfertadoM2 != null ? areaM2 * precioOfertadoM2 : null;
+  // $/m² aprovechable: prioriza el valor objetivo; si no, el ofertado total.
+  const base = valorObjetivoCompra ?? valorOfertado;
+  const precioM2Aprovechable =
+    base != null && aprovechableM2 != null && aprovechableM2 > 0 ? base / aprovechableM2 : null;
+  const brechaPct =
+    valorSolicitado != null && valorOfertado != null && valorSolicitado > 0
+      ? ((valorSolicitado - valorOfertado) / valorSolicitado) * 100
+      : null;
+  return { aprovechableM2, valorSolicitado, valorOfertado, precioM2Aprovechable, brechaPct };
+}
