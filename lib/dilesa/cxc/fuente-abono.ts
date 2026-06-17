@@ -60,3 +60,17 @@ export function abonoCubreMayormenteInstitucion(
   const r = repartirAbonoFifo(cargos, monto);
   return r.institucion > r.cliente;
 }
+
+/**
+ * ¿El abono quedaría 100% sin aplicar (saldo a favor = monto total)? Pasa
+ * cuando la venta no tiene ningún cargo abierto que el FIFO del RPC pueda
+ * cubrir: el dinero queda flotando sin bajar saldo y sin disparar el trigger
+ * de detonación de fase. El caso más común es una venta SIN plan de pagos
+ * (cero cargos), donde un abono se captura sin efecto y se puede duplicar en
+ * silencio (incidente Arizpe Luna 2026-06-17). Espejo del FIFO del RPC.
+ */
+export function abonoQuedariaSinAplicar(cargos: CargoAbiertoFuente[], monto: number): boolean {
+  if (!(monto > 0)) return false;
+  const r = repartirAbonoFifo(cargos, monto);
+  return r.cliente + r.institucion <= 0;
+}

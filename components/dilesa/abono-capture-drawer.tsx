@@ -25,10 +25,18 @@
  * Si el abono es de institución y la venta ya está detonada (o se detona
  * con este abono), el comprobante se copia solo al expediente de la venta
  * (trigger sobre `comprobante_adjunto_id`, migración 20260612173513).
+ *
+ * Gate "sin plan de pagos" (2026-06-17, incidente Arizpe Luna): si la venta
+ * no tiene cargos (`erp.cxc_cargos` vacío), el FIFO del RPC no encuentra qué
+ * cubrir y el abono queda 100% flotando (saldo a favor) sin avanzar la fase —
+ * y se puede repetir, duplicando depósitos en silencio. El drawer bloquea el
+ * submit y ofrece generar el plan ahí mismo (`dilesa.fn_generar_plan_pagos`).
+ * Además, si tras registrar el abono quedó sin aplicarse (plan ya saldado),
+ * avisa fuerte en vez de un "registrado" plano.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Pencil, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus } from 'lucide-react';
 import { z } from 'zod';
 
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
@@ -50,6 +58,7 @@ import {
 } from '@/lib/dilesa/cxc/cfdi-recibo';
 import {
   abonoCubreMayormenteInstitucion,
+  abonoQuedariaSinAplicar,
   sugerirFuenteAbono,
   type CargoAbiertoFuente,
 } from '@/lib/dilesa/cxc/fuente-abono';
@@ -129,9 +138,14 @@ export function AbonoCaptureDrawer({
   // si viene `undefined` (p.ej. Cobranza · Pagos), se resuelve aquí desde
   // erp.personas — sin él, la verificación del recibo caería al nombre.
   const [rfcResuelto, setRfcResuelto] = useState<string | null>(null);
-  // Cargos abiertos de la venta en el orden FIFO del RPC — sugieren la fuente
-  // del abono y alimentan el aviso de etiqueta vs lo que va a cubrir.
-  const [cargosAbiertos, setCargosAbiertos] = useState<CargoAbiertoFuente[] | null>(null);
+  // Cargos de la venta (todos, no solo los abiertos) en el orden FIFO del RPC.
+  // Sirven para: (a) sugerir la fuente del abono y el aviso de etiqueta, (b)
+  // detectar que la venta NO tiene plan de pagos (lista vacía → `sinPlan`).
+  // `null` = aún cargando (no decidir el gate hasta saberlo).
+  const [cargosVenta, setCargosVenta] = useState<CargoAbiertoFuente[] | null>(null);
+  // Bump tras generar el plan inline → re-fetch de cargos sin reabrir el drawer.
+  const [cargosRefreshKey, setCargosRefreshKey] = useState(0);
+  const [generandoPlan, setGenerandoPlan] = useState(false);
   const form = useZodForm({ schema: AbonoSchema, defaultValues: defaults });
 
   // RFC de la empresa (emisor esperado del recibo) — 1 fetch por apertura.
@@ -173,10 +187,10 @@ export function AbonoCaptureDrawer({
 
   const rfcCliente = clienteRfc !== undefined ? clienteRfc : rfcResuelto;
 
-  // Cargos abiertos en cada apertura (los saldos cambian con cada abono;
-  // `reset()` limpia al cerrar). Si lo siguiente por cubrir espera pago de
-  // institución, el abono casi seguro es la disposición del crédito →
-  // pre-selecciona la fuente.
+  // Cargos en cada apertura (los saldos cambian con cada abono; `reset()`
+  // limpia al cerrar) y tras generar el plan inline (`cargosRefreshKey`). Si
+  // lo siguiente por cubrir espera pago de institución, el abono casi seguro
+  // es la disposición del crédito → pre-selecciona la fuente.
   useEffect(() => {
     if (!open) return;
     let activo = true;
@@ -189,7 +203,6 @@ export function AbonoCaptureDrawer({
         .eq('origen_tipo', 'venta_dilesa')
         .eq('origen_id', ventaId)
         .neq('estado', 'cancelado')
-        .gt('saldo', 0)
         .is('deleted_at', null)
         .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
         .order('numero', { ascending: true });
@@ -198,7 +211,7 @@ export function AbonoCaptureDrawer({
         saldo: Number(c.saldo),
         fuente_esperada: c.fuente_esperada,
       }));
-      setCargosAbiertos(cargos);
+      setCargosVenta(cargos);
       if (!form.formState.dirtyFields.fuente && sugerirFuenteAbono(cargos) === 'institucion') {
         form.setValue('fuente', 'institucion');
       }
@@ -206,18 +219,44 @@ export function AbonoCaptureDrawer({
     return () => {
       activo = false;
     };
-  }, [open, ventaId, form]);
+  }, [open, ventaId, form, cargosRefreshKey]);
+
+  // Venta sin plan de pagos: cero cargos. Hasta que `cargosVenta` resuelve
+  // (`null`) no decidimos, para no parpadear el bloqueo mientras carga.
+  const sinPlan = cargosVenta !== null && cargosVenta.length === 0;
 
   const fuenteSel = form.watch('fuente');
   const montoStr = form.watch('monto');
   const avisoFuenteCliente = useMemo(() => {
-    if (fuenteSel !== 'cliente' || !cargosAbiertos?.length) return false;
-    return abonoCubreMayormenteInstitucion(cargosAbiertos, Number(montoStr));
-  }, [fuenteSel, montoStr, cargosAbiertos]);
+    if (fuenteSel !== 'cliente' || !cargosVenta?.length) return false;
+    return abonoCubreMayormenteInstitucion(cargosVenta, Number(montoStr));
+  }, [fuenteSel, montoStr, cargosVenta]);
+
+  const handleGenerarPlanInline = async () => {
+    setGenerandoPlan(true);
+    try {
+      const sb = createSupabaseBrowserClient();
+      const { error } = await sb
+        .schema('dilesa')
+        .rpc('fn_generar_plan_pagos', { p_venta_id: ventaId });
+      if (error) {
+        toast.add({
+          title: 'No se pudo generar el plan',
+          description: getSupabaseErrorMessage(error, 'Error en el RPC.'),
+          type: 'error',
+        });
+        return;
+      }
+      toast.add({ title: 'Plan de pagos generado', type: 'success' });
+      setCargosRefreshKey((k) => k + 1);
+    } finally {
+      setGenerandoPlan(false);
+    }
+  };
 
   const reset = () => {
     form.reset(defaults);
-    setCargosAbiertos(null);
+    setCargosVenta(null);
     setComprobante(null);
     setRecibo(null);
     setReciboXml(null);
@@ -277,6 +316,15 @@ export function AbonoCaptureDrawer({
   };
 
   const handleSubmit = async (values: AbonoValues) => {
+    if (sinPlan) {
+      toast.add({
+        title: 'Genera el plan de pagos primero',
+        description:
+          'Esta venta no tiene cargos: el abono quedaría flotando sin aplicarse y sin avanzar la fase.',
+        type: 'error',
+      });
+      return;
+    }
     if (parsed && verif && !verif.receptorCoincide && !confirmaOtroReceptor) {
       toast.add({
         title: 'El recibo es de otro receptor',
@@ -416,7 +464,19 @@ export function AbonoCaptureDrawer({
       }
     }
 
-    toast.add({ title: 'Abono registrado', type: 'success' });
+    // Aviso fuerte si el abono quedó 100% sin aplicar (saldo a favor = monto):
+    // con el gate `sinPlan` activo esto solo ocurre con el plan ya saldado,
+    // pero el operador debe enterarse en vez de ver un "registrado" plano.
+    if (abonoQuedariaSinAplicar(cargosVenta ?? [], Number(values.monto))) {
+      toast.add({
+        title: 'Abono registrado, pero quedó sin aplicar',
+        description:
+          'No hay cargos abiertos que cubrir: el monto quedó como saldo a favor. Revisa el plan de pagos de la venta.',
+        type: 'warning',
+      });
+    } else {
+      toast.add({ title: 'Abono registrado', type: 'success' });
+    }
     reset();
     onOpenChange(false);
     onDone();
@@ -432,6 +492,32 @@ export function AbonoCaptureDrawer({
     >
       <DetailDrawerContent>
         <Form form={form} onSubmit={handleSubmit} className="space-y-5">
+          {sinPlan ? (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-2">
+                <p className="font-medium">Esta venta no tiene plan de pagos.</p>
+                <p>
+                  Sin cargos abiertos, el abono quedaría flotando sin aplicarse (saldo a favor) y no
+                  avanzaría la fase. Genera el plan de pagos antes de registrar abonos.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleGenerarPlanInline()}
+                  disabled={generandoPlan}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/60 bg-amber-100 px-3 py-1.5 font-medium text-amber-900 hover:bg-amber-200 disabled:opacity-60 dark:bg-amber-900/40 dark:text-amber-100 dark:hover:bg-amber-900/60"
+                >
+                  {generandoPlan ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  {generandoPlan ? 'Generando…' : 'Generar plan de pagos'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div>
             <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
               Recibo de caja (CFDI)
@@ -636,6 +722,7 @@ export function AbonoCaptureDrawer({
             submitLabel="Registrar abono"
             submittingLabel="Registrando..."
             submitIcon={<Plus className="h-4 w-4" />}
+            submitDisabled={sinPlan}
             onCancel={() => handleOpenChange(false)}
             stretch
           />

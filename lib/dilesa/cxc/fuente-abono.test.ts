@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   abonoCubreMayormenteInstitucion,
+  abonoQuedariaSinAplicar,
   repartirAbonoFifo,
   sugerirFuenteAbono,
   type CargoAbiertoFuente,
@@ -74,5 +75,35 @@ describe('abonoCubreMayormenteInstitucion', () => {
   it('no avisa sin monto o sin cargos abiertos', () => {
     expect(abonoCubreMayormenteInstitucion(cargosDisposicionPendiente, 0)).toBe(false);
     expect(abonoCubreMayormenteInstitucion([], 100000)).toBe(false);
+  });
+});
+
+describe('abonoQuedariaSinAplicar', () => {
+  it('detecta el abono que flota 100% sin plan de pagos (incidente Arizpe Luna)', () => {
+    expect(abonoQuedariaSinAplicar([], 908999.71)).toBe(true);
+  });
+
+  it('detecta el abono que flota con el plan ya saldado (todos los cargos en 0)', () => {
+    expect(
+      abonoQuedariaSinAplicar(
+        [
+          { saldo: 0, fuente_esperada: 'cliente' },
+          { saldo: 0, fuente_esperada: 'institucion' },
+        ],
+        50000
+      )
+    ).toBe(true);
+  });
+
+  it('no marca cuando algún cargo abierto absorbe parte del abono', () => {
+    expect(abonoQuedariaSinAplicar(cargosDisposicionPendiente, 700000)).toBe(false);
+    // Excedente sobre un único cargo: aplica algo → no es flotación total.
+    expect(abonoQuedariaSinAplicar([{ saldo: 10000, fuente_esperada: 'cliente' }], 12500)).toBe(
+      false
+    );
+  });
+
+  it('no marca con monto no positivo', () => {
+    expect(abonoQuedariaSinAplicar([], 0)).toBe(false);
   });
 });
