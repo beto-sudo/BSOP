@@ -85,3 +85,18 @@ const ESTADOS_LIBERABLES = new Set(['planeada', 'lote_urbanizado', 'en_construcc
 export function puedeLiberarse(estadoUnidad: string): boolean {
   return ESTADOS_LIBERABLES.has(estadoUnidad);
 }
+
+/**
+ * Deriva un `slug` estable (kebab-case, sin acentos) desde el label que captura
+ * el operador al crear un destino nuevo. El slug es la identidad del destino
+ * (UNIQUE por empresa) y no cambia al editar el label. Devuelve `''` si el
+ * label no deja caracteres usables (el caller valida).
+ */
+export function slugifyDestino(label: string): string {
+  return label
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // quita acentos (combining marks)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_') // no alfanumérico → _
+    .replace(/^_+|_+$/g, ''); // recorta _ de los extremos
+}

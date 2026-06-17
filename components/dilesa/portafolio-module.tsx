@@ -14,9 +14,11 @@ import { DataTable, type Column } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Building2, RefreshCw, Search } from 'lucide-react';
+import { Building2, RefreshCw, Search, Tags } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ActivoDetailDrawer } from '@/components/dilesa/activo-detail-drawer';
+import { DestinosCatalogoDialog } from '@/components/dilesa/destinos-catalogo-dialog';
+import { useEffectiveUser } from '@/components/providers';
 
 type Activo = {
   id: string;
@@ -66,6 +68,10 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('');
   const [detalle, setDetalle] = useState<{ id: string; tipo: string } | null>(null);
+  const [destinosOpen, setDestinosOpen] = useState(false);
+  const { data: effectiveUser } = useEffectiveUser();
+  const puedeAdminDestinos =
+    !!effectiveUser?.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const fetchActivos = useCallback(
     () =>
@@ -192,6 +198,16 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </button>
+        {puedeAdminDestinos ? (
+          <button
+            type="button"
+            onClick={() => setDestinosOpen(true)}
+            className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+          >
+            <Tags className="h-3.5 w-3.5" />
+            Destinos
+          </button>
+        ) : null}
       </div>
 
       <DataTable
@@ -217,6 +233,14 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
         }}
         onChanged={() => void cargar()}
       />
+
+      {puedeAdminDestinos ? (
+        <DestinosCatalogoDialog
+          empresaId={empresaId}
+          open={destinosOpen}
+          onOpenChange={setDestinosOpen}
+        />
+      ) : null}
     </div>
   );
 }

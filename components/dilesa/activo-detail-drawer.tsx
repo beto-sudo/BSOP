@@ -53,6 +53,20 @@ type Origen = {
   identificador: string;
   estado: string;
   proyectoNombre: string | null;
+  /** Avance de obra de la unidad de origen (dilesa.construccion), si la hay. */
+  obra: {
+    avancePct: number | null;
+    estado: string;
+    fechaArranque: string | null;
+    fechaTerminada: string | null;
+  } | null;
+};
+
+const OBRA_ESTADO_LABEL: Record<string, string> = {
+  arrancada: 'Arrancada',
+  en_progreso: 'En progreso',
+  terminada: 'Terminada',
+  suspendida: 'Suspendida',
 };
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
@@ -226,18 +240,45 @@ export function ActivoDetailDrawer({
         proyecto_id: string;
       } | null;
       if (uni) {
-        const { data: prj } = await sb
-          .schema('dilesa')
-          .from('proyectos')
-          .select('nombre')
-          .eq('id', uni.proyecto_id)
-          .maybeSingle();
+        // Proyecto + avance de obra (dilesa.construccion) de la unidad de origen.
+        // Una casa liberada en construcción muestra su % de obra en el portafolio.
+        const [prjRes, obraRes] = await Promise.all([
+          sb
+            .schema('dilesa')
+            .from('proyectos')
+            .select('nombre')
+            .eq('id', uni.proyecto_id)
+            .maybeSingle(),
+          sb
+            .schema('dilesa')
+            .from('construccion')
+            .select('avance_pct, estado, fecha_arranque, fecha_terminada')
+            .eq('unidad_id', uni.id)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
         if (!vivo) return;
+        const obra = obraRes.data as {
+          avance_pct: number | null;
+          estado: string;
+          fecha_arranque: string | null;
+          fecha_terminada: string | null;
+        } | null;
         setOrigen({
           id: uni.id,
           identificador: uni.identificador,
           estado: uni.estado,
-          proyectoNombre: (prj as { nombre?: string } | null)?.nombre ?? null,
+          proyectoNombre: (prjRes.data as { nombre?: string } | null)?.nombre ?? null,
+          obra: obra
+            ? {
+                avancePct: obra.avance_pct,
+                estado: obra.estado,
+                fechaArranque: obra.fecha_arranque,
+                fechaTerminada: obra.fecha_terminada,
+              }
+            : null,
         });
       }
       setLoading(false);
@@ -341,6 +382,43 @@ export function ActivoDetailDrawer({
                   <Field label="Proyecto" value={origen.proyectoNombre} />
                   <p className="pt-1 text-xs text-[var(--text)]/50">
                     Este activo se traspasó al portafolio desde una unidad del fraccionamiento.
+                  </p>
+                </DetailDrawerSection>
+              ) : null}
+
+              {origen?.obra ? (
+                <DetailDrawerSection title="Avance de obra">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Badge
+                      tone={
+                        origen.obra.estado === 'terminada'
+                          ? 'success'
+                          : origen.obra.estado === 'suspendida'
+                            ? 'warning'
+                            : 'info'
+                      }
+                    >
+                      {OBRA_ESTADO_LABEL[origen.obra.estado] ?? origen.obra.estado}
+                    </Badge>
+                    <span className="tabular-nums text-sm font-medium text-[var(--text)]">
+                      {origen.obra.avancePct != null ? `${origen.obra.avancePct.toFixed(1)}%` : '—'}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border)]">
+                    <div
+                      className="h-full bg-[var(--accent)] transition-all"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, origen.obra.avancePct ?? 0))}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <Field label="Arranque" value={origen.obra.fechaArranque} />
+                    <Field label="Terminada" value={origen.obra.fechaTerminada} />
+                  </div>
+                  <p className="pt-1 text-xs text-[var(--text)]/50">
+                    Avance de construcción de la unidad de origen. Una unidad puede entrar al
+                    portafolio antes de terminar la obra.
                   </p>
                 </DetailDrawerSection>
               ) : null}
