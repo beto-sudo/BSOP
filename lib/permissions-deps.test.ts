@@ -102,10 +102,16 @@ describe('requisitosDe / requisitosFaltantes', () => {
   });
 
   it('requisitosFaltantes excluye los que ya tienen lectura', () => {
+    // `autorizar` (captura Fase 2) vive bajo el expediente → requiere operacion,
+    // que a su vez requiere lista (cadena tras `dilesa-ventas-expediente-tabs`).
     expect(
-      requisitosFaltantes('dilesa.ventas.autorizar', new Set(['dilesa.ventas.lista']))
+      requisitosFaltantes(
+        'dilesa.ventas.autorizar',
+        new Set(['dilesa.ventas.lista', 'dilesa.ventas.operacion'])
+      )
     ).toEqual([]);
     expect(requisitosFaltantes('dilesa.ventas.autorizar', new Set())).toEqual([
+      'dilesa.ventas.operacion',
       'dilesa.ventas.lista',
     ]);
   });

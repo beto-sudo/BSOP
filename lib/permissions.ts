@@ -60,6 +60,15 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/dilesa/ventas/clientes': 'dilesa.ventas.clientes',
   '/dilesa/ventas/vendedores': 'dilesa.ventas.vendedores',
   '/dilesa/ventas/promociones': 'dilesa.ventas.promociones',
+  // Detalle de venta = expediente con routed tabs (iniciativa
+  // `dilesa-ventas-expediente-tabs`, ADR-005/030). El landing `/[id]` es el tab
+  // Operación; cada tab tiene su sub-slug. La cabecera/ficha la monta el layout
+  // compartido; el gate fino vive en cada page (SS5). Los tabs persisten en la
+  // captura de fase (`/[id]/capturar/*`).
+  '/dilesa/ventas/[id]': 'dilesa.ventas.operacion',
+  '/dilesa/ventas/[id]/cuadratura': 'dilesa.ventas.cuadratura',
+  '/dilesa/ventas/[id]/documentos': 'dilesa.ventas.documentos',
+  '/dilesa/ventas/[id]/bitacora': 'dilesa.ventas.bitacora',
   // Cobranza (CxC) es un hub con 2 tabs. La URL default mapea al sub-slug
   // del primer tab (`.pagos`). ADR-030 SS2.
   '/dilesa/cobranza': 'dilesa.cobranza.pagos',
