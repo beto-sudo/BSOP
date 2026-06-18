@@ -39,7 +39,7 @@ import { FileAttachments } from '@/components/file-attachments';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { usePermissions } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
-import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { getSupabaseErrorMessage, toSupabaseError } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
 import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
@@ -1026,29 +1026,42 @@ function CapturaPrecios({
       };
     });
 
-    // `try/catch/finally` es obligatorio: supabase-js solo *resuelve* `{ error }`
-    // para errores HTTP; ante un fallo de red (`fetch` rechaza) la promesa
-    // *lanza*. Sin el `finally`, `saving` quedaría en `true` para siempre y el
-    // botón se quedaría girando sin mensaje ("ciclado"). El `finally` garantiza
-    // que el spinner siempre se libere y el `catch` muestra el error real.
-    try {
+    // El guardado necesita un LÍMITE DE TIEMPO DURO, no solo try/catch. Si la
+    // red de la terminal cuelga el POST (incluido el refresh de token de
+    // auth-js, que corre bajo un Web Lock), el `await` nunca se resuelve NI
+    // rechaza → ni el `finally` corre y el botón se queda "pensando"
+    // indefinidamente sin error (reporte de Nahum: "se queda un buen rato y no
+    // avanza"; refrescar lo arregla porque libera el lock). El `Promise.race`
+    // contra un timeout garantiza que el spinner SIEMPRE se libere con un
+    // mensaje accionable, y el `abortSignal` cancela el request en vuelo.
+    const SAVE_TIMEOUT_MS = 15_000;
+    const ac = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              'La conexión tardó demasiado. Refresca la página (Ctrl+Shift+R) e intenta de nuevo.'
+            )
+          ),
+        SAVE_TIMEOUT_MS
+      );
+    });
+    // Evita un unhandledrejection si el timeout pierde la carrera.
+    timeoutPromise.catch(() => {});
+
+    const guardado = (async () => {
       // Saltar el upsert vacío evita un POST inútil (solo se actualiza la
       // respuesta del proveedor cuando no se capturó ningún precio).
       if (filasPrecio.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const precioResp = await (sb.schema('erp') as any)
           .from('cotizacion_proveedor_precios')
-          .upsert(filasPrecio, { onConflict: 'cotizacion_proveedor_id,cotizacion_linea_id' });
+          .upsert(filasPrecio, { onConflict: 'cotizacion_proveedor_id,cotizacion_linea_id' })
+          .abortSignal(ac.signal);
         if (precioResp.error) {
-          toast.add({
-            title: 'Error',
-            description: getSupabaseErrorMessage(
-              precioResp.error,
-              'No se pudieron guardar los precios.'
-            ),
-            type: 'error',
-          });
-          return;
+          throw toSupabaseError(precioResp.error, 'No se pudieron guardar los precios.');
         }
       }
       for (const u of updates) {
@@ -1062,28 +1075,33 @@ function CapturaPrecios({
             condiciones: u.condiciones,
             notas: u.notas,
           })
-          .eq('id', u.id);
+          .eq('id', u.id)
+          .abortSignal(ac.signal);
         if (e) {
-          toast.add({
-            title: 'Error',
-            description: getSupabaseErrorMessage(e, 'No se pudo actualizar un proveedor.'),
-            type: 'error',
-          });
-          return;
+          throw toSupabaseError(e, 'No se pudo actualizar un proveedor.');
         }
       }
+    })();
+    // Si el timeout gana la carrera, la promesa real puede rechazar después:
+    // la silenciamos para no disparar un unhandledrejection.
+    guardado.catch(() => {});
+
+    try {
+      await Promise.race([timeoutPromise, guardado]);
       toast.add({ title: 'Precios guardados', description: cotizacion.codigo, type: 'success' });
       onSaved();
     } catch (err) {
+      ac.abort();
       toast.add({
         title: 'Error',
         description: getSupabaseErrorMessage(
           err,
-          'No se pudieron guardar los precios. Revisa tu conexión e inténtalo de nuevo.'
+          'No se pudieron guardar los precios. Revisa tu conexión e intenta de nuevo.'
         ),
         type: 'error',
       });
     } finally {
+      if (timer) clearTimeout(timer);
       setSaving(false);
     }
   }
