@@ -72,9 +72,9 @@ function CapturarFase11Body() {
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
   const [numeroEscritura, setNumeroEscritura] = useState<string>('');
-  const [fechaEscritura, setFechaEscritura] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  // En blanco a propósito: la fecha de escritura debe seleccionarse a mano
+  // (no asumir "hoy") para que sea la fecha real del instrumento.
+  const [fechaEscritura, setFechaEscritura] = useState<string>('');
   const [numeroCheque, setNumeroCheque] = useState<string>('');
   const [montoCheque, setMontoCheque] = useState<string>('');
 
@@ -191,6 +191,14 @@ function CapturarFase11Body() {
         });
         return;
       }
+      if (!numeroEscritura.trim()) {
+        toast.add({
+          title: 'Falta el número de escritura',
+          description: 'Captura el número de instrumento público del notario.',
+          type: 'error',
+        });
+        return;
+      }
       if (!numeroCheque.trim()) {
         toast.add({
           title: 'Falta el número de cheque',
@@ -219,7 +227,7 @@ function CapturarFase11Body() {
         faseposicion: 11,
         docs: [],
         camposVenta: {
-          numero_escritura: numeroEscritura.trim() || null,
+          numero_escritura: numeroEscritura.trim(),
           fecha_escritura: fechaEscritura,
           numero_cheque_notaria: numeroCheque.trim(),
           monto_cheque_notaria: monto,
@@ -271,13 +279,20 @@ function CapturarFase11Body() {
         });
         return;
       }
+      if (!numeroEscritura.trim()) {
+        toast.add({
+          title: 'Falta el número de escritura',
+          type: 'error',
+        });
+        return;
+      }
       setSubmitting(true);
       const { error: upErr } = await sb
         .schema('dilesa')
         .from('ventas')
         .update({
           fecha_escritura: fechaEscritura,
-          numero_escritura: numeroEscritura.trim() || null,
+          numero_escritura: numeroEscritura.trim(),
         })
         .eq('id', venta.id);
       setSubmitting(false);
@@ -355,10 +370,11 @@ function CapturarFase11Body() {
                     required
                   />
                 </Field>
-                <Field label="Número de instrumento público (escritura)">
+                <Field label="Número de instrumento público (escritura) *">
                   <Input
                     value={numeroEscritura}
                     onChange={(e) => setNumeroEscritura(e.target.value)}
+                    required
                     placeholder="Número que asigna el notario, ej. 206"
                   />
                   <Hint>
@@ -412,10 +428,11 @@ function CapturarFase11Body() {
                   required
                 />
               </Field>
-              <Field label="Número de instrumento público (escritura)">
+              <Field label="Número de instrumento público (escritura) *">
                 <Input
                   value={numeroEscritura}
                   onChange={(e) => setNumeroEscritura(e.target.value)}
+                  required
                   placeholder="Número que asigna el notario, ej. 206"
                 />
                 <Hint>
