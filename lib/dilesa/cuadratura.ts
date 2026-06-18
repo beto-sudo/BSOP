@@ -75,6 +75,12 @@ export type CuadraturaInput = {
   montoCreditoCotitular: number | null;
   /** Pagaré autorizado del crédito directo (Fase 10). */
   montoCreditoDirecto: number | null;
+  /**
+   * Monto detonado: el disbursement real del crédito (Fase 12 Detonada). Es la
+   * "detonación" que usa el archivo de Michelle para el Valor Real Venta DILESA.
+   * null antes de detonar ⇒ se usa el crédito institución como estimado.
+   */
+  montoDetonado?: number | null;
   /** Cheque enviado a la notaría (capturado en Fase 11). */
   montoChequeNotaria: number | null;
   gastosEscrituracion: number | null;
@@ -416,13 +422,18 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     i.montoChequeNotaria != null ? n(i.montoChequeNotaria) : chequeNotariaCalculado
   );
 
-  // Con desglose, el valor real de venta de DILESA = precio interno (base +
-  // incremento): lo que DILESA cobra de la unidad, sin el sobreprecio (que es
-  // pass-through a gastos vía el cheque). La fórmula vieja de Coda (depósitos −
-  // cheque + pagaré) solo vale cuando el crédito se capturó como depósito, no en
-  // columna — en FOVISSSTE sale negativa. Fallback sin desglose intacto.
+  // Valor Real Venta DILESA = lo que DILESA realiza NETO: crédito (detonación) +
+  // enganche del cliente − cheque a notaría (los gastos que pasan al notario NO
+  // son ingreso de DILESA) + pagaré. Es la fórmula operativa que validan Michelle
+  // (Notas de crédito) y Ale (participación), alineada el 2026-06-18 — antes el
+  // desglose usaba el precio interno BRUTO y no restaba el cheque, por lo que la
+  // NC no cuadraba. Con desglose se usa el crédito de la columna (los depósitos
+  // solos dan negativo en FOVISSSTE); sin desglose, la fórmula vieja por depósitos.
+  // Detonación = disbursement real del crédito (Fase 12); antes de detonar se usa
+  // el crédito institución como estimado (mismo criterio que el archivo de Michelle).
+  const detonacion = i.montoDetonado != null ? n(i.montoDetonado) : creditoInstitucion;
   const valorRealVentaDilesa = tieneDesglose
-    ? precioInterno
+    ? round2(detonacion + depositosDirectoCliente - chequeNotariaUsado + montoCreditoDirecto)
     : round2(depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto);
   // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
   // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
@@ -439,39 +450,41 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // Estimado de respaldo: mismo cálculo con el valor de escrituración en vez del
   // CFDI real. Igual al efectivo salvo que el CFDI de escrituración difiera.
   const valorFacturadoSugerido = round2(valorEscrituracion + depositosConRecibo);
-  // Con desglose: la NC acredita el enganche facturado dos veces (está en la
-  // escritura Y en su recibo-CFDI), para que el neto facturado = valor de
-  // escritura. El sobreprecio NO se acredita (es parte de la escritura). Sin
-  // desglose: la NC de Coda = facturado − valor real (fallback intacto).
-  const montoNotaCredito = tieneDesglose
-    ? round2(depositosConRecibo)
-    : round2(valorFacturado - valorRealVentaDilesa);
-  const montoNotaCreditoSugerido = tieneDesglose
-    ? round2(depositosConRecibo)
-    : round2(valorFacturadoSugerido - valorRealVentaDilesa);
+  // Nota de Crédito = Facturado − Valor Real (en AMBOS modelos, alineado a la
+  // fórmula de Michelle el 2026-06-18). Acredita lo facturado que NO es ingreso
+  // neto de DILESA: el enganche facturado dos veces (escritura + su recibo-CFDI)
+  // MÁS el cheque a notaría (pass-through al notario), menos el pagaré. Antes el
+  // desglose la dejaba en solo el enganche y omitía el cheque → no cuadraba.
+  const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
+  const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
   // Con desglose, el "descuento real" = la promoción (lo que DILESA efectivamente
   // regala al cliente). El sobreprecio NO es descuento (es lo contrario: DILESA
   // cobra de más). Sin desglose: la fórmula de Coda (escrituración − valor real).
   const descuentoReal = tieneDesglose
     ? round2(promocionGastos)
     : round2(valorEscrituracion - valorRealVentaDilesa);
-  // Desglose de facturación (ADR-045): factura de venta (escrituración) +
-  // factura de enganche = total facturado; − NC = neto (= escritura). Cuadra
-  // "todo suma el valor de la escritura". Solo con desglose.
+  // Desglose de facturación: factura de venta (escrituración) + factura de
+  // enganche = total facturado; − NC = neto facturado = Valor Real Venta DILESA
+  // (lo que DILESA realiza neto del cheque a notaría). Alineado a Michelle el
+  // 2026-06-18 (antes el neto se forzaba al valor de escritura).
   const desgloseFacturacion = tieneDesglose
     ? {
         facturaVenta: round2(valorEscrituracion),
         facturaEnganche: round2(depositosConRecibo),
         totalFacturado: round2(valorFacturado),
-        notaCredito: round2(depositosConRecibo),
-        netoFacturado: round2(valorFacturado - depositosConRecibo),
+        notaCredito: montoNotaCredito,
+        netoFacturado: round2(valorFacturado - montoNotaCredito),
       }
     : null;
 
-  // Con desglose, las comisiones se calculan sobre el PRECIO INTERNO (la venta
-  // real de DILESA), no sobre el escriturado con sobreprecio (decisión Beto
-  // 2026-06-17). Sin desglose, sobre el valor de escrituración (fallback).
-  const baseComision = tieneDesglose ? precioInterno : valorEscrituracion;
+  // Con desglose, las comisiones se calculan sobre el Valor Real Venta DILESA
+  // menos los productos adicionales (el sobreprecio no comisiona) — base operativa
+  // de Michelle/Ale (col "Venta Dilesa comisiones" = valor real − PA), alineada el
+  // 2026-06-18 (antes era el precio interno bruto). Sin desglose, sobre el valor
+  // de escrituración (fallback).
+  const baseComision = tieneDesglose
+    ? round2(valorRealVentaDilesa - sobreprecioAdicionales)
+    : valorEscrituracion;
   const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
   const comisionGerencia = round2(baseComision * 0.005);
 

@@ -29,6 +29,11 @@ export type Venta = {
   precio_base: number | null;
   incremento_credito: number | null;
   promocion_gastos_monto: number | null;
+  // Geometría del lote (migración 20260618): componentes del precio.
+  valor_excedente_terreno: number | null;
+  valor_frente_verde: number | null;
+  valor_esquina: number | null;
+  valor_venta_futuro: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   credito_titular_ref: string | null;

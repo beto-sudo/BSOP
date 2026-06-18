@@ -493,29 +493,54 @@ describe('calcularCuadratura', () => {
       );
     });
 
-    it('deriva el cierre con el modelo desglosado (cheque = gastos, valor real = precio interno)', () => {
+    it('deriva el cierre con el valor real neto del cheque (fórmula Michelle/Ale)', () => {
       const c = mayra();
       expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
-      expect(c.valorRealVentaDilesa).toBe(954419); // precio interno, NO la fórmula negativa vieja
+      // Valor real = crédito + enganche − cheque + pagaré = 979,070 + 35,000 − 84,038 + 9,387.
+      expect(c.valorRealVentaDilesa).toBe(939419);
       expect(c.descuentoReal).toBe(15000); // la promoción (lo que DILESA regala), NO el sobreprecio
     });
 
-    it('desglosa la facturación: total suma la escritura (factura venta + enganche − NC = neto)', () => {
+    it('NC = facturado − valor real (incluye el cheque a notaría)', () => {
       const c = mayra();
       expect(c.desgloseFacturacion).toEqual({
         facturaVenta: 979070, // escrituración
         facturaEnganche: 35000, // enganche con recibo CFDI
         totalFacturado: 1014070,
-        notaCredito: 35000, // acredita el enganche facturado dos veces
-        netoFacturado: 979070, // = escrituración ✓
+        notaCredito: 74651, // acredita el enganche + el cheque a notaría − pagaré
+        netoFacturado: 939419, // = valor real venta DILESA (neto del cheque) ✓
       });
-      expect(c.montoNotaCredito).toBe(35000); // NC = enganche, no el valor real
+      // NC = 1,014,070 − 939,419 (Michelle: facturado − valor real).
+      expect(c.montoNotaCredito).toBe(74651);
     });
 
-    it('comisiones sobre el precio interno (no el escriturado con sobreprecio)', () => {
+    it('comisiones sobre el valor real − productos adicionales (base Michelle/Ale)', () => {
       const c = mayra();
-      expect(c.comisionVendedor).toBe(9544.19); // 954,419 × 1.0%
-      expect(c.comisionGerencia).toBe(4772.1); // 954,419 × 0.5%
+      // base = valor real 939,419 − PA 24,651 = 914,768.
+      expect(c.comisionVendedor).toBe(9147.68); // 914,768 × 1.0%
+      expect(c.comisionGerencia).toBe(4573.84); // 914,768 × 0.5%
+    });
+
+    it('usa el monto detonado real (no el crédito) para el valor real — caso Arizpe', () => {
+      // INFONAVIT detonada: monto_detonado 908,999.71 (≠ crédito 909,000), cheque
+      // 18,313, sin enganche/pagaré. NC = 909,000 − 890,686.71 = 18,313.29
+      // (igual al peso al archivo de Michelle).
+      const c = calcularCuadratura({
+        valorEscrituracion: 909000,
+        montoCreditoTitular: 909000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoDetonado: 908999.71,
+        montoChequeNotaria: 18313,
+        gastosEscrituracion: 48313,
+        apoyoInfonavit: 30000,
+        precioBase: 909000,
+        sobreprecioAdicionales: 0,
+        promocionGastos: 15000,
+        depositos: [],
+      });
+      expect(c.valorRealVentaDilesa).toBe(890686.71); // detonado − cheque
+      expect(c.montoNotaCredito).toBe(18313.29); // facturado 909,000 − valor real
     });
 
     it('FALLBACK: el cierre NO se toca sin desglose (formacionPrecio null, fórmula vieja)', () => {
