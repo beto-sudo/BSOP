@@ -306,7 +306,9 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // padre `dilesa.ventas.lista` en la migración
   // 20260618155211_modulos_dilesa_ventas_expediente_tabs.sql.
   'dilesa.ventas.operacion',
+  'dilesa.ventas.pipeline',
   'dilesa.ventas.cuadratura',
+  'dilesa.ventas.estado_cuenta',
   'dilesa.ventas.documentos',
   'dilesa.ventas.bitacora',
   // Cobranza (CxC) — hub con 2 tabs. Migración
