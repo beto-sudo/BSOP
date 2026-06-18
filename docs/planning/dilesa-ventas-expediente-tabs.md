@@ -3,11 +3,11 @@
 **Slug:** `dilesa-ventas-expediente-tabs`
 **Empresas:** DILESA
 **Schemas afectados:** Principalmente UI (Next.js) — refactor de `app/dilesa/ventas/[id]/*`: nuevo `[id]/layout.tsx` + partir el monolito `[id]/page.tsx` (2,642 L) en 6 sub-rutas (`page.tsx`=Operación + `cuadratura/`, `estado-cuenta/`, `pipeline/`, `documentos/`, `bitacora/`). RBAC: `core.modulos` + `core.permisos_rol` (6 sub-slugs nuevos `dilesa.ventas.{operacion,pipeline,cuadratura,estado_cuenta,documentos,bitacora}` + backfill de permisos clonando del padre + `NOTIFY pgrst`), `lib/permissions.ts` (`ROUTE_TO_MODULE`, `HUB_PARENT_BY_ROUTE`), `lib/permissions.test.ts` (`EXPECTED_DB_MODULE_SLUGS`). Lectura de datos sin cambios.
-**Estado:** in_progress
-**Próximo hito:** Sprints 1 (#948) y 2 (#949) mergeados, en prod (6 tabs persistentes). Sprint 3 (deep-links del copiloto de cierre) en PR — al merge se **cierra la iniciativa** (Estado `done` + barrido de Reminders). Loading-por-tab resultó innecesario (carga única); manual/HubAccessRedirect descartados como bajo retorno (decisión de Beto 2026-06-18).
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-06-18
-**Última actualización:** 2026-06-18 (Sprints 1 y 2 en prod; Sprint 3 = deep-links del copiloto, completo en local, 6 checks verdes; PR por revisar/mergear → cierre)
+**Última actualización:** 2026-06-18 (cerrada — 3 sprints #948/#949/#950 en prod: 6 tabs persistentes + deep-links del copiloto)
 
 > **Sucede a** [`dilesa-ventas-expediente`](dilesa-ventas-expediente.md) (cerrada — montó el workspace por venta con cabecera + tabs + copiloto). Esta iniciativa toma esos tabs (hoy `useState` sin URL) y los sube a _routed tabs_ con layout compartido, replicando el patrón ya probado en [`app/dilesa/proyectos/[id]/layout.tsx`](../../app/dilesa/proyectos/[id]/layout.tsx).
 
