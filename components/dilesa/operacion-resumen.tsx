@@ -107,18 +107,52 @@ export function OperacionResumen({
         <div className="flex flex-wrap items-stretch gap-x-6 gap-y-2 text-sm">
           <Cifra label="Valor escrituración" value={money(valorEscrituracion)} />
           <Cifra label="Crédito institución" value={money(cuadratura.creditoInstitucion)} />
-          <Cifra label="Crédito directo" value={money(cuadratura.montoCreditoDirecto)} />
+          <Cifra label="Crédito directo (pagaré)" value={money(cuadratura.montoCreditoDirecto)} />
           <Cifra label="Depósitos directos" value={money(cuadratura.depositosDirectoCliente)} />
-          <Cifra label="Disponible" value={money(cuadratura.montoDisponible)} strong />
-          <Cifra label="Cheque notaría (calc.)" value={money(cuadratura.chequeNotariaCalculado)} />
-          <div className="ml-auto">
-            <Cifra
-              label={cuadratura.cubierta ? 'Saldo' : 'Saldo pendiente'}
-              value={money(cuadratura.saldoCliente)}
-              strong
-              tone={cuadratura.cubierta ? 'ok' : 'warn'}
-            />
-          </div>
+          {cuadratura.tieneDesglose ? (
+            // Modelo desglosado (ADR-045): dos cuentas separadas — el precio lo
+            // cubre el crédito; el cliente debe el pagaré de gastos. NO se muestra
+            // el saldoCliente crudo (mezclaba precio + descuento → −74,651).
+            <div className="ml-auto flex items-stretch gap-x-6">
+              <Cifra
+                label="Precio"
+                value={
+                  (cuadratura.saldoPrecioEscrituracion ?? 0) <= 0
+                    ? 'Cubierto ✓'
+                    : money(cuadratura.saldoPrecioEscrituracion)
+                }
+                strong
+                tone={(cuadratura.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : 'warn'}
+              />
+              <Cifra
+                label="Pagaré del cliente"
+                value={money(cuadratura.coberturaGastos?.pagareNecesario ?? 0)}
+                strong
+                tone={
+                  cuadratura.montoCreditoDirecto <
+                  (cuadratura.coberturaGastos?.pagareNecesario ?? 0)
+                    ? 'warn'
+                    : 'ok'
+                }
+              />
+            </div>
+          ) : (
+            <>
+              <Cifra label="Disponible" value={money(cuadratura.montoDisponible)} strong />
+              <Cifra
+                label="Cheque notaría (calc.)"
+                value={money(cuadratura.chequeNotariaCalculado)}
+              />
+              <div className="ml-auto">
+                <Cifra
+                  label={cuadratura.cubierta ? 'Saldo' : 'Saldo pendiente'}
+                  value={money(cuadratura.saldoCliente)}
+                  strong
+                  tone={cuadratura.cubierta ? 'ok' : 'warn'}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>

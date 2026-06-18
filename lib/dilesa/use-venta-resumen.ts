@@ -55,6 +55,11 @@ type VentaRow = {
   tipo_credito: string | null;
   precio_asignacion: number | null;
   valor_escrituracion: number | null;
+  // Desglose (ADR-045): productos_adicionales (sobreprecio, existente) + las 3 nuevas.
+  productos_adicionales: number | null;
+  precio_base: number | null;
+  incremento_credito: number | null;
+  promocion_gastos_monto: number | null;
   valor_facturado: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
@@ -90,7 +95,7 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, fecha_firma_programada, ine_numero'
+          'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, vendedor, notario, notario_id, fase_actual, fase_posicion, tipo_credito, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, fecha_firma_programada, ine_numero, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -270,6 +275,11 @@ export function useVentaResumen(ventaId: string | null): VentaResumenState {
           !!venta.coda_row_id
         ),
         precioAsignacion: venta.precio_asignacion,
+        // Desglose (ADR-045): sobreprecio ← productos_adicionales (existente).
+        precioBase: venta.precio_base,
+        incrementoCredito: venta.incremento_credito,
+        sobreprecioAdicionales: venta.productos_adicionales,
+        promocionGastos: venta.promocion_gastos_monto,
         valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
         depositos: abonos.map((a) => ({
           monto: a.monto_total,

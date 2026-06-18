@@ -96,6 +96,10 @@ type Venta = {
   valor_escrituracion: number | null;
   precio_asignacion: number | null;
   productos_adicionales: number | null;
+  // Desglose nuevo (ADR-045): marcadores del modelo desglosado.
+  precio_base: number | null;
+  incremento_credito: number | null;
+  promocion_gastos_monto: number | null;
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   credito_titular_ref: string | null;
@@ -900,6 +904,13 @@ function DetailInner() {
         montoCreditoDirecto: venta?.monto_credito_directo ?? null,
         montoChequeNotaria: venta?.monto_cheque_notaria ?? null,
         gastosEscrituracion: venta?.gastos_escrituracion ?? null,
+        // Desglose (ADR-045): sobreprecio ← productos_adicionales (existente);
+        // base/incremento/promoción ← columnas nuevas. Marcadores del desglose
+        // nuevo: promocionGastos/precioBase (poblados solo en migradas/nuevas).
+        precioBase: venta?.precio_base ?? null,
+        incrementoCredito: venta?.incremento_credito ?? null,
+        sobreprecioAdicionales: venta?.productos_adicionales ?? null,
+        promocionGastos: venta?.promocion_gastos_monto ?? null,
         // Derivado del catálogo de tipos de crédito (auto, no capturado).
         apoyoInfonavit,
         // `descuento_total` autoritativo (amarre Sprint 1). Los buckets editados
