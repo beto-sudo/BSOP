@@ -431,7 +431,7 @@ describe('calcularCuadratura', () => {
       expect(c.saldoPrecioEscrituracion).toBe(0);
     });
 
-    it('desglosa las 4 fuentes de cobertura de gastos', () => {
+    it('desglosa las fuentes de cobertura de gastos (cuadra en 0)', () => {
       const c = mayra();
       expect(c.coberturaGastos).toEqual({
         gastosNetos: 84038,
@@ -439,8 +439,31 @@ describe('calcularCuadratura', () => {
         promocion: 15000,
         engancheCliente: 35000,
         sobreprecio: 24651,
-        pagareNecesario: 9387, // 84,038 − 15,000 − 35,000 − 24,651
+        pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
+        aportacionDilesa: 15000, // 84,038 − 35,000 − 24,651 − 9,387 (= la promo, aquí)
+        saldoCobertura: 0, // presupuesto − aportación − enganche − sobreprecio − pagaré
       });
+    });
+
+    it('aportación DILESA absorbe el faltante INFONAVIT sin pagaré — caso Arizpe', () => {
+      // gastos netos 18,313, sin enganche/sobreprecio/pagaré → DILESA aporta los
+      // 18,313 (más que la promo de 15,000); la cobertura cuadra en 0.
+      const c = calcularCuadratura({
+        valorEscrituracion: 909000,
+        montoCreditoTitular: 909000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoDetonado: 908999.71,
+        montoChequeNotaria: 18313,
+        gastosEscrituracion: 48313,
+        apoyoInfonavit: 30000,
+        precioBase: 909000,
+        sobreprecioAdicionales: 0,
+        promocionGastos: 15000,
+        depositos: [],
+      });
+      expect(c.coberturaGastos?.aportacionDilesa).toBe(18313);
+      expect(c.coberturaGastos?.saldoCobertura).toBe(0);
     });
 
     it('calcula el pagaré necesario aunque aún no se capture el crédito directo', () => {

@@ -56,6 +56,7 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente,
   tieneDesglose,
   descuentoPromocion,
+  aportacionDilesa,
   sobreprecio,
 }: {
   ventaId: string;
@@ -72,16 +73,21 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente: string | null;
   /** Si la venta usa el modelo desglosado (ADR-045). */
   tieneDesglose: boolean;
-  /** Promoción/bono de gastos (el descuento real con desglose; costo de DILESA). */
+  /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones). */
   descuentoPromocion: number;
+  /** Aportación REAL de DILESA al presupuesto notarial (lo que absorbió; puede
+   *  exceder la promo autorizada). Es el descuento de gastos efectivo. */
+  aportacionDilesa: number;
   /** Sobreprecio (productos adicionales) — lo cubre el crédito, no es regalo. */
   sobreprecio: number;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
-  // ── Modo DESGLOSE: el descuento se deriva (promoción + sobreprecio), no se captura ──
+  // ── Modo DESGLOSE: el descuento se deriva (aportación DILESA + sobreprecio), no se captura ──
   if (tieneDesglose) {
+    const descuentoTotal = Math.round((aportacionDilesa + sobreprecio) * 100) / 100;
+    const excedeAutorizado = aportacionDilesa - descuentoPromocion > 0.5;
     return (
       <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
@@ -89,23 +95,29 @@ export function CuadraturaAjustes({
         </h3>
         <div className="space-y-1">
           <DerivadoRow
-            label="Promoción DILESA (bono — costo de DILESA)"
-            value={moneyFmt.format(descuentoPromocion)}
+            label="Aportación DILESA (bono — costo de DILESA)"
+            value={moneyFmt.format(aportacionDilesa)}
           />
-          <DerivadoRow
-            label="Sobreprecio (lo cubre el crédito, no es regalo)"
-            value={moneyFmt.format(sobreprecio)}
-          />
-          <DerivadoRow
-            label={`Apoyo Infonavit${tipoCredito ? ` · ${tipoCredito}` : ''}`}
-            value={moneyFmt.format(apoyoInfonavit)}
-          />
+          <DerivadoRow label="(+) Descuento por sobreprecio" value={moneyFmt.format(sobreprecio)} />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <DerivadoRow label="(=) Descuento total" value={moneyFmt.format(descuentoTotal)} strong />
+        </div>
+        <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+            Apoyo Infonavit · subsidio (no es descuento DILESA)
+            {tipoCredito ? ` · ${tipoCredito}` : ''}
+          </span>
+          <span className="text-xs font-semibold tabular-nums text-[var(--text)]/85">
+            {moneyFmt.format(apoyoInfonavit)}
+          </span>
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--text)]/50">
-          El descuento se deriva de la <strong>promoción</strong> elegida en la Solicitud de
-          Asignación (catálogo de promociones) y del <strong>sobreprecio</strong>; el apoyo
-          Infonavit sale del catálogo de tipos de crédito. Ninguno se captura aquí — los buckets
-          manuales del modelo viejo no aplican a esta venta.
+          La <strong>aportación DILESA</strong> es lo que DILESA absorbe del presupuesto notarial
+          (su bono); el <strong>sobreprecio</strong> es el incremento de precio que paga el crédito.
+          Juntos son el descuento real frente al valor escriturado.{' '}
+          {excedeAutorizado
+            ? `Ojo: la aportación (${moneyFmt.format(aportacionDilesa)}) excede la promoción autorizada (${moneyFmt.format(descuentoPromocion)}) — pendiente capturar la Máxima Aportación en la solicitud.`
+            : `Promoción autorizada: ${moneyFmt.format(descuentoPromocion)}.`}
         </p>
       </section>
     );
@@ -265,11 +277,25 @@ export function CuadraturaAjustes({
   );
 }
 
-function DerivadoRow({ label, value }: { label: string; value: string }) {
+function DerivadoRow({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-[var(--text)]/65">{label}</span>
-      <span className="font-medium tabular-nums text-[var(--text)]">{value}</span>
+      <span className={strong ? 'font-medium text-[var(--text)]/80' : 'text-[var(--text)]/65'}>
+        {label}
+      </span>
+      <span
+        className={`tabular-nums text-[var(--text)] ${strong ? 'text-base font-semibold' : 'font-medium'}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

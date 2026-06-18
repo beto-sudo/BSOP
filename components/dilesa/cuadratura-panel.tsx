@@ -165,7 +165,8 @@ export function CuadraturaPanel({
         </Bloque>
       )}
 
-      {/* Cobertura del presupuesto notarial — las 4 fuentes (ADR-045) */}
+      {/* Cobertura del presupuesto notarial — las fuentes que lo cubren (ADR-045).
+          Aportación DILESA + enganche + sobreprecio + pagaré = presupuesto → saldo 0. */}
       {c.tieneDesglose && c.coberturaGastos ? (
         <Bloque titulo="Cobertura del presupuesto notarial">
           <Fila
@@ -174,18 +175,22 @@ export function CuadraturaPanel({
             strong
           />
           <div className="my-1 border-t border-dashed border-[var(--border)]" />
-          <Fila label="(−) Promoción DILESA (bono)" value={money(c.coberturaGastos.promocion)} />
+          <Fila
+            label="(−) Aportación DILESA (descuento)"
+            value={money(c.coberturaGastos.aportacionDilesa)}
+          />
           <Fila label="(−) Enganche del cliente" value={money(c.coberturaGastos.engancheCliente)} />
           <Fila
-            label="(−) Sobreprecio (productos adicionales)"
+            label="(−) Sobreprecio (lo cubre el crédito)"
             value={money(c.coberturaGastos.sobreprecio)}
           />
+          <Fila label="(−) Pagaré del cliente" value={money(c.montoCreditoDirecto)} />
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
-            label="(=) Pagaré necesario del cliente"
-            value={money(c.coberturaGastos.pagareNecesario)}
+            label={Math.abs(c.coberturaGastos.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
+            value={money(c.coberturaGastos.saldoCobertura)}
             strong
-            tone={c.coberturaGastos.pagareNecesario > 0 ? 'warn' : 'ok'}
+            tone={Math.abs(c.coberturaGastos.saldoCobertura) <= 2 ? 'ok' : 'warn'}
           />
         </Bloque>
       ) : null}
@@ -250,11 +255,24 @@ export function CuadraturaPanel({
       </Bloque>
 
       <p className="text-[11px] leading-relaxed text-[var(--text)]/45">
-        Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva como
-        Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda los estima
-        como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda aproximado
-        hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de descuento
-        otorgado.
+        {c.tieneDesglose ? (
+          <>
+            Modelo desglosado (Michelle/Ale): el <strong>Valor real venta Dilesa</strong> es lo que
+            DILESA realiza neto del cheque a notaría (detonación + enganche − cheque + pagaré); la{' '}
+            <strong>Nota de Crédito</strong> = Valor Facturado − Valor real; el{' '}
+            <strong>Descuento real</strong> = Escrituración − Valor real; y las comisiones van sobre
+            el Valor real menos productos adicionales. Con factura emitida, el Valor Facturado es el
+            del CFDI; antes de facturar se estima con el valor de escrituración («sugerido»).
+          </>
+        ) : (
+          <>
+            Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva
+            como Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda
+            los estima como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda
+            aproximado hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de
+            descuento otorgado.
+          </>
+        )}
       </p>
     </div>
   );
