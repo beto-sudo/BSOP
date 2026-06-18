@@ -39,6 +39,12 @@ export type CotLinea = {
   descripcion: string;
   unidad: string | null;
   cantidad: number;
+  /**
+   * Precio unitario estimado heredado de la requisición origen (0 = sin
+   * estimado, p. ej. RFQ creada desde cero). Semilla editable de la matriz de
+   * captura — el proveedor lo ajusta si difiere (ver `seedMatrizPrecios`).
+   */
+  precioEstimado: number;
 };
 
 /** Proveedor invitado a cotizar y su respuesta. */
@@ -92,6 +98,29 @@ export function precioCelda(
 ): number {
   const hit = precios.find((p) => p.cotProveedorId === cotProveedorId && p.lineaId === lineaId);
   return hit ? (hit.precioUnitario ?? 0) : 0;
+}
+
+/** Subtotal estimado de una línea (heredado de la requisición): cantidad × precio estimado. */
+export function subtotalEstimadoLinea(l: Pick<CotLinea, 'cantidad' | 'precioEstimado'>): number {
+  return (l.cantidad ?? 0) * (l.precioEstimado ?? 0);
+}
+
+/**
+ * Total estimado de la RFQ = Σ (cantidad × precio estimado) de sus líneas. Es la
+ * **referencia interna** heredada de la requisición, NO una oferta de proveedor:
+ * se muestra a quien captura para comparar contra lo cotizado, y **nunca** se
+ * envía en la Solicitud de Cotización — cada proveedor cotiza a ciegas para que
+ * mande su mejor oferta sin anclarse al estimado.
+ */
+export function totalEstimado(
+  lineas: readonly Pick<CotLinea, 'cantidad' | 'precioEstimado'>[]
+): number {
+  return lineas.reduce((acc, l) => acc + subtotalEstimadoLinea(l), 0);
+}
+
+/** ¿Alguna línea trae estimado heredado de la requisición? (gate de la columna ref.) */
+export function tieneEstimado(lineas: readonly Pick<CotLinea, 'precioEstimado'>[]): boolean {
+  return lineas.some((l) => (l.precioEstimado ?? 0) > 0);
 }
 
 /** Total de un proveedor desde la matriz: Σ (cantidad de la línea × precio de su celda). */

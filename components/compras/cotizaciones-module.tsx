@@ -55,6 +55,9 @@ import {
   mejorProveedorLinea,
   precioCelda,
   rankingProveedores,
+  subtotalEstimadoLinea,
+  tieneEstimado,
+  totalEstimado,
   totalProveedor,
   puedeAdjudicar,
   type CotizacionEstado,
@@ -158,7 +161,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         .from('cotizaciones')
         .select(
           'id, codigo, tipo, estado, descripcion, fecha_limite, adjudicado_proveedor_id, created_at, ' +
-            'cotizacion_lineas(id, partida_id, descripcion, unidad, cantidad), ' +
+            'cotizacion_lineas(id, partida_id, descripcion, unidad, cantidad, precio_estimado), ' +
             'cotizacion_proveedores(id, proveedor_id, estado, monto_total, tiempo_entrega, condiciones, notas, ' +
             'cotizacion_proveedor_precios(id, cotizacion_linea_id, precio_unitario))'
         )
@@ -251,6 +254,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         descripcion: string | null;
         unidad: string | null;
         cantidad: number | null;
+        precio_estimado: number | null;
       }> | null;
       cotizacion_proveedores: Array<{
         id: string;
@@ -276,6 +280,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
         descripcion: l.descripcion ?? '',
         unidad: l.unidad,
         cantidad: Number(l.cantidad ?? 0),
+        precioEstimado: Number(l.precio_estimado ?? 0),
       }));
       const cotProveedores: CotProveedor[] = (c.cotizacion_proveedores ?? []).map((p) => ({
         id: p.id,
@@ -916,7 +921,10 @@ function CapturaPrecios({
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
-  // Matriz local: `${cotProveedorId}|${lineaId}` → precio (string).
+  // Matriz local: `${cotProveedorId}|${lineaId}` → precio (string). Solo los
+  // precios YA guardados por proveedor — la matriz arranca en blanco para que
+  // cada proveedor cotice a ciegas (el estimado heredado de la requisición vive
+  // en su propia columna de referencia, no pre-llena la oferta de nadie).
   const [precios, setPrecios] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
     for (const p of cotizacion.precios) {
@@ -986,6 +994,9 @@ function CapturaPrecios({
       const v = Number((precios[`${cotProvId}|${l.id}`] ?? '').trim());
       return acc + (l.cantidad ?? 0) * (Number.isFinite(v) ? v : 0);
     }, 0);
+
+  // ¿La RFQ trae estimado de la requisición? → muestra la columna de referencia.
+  const hayEstimado = tieneEstimado(cotizacion.lineas);
 
   async function guardar() {
     if (saving) return;
@@ -1272,8 +1283,11 @@ function CapturaPrecios({
             Capturar y comparar · {cotizacion.codigo}
           </h2>
           <p className="mt-0.5 text-xs text-[var(--text)]/50">
-            Captura el precio de cada proveedor por línea (el mejor por renglón se resalta); sube su
-            archivo de cotización y condiciones abajo.
+            Captura el <strong className="font-medium">precio unitario</strong> de cada proveedor
+            por línea — el importe del renglón y el total se suman solos. Si la RFQ vino de una
+            requisición verás la columna <em>Estimado</em> como referencia interna (no se envía al
+            proveedor): cada quien cotiza en blanco para que mande su mejor oferta. El mejor por
+            renglón se resalta; sube su archivo y condiciones abajo.
           </p>
         </div>
         <button
@@ -1318,6 +1332,14 @@ function CapturaPrecios({
             <tr className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--text)]/50">
               <th className="py-2 pr-3 font-medium">Partida</th>
               <th className="px-2 py-2 text-right font-medium">Cant.</th>
+              {hayEstimado ? (
+                <th
+                  className="px-2 py-2 text-right font-medium"
+                  title="Precio estimado heredado de la requisición — referencia interna, no se envía al proveedor"
+                >
+                  Estimado
+                </th>
+              ) : null}
               {cotizacion.proveedores.map((p) => (
                 <th key={p.id} className="px-2 py-2 text-right font-medium">
                   {p.proveedorNombre}
@@ -1337,11 +1359,29 @@ function CapturaPrecios({
                 <td className="px-2 py-2 text-right tabular-nums text-[var(--text)]/70">
                   {l.cantidad} {l.unidad ?? ''}
                 </td>
+                {hayEstimado ? (
+                  <td className="px-2 py-2 text-right align-top tabular-nums text-[var(--text)]/55">
+                    {l.precioEstimado > 0 ? (
+                      <>
+                        {formatCurrency(l.precioEstimado)}
+                        <span className="mt-0.5 block text-[11px] text-[var(--text)]/40">
+                          {formatCurrency(subtotalEstimadoLinea(l))}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                ) : null}
                 {cotizacion.proveedores.map((p) => {
                   const mejor = mejorProveedorLinea(cotizacion.precios, l.id);
                   const esMejor = mejor === p.id;
+                  const raw = (precios[`${p.id}|${l.id}`] ?? '').trim();
+                  const pu = Number(raw);
+                  const subtotal =
+                    raw !== '' && Number.isFinite(pu) && pu > 0 ? (l.cantidad ?? 0) * pu : null;
                   return (
-                    <td key={p.id} className="px-2 py-1.5 text-right">
+                    <td key={p.id} className="px-2 py-1.5 text-right align-top">
                       <Input
                         value={precios[`${p.id}|${l.id}`] ?? ''}
                         onChange={(e) => setCelda(p.id, l.id, e.target.value)}
@@ -1350,20 +1390,30 @@ function CapturaPrecios({
                         placeholder="—"
                         className={`w-28 text-right ${esMejor ? 'border-[var(--accent)]' : ''}`}
                       />
+                      {subtotal != null ? (
+                        <span className="mt-0.5 block text-[11px] tabular-nums text-[var(--text)]/45">
+                          {formatCurrency(subtotal)}
+                        </span>
+                      ) : null}
                     </td>
                   );
                 })}
               </tr>
             ))}
-            <tr className="font-medium">
+            <tr className="border-t-2 border-[var(--border)] font-semibold">
               <td
                 className="py-2 pr-3 text-right text-xs uppercase text-[var(--text)]/50"
                 colSpan={2}
               >
                 Total
               </td>
+              {hayEstimado ? (
+                <td className="px-2 py-2 text-right tabular-nums text-[var(--text)]/60">
+                  {formatCurrency(totalEstimado(cotizacion.lineas))}
+                </td>
+              ) : null}
               {cotizacion.proveedores.map((p) => (
-                <td key={p.id} className="px-2 py-2 text-right tabular-nums">
+                <td key={p.id} className="px-2 py-2 text-right tabular-nums text-[var(--text)]">
                   {formatCurrency(totalLocal(p.id))}
                 </td>
               ))}

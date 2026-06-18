@@ -6910,6 +6910,7 @@ export type Database = {
           empresa_id: string
           id: string
           partida_id: string | null
+          precio_estimado: number | null
           unidad: string | null
         }
         Insert: {
@@ -6920,6 +6921,7 @@ export type Database = {
           empresa_id: string
           id?: string
           partida_id?: string | null
+          precio_estimado?: number | null
           unidad?: string | null
         }
         Update: {
@@ -6930,6 +6932,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           partida_id?: string | null
+          precio_estimado?: number | null
           unidad?: string | null
         }
         Relationships: [
