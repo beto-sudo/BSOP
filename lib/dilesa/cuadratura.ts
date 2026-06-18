@@ -111,6 +111,18 @@ export type CuadraturaInput = {
   sobreprecioAdicionales?: number | null;
   promocionGastos?: number | null;
   /**
+   * Geometría del lote (premios congelados de la Solicitud de Asignación, ver
+   * migración 20260618022906). Componentes de la cadena de precio que van entre
+   * el precio base y el incremento de crédito:
+   *   base + excedente + frenteVerde + esquina + ventaFuturo + incremento + sobreprecio = escrituración.
+   * Cada uno opcional (null/undefined ⇒ 0). Solo se muestran en `formacionPrecio`
+   * cuando el desglose está activo (`tieneDesglose`).
+   */
+  valorExcedenteTerreno?: number | null;
+  valorFrenteVerde?: number | null;
+  valorEsquina?: number | null;
+  valorVentaFuturo?: number | null;
+  /**
    * Total del CFDI de la factura de ESCRITURACIÓN (Fase 13,
    * `dilesa.ventas.valor_facturado`) — la factura de la operación que coincide
    * con la escritura. El motor lo usa como el componente "factura de
@@ -187,14 +199,21 @@ export type Cuadratura = {
     pagareNecesario: number;
   } | null;
   /**
-   * Formación del precio de escrituración (ADR-045), solo con desglose. La
-   * cadena: precioBase + incrementoCredito = precioInterno; + adicionales =
+   * Formación del precio de escrituración (ADR-045 + geometría desglosada
+   * 20260618). La cadena: precioBase + geometría (excedente/frente verde/esquina/
+   * venta futuro) + incrementoCredito = precioInterno; + adicionales =
    * valorEscrituracion. `null` en legacy/cerradas.
    */
   formacionPrecio: {
     precioBase: number;
+    valorExcedenteTerreno: number;
+    valorFrenteVerde: number;
+    valorEsquina: number;
+    valorVentaFuturo: number;
+    /** Suma de los premios de geometría del lote. */
+    geometria: number;
     incrementoCredito: number;
-    /** Precio interno DILESA = base + incremento (su venta real). */
+    /** Precio interno DILESA = base + geometría + incremento (su venta real). */
     precioInterno: number;
     adicionales: number;
     valorEscrituracion: number;
@@ -349,14 +368,25 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       }
     : null;
 
-  // ADR-045: formación del precio de escrituración (cadena congelada al asignar).
-  // precio_base + incremento_credito = precio interno DILESA (su venta real);
-  // + sobreprecio (productos adicionales) = valor de escrituración. Solo con
-  // desglose poblado.
-  const precioInterno = tieneDesglose ? round2(n(i.precioBase) + n(i.incrementoCredito)) : 0;
+  // ADR-045 + geometría 20260618: formación del precio de escrituración (cadena
+  // congelada de la Solicitud de Asignación). precio_base + geometría del lote
+  // (excedente/frente verde/esquina/venta futuro) + incremento_credito = precio
+  // interno DILESA (su venta real); + sobreprecio (productos adicionales) = valor
+  // de escrituración. Solo con desglose poblado.
+  const geometria = round2(
+    n(i.valorExcedenteTerreno) + n(i.valorFrenteVerde) + n(i.valorEsquina) + n(i.valorVentaFuturo)
+  );
+  const precioInterno = tieneDesglose
+    ? round2(n(i.precioBase) + geometria + n(i.incrementoCredito))
+    : 0;
   const formacionPrecio = tieneDesglose
     ? {
         precioBase: round2(n(i.precioBase)),
+        valorExcedenteTerreno: round2(n(i.valorExcedenteTerreno)),
+        valorFrenteVerde: round2(n(i.valorFrenteVerde)),
+        valorEsquina: round2(n(i.valorEsquina)),
+        valorVentaFuturo: round2(n(i.valorVentaFuturo)),
+        geometria,
         incrementoCredito: round2(n(i.incrementoCredito)),
         precioInterno,
         adicionales: round2(sobreprecioAdicionales),

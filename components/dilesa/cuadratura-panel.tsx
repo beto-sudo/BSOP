@@ -60,10 +60,25 @@ export function CuadraturaPanel({
         </div>
       ) : null}
 
-      {/* Formación del precio de escrituración (ADR-045) */}
+      {/* Formación del precio de escrituración (ADR-045 + geometría 20260618) */}
       {c.formacionPrecio ? (
         <Bloque titulo="Formación del precio de escrituración">
-          <Fila label="Precio base asignación (Coda)" value={money(c.formacionPrecio.precioBase)} />
+          <Fila label="Precio base (valor comercial)" value={money(c.formacionPrecio.precioBase)} />
+          {c.formacionPrecio.valorExcedenteTerreno > 0 ? (
+            <Fila
+              label="(+) Excedente de terreno"
+              value={money(c.formacionPrecio.valorExcedenteTerreno)}
+            />
+          ) : null}
+          {c.formacionPrecio.valorFrenteVerde > 0 ? (
+            <Fila label="(+) Frente verde" value={money(c.formacionPrecio.valorFrenteVerde)} />
+          ) : null}
+          {c.formacionPrecio.valorEsquina > 0 ? (
+            <Fila label="(+) Esquina" value={money(c.formacionPrecio.valorEsquina)} />
+          ) : null}
+          {c.formacionPrecio.valorVentaFuturo > 0 ? (
+            <Fila label="(+) Venta futuro" value={money(c.formacionPrecio.valorVentaFuturo)} />
+          ) : null}
           <Fila
             label="(+) Incremento por crédito (FOVISSSTE/IMSS)"
             value={money(c.formacionPrecio.incrementoCredito)}
