@@ -60,46 +60,151 @@ export function CuadraturaPanel({
         </div>
       ) : null}
 
-      {/* Cobertura */}
-      <Bloque titulo="Cobertura de la operación">
-        <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
-        <div className="my-1 border-t border-dashed border-[var(--border)]" />
-        <Fila
-          label="Crédito institución (titular + co-titular)"
-          value={money(c.creditoInstitucion)}
-        />
-        <Fila label="Crédito directo (pagaré)" value={money(c.montoCreditoDirecto)} />
-        <Fila label="Depósitos directos del cliente" value={money(c.depositosDirectoCliente)} />
-        <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
-        {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
-          <>
-            <Fila
-              label="(+) Descuento aplicado"
-              value={money(c.descuentoAplicado)}
-              hint={
-                c.descuentoAplicado < c.descuentoOtorgado
-                  ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
-                  : undefined
-              }
-            />
-            {c.chequePagado > 0 ? (
-              <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
-            ) : null}
-          </>
-        ) : null}
-        <div className="my-1 border-t border-[var(--border)]" />
-        <Fila
-          label={c.cubierta ? 'Saldo (cubierta)' : 'Saldo pendiente'}
-          value={money(c.saldoCliente)}
-          strong
-          tone={c.cubierta ? 'ok' : 'warn'}
-          hint={
-            c.descuentoOtorgado > 0 || c.chequePagado > 0
-              ? `Cobranza cruda: ${money(c.saldoCobranza)}`
-              : undefined
-          }
-        />
-      </Bloque>
+      {/* Formación del precio de escrituración (ADR-045) */}
+      {c.formacionPrecio ? (
+        <Bloque titulo="Formación del precio de escrituración">
+          <Fila label="Precio base asignación (Coda)" value={money(c.formacionPrecio.precioBase)} />
+          <Fila
+            label="(+) Incremento por crédito (FOVISSSTE/IMSS)"
+            value={money(c.formacionPrecio.incrementoCredito)}
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="(=) Precio interno DILESA"
+            value={money(c.formacionPrecio.precioInterno)}
+            strong
+          />
+          <Fila label="(+) Adicionales (productos)" value={money(c.formacionPrecio.adicionales)} />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Precio de escrituración"
+            value={money(c.formacionPrecio.valorEscrituracion)}
+            strong
+          />
+        </Bloque>
+      ) : null}
+
+      {/* Cobertura del precio. Con desglose: simple (el precio lo cubre el
+          crédito; los gastos van en su propia card). Sin desglose: fórmula vieja. */}
+      {c.tieneDesglose ? (
+        <Bloque titulo="Cobertura del precio de escrituración">
+          <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
+          <Fila
+            label="(−) Crédito institución (titular + co-titular)"
+            value={money(c.creditoInstitucion)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label={
+              (c.saldoPrecioEscrituracion ?? 0) <= 0
+                ? '(=) Saldo del precio (cubierto)'
+                : '(=) Saldo del precio'
+            }
+            value={money(c.saldoPrecioEscrituracion)}
+            strong
+            tone={(c.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : 'warn'}
+          />
+          <p className="mt-1 text-[11px] text-[var(--text)]/45">
+            El precio lo cubre el crédito; los gastos de escrituración se desglosan abajo.
+          </p>
+        </Bloque>
+      ) : (
+        <Bloque titulo="Cobertura de la operación">
+          <Fila label="Valor de escrituración" value={money(valorEscrituracion)} />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="Crédito institución (titular + co-titular)"
+            value={money(c.creditoInstitucion)}
+          />
+          <Fila label="Crédito directo (pagaré)" value={money(c.montoCreditoDirecto)} />
+          <Fila label="Depósitos directos del cliente" value={money(c.depositosDirectoCliente)} />
+          <Fila label="Monto disponible para operación" value={money(c.montoDisponible)} strong />
+          {c.descuentoOtorgado > 0 || c.chequePagado > 0 ? (
+            <>
+              <Fila
+                label="(+) Descuento aplicado"
+                value={money(c.descuentoAplicado)}
+                hint={
+                  c.descuentoAplicado < c.descuentoOtorgado
+                    ? `Otorgado ${money(c.descuentoOtorgado)} · topado al autorizado`
+                    : undefined
+                }
+              />
+              {c.chequePagado > 0 ? (
+                <Fila label="(−) Cheque a notaría girado" value={money(c.chequePagado)} />
+              ) : null}
+            </>
+          ) : null}
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label={c.cubierta ? 'Saldo (cubierta)' : 'Saldo pendiente'}
+            value={money(c.saldoCliente)}
+            strong
+            tone={c.cubierta ? 'ok' : 'warn'}
+            hint={
+              c.descuentoOtorgado > 0 || c.chequePagado > 0
+                ? `Cobranza cruda: ${money(c.saldoCobranza)}`
+                : undefined
+            }
+          />
+        </Bloque>
+      )}
+
+      {/* Cobertura del presupuesto notarial — las 4 fuentes (ADR-045) */}
+      {c.tieneDesglose && c.coberturaGastos ? (
+        <Bloque titulo="Cobertura del presupuesto notarial">
+          <Fila
+            label="Presupuesto notarial (neto de apoyo Infonavit)"
+            value={money(c.coberturaGastos.gastosNetos)}
+            strong
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila label="(−) Promoción DILESA (bono)" value={money(c.coberturaGastos.promocion)} />
+          <Fila label="(−) Enganche del cliente" value={money(c.coberturaGastos.engancheCliente)} />
+          <Fila
+            label="(−) Sobreprecio (productos adicionales)"
+            value={money(c.coberturaGastos.sobreprecio)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Pagaré necesario del cliente"
+            value={money(c.coberturaGastos.pagareNecesario)}
+            strong
+            tone={c.coberturaGastos.pagareNecesario > 0 ? 'warn' : 'ok'}
+          />
+        </Bloque>
+      ) : null}
+
+      {/* Facturación de la venta — desglose (ADR-045) */}
+      {c.desgloseFacturacion ? (
+        <Bloque titulo="Facturación de la venta">
+          <Fila
+            label="Factura de la venta (escrituración)"
+            value={money(c.desgloseFacturacion.facturaVenta)}
+          />
+          <Fila
+            label="(+) Factura de enganche (recibo CFDI)"
+            value={money(c.desgloseFacturacion.facturaEnganche)}
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="(=) Total facturado"
+            value={money(c.desgloseFacturacion.totalFacturado)}
+            strong
+          />
+          <Fila
+            label="(−) Nota de crédito (acredita el enganche)"
+            value={money(c.desgloseFacturacion.notaCredito)}
+          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label="(=) Neto facturado (= escrituración)"
+            value={money(c.desgloseFacturacion.netoFacturado)}
+            strong
+            tone="ok"
+          />
+        </Bloque>
+      ) : null}
 
       {/* Derivados de cierre */}
       <Bloque titulo="Cierre (valores derivados)">

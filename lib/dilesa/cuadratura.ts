@@ -94,6 +94,23 @@ export type CuadraturaInput = {
   /** Para referencia (no entra al saldo). */
   precioAsignacion?: number | null;
   /**
+   * Desglose nuevo (ADR-045). El motor usa el MODELO DESGLOSADO cuando hay
+   * marcador del desglose nuevo (`promocionGastos` o `precioBase` poblado): el
+   * "descuento" que cubre gastos = `promocionGastos` (bono, costo DILESA) +
+   * `sobreprecioAdicionales` (lo paga el crédito). Sin marcador (cerradas/legacy)
+   * → modelo viejo (`descuentoOtorgadoTotal` topado), fallback que NO altera nada
+   * histórico. `precioBase`/`incrementoCredito` alimentan el panel de precio.
+   *
+   * OJO: `sobreprecioAdicionales` se alimenta de `dilesa.ventas.productos_adicionales`,
+   * que YA estaba poblado en TODAS las ventas — por eso NO es marcador del
+   * desglose (lo sería todo el histórico). Solo entra al saldo cuando el desglose
+   * ya está activo por `promocionGastos`/`precioBase`.
+   */
+  precioBase?: number | null;
+  incrementoCredito?: number | null;
+  sobreprecioAdicionales?: number | null;
+  promocionGastos?: number | null;
+  /**
    * Total del CFDI de la factura de ESCRITURACIÓN (Fase 13,
    * `dilesa.ventas.valor_facturado`) — la factura de la operación que coincide
    * con la escritura. El motor lo usa como el componente "factura de
@@ -147,6 +164,60 @@ export type Cuadratura = {
   descuentoReal: number;
   comisionVendedor: number;
   comisionGerencia: number;
+  /**
+   * ADR-045: true si la venta trae el desglose nuevo poblado (modelo
+   * desglosado). false ⇒ se usó el modelo viejo (fallback legacy/cerradas).
+   */
+  tieneDesglose: boolean;
+  /**
+   * Desglose de la cobertura del presupuesto notarial (las 4 fuentes), solo
+   * cuando `tieneDesglose`. `null` en ventas legacy/cerradas. Para el panel.
+   */
+  coberturaGastos: {
+    /** Gastos de escrituración netos del apoyo Infonavit (= cheque a notaría). */
+    gastosNetos: number;
+    apoyoInfonavit: number;
+    /** Promoción/bono de gastos (costo de DILESA). */
+    promocion: number;
+    /** Enganche/depósitos del cliente. */
+    engancheCliente: number;
+    /** Sobreprecio (productos adicionales) — lo paga el crédito. */
+    sobreprecio: number;
+    /** Pagaré necesario = faltante tras promoción + enganche + sobreprecio. */
+    pagareNecesario: number;
+  } | null;
+  /**
+   * Formación del precio de escrituración (ADR-045), solo con desglose. La
+   * cadena: precioBase + incrementoCredito = precioInterno; + adicionales =
+   * valorEscrituracion. `null` en legacy/cerradas.
+   */
+  formacionPrecio: {
+    precioBase: number;
+    incrementoCredito: number;
+    /** Precio interno DILESA = base + incremento (su venta real). */
+    precioInterno: number;
+    adicionales: number;
+    valorEscrituracion: number;
+  } | null;
+  /**
+   * Saldo del PRECIO de escrituración (ADR-045): valor escrituración − crédito
+   * institución. `0`/negativo ⇒ el crédito cubre el precio. El saldo de GASTOS
+   * del cliente es `coberturaGastos.pagareNecesario`, NO esto. `null` en
+   * legacy/cerradas (ahí el "saldo" es `saldoCliente`).
+   */
+  saldoPrecioEscrituracion: number | null;
+  /**
+   * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
+   * (escrituración) + factura de enganche = total facturado; − NC = neto (=
+   * escritura). `null` en legacy/cerradas.
+   */
+  desgloseFacturacion: {
+    facturaVenta: number;
+    facturaEnganche: number;
+    totalFacturado: number;
+    notaCredito: number;
+    netoFacturado: number;
+  } | null;
   /**
    * Señal de doble conteo: depósitos fuente-cliente + crédito institución
    * exceden el valor de escrituración (+ gastos netos legítimos) por más del
@@ -213,17 +284,37 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoCobranza = round2(valorEscrituracion - montoDisponible);
 
   const descuentoOtorgadoTotal = n(i.descuentoOtorgadoTotal);
+  // ADR-045: con el desglose poblado (venta nueva o en proceso), el "descuento"
+  // que reduce el saldo = promoción (bono, costo DILESA) + sobreprecio (lo paga
+  // el crédito). Sin desglose (ventas cerradas/legacy) → modelo viejo:
+  // descuento_total topado al máximo autorizado. Fallback que NO altera nada
+  // histórico.
+  //
+  // La detección usa los marcadores del desglose NUEVO (`promocionGastos` /
+  // `precioBase`), que solo se pueblan al migrar/asignar. NO usa
+  // `sobreprecioAdicionales`: ese viene de `productos_adicionales`, que ya estaba
+  // poblado en TODAS las ventas (legacy incluido) — usarlo activaría el modelo
+  // nuevo en todo el histórico y le movería el saldo.
+  const tieneDesglose = i.promocionGastos != null || i.precioBase != null;
+  const promocionGastos = n(i.promocionGastos);
+  const sobreprecioAdicionales = n(i.sobreprecioAdicionales);
   // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento
   // hasta el máximo CONFIABLE (promo de la solicitud). Sin tope confiable
   // (legacy) se aplica el otorgado completo. El exceso sobre el tope NO reduce
   // el saldo (queda como pendiente a revisar).
-  const descuentoAplicado =
-    i.descuentoMaximoAutorizado != null
+  const descuentoAplicado = tieneDesglose
+    ? round2(promocionGastos + sobreprecioAdicionales)
+    : i.descuentoMaximoAutorizado != null
       ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
       : descuentoOtorgadoTotal;
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
   const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoAplicado;
-  const chequeNotariaCalculado = round2(Math.min(gastosNetos, excedenteDisponible));
+  // Con desglose, el cheque a notaría cubre los gastos netos COMPLETOS (las 4
+  // fuentes los fondean; ADR-045). Sin desglose, la fórmula vieja de Coda
+  // (capeada al excedente disponible) — fallback intacto.
+  const chequeNotariaCalculado = tieneDesglose
+    ? round2(gastosNetos)
+    : round2(Math.min(gastosNetos, excedenteDisponible));
 
   // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
   // saldo efectivo usa este, no el calculado: mide un giro real contra el
@@ -234,6 +325,53 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // `chequePagado − excedenteDisponible`.
   const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
   const cubierta = saldoCliente <= TOLERANCIA_SALDO;
+
+  // ADR-045: desglose de las 4 fuentes que cubren el presupuesto notarial
+  // (gastos netos). Solo con desglose poblado; el pagaré es el faltante tras
+  // promoción + enganche del cliente + sobreprecio.
+  const gastosNetosR = round2(gastosNetos);
+  const pagareNecesario = tieneDesglose
+    ? round2(
+        Math.max(
+          0,
+          gastosNetosR - promocionGastos - depositosDirectoCliente - sobreprecioAdicionales
+        )
+      )
+    : 0;
+  const coberturaGastos = tieneDesglose
+    ? {
+        gastosNetos: gastosNetosR,
+        apoyoInfonavit: round2(n(i.apoyoInfonavit)),
+        promocion: round2(promocionGastos),
+        engancheCliente: round2(depositosDirectoCliente),
+        sobreprecio: round2(sobreprecioAdicionales),
+        pagareNecesario,
+      }
+    : null;
+
+  // ADR-045: formación del precio de escrituración (cadena congelada al asignar).
+  // precio_base + incremento_credito = precio interno DILESA (su venta real);
+  // + sobreprecio (productos adicionales) = valor de escrituración. Solo con
+  // desglose poblado.
+  const precioInterno = tieneDesglose ? round2(n(i.precioBase) + n(i.incrementoCredito)) : 0;
+  const formacionPrecio = tieneDesglose
+    ? {
+        precioBase: round2(n(i.precioBase)),
+        incrementoCredito: round2(n(i.incrementoCredito)),
+        precioInterno,
+        adicionales: round2(sobreprecioAdicionales),
+        valorEscrituracion: round2(valorEscrituracion),
+      }
+    : null;
+
+  // ADR-045: saldo del PRECIO de escrituración (lo cubre el crédito institución;
+  // el pagaré es de GASTOS, no de precio). Solo con desglose. El header y el
+  // panel lo leen para NO exponer `saldoCliente` (que mezcla el excedente del
+  // precio con el descuento de gastos → el −74,651 sin sentido). El saldo de
+  // gastos del cliente es `coberturaGastos.pagareNecesario`.
+  const saldoPrecioEscrituracion = tieneDesglose
+    ? round2(valorEscrituracion - creditoInstitucion)
+    : null;
 
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
@@ -248,9 +386,14 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     i.montoChequeNotaria != null ? n(i.montoChequeNotaria) : chequeNotariaCalculado
   );
 
-  const valorRealVentaDilesa = round2(
-    depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto
-  );
+  // Con desglose, el valor real de venta de DILESA = precio interno (base +
+  // incremento): lo que DILESA cobra de la unidad, sin el sobreprecio (que es
+  // pass-through a gastos vía el cheque). La fórmula vieja de Coda (depósitos −
+  // cheque + pagaré) solo vale cuando el crédito se capturó como depósito, no en
+  // columna — en FOVISSSTE sale negativa. Fallback sin desglose intacto.
+  const valorRealVentaDilesa = tieneDesglose
+    ? precioInterno
+    : round2(depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto);
   // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
   // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
   // del cliente con recibo se factura aparte). La factura de escrituración toma
@@ -266,14 +409,41 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // Estimado de respaldo: mismo cálculo con el valor de escrituración en vez del
   // CFDI real. Igual al efectivo salvo que el CFDI de escrituración difiera.
   const valorFacturadoSugerido = round2(valorEscrituracion + depositosConRecibo);
-  const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
-  const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
-  const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
+  // Con desglose: la NC acredita el enganche facturado dos veces (está en la
+  // escritura Y en su recibo-CFDI), para que el neto facturado = valor de
+  // escritura. El sobreprecio NO se acredita (es parte de la escritura). Sin
+  // desglose: la NC de Coda = facturado − valor real (fallback intacto).
+  const montoNotaCredito = tieneDesglose
+    ? round2(depositosConRecibo)
+    : round2(valorFacturado - valorRealVentaDilesa);
+  const montoNotaCreditoSugerido = tieneDesglose
+    ? round2(depositosConRecibo)
+    : round2(valorFacturadoSugerido - valorRealVentaDilesa);
+  // Con desglose, el "descuento real" = la promoción (lo que DILESA efectivamente
+  // regala al cliente). El sobreprecio NO es descuento (es lo contrario: DILESA
+  // cobra de más). Sin desglose: la fórmula de Coda (escrituración − valor real).
+  const descuentoReal = tieneDesglose
+    ? round2(promocionGastos)
+    : round2(valorEscrituracion - valorRealVentaDilesa);
+  // Desglose de facturación (ADR-045): factura de venta (escrituración) +
+  // factura de enganche = total facturado; − NC = neto (= escritura). Cuadra
+  // "todo suma el valor de la escritura". Solo con desglose.
+  const desgloseFacturacion = tieneDesglose
+    ? {
+        facturaVenta: round2(valorEscrituracion),
+        facturaEnganche: round2(depositosConRecibo),
+        totalFacturado: round2(valorFacturado),
+        notaCredito: round2(depositosConRecibo),
+        netoFacturado: round2(valorFacturado - depositosConRecibo),
+      }
+    : null;
 
-  const comisionVendedor = round2(
-    valorEscrituracion * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01)
-  );
-  const comisionGerencia = round2(valorEscrituracion * 0.005);
+  // Con desglose, las comisiones se calculan sobre el PRECIO INTERNO (la venta
+  // real de DILESA), no sobre el escriturado con sobreprecio (decisión Beto
+  // 2026-06-17). Sin desglose, sobre el valor de escrituración (fallback).
+  const baseComision = tieneDesglose ? precioInterno : valorEscrituracion;
+  const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
+  const comisionGerencia = round2(baseComision * 0.005);
 
   return {
     depositosRecibidos: round2(depositosRecibidos),
@@ -297,6 +467,11 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     descuentoReal,
     comisionVendedor,
     comisionGerencia,
+    tieneDesglose,
+    coberturaGastos,
+    formacionPrecio,
+    saldoPrecioEscrituracion,
+    desgloseFacturacion,
     posibleDobleConteo,
   };
 }

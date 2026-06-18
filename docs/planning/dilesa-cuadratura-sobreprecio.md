@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.ventas` — **campos nuevos de desglose** (promoción de gastos de escrituración, sobreprecio para gastos / productos adicionales, aportación Dilesa, enganche aplicado a gastos) separados del actual `descuento_total` que hoy los mezcla; motor `lib/dilesa/cuadratura.ts` + UI `components/dilesa/cuadratura-panel.tsx` + armado de inputs en `app/dilesa/ventas/[id]/page.tsx` y la captura de fase 10 (`.../capturar/10-firmas-programadas/page.tsx`). Lectura de `tipos_credito` (apoyo Infonavit, costo_venta_adicional), `productos.valor_comercial_referencia`, `desglose_precio`, `erp.cxc_pagos`. Posible ADR del modelo financiero.
 **Estado:** in_progress
-**Próximo hito:** Beto aprueba el diseño ([ADR-045](../adr/045_cuadratura_desglose_gastos_escrituracion.md) + mockup del panel) → Sprint 2: implementar los campos desglosados + el motor + el panel (con verificación adversarial contra las ~230 escrituradas).
+**Próximo hito:** Sprint 2 PR b — motor de cuadratura con fallback (desglose si poblado, modelo viejo si null), verificando que las ~230 escrituradas den idéntico. Luego PR c (captura + panel) y cerrar MAYRA. (PR a — columnas — ya en [#934](https://github.com/beto-sudo/BSOP/pull/934).)
 **Dueño:** Beto
 **Creada:** 2026-06-17
-**Última actualización:** 2026-06-17 (Sprint 1 entregado: ADR-045 con modelo de las 4 fuentes, spec de campos y plan de migración + mockup del panel; pendiente aprobación de Beto)
+**Última actualización:** 2026-06-17 (Sprint 2 arrancado: columnas en prod #934; alcance acotado — sin backfill, solo activas + nuevas + fallback)
 
 > Detonante operativo: la venta **MAYRA ALEJANDRA GOMEZ TERRAZAS** (FOVISSSTE Tradicional) se regresó de fase buscando "capturar un pagaré para cuadrar". El pagaré era una pista falsa al inicio (ver [PR #927](https://github.com/beto-sudo/BSOP/pull/927), chip fantasma) pero **resultó real** (9,387). El problema de fondo: la cuadratura mezcla en `descuento` cosas que son conceptualmente distintas (promoción vs sobreprecio), y eso descuadra la utilidad. Modelo en memoria `reference_dilesa_sobreprecio_cheque_notaria`.
 
@@ -56,23 +56,22 @@ La cuadratura **desglosa completamente** las fuentes de cobertura de gastos (pro
 
 ## Alcance
 
-**Sprint 1 — Diseño (sin código de motor):**
+**Sprint 1 — Diseño** ✅ — [ADR-045](../adr/045_cuadratura_desglose_gastos_escrituracion.md) (modelo de 4 fuentes, spec de campos, fórmulas) + mockup del panel. Aprobado por Beto.
 
-- Modelo de datos: campos nuevos en `dilesa.ventas` (o tabla de cuadratura) — `promocion_gastos_escrituracion`, `sobreprecio_gastos`, `aportacion_dilesa_gastos`, y la separación clara vs `descuento_total` (descuento comercial al precio, distinto de la promoción de gastos). Mapeo de migración desde lo legacy.
-- Diseño del panel de cuadratura con el bloque "Cobertura de gastos de escrituración" mostrando las 4 fuentes.
-- Fórmula del pagaré (faltante) y del cheque (= gastos − apoyo) alineadas con Coda.
-- **Entregable: documento de diseño + ADR del modelo financiero, revisado por Beto antes de codear.**
+**Sprint 2 — Implementación (PRs chiquitos):**
 
-**Sprint 2 — Motor + UI** (tras OK del diseño): implementar los campos, el motor desglosado y el panel; recálculo de utilidad/participación correcto.
+- **PR a — columnas** ✅ ([#934](https://github.com/beto-sudo/BSOP/pull/934)): `precio_base`, `incremento_credito`, `sobreprecio_adicionales`, `promocion_gastos_monto` (nullable) en `dilesa.ventas`.
+- **PR b — motor con fallback**: `lib/dilesa/cuadratura.ts` lee el desglose si está poblado, si no usa el modelo viejo (D7). Verificación obligatoria de que las ~230 escrituradas dan idéntico. Tests.
+- **PR c — captura + panel**: asignación pobla las 4 columnas (nuevas ventas); fase 10 captura el pagaré por faltante de gastos; panel muestra las 4 fuentes (como el mockup).
 
-**Sprint 3 — Migración de datos legacy:** repartir el `descuento_total` mezclado en promoción vs sobreprecio para las ventas existentes (con OK caso por caso; el "15,000 plano" es la promoción estándar).
+**Alcance del poblado (acotado — decisión Beto):** NO backfill masivo. Las cerradas/legacy se quedan como están (fallback). Solo se pobla en **nuevas asignaciones** (el flujo lo hace) y en las **~70 activas en proceso** conforme se operan. MAYRA es la primera.
 
-**Sprint 4 — Cerrar MAYRA** con el modelo desglosado (en pausa hasta entonces, por decisión de Beto: no cerrarla con el descuento mezclado para que la utilidad salga bien).
+**Sprint 3 — Cerrar MAYRA** con el modelo desglosado (en pausa hasta tener motor + captura).
 
 ## Riesgos
 
 - **Tocar el saldo rompe ventas que hoy cuadran.** Cualquier cambio a `saldoCliente`/`cubierta` exige verificación adversarial contra las ~230 escrituradas antes de mergear.
-- **Migración de datos legacy delicada:** separar promoción/sobreprecio en el histórico requiere criterio (el 15,000 es la promoción; el resto del descuento mezclado puede ser sobreprecio). OK de Beto caso por caso.
+- **Histórico protegido por fallback (no backfill):** las cerradas/legacy quedan con las columnas en `null` y el motor usa el modelo viejo — no se reescribe nada cerrado. El riesgo se reduce a verificar que el fallback dé idéntico en las escrituradas.
 - **Modelo financiero sensible.** Afecta correo al Consejo, copiloto de cierre, nota de crédito, utilidad Dilesa. Nada al motor sin diseño aprobado por Beto.
 
 ## Métricas de éxito
@@ -94,3 +93,4 @@ La cuadratura **desglosa completamente** las fuentes de cobertura de gastos (pro
 - **2026-06-17** — El "descuento" se **desglosa** en conceptos separados: promoción de gastos (costo de DILESA) vs sobreprecio/productos adicionales (lo paga el crédito) vs descuento comercial al precio. Es la raíz de la subestimación de utilidad.
 - **2026-06-17** — **Diseño antes de código** para el motor (decisión de Beto): Sprint 1 entrega documento + ADR revisable; nada al motor de cuadratura sin su OK.
 - **2026-06-17** — MAYRA **en pausa** hasta el rediseño (no cerrarla con el descuento mezclado, para que la utilidad/participación salga correcta desde el inicio).
+- **2026-06-17** — **Alcance acotado (decisión Beto):** NO backfill masivo de las 627. Las ventas ya cerradas (escrituradas/terminadas/desasignadas) se quedan como están; el motor las maneja con **fallback** (columnas null → modelo viejo). Solo se pobla el desglose en **nuevas asignaciones** (el flujo lo guarda) y en las **~70 activas en proceso** conforme se operan (MAYRA primero). Columnas DDL ya en prod ([#934](https://github.com/beto-sudo/BSOP/pull/934)). Esto elimina el riesgo de reescribir histórico.

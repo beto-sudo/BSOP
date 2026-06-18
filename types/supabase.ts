@@ -5177,6 +5177,7 @@ export type Database = {
           gastos_escrituracion: number | null
           hora_firma_programada: string | null
           id: string
+          incremento_credito: number | null
           ine_numero: string | null
           monto_avaluo: number | null
           monto_cheque_notaria: number | null
@@ -5202,7 +5203,9 @@ export type Database = {
           persona_id: string
           poliza_garantia_expedida_at: string | null
           precio_asignacion: number | null
+          precio_base: number | null
           productos_adicionales: number
+          promocion_gastos_monto: number | null
           promocion_id: string | null
           tipo_credito: string | null
           unidad_id: string | null
@@ -5266,6 +5269,7 @@ export type Database = {
           gastos_escrituracion?: number | null
           hora_firma_programada?: string | null
           id?: string
+          incremento_credito?: number | null
           ine_numero?: string | null
           monto_avaluo?: number | null
           monto_cheque_notaria?: number | null
@@ -5291,7 +5295,9 @@ export type Database = {
           persona_id: string
           poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
+          precio_base?: number | null
           productos_adicionales?: number
+          promocion_gastos_monto?: number | null
           promocion_id?: string | null
           tipo_credito?: string | null
           unidad_id?: string | null
@@ -5355,6 +5361,7 @@ export type Database = {
           gastos_escrituracion?: number | null
           hora_firma_programada?: string | null
           id?: string
+          incremento_credito?: number | null
           ine_numero?: string | null
           monto_avaluo?: number | null
           monto_cheque_notaria?: number | null
@@ -5380,7 +5387,9 @@ export type Database = {
           persona_id?: string
           poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
+          precio_base?: number | null
           productos_adicionales?: number
+          promocion_gastos_monto?: number | null
           promocion_id?: string | null
           tipo_credito?: string | null
           unidad_id?: string | null

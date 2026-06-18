@@ -395,4 +395,136 @@ describe('calcularCuadratura', () => {
       expect(c.cubierta).toBe(false); // pendiente a revisar
     });
   });
+
+  // ADR-045: modelo desglosado (venta nueva o en proceso). El "descuento" que
+  // reduce el saldo = promoción + sobreprecio; el desglose de cobertura de
+  // gastos sale en `coberturaGastos`. Caso MAYRA (FOVISSSTE, apoyo 0).
+  describe('modelo desglosado (ADR-045)', () => {
+    const mayra = (over = {}) =>
+      calcularCuadratura({
+        valorEscrituracion: 979070,
+        montoCreditoTitular: 979070,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 9387, // pagaré
+        montoChequeNotaria: 84038, // gastos completos (FOVISSSTE sin apoyo)
+        gastosEscrituracion: 84038,
+        apoyoInfonavit: 0,
+        precioBase: 899000,
+        incrementoCredito: 55419,
+        sobreprecioAdicionales: 24651,
+        promocionGastos: 15000,
+        depositos: [{ monto: 35000, directoCliente: true, tieneRecibo: true }],
+        proyectoNombre: 'Lomas de la Loma Este',
+        ...over,
+      });
+
+    it('MAYRA cuadra en 0 con el desglose (promoción + sobreprecio = descuento aplicado)', () => {
+      const c = mayra();
+      expect(c.tieneDesglose).toBe(true);
+      expect(c.descuentoAplicado).toBe(39651); // 15,000 promo + 24,651 sobreprecio
+      expect(c.montoDisponible).toBe(1023457); // 35,000 + 979,070 + 9,387
+      expect(c.saldoCobranza).toBe(-44387); // 979,070 − 1,023,457
+      expect(c.saldoCliente).toBe(0); // −44,387 − 39,651 + 84,038
+      expect(c.cubierta).toBe(true);
+      // Saldo del precio (lo que header/panel muestran, NO el saldoCliente): el
+      // crédito cubre el precio al 100%. El saldo de gastos = pagaré (9,387).
+      expect(c.saldoPrecioEscrituracion).toBe(0);
+    });
+
+    it('desglosa las 4 fuentes de cobertura de gastos', () => {
+      const c = mayra();
+      expect(c.coberturaGastos).toEqual({
+        gastosNetos: 84038,
+        apoyoInfonavit: 0,
+        promocion: 15000,
+        engancheCliente: 35000,
+        sobreprecio: 24651,
+        pagareNecesario: 9387, // 84,038 − 15,000 − 35,000 − 24,651
+      });
+    });
+
+    it('calcula el pagaré necesario aunque aún no se capture el crédito directo', () => {
+      // Antes de capturar el pagaré (CD=0) y el cheque: el faltante sigue siendo 9,387.
+      const c = mayra({ montoCreditoDirecto: 0, montoChequeNotaria: 0 });
+      expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
+    });
+
+    it('expone la formación del precio (cadena base → incremento → interno → adicionales)', () => {
+      const c = mayra();
+      expect(c.formacionPrecio).toEqual({
+        precioBase: 899000,
+        incrementoCredito: 55419,
+        precioInterno: 954419, // 899,000 + 55,419
+        adicionales: 24651,
+        valorEscrituracion: 979070, // 954,419 + 24,651
+      });
+    });
+
+    it('deriva el cierre con el modelo desglosado (cheque = gastos, valor real = precio interno)', () => {
+      const c = mayra();
+      expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
+      expect(c.valorRealVentaDilesa).toBe(954419); // precio interno, NO la fórmula negativa vieja
+      expect(c.descuentoReal).toBe(15000); // la promoción (lo que DILESA regala), NO el sobreprecio
+    });
+
+    it('desglosa la facturación: total suma la escritura (factura venta + enganche − NC = neto)', () => {
+      const c = mayra();
+      expect(c.desgloseFacturacion).toEqual({
+        facturaVenta: 979070, // escrituración
+        facturaEnganche: 35000, // enganche con recibo CFDI
+        totalFacturado: 1014070,
+        notaCredito: 35000, // acredita el enganche facturado dos veces
+        netoFacturado: 979070, // = escrituración ✓
+      });
+      expect(c.montoNotaCredito).toBe(35000); // NC = enganche, no el valor real
+    });
+
+    it('comisiones sobre el precio interno (no el escriturado con sobreprecio)', () => {
+      const c = mayra();
+      expect(c.comisionVendedor).toBe(9544.19); // 954,419 × 1.0%
+      expect(c.comisionGerencia).toBe(4772.1); // 954,419 × 0.5%
+    });
+
+    it('FALLBACK: el cierre NO se toca sin desglose (formacionPrecio null, fórmula vieja)', () => {
+      const c = mayra({ promocionGastos: null, precioBase: null, incrementoCredito: null });
+      expect(c.formacionPrecio).toBe(null);
+      expect(c.saldoPrecioEscrituracion).toBe(null); // legacy usa saldoCliente, no este
+      // Con la fórmula vieja: depósitos 35,000 − cheque calc + CD.
+      expect(c.valorRealVentaDilesa).not.toBe(954419);
+    });
+
+    it('FALLBACK: sin desglose, el mismo escenario usa descuento_total (idéntico al modelo viejo)', () => {
+      // Cerradas/legacy: sin promocionGastos/sobreprecioAdicionales, con el
+      // descuento mezclado en descuento_total. Debe dar el mismo saldo y NO
+      // exponer coberturaGastos.
+      const c = mayra({
+        promocionGastos: null,
+        sobreprecioAdicionales: null,
+        precioBase: null,
+        incrementoCredito: null,
+        descuentoOtorgadoTotal: 39651, // promoción + sobreprecio mezclados (modelo viejo)
+      });
+      expect(c.tieneDesglose).toBe(false);
+      expect(c.coberturaGastos).toBe(null);
+      expect(c.descuentoAplicado).toBe(39651);
+      expect(c.saldoCliente).toBe(0); // mismo resultado que el desglosado
+    });
+
+    // Blindaje: `productos_adicionales` (→ sobreprecioAdicionales) está poblado
+    // en TODAS las ventas (legacy incluido). Por sí solo NO debe activar el
+    // modelo desglosado — si lo hiciera, le movería el saldo a todo el histórico.
+    it('NO activa el desglose si solo viene sobreprecioAdicionales (sin promoción/base)', () => {
+      const c = mayra({
+        promocionGastos: null,
+        precioBase: null,
+        incrementoCredito: null,
+        sobreprecioAdicionales: 24651, // poblado (productos_adicionales legacy)
+        descuentoOtorgadoTotal: 0,
+        descuentoMaximoAutorizado: null,
+      });
+      expect(c.tieneDesglose).toBe(false); // ← clave: NO se activa
+      expect(c.coberturaGastos).toBe(null);
+      expect(c.descuentoAplicado).toBe(0); // usa descuento_total (0), no el sobreprecio
+    });
+  });
 });
