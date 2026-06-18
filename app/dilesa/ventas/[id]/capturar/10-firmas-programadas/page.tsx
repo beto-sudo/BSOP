@@ -29,7 +29,7 @@
  */
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, Download, Loader2, Lock, Plus, Save, Trash2 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
@@ -57,6 +57,7 @@ const SLOTS_FASE: SlotColaborativo[] = [
 ];
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { getNotaria } from '@/lib/dilesa/notarios';
+import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
 
 type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
@@ -275,13 +276,10 @@ function CapturarFase10Body() {
       setFase9Cerrada(posiciones.includes(9));
       setYaCerrada(posiciones.includes(10));
 
-      // Prefill crédito directo: desde lo persistido, o desde el saldo si aún
-      // no se configura.
-      const totalDep = deps.reduce((s, d) => s + Number(d.monto_total ?? 0), 0);
-      const credInst =
-        Number(v.monto_credito_titular ?? 0) + Number(v.monto_credito_cotitular ?? 0);
-      const saldoLocal = Number(v.precio_asignacion ?? 0) - credInst - totalDep;
-
+      // Prefill del crédito directo persistido. El default (cuando aún no se
+      // captura) se llena desde el motor de cuadratura en un efecto aparte: el
+      // pagaré cubre el faltante de GASTOS (no el saldo de precio, que el crédito
+      // institución ya cubre).
       if (v.monto_credito_directo != null) {
         setMontoCD(String(v.monto_credito_directo));
         const plan = Array.isArray(v.cd_plan_pagos) ? v.cd_plan_pagos : [];
@@ -291,10 +289,6 @@ function CapturarFase10Body() {
             : [{ fecha: '', monto: String(v.monto_credito_directo) }]
         );
         setCdGuardado(true);
-      } else if (saldoLocal > 0.0049) {
-        setMontoCD(saldoLocal.toFixed(2));
-        setPlanPagos([{ fecha: '', monto: saldoLocal.toFixed(2) }]);
-        setCdGuardado(false);
       }
       if (v.cd_tiie28_pct != null) setTiie(String(v.cd_tiie28_pct));
       if (v.cd_spread_ordinario_pct != null) setSpread(String(v.cd_spread_ordinario_pct));
@@ -319,8 +313,33 @@ function CapturarFase10Body() {
     Number(venta?.monto_credito_titular ?? 0) + Number(venta?.monto_credito_cotitular ?? 0);
   const precio = Number(venta?.precio_asignacion ?? 0);
   const cobertura = creditoInstitucion + totalDepositos;
-  const saldo = precio - cobertura;
+  const saldoPrecio = precio - cobertura;
+
+  // El pagaré (crédito directo) cubre el faltante de GASTOS de escrituración —
+  // NO el saldo de precio (el crédito institución cubre el precio). Con el
+  // desglose poblado (ADR-045) el motor deriva ese pagaré
+  // (gastos − apoyo − promoción − enganche − sobreprecio): MAYRA = 9,387 aunque
+  // el precio esté sobre-cubierto por el crédito. Sin desglose (legacy) cae al
+  // saldo de precio (comportamiento viejo).
+  const resumen = useVentaResumen(ventaId);
+  const cobGastos = resumen.status === 'ready' ? resumen.props.cuadratura.coberturaGastos : null;
+  const saldo = cobGastos ? cobGastos.pagareNecesario : saldoPrecio;
   const aplicaCD = saldo > 0.0049;
+
+  // Default del monto del pagaré: el faltante que deriva el motor, una vez que
+  // la cuadratura cargó y si aún no se capturó ni editó.
+  const prefilledCD = useRef(false);
+  useEffect(() => {
+    if (prefilledCD.current || cdGuardado) return;
+    if (venta?.monto_credito_directo != null) return;
+    if (saldo <= 0.0049) return;
+    prefilledCD.current = true;
+    // Sincroniza el default del pagaré desde el motor una sola vez (guardado por
+    // el ref), patrón de pre-fill desde dato async — igual que otras páginas DILESA.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setMontoCD(saldo.toFixed(2));
+    setPlanPagos([{ fecha: '', monto: saldo.toFixed(2) }]);
+  }, [saldo, cdGuardado, venta]);
 
   // ── Candado de la fecha de firma ─────────────────────────────────
   // Dirección/Admin (espejo de erp.fn_es_direccion) puede reprogramar aun
@@ -833,20 +852,49 @@ function CapturarFase10Body() {
             )}
 
             <div className="mt-4 space-y-1 rounded-md border border-[var(--border)] bg-[var(--bg)]/20 p-3 text-sm">
-              <CoberturaRow label="Precio de asignación" value={money(precio)} />
-              <CoberturaRow
-                label="Crédito institución (titular + co-titular)"
-                value={money(creditoInstitucion)}
-              />
-              <CoberturaRow label="Depósitos del cliente" value={money(totalDepositos)} />
-              <div className="my-1 border-t border-[var(--border)]" />
-              <CoberturaRow label="Cobertura total" value={money(cobertura)} />
-              <CoberturaRow
-                label={aplicaCD ? 'Saldo pendiente' : 'Saldo'}
-                value={money(saldo)}
-                strong
-                tone={aplicaCD ? 'warn' : 'ok'}
-              />
+              {cobGastos ? (
+                // Desglose (ADR-045): el crédito cubre el precio; el pagaré cubre
+                // el faltante de GASTOS de escrituración tras las demás fuentes.
+                <>
+                  <CoberturaRow
+                    label="Presupuesto notarial (neto de apoyo)"
+                    value={money(cobGastos.gastosNetos)}
+                  />
+                  <CoberturaRow label="(−) Promoción DILESA" value={money(cobGastos.promocion)} />
+                  <CoberturaRow
+                    label="(−) Enganche del cliente"
+                    value={money(cobGastos.engancheCliente)}
+                  />
+                  <CoberturaRow
+                    label="(−) Sobreprecio (lo cubre el crédito)"
+                    value={money(cobGastos.sobreprecio)}
+                  />
+                  <div className="my-1 border-t border-[var(--border)]" />
+                  <CoberturaRow
+                    label={aplicaCD ? '(=) Pagaré necesario del cliente' : '(=) Gastos cubiertos'}
+                    value={money(saldo)}
+                    strong
+                    tone={aplicaCD ? 'warn' : 'ok'}
+                  />
+                </>
+              ) : (
+                <>
+                  <CoberturaRow label="Precio de asignación" value={money(precio)} />
+                  <CoberturaRow
+                    label="Crédito institución (titular + co-titular)"
+                    value={money(creditoInstitucion)}
+                  />
+                  <CoberturaRow label="Depósitos del cliente" value={money(totalDepositos)} />
+                  <div className="my-1 border-t border-[var(--border)]" />
+                  <CoberturaRow label="Cobertura total" value={money(cobertura)} />
+                  <CoberturaRow
+                    label={aplicaCD ? 'Saldo pendiente' : 'Saldo'}
+                    value={money(saldo)}
+                    strong
+                    tone={aplicaCD ? 'warn' : 'ok'}
+                  />
+                </>
+              )}
             </div>
           </Section>
 
