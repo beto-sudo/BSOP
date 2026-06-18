@@ -15,9 +15,7 @@
 
 import { AlertTriangle } from 'lucide-react';
 
-import { partirDescuento, type Cuadratura } from '@/lib/dilesa/cuadratura';
-
-const round2 = (v: number): number => Math.round((v + Number.EPSILON) * 100) / 100;
+import type { Cuadratura } from '@/lib/dilesa/cuadratura';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -47,27 +45,9 @@ export function CuadraturaPanel({
   chequeCapturado,
   hayFacturaCfdi,
 }: CuadraturaPanelProps) {
-  // Cobertura del presupuesto notarial COMPLETO (bruto): subsidio Infonavit +
-  // aportación DILESA (promoción) + enganche + sobreprecio + pagaré = gastos
-  // brutos. El lado DILESA (promoción + sobreprecio) cubre el faltante de gastos
-  // tras el enganche y el pagaré; se parte con `partirDescuento` (promoción topada
-  // al bono autorizado, el resto sobreprecio). Cuadra en 0 por construcción.
+  // Cobertura del presupuesto notarial COMPLETO: el motor (`coberturaGastos`) ya
+  // trae todos los componentes y el saldo — fuente única, el panel no recalcula.
   const cob = c.coberturaGastos;
-  const cobBudget = cob
-    ? (() => {
-        const totalDilesa = round2(cob.gastosNetos - cob.engancheCliente - c.montoCreditoDirecto);
-        const { promocion, sobreprecio } = partirDescuento(totalDilesa, cob.promocion);
-        const saldo = round2(
-          cob.gastosBrutos -
-            cob.apoyoInfonavit -
-            promocion -
-            cob.engancheCliente -
-            sobreprecio -
-            c.montoCreditoDirecto
-        );
-        return { promocion, sobreprecio, saldo };
-      })()
-    : null;
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (
@@ -191,23 +171,23 @@ export function CuadraturaPanel({
       {/* Cobertura del presupuesto notarial COMPLETO (ADR-045). Gastos brutos =
           subsidio Infonavit + aportación DILESA (promoción) + enganche +
           sobreprecio + pagaré → saldo 0. */}
-      {c.tieneDesglose && cob && cobBudget ? (
+      {c.tieneDesglose && cob ? (
         <Bloque titulo="Cobertura del presupuesto notarial">
           <Fila label="Gastos notariales (completos)" value={money(cob.gastosBrutos)} strong />
           <div className="my-1 border-t border-dashed border-[var(--border)]" />
           {cob.apoyoInfonavit > 0 ? (
             <Fila label="(−) Subsidio Infonavit" value={money(cob.apoyoInfonavit)} />
           ) : null}
-          <Fila label="(−) Aportación DILESA (promoción)" value={money(cobBudget.promocion)} />
+          <Fila label="(−) Aportación DILESA (promoción)" value={money(cob.aportacionPromocion)} />
           <Fila label="(−) Enganche del cliente" value={money(cob.engancheCliente)} />
-          <Fila label="(−) Sobreprecio" value={money(cobBudget.sobreprecio)} />
+          <Fila label="(−) Sobreprecio" value={money(cob.sobreprecioCobertura)} />
           <Fila label="(−) Pagaré del cliente" value={money(c.montoCreditoDirecto)} />
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
-            label={Math.abs(cobBudget.saldo) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
-            value={money(cobBudget.saldo)}
+            label={Math.abs(cob.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
+            value={money(cob.saldoCobertura)}
             strong
-            tone={Math.abs(cobBudget.saldo) <= 2 ? 'ok' : 'warn'}
+            tone={Math.abs(cob.saldoCobertura) <= 2 ? 'ok' : 'warn'}
           />
         </Bloque>
       ) : null}

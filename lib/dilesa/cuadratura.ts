@@ -208,19 +208,27 @@ export type Cuadratura = {
     /** Subsidio Infonavit a gastos (por tipo de crédito). 0 si no hay. */
     apoyoInfonavit: number;
     /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones; costo DILESA).
-     *  Es el TOPE; lo realmente usado se parte con `partirDescuento`. */
+     *  Es el TOPE; lo realmente usado para cubrir gastos es `aportacionPromocion`. */
     promocion: number;
+    /** Promoción USADA para cubrir el presupuesto (= promo topada al faltante de
+     *  gastos del lado DILESA). La línea "Aportación DILESA (promoción)" de la card. */
+    aportacionPromocion: number;
     /** Enganche/depósitos del cliente. */
     engancheCliente: number;
-    /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. El
-     *  sobreprecio EFECTIVO de la cobertura se deriva con `partirDescuento` (puede
-     *  ser mayor: lo que DILESA concede de más, pendiente de formalizar). */
+    /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. */
     sobreprecio: number;
+    /** Sobreprecio EFECTIVO que cubre el presupuesto (faltante del lado DILESA −
+     *  promoción usada). Puede exceder a `sobreprecio` capturado: lo que DILESA
+     *  concede de más subiendo el precio, pendiente de formalizar (Máx. Aportación). */
+    sobreprecioCobertura: number;
     /** Pagaré necesario = faltante tras promoción autorizada + enganche + sobreprecio
      *  (lo que el cliente debería financiar si DILESA solo aporta la promo). Para
-     *  la fase 10 / gate. NO necesariamente es lo que pasó: cuando DILESA absorbe
-     *  más que la promo (Máxima Aportación) el pagaré real es menor. */
+     *  la fase 10 / gate. NO es el pagaré real: cuando DILESA absorbe más que la
+     *  promo (Máxima Aportación) el pagaré del cliente es menor (o 0). */
     pagareNecesario: number;
+    /** Saldo de la cobertura: gastos brutos − subsidio − promoción − enganche −
+     *  sobreprecio − pagaré. ≈ 0 cuando las fuentes cubren el presupuesto. */
+    saldoCobertura: number;
   } | null;
   /**
    * Formación del precio de escrituración (ADR-045 + geometría desglosada
@@ -388,15 +396,17 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
   const cubierta = saldoCliente <= TOLERANCIA_SALDO;
 
-  // ADR-045: desglose de las fuentes que cubren el presupuesto notarial. Solo con
-  // desglose poblado. El presupuesto BRUTO se cubre con: subsidio Infonavit +
-  // aportación DILESA (promoción) + enganche del cliente + sobreprecio + pagaré.
-  // El split promoción/sobreprecio del lado DILESA lo hace `partirDescuento` en el
-  // panel (sobre `descuentoReal`); aquí se exponen los componentes base.
+  // ADR-045: desglose de las fuentes que cubren el presupuesto notarial COMPLETO.
+  // Solo con desglose poblado. Gastos BRUTOS = subsidio Infonavit + aportación
+  // DILESA (promoción) + enganche + sobreprecio + pagaré → saldo 0. El split del
+  // lado DILESA (lo que cubre tras el enganche y el pagaré) se hace con
+  // `partirDescuento`: promoción (bono autorizado, topado) + sobreprecio (el resto).
+  // Fuente ÚNICA para la card de cuadratura y el mini-resumen (no recalcular).
   const gastosNetosR = round2(gastosNetos);
   const gastosBrutosR = round2(n(i.gastosEscrituracion));
   // `pagareNecesario`: faltante si DILESA solo aportara la promoción AUTORIZADA
-  // (para la fase 10 / gate). NO es lo que necesariamente pasó.
+  // (para la fase 10 / gate). NO es el pagaré real: cuando DILESA absorbe más que
+  // la promo (Máxima Aportación) el pagaré del cliente es menor (o 0).
   const pagareNecesario = tieneDesglose
     ? round2(
         Math.max(
@@ -405,15 +415,33 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         )
       )
     : 0;
+  // Lo que DILESA debe cubrir del presupuesto tras el enganche y el pagaré del
+  // cliente, partido en promoción (topada al bono) + sobreprecio (el resto).
+  const faltanteGastosDilesa = round2(gastosNetosR - depositosDirectoCliente - montoCreditoDirecto);
+  const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
+    faltanteGastosDilesa,
+    promocionGastos
+  );
+  const saldoCobertura = round2(
+    gastosBrutosR -
+      n(i.apoyoInfonavit) -
+      aportacionPromocion -
+      depositosDirectoCliente -
+      sobreprecioCobertura -
+      montoCreditoDirecto
+  );
   const coberturaGastos = tieneDesglose
     ? {
         gastosBrutos: gastosBrutosR,
         gastosNetos: gastosNetosR,
         apoyoInfonavit: round2(n(i.apoyoInfonavit)),
         promocion: round2(promocionGastos),
+        aportacionPromocion,
         engancheCliente: round2(depositosDirectoCliente),
         sobreprecio: round2(sobreprecioAdicionales),
+        sobreprecioCobertura,
         pagareNecesario,
+        saldoCobertura,
       }
     : null;
 
