@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularCuadratura, topeDescuentoAutorizado } from './cuadratura';
+import { calcularCuadratura, topeDescuentoAutorizado, partirDescuento } from './cuadratura';
 
 describe('calcularCuadratura', () => {
   // Ejemplo real de Beto (pantalla de Coda):
@@ -434,20 +434,40 @@ describe('calcularCuadratura', () => {
     it('desglosa las fuentes de cobertura de gastos (cuadra en 0)', () => {
       const c = mayra();
       expect(c.coberturaGastos).toEqual({
+        gastosBrutos: 84038, // sin subsidio (FOVISSSTE) → bruto = neto
         gastosNetos: 84038,
         apoyoInfonavit: 0,
         promocion: 15000,
         engancheCliente: 35000,
         sobreprecio: 24651,
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
-        aportacionDilesa: 15000, // 84,038 − 35,000 − 24,651 − 9,387 (= la promo, aquí)
-        saldoCobertura: 0, // presupuesto − aportación − enganche − sobreprecio − pagaré
       });
     });
 
-    it('aportación DILESA absorbe el faltante INFONAVIT sin pagaré — caso Arizpe', () => {
-      // gastos netos 18,313, sin enganche/sobreprecio/pagaré → DILESA aporta los
-      // 18,313 (más que la promo de 15,000); la cobertura cuadra en 0.
+    it('cobertura del presupuesto notarial completo cuadra en 0 — MAYRA', () => {
+      // Gastos brutos 84,038 = subsidio 0 + promoción 15,000 + enganche 35,000 +
+      // sobreprecio 24,651 + pagaré 9,387. El lado DILESA (promoción + sobreprecio)
+      // = gastosNetos − enganche − pagaré = 39,651, partido en 15,000 + 24,651.
+      const c = mayra();
+      const cob = c.coberturaGastos!;
+      const totalDilesa = cob.gastosNetos - cob.engancheCliente - c.montoCreditoDirecto;
+      const { promocion, sobreprecio } = partirDescuento(totalDilesa, cob.promocion);
+      expect(promocion).toBe(15000);
+      expect(sobreprecio).toBe(24651);
+      const saldo =
+        cob.gastosBrutos -
+        cob.apoyoInfonavit -
+        promocion -
+        cob.engancheCliente -
+        sobreprecio -
+        c.montoCreditoDirecto;
+      expect(Math.round(saldo * 100) / 100).toBe(0);
+    });
+
+    it('cobertura con subsidio Infonavit: gastos brutos, subsidio aparte, sobreprecio desglosado — Arizpe', () => {
+      // Gastos brutos 48,313 = subsidio Infonavit 30,000 + promoción 15,000 +
+      // enganche 0 + sobreprecio 3,313 + pagaré 0. El subsidio se pinta como línea
+      // propia; el lado DILESA (18,313) se parte en promoción topada + sobreprecio.
       const c = calcularCuadratura({
         valorEscrituracion: 909000,
         montoCreditoTitular: 909000,
@@ -462,8 +482,29 @@ describe('calcularCuadratura', () => {
         promocionGastos: 15000,
         depositos: [],
       });
-      expect(c.coberturaGastos?.aportacionDilesa).toBe(18313);
-      expect(c.coberturaGastos?.saldoCobertura).toBe(0);
+      const cob = c.coberturaGastos!;
+      expect(cob.gastosBrutos).toBe(48313);
+      expect(cob.gastosNetos).toBe(18313);
+      expect(cob.apoyoInfonavit).toBe(30000);
+      // Lado DILESA (gastos-side): promoción topada 15,000 + sobreprecio 3,313 → cuadra 0.
+      const totalDilesa = cob.gastosNetos - cob.engancheCliente - c.montoCreditoDirecto;
+      const { promocion, sobreprecio } = partirDescuento(totalDilesa, cob.promocion);
+      expect(promocion).toBe(15000);
+      expect(sobreprecio).toBe(3313);
+      const saldo =
+        cob.gastosBrutos -
+        cob.apoyoInfonavit -
+        promocion -
+        cob.engancheCliente -
+        sobreprecio -
+        c.montoCreditoDirecto;
+      expect(Math.round(saldo * 100) / 100).toBe(0);
+      // Descuento real (escritura − valor real) = 18,313.29; la card "Descuento" lo
+      // parte en promoción 15,000 + sobreprecio 3,313.29.
+      expect(c.descuentoReal).toBe(18313.29);
+      const split = partirDescuento(c.descuentoReal, cob.promocion);
+      expect(split.promocion).toBe(15000);
+      expect(split.sobreprecio).toBe(3313.29);
     });
 
     it('calcula el pagaré necesario aunque aún no se capture el crédito directo', () => {
@@ -609,5 +650,32 @@ describe('calcularCuadratura', () => {
       expect(c.coberturaGastos).toBe(null);
       expect(c.descuentoAplicado).toBe(0); // usa descuento_total (0), no el sobreprecio
     });
+  });
+});
+
+describe('partirDescuento', () => {
+  it('parte un descuento mayor que la promo en promoción topada + sobreprecio (resto)', () => {
+    // Arizpe: descuento real 18,313 → promo 15,000 (topada) + sobreprecio 3,313.
+    expect(partirDescuento(18313, 15000)).toEqual({ promocion: 15000, sobreprecio: 3313 });
+    // MAYRA: 39,651 → 15,000 + 24,651.
+    expect(partirDescuento(39651, 15000)).toEqual({ promocion: 15000, sobreprecio: 24651 });
+  });
+
+  it('si el descuento no llega a la promo, toda la promoción y 0 de sobreprecio', () => {
+    expect(partirDescuento(10000, 15000)).toEqual({ promocion: 10000, sobreprecio: 0 });
+  });
+
+  it('descuento 0 o negativo → 0 y 0 (no inventa promoción)', () => {
+    expect(partirDescuento(0, 15000)).toEqual({ promocion: 0, sobreprecio: 0 });
+    expect(partirDescuento(-500, 15000)).toEqual({ promocion: 0, sobreprecio: 0 });
+  });
+
+  it('sin promoción autorizada (0/null) todo el descuento es sobreprecio', () => {
+    expect(partirDescuento(8000, 0)).toEqual({ promocion: 0, sobreprecio: 8000 });
+    expect(partirDescuento(8000, null)).toEqual({ promocion: 0, sobreprecio: 8000 });
+  });
+
+  it('conserva centavos (escritura − valor real puede no ser entero)', () => {
+    expect(partirDescuento(18313.29, 15000)).toEqual({ promocion: 15000, sobreprecio: 3313.29 });
   });
 });

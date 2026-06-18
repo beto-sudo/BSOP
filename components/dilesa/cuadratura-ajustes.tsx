@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
+import { partirDescuento } from '@/lib/dilesa/cuadratura';
 
 export type CuadraturaInputsStr = {
   /** Total del descuento. Con buckets = su suma (auto); legacy total-only = lo capturado en Coda. */
@@ -95,12 +96,10 @@ export function CuadraturaAjustes({
   //    No se captura aquí; se deriva. ──
   if (tieneDesglose) {
     const descuentoTotal = Math.round(descuentoReal * 100) / 100;
-    // El descuento por promoción es el bono autorizado, usado hasta el total
-    // (topado al autorizado). El resto es descuento por sobreprecio.
-    const descuentoPorPromocion =
-      descuentoTotal <= 0 ? 0 : Math.min(descuentoTotal, descuentoPromocion);
-    const descuentoPorSobreprecio =
-      Math.round((descuentoTotal - descuentoPorPromocion) * 100) / 100;
+    // Parte el descuento real en promoción (bono autorizado, topado) + sobreprecio
+    // (el resto). Mismo helper que la card de cobertura del presupuesto notarial.
+    const { promocion: descuentoPorPromocion, sobreprecio: descuentoPorSobreprecio } =
+      partirDescuento(descuentoReal, descuentoPromocion);
     // Cuánto del sobreprecio aún no está formalizado como productos adicionales
     // (precio inflado) → pendiente de capturar como Máxima Aportación.
     const sobreprecioPorCapturar =
