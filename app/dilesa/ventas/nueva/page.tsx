@@ -610,6 +610,21 @@ function NuevaSolicitudForm() {
           // La promo elegida define el Descuento Máximo Autorizado de la
           // cuadratura (promociones.monto) — FK, ya no texto en notas.
           promocion_id: promocionId || null,
+          // Desglose escalar (ADR-045 + geometría 20260618): lo que LEE el motor
+          // de cuadratura. La venta nace poblada desde el mismo
+          // `fn_calcular_precio_venta`, así usa el modelo desglosado desde la
+          // asignación y NO necesita backfill (el `desglose_precio` jsonb de
+          // arriba es el snapshot para el PDF/detalle; estos escalares son los
+          // que consume `lib/dilesa/cuadratura.ts`). precio_base = valor
+          // comercial; la geometría y el +6% en sus columnas; la promoción = el
+          // bono de la promo elegida (0 si no hay).
+          precio_base: calculo?.valor_comercial ?? null,
+          incremento_credito: calculo?.costo_credito_adicional ?? null,
+          valor_excedente_terreno: calculo?.valor_excedente_terreno ?? null,
+          valor_frente_verde: calculo?.valor_frente_verde ?? null,
+          valor_esquina: calculo?.valor_esquina ?? null,
+          valor_venta_futuro: calculo?.valor_venta_futuro ?? null,
+          promocion_gastos_monto: promociones.find((p) => p.id === promocionId)?.monto ?? 0,
         })
         .select('id')
         .single();
