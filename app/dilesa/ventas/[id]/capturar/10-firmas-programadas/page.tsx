@@ -57,7 +57,7 @@ const SLOTS_FASE: SlotColaborativo[] = [
 ];
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
 import { getNotaria } from '@/lib/dilesa/notarios';
-import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
+import { useVentaCapturaResumen } from '@/components/dilesa/venta-detalle/captura-shell';
 
 type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 
@@ -142,8 +142,6 @@ function CapturarFase10Body() {
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [clienteNombre, setClienteNombre] = useState<string>('');
-  const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [fase9Cerrada, setFase9Cerrada] = useState<boolean | null>(null);
@@ -207,21 +205,7 @@ function CapturarFase10Body() {
       if (v.fecha_firma_programada) setFechaFirma(v.fecha_firma_programada);
       if (v.hora_firma_programada) setHoraFirma(v.hora_firma_programada.slice(0, 5));
 
-      const [pRes, uRes, fRes, nRes, dRes] = await Promise.all([
-        sb
-          .schema('erp')
-          .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
-          .eq('id', v.persona_id)
-          .maybeSingle(),
-        v.unidad_id
-          ? sb
-              .schema('dilesa')
-              .from('unidades')
-              .select('identificador, producto_id')
-              .eq('id', v.unidad_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+      const [fRes, nRes, dRes] = await Promise.all([
         sb
           .schema('dilesa')
           .from('venta_fases')
@@ -241,30 +225,6 @@ function CapturarFase10Body() {
       ]);
       if (!activo) return;
 
-      if (pRes.data) {
-        setClienteNombre(
-          [pRes.data.nombre, pRes.data.apellido_paterno, pRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ') || '(sin nombre)'
-        );
-      }
-      if (uRes.data) {
-        const prodSufijo = uRes.data.producto_id
-          ? (
-              await sb
-                .schema('dilesa')
-                .from('productos')
-                .select('nombre')
-                .eq('id', uRes.data.producto_id)
-                .maybeSingle()
-            ).data?.nombre
-              ?.split('-')
-              .pop()
-          : '';
-        setIdentificacionInv(
-          prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
-        );
-      }
       if (nRes) {
         setNotarioNombre(
           nRes.numeroNotaria ? `Notaría ${nRes.numeroNotaria} — ${nRes.nombre}` : nRes.nombre
@@ -321,7 +281,7 @@ function CapturarFase10Body() {
   // (gastos − apoyo − promoción − enganche − sobreprecio): MAYRA = 9,387 aunque
   // el precio esté sobre-cubierto por el crédito. Sin desglose (legacy) cae al
   // saldo de precio (comportamiento viejo).
-  const resumen = useVentaResumen(ventaId);
+  const resumen = useVentaCapturaResumen();
   const cobGastos = resumen.status === 'ready' ? resumen.props.cuadratura.coberturaGastos : null;
   const saldo = cobGastos ? cobGastos.pagareNecesario : saldoPrecio;
   const aplicaCD = saldo > 0.0049;
@@ -614,7 +574,7 @@ function CapturarFase10Body() {
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -624,14 +584,8 @@ function CapturarFase10Body() {
 
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={10}
-          faseNombre="Firmas Programadas"
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={10} faseNombre="Firmas Programadas" />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -672,11 +626,8 @@ function CapturarFase10Body() {
   ) : null;
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={venta.id}
-        clienteNombre={clienteNombre}
-        identificacionInventario={identificacionInv}
         faseposicion={10}
         faseNombre="Firmas Programadas"
         descripcion="Programa la fecha y hora de firma acordada con el notario. Genera la Póliza de Garantía y, si hay saldo, el crédito directo con su pagaré."

@@ -93,7 +93,7 @@ import {
   type RevisionCheck,
   type VeredictoRevision,
 } from '@/lib/dilesa/captura/pld-revision';
-import { useVentaResumen } from '@/lib/dilesa/use-venta-resumen';
+import { useVentaCapturaResumen } from '@/components/dilesa/venta-detalle/captura-shell';
 import { useEffectiveUser } from '@/components/providers';
 import {
   Dialog,
@@ -208,11 +208,8 @@ function CapturarFase13Body() {
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
 
-  const resumen = useVentaResumen(ventaId);
+  const resumen = useVentaCapturaResumen();
   const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
-  const clienteNombre = resumen.status === 'ready' ? resumen.props.cliente.nombre : null;
-  const identificacionInv =
-    resumen.status === 'ready' ? (resumen.props.vivienda.identificador ?? null) : null;
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
@@ -651,7 +648,7 @@ function CapturarFase13Body() {
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -661,15 +658,8 @@ function CapturarFase13Body() {
 
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={13}
-          faseNombre="Facturada"
-          resumen={resumen}
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={13} faseNombre="Facturada" />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -681,15 +671,11 @@ function CapturarFase13Body() {
   const capturaHabilitada = !bloqueadaPorFase12;
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={ventaId}
-        clienteNombre={clienteNombre}
-        identificacionInventario={identificacionInv}
         faseposicion={13}
         faseNombre="Facturada"
         descripcion="Sube el XML de la factura (y nota de crédito / aviso PLD si aplican). Cada documento se valida y se guarda al subirse; los montos del CFDI se llenan solos."
-        resumen={resumen}
       />
 
       {yaCerrada ? (
