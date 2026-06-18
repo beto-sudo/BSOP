@@ -1186,6 +1186,9 @@ function DetailInner() {
             onPatch={(patch) => setCuadInputs((prev) => ({ ...prev, ...patch }))}
             apoyoInfonavit={apoyoInfonavit}
             tipoCredito={venta.tipo_credito}
+            tieneDesglose={cuadratura.tieneDesglose}
+            descuentoPromocion={cuadratura.coberturaGastos?.promocion ?? 0}
+            sobreprecio={cuadratura.coberturaGastos?.sobreprecio ?? 0}
             descuentoMaximo={promo ? promo.monto : Number(venta.descuento_maximo_autorizado ?? 0)}
             descuentoMaximoFuente={
               promo

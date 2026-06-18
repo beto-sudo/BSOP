@@ -1,21 +1,25 @@
 'use client';
 
 /**
- * Editor de las entradas de cuadratura (pestaña Cuadratura del Expediente de
- * Operación). Captura/ajusta los 4 buckets de descuento — el saldo y los
- * derivados recomputan en vivo (el padre re-calcula con
- * `lib/dilesa/cuadratura.ts`).
+ * Editor de descuentos de la cuadratura (pestaña Cuadratura del Expediente de
+ * Operación). Tiene DOS modos según el modelo de la venta:
  *
- * Derivados (read-only, no se capturan):
- * - Apoyo Infonavit — del catálogo `dilesa.tipos_credito` según el tipo de
- *   crédito de la venta (misma fuente que el RPC `fn_calcular_precio_venta`).
- * - Descuento Máximo Autorizado — el monto de la promoción/bono elegido en la
- *   Solicitud de Asignación (`promociones.monto` vía `ventas.promocion_id`).
- *   Son bonos flexibles: el cliente los reparte entre los 4 buckets; si la
- *   suma excede el tope, se alerta (regla Beto 2026-06-11). Ventas legacy de
- *   Coda sin promo caen al `descuento_maximo_autorizado` capturado allá.
+ * - CON DESGLOSE (ADR-045 — ventas activas y nuevas): el descuento ya NO se
+ *   captura aquí. El motor lo deriva de la PROMOCIÓN elegida en la Solicitud de
+ *   Asignación (bono DILESA, del catálogo `dilesa.promociones`) + el SOBREPRECIO
+ *   (productos adicionales, que lo cubre el crédito, no es regalo). Los 4 buckets
+ *   viejos no movían la cuadratura desglosada, así que se muestran read-only para
+ *   no confundir (decisión Beto 2026-06-18).
  *
- * Iniciativa `dilesa-ventas-expediente` (Sprint 2b; tope derivado post-cierre).
+ * - LEGACY (ventas viejas de Coda sin desglose): editor de los 4 buckets. El
+ *   total se AUTO-CALCULA como la suma de los buckets (ya no se captura aparte —
+ *   antes era un campo manual que había que cuadrar a mano). Las ventas
+ *   total-only de Coda conservan su total hasta que se itemice en buckets.
+ *
+ * Derivados read-only en ambos modos: Apoyo Infonavit (catálogo
+ * `tipos_credito`) y Descuento Máximo Autorizado (promoción de la solicitud).
+ *
+ * Iniciativa `dilesa-cuadratura-sobreprecio`.
  */
 
 import { useState } from 'react';
@@ -27,7 +31,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
 
 export type CuadraturaInputsStr = {
-  /** El "cuánto" autoritativo del descuento. Los buckets lo reparten. */
+  /** Total del descuento. Con buckets = su suma (auto); legacy total-only = lo capturado en Coda. */
   descuentoTotal: string;
   descuentoPrecio: string;
   descuentoEquipamiento: string;
@@ -40,7 +44,6 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
   currency: 'MXN',
   maximumFractionDigits: 2,
 });
-const round2 = (v: number): number => Math.round(v * 100);
 
 export function CuadraturaAjustes({
   ventaId,
@@ -51,6 +54,9 @@ export function CuadraturaAjustes({
   tipoCredito,
   descuentoMaximo,
   descuentoMaximoFuente,
+  tieneDesglose,
+  descuentoPromocion,
+  sobreprecio,
 }: {
   ventaId: string;
   values: CuadraturaInputsStr;
@@ -64,41 +70,68 @@ export function CuadraturaAjustes({
   descuentoMaximo: number;
   /** Nombre de la promoción (o "legacy Coda"); null = sin promo ni captura legacy. */
   descuentoMaximoFuente: string | null;
+  /** Si la venta usa el modelo desglosado (ADR-045). */
+  tieneDesglose: boolean;
+  /** Promoción/bono de gastos (el descuento real con desglose; costo de DILESA). */
+  descuentoPromocion: number;
+  /** Sobreprecio (productos adicionales) — lo cubre el crédito, no es regalo. */
+  sobreprecio: number;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
-  // `total` es el "cuánto" autoritativo. Los buckets son el reparto.
-  const total = Number(values.descuentoTotal) || 0;
-  const sumBuckets =
-    (Number(values.descuentoPrecio) || 0) +
-    (Number(values.descuentoEquipamiento) || 0) +
-    (Number(values.descuentoGastosEscr) || 0) +
-    (Number(values.descuentoNotaCredito) || 0);
+  // ── Modo DESGLOSE: el descuento se deriva (promoción + sobreprecio), no se captura ──
+  if (tieneDesglose) {
+    return (
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
+          Descuento de la operación
+        </h3>
+        <div className="space-y-1">
+          <DerivadoRow
+            label="Promoción DILESA (bono — costo de DILESA)"
+            value={moneyFmt.format(descuentoPromocion)}
+          />
+          <DerivadoRow
+            label="Sobreprecio (lo cubre el crédito, no es regalo)"
+            value={moneyFmt.format(sobreprecio)}
+          />
+          <DerivadoRow
+            label={`Apoyo Infonavit${tipoCredito ? ` · ${tipoCredito}` : ''}`}
+            value={moneyFmt.format(apoyoInfonavit)}
+          />
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--text)]/50">
+          El descuento se deriva de la <strong>promoción</strong> elegida en la Solicitud de
+          Asignación (catálogo de promociones) y del <strong>sobreprecio</strong>; el apoyo
+          Infonavit sale del catálogo de tipos de crédito. Ninguno se captura aquí — los buckets
+          manuales del modelo viejo no aplican a esta venta.
+        </p>
+      </section>
+    );
+  }
+
+  // ── Modo LEGACY: buckets con total auto-calculado (suma de los buckets) ──
   const hasBuckets =
     values.descuentoPrecio.trim() !== '' ||
     values.descuentoEquipamiento.trim() !== '' ||
     values.descuentoGastosEscr.trim() !== '' ||
     values.descuentoNotaCredito.trim() !== '';
-  // Amarre: si hay reparto, su suma debe cuadrar con el total.
-  const desgloseCuadra = !hasBuckets || round2(sumBuckets) === round2(total);
+  const sumBuckets =
+    (Number(values.descuentoPrecio) || 0) +
+    (Number(values.descuentoEquipamiento) || 0) +
+    (Number(values.descuentoGastosEscr) || 0) +
+    (Number(values.descuentoNotaCredito) || 0);
+  // El total ES la suma de los buckets cuando hay reparto; si no, el total
+  // legacy capturado en Coda (se conserva hasta que se itemice).
+  const total = hasBuckets ? sumBuckets : Number(values.descuentoTotal) || 0;
 
   async function guardar() {
-    if (hasBuckets && !desgloseCuadra) {
-      toast.add({
-        title: 'El desglose no cuadra',
-        description: `La suma de los buckets (${moneyFmt.format(sumBuckets)}) debe ser igual al descuento total (${moneyFmt.format(total)}).`,
-        type: 'error',
-      });
-      return;
-    }
     setSaving(true);
     const sb = createSupabaseBrowserClient();
-    // Vía RPC auditada (amarre + core.audit_log). Sin desglose → modo
-    // total-only (la RPC no toca los buckets). Con desglose → exige sum=total.
-    // Sin desglose ⇒ se omiten los buckets (la función usa DEFAULT NULL =
-    // modo total-only, no toca el reparto). Con desglose ⇒ números (la
-    // función exige sum=total).
+    // Vía RPC auditada. Con buckets → los manda + el total = su suma (la función
+    // exige sum=total, que se cumple por construcción). Sin buckets → modo
+    // total-only (no toca el reparto), preservando el total legacy.
     const { error } = await sb.schema('dilesa').rpc('fn_actualizar_descuentos_venta', {
       p_venta_id: ventaId,
       p_descuento_total: total,
@@ -146,18 +179,8 @@ export function CuadraturaAjustes({
         ) : null}
       </div>
 
-      <div className="mb-3">
-        <Campo label="Descuento total (cuánto)">
-          <NumInput
-            value={values.descuentoTotal}
-            onChange={(v) => onPatch({ descuentoTotal: v })}
-            disabled={!canWrite}
-          />
-        </Campo>
-      </div>
-
       <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/40">
-        Reparto · en qué se aplica (opcional; debe sumar el total)
+        Reparto del descuento · en qué se aplica
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Campo label="Descuento al precio">
@@ -190,7 +213,17 @@ export function CuadraturaAjustes({
         </Campo>
       </div>
 
-      <div className="mt-3 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
+      {/* Total = suma de los buckets (auto, ya no se captura). */}
+      <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 py-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+          Descuento total {hasBuckets ? '· suma de los buckets' : '· legacy (sin desglose)'}
+        </span>
+        <span className="text-xs font-semibold tabular-nums text-[var(--text)]/85">
+          {moneyFmt.format(total)}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
           Descuento máximo autorizado · auto
         </span>
@@ -214,14 +247,6 @@ export function CuadraturaAjustes({
         </span>
       </div>
 
-      {hasBuckets && !desgloseCuadra ? (
-        <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
-          El reparto suma <span className="font-semibold">{moneyFmt.format(sumBuckets)}</span> pero
-          el descuento total es <span className="font-semibold">{moneyFmt.format(total)}</span> — no
-          cuadran. Ajusta los buckets o el total antes de guardar.
-        </p>
-      ) : null}
-
       <p
         className={`mt-2 text-[11px] ${
           total > descuentoMaximo
@@ -229,15 +254,23 @@ export function CuadraturaAjustes({
             : 'text-[var(--text)]/55'
         }`}
       >
-        Descuento total: <span className="font-semibold">{moneyFmt.format(total)}</span>
-        {hasBuckets ? ` · repartido ${moneyFmt.format(sumBuckets)}` : ' · sin desglose'}
+        El total es la suma de los buckets.
         {total > descuentoMaximo
-          ? ` — EXCEDE el máximo autorizado ${moneyFmt.format(descuentoMaximo)}`
-          : ` de un máximo autorizado de ${moneyFmt.format(descuentoMaximo)}`}
-        . El tope viene de la promoción elegida en la solicitud; el apoyo Infonavit, del catálogo de
-        tipos de crédito — ninguno se captura.
+          ? ` EXCEDE el máximo autorizado de ${moneyFmt.format(descuentoMaximo)}.`
+          : ` Máximo autorizado: ${moneyFmt.format(descuentoMaximo)}.`}{' '}
+        El tope viene de la promoción de la solicitud y el apoyo Infonavit del catálogo de tipos de
+        crédito — ninguno se captura.
       </p>
     </section>
+  );
+}
+
+function DerivadoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="text-[var(--text)]/65">{label}</span>
+      <span className="font-medium tabular-nums text-[var(--text)]">{value}</span>
+    </div>
   );
 }
 
