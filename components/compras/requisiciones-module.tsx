@@ -635,6 +635,10 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         return;
       }
       const cotId = cotResp.data.id as string;
+      // `precio_estimado` se hereda → la captura de la RFQ lo muestra como
+      // columna de referencia interna (con su total); NO pre-llena ni se envía
+      // al proveedor (cotiza a ciegas). Mejora pedida por Nahum: tener el
+      // estimado/total de la requisición a la vista sin recapturarlo.
       const lineas = req.lineas.map((l) => ({
         empresa_id: empresaId,
         cotizacion_id: cotId,
@@ -642,6 +646,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         descripcion: l.descripcion || null,
         unidad: l.unidad,
         cantidad: l.cantidad,
+        precio_estimado: l.precioEstimado || null,
       }));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const linResp = await (sb.schema('erp') as any).from('cotizacion_lineas').insert(lineas);

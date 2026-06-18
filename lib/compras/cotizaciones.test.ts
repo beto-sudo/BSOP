@@ -6,7 +6,10 @@ import {
   precioCelda,
   puedeAdjudicar,
   rankingProveedores,
+  subtotalEstimadoLinea,
+  tieneEstimado,
   tieneRespuestas,
+  totalEstimado,
   totalProveedor,
   totalProveedorMatriz,
   type CotLinea,
@@ -23,6 +26,7 @@ function linea(over: Partial<CotLinea>): CotLinea {
     descripcion: '',
     unidad: 'm3',
     cantidad: 1,
+    precioEstimado: 0,
     ...over,
   };
 }
@@ -87,6 +91,29 @@ describe('precioCelda / totalProveedorMatriz', () => {
     expect(totalProveedorMatriz(lineas, precios, 'cpA')).toBe(350);
     // cpB: 2×90 + 3×0 = 180
     expect(totalProveedorMatriz(lineas, precios, 'cpB')).toBe(180);
+  });
+});
+
+describe('totalEstimado (referencia interna heredada de la requisición)', () => {
+  it('suma cantidad × precio estimado por línea', () => {
+    const lineas = [
+      linea({ id: 'l1', cantidad: 2, precioEstimado: 100 }),
+      linea({ id: 'l2', cantidad: 3, precioEstimado: 50 }),
+    ];
+    expect(subtotalEstimadoLinea(lineas[0])).toBe(200);
+    expect(totalEstimado(lineas)).toBe(350); // 2×100 + 3×50
+  });
+
+  it('líneas sin estimado no aportan (RFQ creada desde cero)', () => {
+    const lineas = [linea({ id: 'l1', cantidad: 5, precioEstimado: 0 })];
+    expect(totalEstimado(lineas)).toBe(0);
+    expect(tieneEstimado(lineas)).toBe(false);
+  });
+
+  it('tieneEstimado true si al menos una línea trae estimado', () => {
+    expect(
+      tieneEstimado([linea({ precioEstimado: 0 }), linea({ id: 'l2', precioEstimado: 12 })])
+    ).toBe(true);
   });
 });
 
