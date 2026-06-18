@@ -87,7 +87,14 @@ describe('expandirPermisosConRequisitos', () => {
       acceso_lectura: true,
       acceso_escritura: true,
     });
-    expect(out).toHaveLength(2);
+    // `autorizar` ahora arrastra `operacion` (read-only) además de `lista`
+    // (cadena tras `dilesa-ventas-expediente-tabs`): autorizar → operacion → lista.
+    expect(out).toContainEqual({
+      slug: 'dilesa.ventas.operacion',
+      acceso_lectura: true,
+      acceso_escritura: false,
+    });
+    expect(out).toHaveLength(3);
   });
 
   it('drops all-false items and never adds write implicitly', () => {
@@ -95,12 +102,17 @@ describe('expandirPermisosConRequisitos', () => {
       { slug: 'dilesa.ventas.fase03_formalizada', acceso_lectura: true, acceso_escritura: true },
       { slug: 'dilesa.manual', acceso_lectura: false, acceso_escritura: false },
     ]);
+    // fase03 → operacion → lista (cadena tras `dilesa-ventas-expediente-tabs`);
+    // `manual` (all-false) se cae.
     expect(out.map((p) => p.slug).sort()).toEqual([
       'dilesa.ventas.fase03_formalizada',
       'dilesa.ventas.lista',
+      'dilesa.ventas.operacion',
     ]);
     const lista = out.find((p) => p.slug === 'dilesa.ventas.lista');
     expect(lista?.acceso_escritura).toBe(false);
+    const operacion = out.find((p) => p.slug === 'dilesa.ventas.operacion');
+    expect(operacion?.acceso_escritura).toBe(false);
   });
 
   it('keeps an already-coherent set unchanged', () => {

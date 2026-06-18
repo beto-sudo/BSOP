@@ -24,26 +24,35 @@
 /** Sub-slug → slugs cuya LECTURA requiere para ser alcanzable navegando. */
 export const MODULE_DEPS: Record<string, readonly string[]> = {
   // ── DILESA · Ventas ────────────────────────────────────────────────────────
-  // Las capturas de fase viven bajo el expediente (/dilesa/ventas/[id]/capturar/*)
-  // y el expediente + la lista piden `dilesa.ventas.lista`.
+  // El expediente de venta (/dilesa/ventas/[id]) es el tab Operación; las
+  // capturas de fase y los tabs hermanos (Cuadratura/Documentos/Bitácora) viven
+  // anidados bajo él (iniciativa `dilesa-ventas-expediente-tabs`). Cadena de
+  // navegación: lista → operacion → {capturas, tabs}. La lista
+  // (`/dilesa/ventas`) sigue siendo la puerta de entrada (caso Nelcy); a las
+  // capturas/tabs `lista` les llega por transitividad vía operacion.
   'dilesa.ventas.lista': [],
+  'dilesa.ventas.operacion': ['dilesa.ventas.lista'],
+  'dilesa.ventas.cuadratura': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.documentos': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.bitacora': ['dilesa.ventas.operacion'],
+  // `fase01_solicitud` = /dilesa/ventas/nueva (no anida bajo [id]): pide lista.
   'dilesa.ventas.fase01_solicitud': ['dilesa.ventas.lista'],
-  'dilesa.ventas.autorizar': ['dilesa.ventas.lista'], // captura Fase 2 — Asignada
-  'dilesa.ventas.fase03_formalizada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase04_solicitud_avaluo': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase05_avaluo_cerrado': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase06_inscrita': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase07_solicitud_dictamen': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase08_dictaminada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase09_validacion_patronal': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase10_firmas_programadas': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase11_escriturada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase12_detonada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase13_facturada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase14_preparada_entrega': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase15_entregada': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase16_conformidad': ['dilesa.ventas.lista'],
-  'dilesa.ventas.fase17_operacion_terminada': ['dilesa.ventas.lista'],
+  'dilesa.ventas.autorizar': ['dilesa.ventas.operacion'], // captura Fase 2 — Asignada
+  'dilesa.ventas.fase03_formalizada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase04_solicitud_avaluo': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase05_avaluo_cerrado': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase06_inscrita': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase07_solicitud_dictamen': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase08_dictaminada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase09_validacion_patronal': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase10_firmas_programadas': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase11_escriturada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase12_detonada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase13_facturada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase14_preparada_entrega': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase15_entregada': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase16_conformidad': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.fase17_operacion_terminada': ['dilesa.ventas.operacion'],
   // `fase02_asignada` existe en RBAC pero la pantalla de Fase 2 la gobierna
   // `autorizar`; se conserva sin dependencias mientras no gobierne página.
   'dilesa.ventas.fase02_asignada': [],

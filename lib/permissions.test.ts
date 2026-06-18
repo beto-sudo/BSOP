@@ -300,6 +300,15 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.ventas.clientes',
   'dilesa.ventas.vendedores',
   'dilesa.ventas.promociones',
+  // Sub-slugs del expediente de venta = routed tabs del detalle (iniciativa
+  // `dilesa-ventas-expediente-tabs`, ADR-030). El landing `/[id]` es Operación;
+  // Cuadratura/Documentos/Bitácora son tabs hermanos. Permisos clonados del
+  // padre `dilesa.ventas.lista` en la migración
+  // 20260618155211_modulos_dilesa_ventas_expediente_tabs.sql.
+  'dilesa.ventas.operacion',
+  'dilesa.ventas.cuadratura',
+  'dilesa.ventas.documentos',
+  'dilesa.ventas.bitacora',
   // Cobranza (CxC) — hub con 2 tabs. Migración
   // 20260601192607_modulo_dilesa_cobranza.sql.
   'dilesa.cobranza',

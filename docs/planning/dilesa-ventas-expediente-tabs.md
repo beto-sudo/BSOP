@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** Principalmente UI (Next.js) — refactor de `app/dilesa/ventas/[id]/*`: nuevo `[id]/layout.tsx` + partir el monolito `[id]/page.tsx` (2,642 L) en 6 sub-rutas (`page.tsx`=Operación + `cuadratura/`, `estado-cuenta/`, `pipeline/`, `documentos/`, `bitacora/`). RBAC: `core.modulos` + `core.permisos_rol` (6 sub-slugs nuevos `dilesa.ventas.{operacion,pipeline,cuadratura,estado_cuenta,documentos,bitacora}` + backfill de permisos clonando del padre + `NOTIFY pgrst`), `lib/permissions.ts` (`ROUTE_TO_MODULE`, `HUB_PARENT_BY_ROUTE`), `lib/permissions.test.ts` (`EXPECTED_DB_MODULE_SLUGS`). Lectura de datos sin cambios.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — `[id]/layout.tsx` con `<RoutedModuleTabs>` + ficha persistente + partir Operación/Cuadratura/Documentos/Bitácora a sub-rutas (paridad funcional) + sus 4 sub-slugs RBAC.
+**Próximo hito:** Sprint 1 entregado en PR (layout + provider/context + 4 tabs routed + RBAC, 6 checks verdes) — Beto: revisar Vercel preview, aplicar la migración de sub-slugs (con OK) y mergear. Luego Sprint 2: Pipeline + Estado de cuenta a tab propio + reconciliar `<CapturarFaseHeader>`.
 **Dueño:** Beto
 **Creada:** 2026-06-18
-**Última actualización:** 2026-06-18 (promovida; arranca Sprint 1)
+**Última actualización:** 2026-06-18 (Sprint 1 completo en local; 6 checks verdes; PR por revisar)
 
 > **Sucede a** [`dilesa-ventas-expediente`](dilesa-ventas-expediente.md) (cerrada — montó el workspace por venta con cabecera + tabs + copiloto). Esta iniciativa toma esos tabs (hoy `useState` sin URL) y los sube a _routed tabs_ con layout compartido, replicando el patrón ya probado en [`app/dilesa/proyectos/[id]/layout.tsx`](../../app/dilesa/proyectos/[id]/layout.tsx).
 
@@ -62,3 +62,4 @@ Set final de tabs (6): **Operación · Pipeline · Cuadratura · Estado de cuent
 ## Bitácora
 
 - **2026-06-18** — Promovida. Diagnóstico confirmado en código (tabs `useState` en `[id]/page.tsx:346`; cabecera ya persiste en captura vía `<CapturarFaseHeader>`; molde = `proyectos/[id]/layout.tsx`). Arranca Sprint 1.
+- **2026-06-18** — **Sprint 1 completo (local, 6 checks verdes).** El monolito de 2,642 L se partió en: `components/dilesa/venta-detalle/{types,provider,ui,shell}.tsx` (cerebro = `VentaDetalleProvider` + context `useVentaDetalle`, sub-componentes y Shell) + `[id]/layout.tsx` (detecta captura: rama expediente monta provider+shell+tabs, rama captura solo persiste la barra de tabs encima del `CapturarFaseHeader` existente) + 4 páginas de tab (`page.tsx`=Operación con Pipeline+Estado de cuenta dentro, `cuadratura/`, `documentos/`, `bitacora/`), cada una con su `<RequireAccess>` fino. Decisión de arquitectura: provider en el layout (carga única, navegación entre tabs instantánea); el provider NO se monta en captura (sin doble carga). RBAC: 4 sub-slugs `dilesa.ventas.{operacion,cuadratura,documentos,bitacora}` en `ROUTE_TO_MODULE` + `EXPECTED_DB_MODULE_SLUGS` + `MODULE_DEPS` (cadena lista→operacion→{capturas,tabs}; ajustados 3 tests de `acceso-rules`/`permissions-deps` por la nueva jerarquía) + migración `20260618155211_modulos_dilesa_ventas_expediente_tabs.sql` (INSERT + backfill de permisos clonando de `dilesa.ventas.lista` — **pendiente de aplicar por Beto**). Pipeline y Estado de cuenta siguen dentro de Operación (salen en S2).
