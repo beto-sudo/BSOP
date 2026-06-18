@@ -66,7 +66,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // compartido; el gate fino vive en cada page (SS5). Los tabs persisten en la
   // captura de fase (`/[id]/capturar/*`).
   '/dilesa/ventas/[id]': 'dilesa.ventas.operacion',
+  '/dilesa/ventas/[id]/pipeline': 'dilesa.ventas.pipeline',
   '/dilesa/ventas/[id]/cuadratura': 'dilesa.ventas.cuadratura',
+  '/dilesa/ventas/[id]/estado-cuenta': 'dilesa.ventas.estado_cuenta',
   '/dilesa/ventas/[id]/documentos': 'dilesa.ventas.documentos',
   '/dilesa/ventas/[id]/bitacora': 'dilesa.ventas.bitacora',
   // Cobranza (CxC) es un hub con 2 tabs. La URL default mapea al sub-slug

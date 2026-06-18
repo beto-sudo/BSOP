@@ -31,7 +31,13 @@ export function VentaExpedienteTabs({ id }: { id: string }) {
     <RoutedModuleTabs
       tabs={[
         { label: 'Operación', href: base, exact: true, module: 'dilesa.ventas.operacion' },
+        { label: 'Pipeline', href: `${base}/pipeline`, module: 'dilesa.ventas.pipeline' },
         { label: 'Cuadratura', href: `${base}/cuadratura`, module: 'dilesa.ventas.cuadratura' },
+        {
+          label: 'Estado de cuenta',
+          href: `${base}/estado-cuenta`,
+          module: 'dilesa.ventas.estado_cuenta',
+        },
         { label: 'Documentos', href: `${base}/documentos`, module: 'dilesa.ventas.documentos' },
         { label: 'Bitácora', href: `${base}/bitacora`, module: 'dilesa.ventas.bitacora' },
       ]}

@@ -32,7 +32,9 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   // capturas/tabs `lista` les llega por transitividad vía operacion.
   'dilesa.ventas.lista': [],
   'dilesa.ventas.operacion': ['dilesa.ventas.lista'],
+  'dilesa.ventas.pipeline': ['dilesa.ventas.operacion'],
   'dilesa.ventas.cuadratura': ['dilesa.ventas.operacion'],
+  'dilesa.ventas.estado_cuenta': ['dilesa.ventas.operacion'],
   'dilesa.ventas.documentos': ['dilesa.ventas.operacion'],
   'dilesa.ventas.bitacora': ['dilesa.ventas.operacion'],
   // `fase01_solicitud` = /dilesa/ventas/nueva (no anida bajo [id]): pide lista.
