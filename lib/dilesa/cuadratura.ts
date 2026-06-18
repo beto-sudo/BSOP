@@ -173,8 +173,16 @@ export type Cuadratura = {
   /** Cheque a notaría CAPTURADO (0 si aún no se gira). Distinto del calculado. */
   chequePagado: number;
   /** true si el descuento autorizado + el disponible cubren la escrituración
-   *  (saldo efectivo ≤ TOLERANCIA_SALDO). */
+   *  (saldo efectivo ≤ TOLERANCIA_SALDO). LEGACY: en ventas desglosadas mezcla
+   *  precio + descuento; para gates usar `operacionCubierta`. */
   cubierta: boolean;
+  /** Cobertura model-aware de TODA la operación (fuente única para el copiloto y
+   *  gates). Desglose: crédito cubre precio Y fuentes cubren el presupuesto
+   *  notarial. Legacy: = `cubierta`. */
+  operacionCubierta: boolean;
+  /** Saldo a mostrar cuando la operación NO está cubierta (faltante de precio o
+   *  residual de gastos en desglose; saldo efectivo en legacy). */
+  saldoOperacion: number;
   /** Cheque a notaría sugerido por la fórmula (vs el capturado). */
   chequeNotariaCalculado: number;
   /** Cheque usado para los derivados: el capturado si existe, si no el calculado. */
@@ -480,6 +488,24 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     ? round2(valorEscrituracion - creditoInstitucion)
     : null;
 
+  // Cobertura model-aware de TODA la operación — fuente ÚNICA para el copiloto de
+  // cierre y otros gates. NO el `saldoCliente`/`cubierta` legacy, que en ventas
+  // desglosadas mezcla precio + descuento y deja un saldo fantasma (Arizpe:
+  // 18,313 cheque − 15,000 descuento = 3,313 que NO es deuda). Desglose: el crédito
+  // cubre el precio Y las fuentes cubren el presupuesto notarial. Legacy: el saldo
+  // efectivo ≤ tolerancia.
+  const operacionCubierta = tieneDesglose
+    ? (saldoPrecioEscrituracion ?? 0) <= TOLERANCIA_SALDO &&
+      Math.abs(saldoCobertura) <= TOLERANCIA_SALDO
+    : cubierta;
+  // Saldo a mostrar cuando NO está cubierta: el faltante de precio si el crédito
+  // no alcanza, si no el residual de gastos. Legacy: el saldo efectivo del cliente.
+  const saldoOperacion = tieneDesglose
+    ? (saldoPrecioEscrituracion ?? 0) > TOLERANCIA_SALDO
+      ? (saldoPrecioEscrituracion ?? 0)
+      : saldoCobertura
+    : saldoCliente;
+
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
     valorEscrituracion > 0 &&
@@ -572,6 +598,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     descuentoAplicado: round2(descuentoAplicado),
     chequePagado,
     cubierta,
+    operacionCubierta,
+    saldoOperacion: round2(saldoOperacion),
     chequeNotariaCalculado,
     chequeNotariaUsado,
     valorRealVentaDilesa,

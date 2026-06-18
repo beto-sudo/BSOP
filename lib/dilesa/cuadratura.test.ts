@@ -492,6 +492,31 @@ describe('calcularCuadratura', () => {
       expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
     });
 
+    it('operacionCubierta es model-aware: cubierta aunque el saldoCliente legacy sea fantasma — Arizpe', () => {
+      // El crédito cubre el precio (909,000) y las fuentes cubren los gastos. El
+      // `saldoCliente` legacy = cheque 18,313 − descuento 15,000 = 3,313 (fantasma,
+      // NO deuda) y marca `cubierta=false`; `operacionCubierta` corrige a true y el
+      // copiloto/gates lo leen. saldoOperacion = 0 (nada pendiente).
+      const c = calcularCuadratura({
+        valorEscrituracion: 909000,
+        montoCreditoTitular: 909000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoDetonado: 908999.71,
+        montoChequeNotaria: 18313,
+        gastosEscrituracion: 48313,
+        apoyoInfonavit: 30000,
+        precioBase: 909000,
+        sobreprecioAdicionales: 0,
+        promocionGastos: 15000,
+        depositos: [],
+      });
+      expect(c.saldoCliente).toBe(3313); // legacy fantasma
+      expect(c.cubierta).toBe(false); // legacy, equivocado para desglose
+      expect(c.operacionCubierta).toBe(true); // ← model-aware: SÍ cubierta
+      expect(c.saldoOperacion).toBe(0); // nada pendiente
+    });
+
     it('expone la formación del precio (cadena base → incremento → interno → adicionales)', () => {
       const c = mayra();
       expect(c.formacionPrecio).toEqual({
