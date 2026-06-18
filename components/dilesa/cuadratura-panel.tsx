@@ -94,20 +94,16 @@ export function CuadraturaPanel({
             value={money(c.creditoInstitucion)}
           />
           <div className="my-1 border-t border-[var(--border)]" />
-          {(() => {
-            const saldoPrecio =
-              Math.round((Number(valorEscrituracion ?? 0) - c.creditoInstitucion) * 100) / 100;
-            return (
-              <Fila
-                label={
-                  saldoPrecio <= 0 ? '(=) Saldo del precio (cubierto)' : '(=) Saldo del precio'
-                }
-                value={money(saldoPrecio)}
-                strong
-                tone={saldoPrecio <= 0 ? 'ok' : 'warn'}
-              />
-            );
-          })()}
+          <Fila
+            label={
+              (c.saldoPrecioEscrituracion ?? 0) <= 0
+                ? '(=) Saldo del precio (cubierto)'
+                : '(=) Saldo del precio'
+            }
+            value={money(c.saldoPrecioEscrituracion)}
+            strong
+            tone={(c.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : 'warn'}
+          />
           <p className="mt-1 text-[11px] text-[var(--text)]/45">
             El precio lo cubre el crédito; los gastos de escrituración se desglosan abajo.
           </p>

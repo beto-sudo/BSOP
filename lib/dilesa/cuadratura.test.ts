@@ -426,6 +426,9 @@ describe('calcularCuadratura', () => {
       expect(c.saldoCobranza).toBe(-44387); // 979,070 − 1,023,457
       expect(c.saldoCliente).toBe(0); // −44,387 − 39,651 + 84,038
       expect(c.cubierta).toBe(true);
+      // Saldo del precio (lo que header/panel muestran, NO el saldoCliente): el
+      // crédito cubre el precio al 100%. El saldo de gastos = pagaré (9,387).
+      expect(c.saldoPrecioEscrituracion).toBe(0);
     });
 
     it('desglosa las 4 fuentes de cobertura de gastos', () => {
@@ -485,6 +488,7 @@ describe('calcularCuadratura', () => {
     it('FALLBACK: el cierre NO se toca sin desglose (formacionPrecio null, fórmula vieja)', () => {
       const c = mayra({ promocionGastos: null, precioBase: null, incrementoCredito: null });
       expect(c.formacionPrecio).toBe(null);
+      expect(c.saldoPrecioEscrituracion).toBe(null); // legacy usa saldoCliente, no este
       // Con la fórmula vieja: depósitos 35,000 − cheque calc + CD.
       expect(c.valorRealVentaDilesa).not.toBe(954419);
     });

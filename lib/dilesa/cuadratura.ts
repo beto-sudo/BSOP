@@ -200,6 +200,13 @@ export type Cuadratura = {
     valorEscrituracion: number;
   } | null;
   /**
+   * Saldo del PRECIO de escrituración (ADR-045): valor escrituración − crédito
+   * institución. `0`/negativo ⇒ el crédito cubre el precio. El saldo de GASTOS
+   * del cliente es `coberturaGastos.pagareNecesario`, NO esto. `null` en
+   * legacy/cerradas (ahí el "saldo" es `saldoCliente`).
+   */
+  saldoPrecioEscrituracion: number | null;
+  /**
    * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
    * (escrituración) + factura de enganche = total facturado; − NC = neto (=
    * escritura). `null` en legacy/cerradas.
@@ -357,6 +364,15 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       }
     : null;
 
+  // ADR-045: saldo del PRECIO de escrituración (lo cubre el crédito institución;
+  // el pagaré es de GASTOS, no de precio). Solo con desglose. El header y el
+  // panel lo leen para NO exponer `saldoCliente` (que mezcla el excedente del
+  // precio con el descuento de gastos → el −74,651 sin sentido). El saldo de
+  // gastos del cliente es `coberturaGastos.pagareNecesario`.
+  const saldoPrecioEscrituracion = tieneDesglose
+    ? round2(valorEscrituracion - creditoInstitucion)
+    : null;
+
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
     valorEscrituracion > 0 &&
@@ -454,6 +470,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     tieneDesglose,
     coberturaGastos,
     formacionPrecio,
+    saldoPrecioEscrituracion,
     desgloseFacturacion,
     posibleDobleConteo,
   };
