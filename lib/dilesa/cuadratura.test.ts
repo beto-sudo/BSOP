@@ -498,7 +498,9 @@ describe('calcularCuadratura', () => {
       expect(c.chequeNotariaCalculado).toBe(84038); // gastos netos completos, no el min() viejo
       // Valor real = crédito + enganche − cheque + pagaré = 979,070 + 35,000 − 84,038 + 9,387.
       expect(c.valorRealVentaDilesa).toBe(939419);
-      expect(c.descuentoReal).toBe(15000); // la promoción (lo que DILESA regala), NO el sobreprecio
+      // Descuento real = escritura − valor real = 979,070 − 939,419 = promoción
+      // 15,000 + sobreprecio 24,651 (todo lo que DILESA cede; fórmula Michelle).
+      expect(c.descuentoReal).toBe(39651);
     });
 
     it('NC = facturado − valor real (incluye el cheque a notaría)', () => {

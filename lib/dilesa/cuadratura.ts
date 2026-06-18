@@ -457,12 +457,13 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // desglose la dejaba en solo el enganche y omitía el cheque → no cuadraba.
   const montoNotaCredito = round2(valorFacturado - valorRealVentaDilesa);
   const montoNotaCreditoSugerido = round2(valorFacturadoSugerido - valorRealVentaDilesa);
-  // Con desglose, el "descuento real" = la promoción (lo que DILESA efectivamente
-  // regala al cliente). El sobreprecio NO es descuento (es lo contrario: DILESA
-  // cobra de más). Sin desglose: la fórmula de Coda (escrituración − valor real).
-  const descuentoReal = tieneDesglose
-    ? round2(promocionGastos)
-    : round2(valorEscrituracion - valorRealVentaDilesa);
+  // Descuento real = Escritura − Valor Real (fórmula de Michelle/Ale, alineada el
+  // 2026-06-18). Es TODO lo que DILESA cede frente al valor escriturado: la
+  // promoción/bono MÁS el sobreprecio (cuando la promo no cubre los gastos se sube
+  // el precio para que el crédito los absorba — ese incremento también es
+  // descuento real, aunque vaya acompañado de una venta mayor). Antes el desglose
+  // mostraba solo la promoción y subvaluaba el descuento.
+  const descuentoReal = round2(valorEscrituracion - valorRealVentaDilesa);
   // Desglose de facturación: factura de venta (escrituración) + factura de
   // enganche = total facturado; − NC = neto facturado = Valor Real Venta DILESA
   // (lo que DILESA realiza neto del cheque a notaría). Alineado a Michelle el
