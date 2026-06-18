@@ -11,7 +11,19 @@
 
 import Link from 'next/link';
 import { CheckCircle2, ChevronRight, Circle, Flag, PartyPopper } from 'lucide-react';
-import type { CopilotoResultado } from '@/lib/dilesa/copiloto-cierre';
+import type { CopilotoResultado, CopilotoDestino } from '@/lib/dilesa/copiloto-cierre';
+
+/** Traduce el destino semántico de un pendiente al tab/captura concreto. */
+function hrefDestino(ventaId: string, destino: CopilotoDestino): string {
+  switch (destino) {
+    case 'pipeline':
+      return `/dilesa/ventas/${ventaId}/pipeline`;
+    case 'cuadratura':
+      return `/dilesa/ventas/${ventaId}/cuadratura`;
+    case 'conformidad':
+      return `/dilesa/ventas/${ventaId}/capturar/16-conformidad`;
+  }
+}
 
 export function CopilotoCierre({
   resultado,
@@ -69,11 +81,21 @@ export function CopilotoCierre({
               <Circle className="mt-0.5 size-4 shrink-0 text-[var(--text)]/30" />
             )}
             <div className="min-w-0">
-              <span
-                className={item.ok ? 'text-[var(--text)]/70' : 'font-medium text-[var(--text)]'}
-              >
-                {item.label}
-              </span>
+              {!item.ok && item.destino ? (
+                <Link
+                  href={hrefDestino(ventaId, item.destino)}
+                  className="group inline-flex items-center gap-1 font-medium text-[var(--text)] hover:text-[var(--accent)]"
+                >
+                  {item.label}
+                  <ChevronRight className="size-3.5 text-[var(--text)]/40 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
+                </Link>
+              ) : (
+                <span
+                  className={item.ok ? 'text-[var(--text)]/70' : 'font-medium text-[var(--text)]'}
+                >
+                  {item.label}
+                </span>
+              )}
               {item.detalle ? (
                 <p className="text-xs text-[var(--text)]/55">{item.detalle}</p>
               ) : null}
