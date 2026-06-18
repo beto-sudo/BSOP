@@ -17,10 +17,12 @@
  *  - PROMOCIÓN = 15,000 para prototipo LDLE-ISC, 0 para el resto.
  *  - SOBREPRECIO = productos_adicionales (ya en DB).
  *
- * EXCLUIDOS (anomalías DB↔PDF que requieren decisión de Beto — NO se tocan):
- * M10-L8/M12-L9/M9-L18 (descuentos no capturados), M8-L10 (escrituración sin el
- * sobreprecio), M22-L1 (escrituración +3k sin sustento), M9-L18 duplicado.
- * También se omiten las ventas sin valor_escrituracion (fase temprana).
+ * ANOMALÍAS resueltas por Beto 2026-06-18 (escrituración ya corregida al PDF en
+ * prod, se pueblan): M8-L10 (faltaba el sobreprecio), M22-L1 (+3k de más),
+ * M9-L18 (duplicado: se soft-deleteó la hipotecaria, queda Tafoya).
+ * PENDIENTES (Beto no puede revisarlas ahora — NO se tocan): M10-L8, M12-L9
+ * (descuentos no capturados). También se omiten las ventas sin
+ * valor_escrituracion (fase temprana).
  *
  * Uso:
  *   DRY_RUN=1 npx tsx --env-file=.env.local scripts/populate_dilesa_desglose_precio.ts
@@ -181,6 +183,28 @@ const GEOM_EXACTO: Record<
   'i-1YV8OCj2lS': { loc: 'M9-L19-LDS', base: 2038000, exc: 31500, fv: 0, esq: 0, vfut: 0, incr: 0 },
   'i-zqCzHVzUFj': { loc: 'M9-L7-LDS', base: 2038000, exc: 41200, fv: 0, esq: 0, vfut: 0, incr: 0 },
   'i-ERZNrM5h03': { loc: 'M9-L8-LDS', base: 2094000, exc: 41200, fv: 0, esq: 0, vfut: 0, incr: 0 },
+  // Anomalías resueltas por Beto 2026-06-18 (escrituración ya corregida al PDF en prod):
+  // M8-L10 escrituración → 3,217,150 + sobreprecio 163,500; M22-L1 → 1,392,050;
+  // M9-L18 vigente = Tafoya (la hipotecaria se soft-deleteó).
+  'i-2jG0so0tmO': {
+    loc: 'M8-L10-LDS',
+    base: 2790000,
+    exc: 263650,
+    fv: 0,
+    esq: 0,
+    vfut: 0,
+    incr: 0,
+  },
+  'i-IGNexBTW9S': {
+    loc: 'M22-L1-LDLE',
+    base: 920000,
+    exc: 334050,
+    fv: 0,
+    esq: 138000,
+    vfut: 0,
+    incr: 0,
+  },
+  'i-_MsYB4yonD': { loc: 'M9-L18-LDS', base: 2038000, exc: 0, fv: 0, esq: 0, vfut: 0, incr: 0 },
 };
 
 async function main() {
@@ -269,6 +293,18 @@ async function main() {
       !!u &&
       (u.es_esquina || u.tiene_frente_verde || (u.area_m2 != null && Number(u.area_m2) > tamano));
 
+    // Anomalías DB↔PDF pendientes de Beto — NO poblar (la escrituración de la DB
+    // no coincide con la Solicitud firmada): M10-L8/M12-L9 (descuentos no
+    // capturados), M12-L33 (escrituración 1,021,000 vs PDF 1,027,390 + venta
+    // futuro 8,990 no capturada).
+    const PENDIENTES = new Set(['i-3NwkxRAqys', 'i-hDrWzYEYi8', 'i-jWOUd3Es-B']);
+    if (v.coda_row_id && PENDIENTES.has(v.coda_row_id)) {
+      skipped.push(
+        `${u?.id ? `unidad ${v.unidad_id}` : v.id} (anomalía DB↔PDF — pendiente de Beto)`
+      );
+      continue;
+    }
+
     const g = v.coda_row_id ? GEOM_EXACTO[v.coda_row_id] : undefined;
     if (g) {
       const suma = g.base + g.exc + g.fv + g.esq + g.vfut + g.incr + sobre;
@@ -290,10 +326,14 @@ async function main() {
       const ident = u ? `unidad ${v.unidad_id}` : v.id;
       skipped.push(`${ident} (geometría sin PDF exacto — anomalía)`);
     } else {
-      // Sin geometría: derivar base e incremento de la escrituración.
+      // Sin geometría: derivar de la escrituración. El precio base de la
+      // Solicitud de Asignación es SIEMPRE entero (valor comercial), así que la
+      // base se redondea al entero (= el PDF) y el incremento absorbe el residuo
+      // de centavos del redondeo del +6% (escrituración capturada en enteros).
+      // INFONAVIT (pct6=0): base = escr − sobre exacto, incremento = 0.
       const f = 1 + pct6;
-      const base = round2(escr / f - sobre);
-      const incr = round2((escr * pct6) / f);
+      const base = Math.round(escr / f - sobre);
+      const incr = round2(escr - base - sobre);
       updates.push({
         id: v.id as string,
         loc: proto ?? '?',
