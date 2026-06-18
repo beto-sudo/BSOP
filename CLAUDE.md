@@ -206,6 +206,41 @@ header — restaurar antes de mergear.
   `SUPABASE_DB_URL` está set. Drift entre `SCHEMA_REF.md` y la DB viva confunde
   a sesiones futuras.
 
+### Aplicar migración por MCP → registrar de una vez (anti-drift del ledger)
+
+> Norma 2026-06-17 (Beto): cortar de raíz el drift del historial de migraciones.
+
+`apply_migration` (MCP) / `execute_sql` / `psql` registran la migración en
+`supabase_migrations.schema_migrations` con el **timestamp de aplicación**, NO
+con el timestamp del nombre del archivo (`db:new`). El `name` sí se conserva.
+Cada aplicación así deja un par divergente: el archivo queda **local-only** (sin
+registrar) y la versión aplicada queda como **huérfano remoto**. Acumulado entre
+sesiones, esto **rompe `supabase db push`** ("Remote migration versions not found"
+/ re-aplica archivos) y puede tumbar el **Supabase Preview branch** de todos los
+PRs.
+
+**Regla:** cuando apliques a prod por fuera de `supabase db push`, **reconciliá
+el ledger en la misma sesión**, apenas apliques:
+
+1. Lee el timestamp huérfano que generó el MCP (matchea por `name`):
+   `SELECT version, name FROM supabase_migrations.schema_migrations ORDER BY version DESC LIMIT 5;`
+2. Reconciliá (solo toca la tabla de tracking, no el schema ni datos):
+   ```bash
+   supabase migration repair --db-url "$SUPABASE_DB_URL" --status applied <ts-archivo>
+   supabase migration repair --db-url "$SUPABASE_DB_URL" --status reverted <ts-huérfano-MCP>
+   ```
+3. Verificá 1:1: `supabase migration list --db-url "$SUPABASE_DB_URL"` sin
+   local-only ni remote-only.
+
+**Diagnóstico de drift acumulado:** `migration list` muestra los pares (file-ts
+en una columna, huérfano-ts en la otra); emparejá por **`name`** (el timestamp
+difiere, el name no). **Antes** de registrar un `--status applied`, verificá que
+el efecto del archivo YA esté en prod (tabla/columna/función/trigger/índice/dato
+existe — SELECT de introspección). **Límite del CLI:** `migration repair` se
+atraganta con muchas versiones en un solo comando → **lotes de ≤5**. Es cambio en
+prod (tracking compartido) → **OK verbal de Beto**. Detalle operativo y casos
+borde en la memoria `reference_bsop_merge_flow_multisesion`.
+
 ### Liberación de módulo nuevo (RBAC sync) — ADR-014
 
 Al liberar un módulo (page nuevo bajo `app/<empresa>/` con URL en sidebar, o
