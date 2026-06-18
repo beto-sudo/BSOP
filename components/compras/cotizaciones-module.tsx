@@ -1026,47 +1026,66 @@ function CapturaPrecios({
       };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const precioResp = await (sb.schema('erp') as any)
-      .from('cotizacion_proveedor_precios')
-      .upsert(filasPrecio, { onConflict: 'cotizacion_proveedor_id,cotizacion_linea_id' });
-    if (precioResp.error) {
+    // `try/catch/finally` es obligatorio: supabase-js solo *resuelve* `{ error }`
+    // para errores HTTP; ante un fallo de red (`fetch` rechaza) la promesa
+    // *lanza*. Sin el `finally`, `saving` quedaría en `true` para siempre y el
+    // botón se quedaría girando sin mensaje ("ciclado"). El `finally` garantiza
+    // que el spinner siempre se libere y el `catch` muestra el error real.
+    try {
+      // Saltar el upsert vacío evita un POST inútil (solo se actualiza la
+      // respuesta del proveedor cuando no se capturó ningún precio).
+      if (filasPrecio.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const precioResp = await (sb.schema('erp') as any)
+          .from('cotizacion_proveedor_precios')
+          .upsert(filasPrecio, { onConflict: 'cotizacion_proveedor_id,cotizacion_linea_id' });
+        if (precioResp.error) {
+          toast.add({
+            title: 'Error',
+            description: getSupabaseErrorMessage(
+              precioResp.error,
+              'No se pudieron guardar los precios.'
+            ),
+            type: 'error',
+          });
+          return;
+        }
+      }
+      for (const u of updates) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: e } = await (sb.schema('erp') as any)
+          .from('cotizacion_proveedores')
+          .update({
+            estado: u.estado,
+            monto_total: u.monto_total,
+            tiempo_entrega: u.tiempo_entrega,
+            condiciones: u.condiciones,
+            notas: u.notas,
+          })
+          .eq('id', u.id);
+        if (e) {
+          toast.add({
+            title: 'Error',
+            description: getSupabaseErrorMessage(e, 'No se pudo actualizar un proveedor.'),
+            type: 'error',
+          });
+          return;
+        }
+      }
+      toast.add({ title: 'Precios guardados', description: cotizacion.codigo, type: 'success' });
+      onSaved();
+    } catch (err) {
       toast.add({
         title: 'Error',
         description: getSupabaseErrorMessage(
-          precioResp.error,
-          'No se pudieron guardar los precios.'
+          err,
+          'No se pudieron guardar los precios. Revisa tu conexión e inténtalo de nuevo.'
         ),
         type: 'error',
       });
+    } finally {
       setSaving(false);
-      return;
     }
-    for (const u of updates) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('erp') as any)
-        .from('cotizacion_proveedores')
-        .update({
-          estado: u.estado,
-          monto_total: u.monto_total,
-          tiempo_entrega: u.tiempo_entrega,
-          condiciones: u.condiciones,
-          notas: u.notas,
-        })
-        .eq('id', u.id);
-      if (e) {
-        toast.add({
-          title: 'Error',
-          description: getSupabaseErrorMessage(e, 'No se pudo actualizar un proveedor.'),
-          type: 'error',
-        });
-        setSaving(false);
-        return;
-      }
-    }
-    toast.add({ title: 'Precios guardados', description: cotizacion.codigo, type: 'success' });
-    setSaving(false);
-    onSaved();
   }
 
   // Invitar otro proveedor a una RFQ ya creada (agrega una columna a la matriz).
