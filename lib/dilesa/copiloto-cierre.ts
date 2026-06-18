@@ -41,10 +41,19 @@ export type CopilotoInput = {
   cubierta: boolean | null;
 };
 
+/**
+ * Destino de navegación de un pendiente del copiloto — a dónde va el operador
+ * para resolverlo. Semántico (sin URL): el componente `CopilotoCierre` lo
+ * traduce al tab/captura concreto. `null` = sin acción navegable.
+ */
+export type CopilotoDestino = 'pipeline' | 'cuadratura' | 'conformidad';
+
 export type CopilotoItem = {
   ok: boolean;
   label: string;
   detalle: string | null;
+  /** Tab/captura donde se resuelve este pendiente (deep-link del copiloto). */
+  destino: CopilotoDestino | null;
 };
 
 export type CopilotoResultado = {
@@ -67,6 +76,7 @@ export function evaluarCierre(
       fasesPendientes.length === 0
         ? null
         : `Faltan: ${fasesPendientes.map((f) => `${f.pos} · ${f.nombre}`).join(', ')}`,
+    destino: 'pipeline',
   };
 
   const itemDocs: CopilotoItem = {
@@ -76,6 +86,7 @@ export function evaluarCierre(
       i.docsFaltantes.length === 0
         ? null
         : `Faltan ${i.docsFaltantes.length}: ${i.docsFaltantes.map((d) => d.label).join(', ')}`,
+    destino: 'pipeline',
   };
 
   const itemCuadratura: CopilotoItem = {
@@ -87,6 +98,7 @@ export function evaluarCierre(
         : i.cubierta === null || i.saldoCliente == null
           ? 'Sin datos suficientes (falta valor de escrituración o depósitos).'
           : `Saldo del cliente: ${money(i.saldoCliente)}.`,
+    destino: 'cuadratura',
   };
 
   const fase16 = i.fases.find((f) => f.pos === 16);
@@ -97,6 +109,7 @@ export function evaluarCierre(
       fase16?.alcanzada === true
         ? null
         : 'La encuesta posventa no se ha respondido ni capturado (Fase 16).',
+    destino: 'conformidad',
   };
 
   const items = [itemFases, itemDocs, itemCuadratura, itemConformidad];

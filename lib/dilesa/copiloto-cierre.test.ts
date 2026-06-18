@@ -23,6 +23,16 @@ describe('evaluarCierre', () => {
     expect(r.items.every((i) => i.ok)).toBe(true);
   });
 
+  it('cada item declara su destino de navegación (deep-link del copiloto)', () => {
+    const r = evaluarCierre(BASE);
+    expect(r.items.map((i) => i.destino)).toEqual([
+      'pipeline', // Pipeline completo → tab Pipeline
+      'pipeline', // Expediente documental → tab Pipeline (ahí se cargan)
+      'cuadratura', // Cuadratura cubierta → tab Cuadratura
+      'conformidad', // Conformidad → captura Fase 16
+    ]);
+  });
+
   it('fases pendientes se listan con posición y nombre', () => {
     const fases = BASE.fases.map((f) =>
       f.pos === 9 || f.pos === 12 ? { ...f, alcanzada: false } : f
