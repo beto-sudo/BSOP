@@ -30,6 +30,7 @@ type VentaCuadraturaRow = {
   monto_credito_titular: number | null;
   monto_credito_cotitular: number | null;
   monto_credito_directo: number | null;
+  monto_detonado: number | null;
   monto_cheque_notaria: number | null;
   gastos_escrituracion: number | null;
   descuento_total: number | null;
@@ -65,7 +66,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto, valor_excedente_terreno, valor_frente_verde, valor_esquina, valor_venta_futuro'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_detonado, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto, valor_excedente_terreno, valor_frente_verde, valor_esquina, valor_venta_futuro'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -162,6 +163,7 @@ export async function cargarCuadraturaVenta(
     montoCreditoTitular: venta.monto_credito_titular,
     montoCreditoCotitular: venta.monto_credito_cotitular,
     montoCreditoDirecto: venta.monto_credito_directo,
+    montoDetonado: venta.monto_detonado,
     montoChequeNotaria: venta.monto_cheque_notaria,
     gastosEscrituracion: venta.gastos_escrituracion,
     apoyoInfonavit: Number(
