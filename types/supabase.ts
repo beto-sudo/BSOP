@@ -5213,8 +5213,12 @@ export type Database = {
           uso_efectivo: string | null
           valor_comercial: number | null
           valor_escrituracion: number | null
+          valor_esquina: number | null
+          valor_excedente_terreno: number | null
           valor_facturado: number | null
+          valor_frente_verde: number | null
           valor_real_venta_dilesa: number | null
+          valor_venta_futuro: number | null
           valuador_id: string | null
           vendedor: string | null
           vendedor_usuario_id: string | null
@@ -5305,8 +5309,12 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valor_esquina?: number | null
+          valor_excedente_terreno?: number | null
           valor_facturado?: number | null
+          valor_frente_verde?: number | null
           valor_real_venta_dilesa?: number | null
+          valor_venta_futuro?: number | null
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
@@ -5397,8 +5405,12 @@ export type Database = {
           uso_efectivo?: string | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
+          valor_esquina?: number | null
+          valor_excedente_terreno?: number | null
           valor_facturado?: number | null
+          valor_frente_verde?: number | null
           valor_real_venta_dilesa?: number | null
+          valor_venta_futuro?: number | null
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null

@@ -41,11 +41,16 @@ type VentaCuadraturaRow = {
   coda_row_id: string | null;
   // Desglose (ADR-045). `productos_adicionales` (sobreprecio) ya existía y está
   // poblado; las otras 3 son del desglose nuevo (null en cerradas/legacy →
-  // motor con fallback).
+  // motor con fallback). Las 4 de geometría (20260618) congelan el premio del
+  // lote de la Solicitud de Asignación.
   productos_adicionales: number | null;
   precio_base: number | null;
   incremento_credito: number | null;
   promocion_gastos_monto: number | null;
+  valor_excedente_terreno: number | null;
+  valor_frente_verde: number | null;
+  valor_esquina: number | null;
+  valor_venta_futuro: number | null;
 };
 
 /**
@@ -60,7 +65,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto, valor_excedente_terreno, valor_frente_verde, valor_esquina, valor_venta_futuro'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -180,6 +185,10 @@ export async function cargarCuadraturaVenta(
     incrementoCredito: venta.incremento_credito,
     sobreprecioAdicionales: venta.productos_adicionales,
     promocionGastos: venta.promocion_gastos_monto,
+    valorExcedenteTerreno: venta.valor_excedente_terreno,
+    valorFrenteVerde: venta.valor_frente_verde,
+    valorEsquina: venta.valor_esquina,
+    valorVentaFuturo: venta.valor_venta_futuro,
     valorFacturadoReal: hayFactura ? venta.valor_facturado : null,
     depositos: abonos.map((a) => ({
       monto: a.monto_total,

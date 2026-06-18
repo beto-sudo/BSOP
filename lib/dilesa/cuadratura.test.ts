@@ -453,11 +453,44 @@ describe('calcularCuadratura', () => {
       const c = mayra();
       expect(c.formacionPrecio).toEqual({
         precioBase: 899000,
+        valorExcedenteTerreno: 0,
+        valorFrenteVerde: 0,
+        valorEsquina: 0,
+        valorVentaFuturo: 0,
+        geometria: 0,
         incrementoCredito: 55419,
-        precioInterno: 954419, // 899,000 + 55,419
+        precioInterno: 954419, // 899,000 + 0 geom + 55,419
         adicionales: 24651,
         valorEscrituracion: 979070, // 954,419 + 24,651
       });
+    });
+
+    it('desglosa la geometría del lote en la cadena de precio (excedente/esquina + IMSS)', () => {
+      // Caso real M10-L1-LDS: base 2,094,000 + excedente 36,700 + esquina 67,008
+      // + IMSS +6% 131,862.48 = escrituración 2,329,570.48 (cuadra al centavo).
+      const c = calcularCuadratura({
+        valorEscrituracion: 2329570.48,
+        montoCreditoTitular: 2329570.48,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 0,
+        precioBase: 2094000,
+        valorExcedenteTerreno: 36700,
+        valorEsquina: 67008,
+        incrementoCredito: 131862.48,
+        sobreprecioAdicionales: 0,
+        promocionGastos: 15000,
+        depositos: [],
+      });
+      expect(c.formacionPrecio?.geometria).toBe(103708); // 36,700 + 67,008
+      expect(c.formacionPrecio?.precioInterno).toBe(2329570.48); // base + geom + incremento
+      // base + geometría + incremento + sobreprecio = escrituración (cuadra)
+      const fp = c.formacionPrecio!;
+      expect(fp.precioBase + fp.geometria + fp.incrementoCredito + fp.adicionales).toBeCloseTo(
+        fp.valorEscrituracion,
+        2
+      );
     });
 
     it('deriva el cierre con el modelo desglosado (cheque = gastos, valor real = precio interno)', () => {
