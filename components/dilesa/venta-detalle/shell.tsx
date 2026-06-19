@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useVentaDetalle } from './provider';
 import { BackLink, HoldBanner } from './ui';
 import { VentaExpedienteTabs } from './tabs';
+import { BotonSiguienteFase } from './boton-siguiente-fase';
 import { FASES_ORDEN } from './types';
 
 export function VentaExpedienteShell({ children }: { children: ReactNode }) {
@@ -108,25 +109,29 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Si la venta está desasignada, NO mostramos el badge de fase — evita
-              el efecto contradictorio "2. Asignada · Desasignada". */}
-          {venta.fase_actual && venta.estado !== 'desasignada' ? (
-            <Badge tone="neutral">
-              {venta.fase_posicion ? `${venta.fase_posicion}. ` : ''}
-              {venta.fase_actual}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {/* Si la venta está desasignada, NO mostramos el badge de fase — evita
+                el efecto contradictorio "2. Asignada · Desasignada". */}
+            {venta.fase_actual && venta.estado !== 'desasignada' ? (
+              <Badge tone="neutral">
+                {venta.fase_posicion ? `${venta.fase_posicion}. ` : ''}
+                {venta.fase_actual}
+              </Badge>
+            ) : null}
+            <Badge
+              tone={
+                VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.tone ??
+                'neutral'
+              }
+            >
+              {VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ??
+                venta.estado}
             </Badge>
-          ) : null}
-          <Badge
-            tone={
-              VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.tone ??
-              'neutral'
-            }
-          >
-            {VENTA_ESTADO_CONFIG[venta.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ??
-              venta.estado}
-          </Badge>
-          {venta.tipo_credito ? <Badge tone="neutral">{venta.tipo_credito}</Badge> : null}
+            {venta.tipo_credito ? <Badge tone="neutral">{venta.tipo_credito}</Badge> : null}
+          </div>
+          {/* Atajo a la captura de la fase siguiente (si el usuario tiene permiso). */}
+          <BotonSiguienteFase />
         </div>
       </header>
 
