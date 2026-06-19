@@ -110,9 +110,11 @@ export function OperacionResumen({
           <Cifra label="Crédito directo (pagaré)" value={money(cuadratura.montoCreditoDirecto)} />
           <Cifra label="Depósitos directos" value={money(cuadratura.depositosDirectoCliente)} />
           {cuadratura.tieneDesglose ? (
-            // Modelo desglosado (ADR-045): dos cuentas separadas — el precio lo
-            // cubre el crédito; el cliente debe el pagaré de gastos. NO se muestra
-            // el saldoCliente crudo (mezclaba precio + descuento → −74,651).
+            // Modelo desglosado (ADR-045): dos coberturas separadas — el precio lo
+            // cubre el crédito; los gastos notariales los cubre el presupuesto
+            // (subsidio + DILESA + enganche + sobreprecio + pagaré). Ambos leen de
+            // la misma `cuadratura`; el pagaré real va en su columna de arriba. NO
+            // se muestra el saldoCliente crudo (mezclaba precio + descuento → −74,651).
             <div className="ml-auto flex items-stretch gap-x-6">
               <Cifra
                 label="Precio"
@@ -125,14 +127,15 @@ export function OperacionResumen({
                 tone={(cuadratura.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : 'warn'}
               />
               <Cifra
-                label="Pagaré del cliente"
-                value={money(cuadratura.coberturaGastos?.pagareNecesario ?? 0)}
+                label="Gastos notariales"
+                value={
+                  Math.abs(cuadratura.coberturaGastos?.saldoCobertura ?? 0) <= 2
+                    ? 'Cubierto ✓'
+                    : money(cuadratura.coberturaGastos?.saldoCobertura)
+                }
                 strong
                 tone={
-                  cuadratura.montoCreditoDirecto <
-                  (cuadratura.coberturaGastos?.pagareNecesario ?? 0)
-                    ? 'warn'
-                    : 'ok'
+                  Math.abs(cuadratura.coberturaGastos?.saldoCobertura ?? 0) <= 2 ? 'ok' : 'warn'
                 }
               />
             </div>

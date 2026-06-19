@@ -211,8 +211,8 @@ function CapturarFase17Body() {
           {
             fases,
             docsFaltantes,
-            saldoCliente: cuadratura.saldoCliente,
-            cubierta: v.valor_escrituracion == null ? null : cuadratura.cubierta,
+            saldoCliente: cuadratura.saldoOperacion,
+            cubierta: v.valor_escrituracion == null ? null : cuadratura.operacionCubierta,
           },
           (n) => moneyFmt.format(n)
         )

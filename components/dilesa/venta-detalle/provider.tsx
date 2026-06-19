@@ -725,8 +725,8 @@ export function VentaDetalleProvider({
       {
         fases: pipelineRows.map((r) => ({ pos: r.pos, nombre: r.nombre, alcanzada: r.alcanzada })),
         docsFaltantes,
-        saldoCliente: cuadratura.saldoCliente,
-        cubierta: venta?.valor_escrituracion == null ? null : cuadratura.cubierta,
+        saldoCliente: cuadratura.saldoOperacion,
+        cubierta: venta?.valor_escrituracion == null ? null : cuadratura.operacionCubierta,
       },
       (n) => moneyFmt.format(n)
     );

@@ -5,11 +5,12 @@
  * Operación). Tiene DOS modos según el modelo de la venta:
  *
  * - CON DESGLOSE (ADR-045 — ventas activas y nuevas): el descuento ya NO se
- *   captura aquí. El motor lo deriva de la PROMOCIÓN elegida en la Solicitud de
- *   Asignación (bono DILESA, del catálogo `dilesa.promociones`) + el SOBREPRECIO
- *   (productos adicionales, que lo cubre el crédito, no es regalo). Los 4 buckets
- *   viejos no movían la cuadratura desglosada, así que se muestran read-only para
- *   no confundir (decisión Beto 2026-06-18).
+ *   captura aquí; se deriva. Muestra el DESCUENTO REAL (= Escrituración − Valor
+ *   Real, la columna "Descuento" de Michelle) partido en dos: el "descuento por
+ *   promoción" (el bono autorizado del catálogo `dilesa.promociones`, topado al
+ *   máximo) y el "descuento por sobreprecio" (el resto, que DILESA concede
+ *   subiendo el precio — pendiente de formalizar como Máxima Aportación en la
+ *   solicitud). Los 4 buckets viejos ya no aplican al modelo desglosado.
  *
  * - LEGACY (ventas viejas de Coda sin desglose): editor de los 4 buckets. El
  *   total se AUTO-CALCULA como la suma de los buckets (ya no se captura aparte —
@@ -29,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
+import { partirDescuento } from '@/lib/dilesa/cuadratura';
 
 export type CuadraturaInputsStr = {
   /** Total del descuento. Con buckets = su suma (auto); legacy total-only = lo capturado en Coda. */
@@ -56,7 +58,8 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente,
   tieneDesglose,
   descuentoPromocion,
-  sobreprecio,
+  descuentoReal,
+  sobreprecioCapturado,
 }: {
   ventaId: string;
   values: CuadraturaInputsStr;
@@ -72,16 +75,35 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente: string | null;
   /** Si la venta usa el modelo desglosado (ADR-045). */
   tieneDesglose: boolean;
-  /** Promoción/bono de gastos (el descuento real con desglose; costo de DILESA). */
+  /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones). Es el TOPE
+   *  del "descuento por promoción"; el resto del descuento real es sobreprecio. */
   descuentoPromocion: number;
-  /** Sobreprecio (productos adicionales) — lo cubre el crédito, no es regalo. */
-  sobreprecio: number;
+  /** Descuento real = Escrituración − Valor Real (columna "Descuento" de
+   *  Michelle). El total que se parte en promoción (topada al autorizado) +
+   *  sobreprecio (el resto que DILESA concede subiendo el precio). */
+  descuentoReal: number;
+  /** Sobreprecio YA capturado como productos adicionales (precio inflado). Sirve
+   *  para señalar cuánto del descuento por sobreprecio falta formalizar como
+   *  Máxima Aportación en la solicitud. */
+  sobreprecioCapturado: number;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
-  // ── Modo DESGLOSE: el descuento se deriva (promoción + sobreprecio), no se captura ──
+  // ── Modo DESGLOSE: el descuento total (= Escrituración − Valor Real, columna
+  //    "Descuento" de Michelle) se PARTE en promoción (bono autorizado, topado al
+  //    máximo) + sobreprecio (el resto, que DILESA concede subiendo el precio).
+  //    No se captura aquí; se deriva. ──
   if (tieneDesglose) {
+    const descuentoTotal = Math.round(descuentoReal * 100) / 100;
+    // Parte el descuento real en promoción (bono autorizado, topado) + sobreprecio
+    // (el resto). Mismo helper que la card de cobertura del presupuesto notarial.
+    const { promocion: descuentoPorPromocion, sobreprecio: descuentoPorSobreprecio } =
+      partirDescuento(descuentoReal, descuentoPromocion);
+    // Cuánto del sobreprecio aún no está formalizado como productos adicionales
+    // (precio inflado) → pendiente de capturar como Máxima Aportación.
+    const sobreprecioPorCapturar =
+      Math.round((descuentoPorSobreprecio - sobreprecioCapturado) * 100) / 100;
     return (
       <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
@@ -89,23 +111,33 @@ export function CuadraturaAjustes({
         </h3>
         <div className="space-y-1">
           <DerivadoRow
-            label="Promoción DILESA (bono — costo de DILESA)"
-            value={moneyFmt.format(descuentoPromocion)}
+            label="Descuento por promoción (bono autorizado)"
+            value={moneyFmt.format(descuentoPorPromocion)}
           />
           <DerivadoRow
-            label="Sobreprecio (lo cubre el crédito, no es regalo)"
-            value={moneyFmt.format(sobreprecio)}
+            label="(+) Descuento por sobreprecio"
+            value={moneyFmt.format(descuentoPorSobreprecio)}
           />
-          <DerivadoRow
-            label={`Apoyo Infonavit${tipoCredito ? ` · ${tipoCredito}` : ''}`}
-            value={moneyFmt.format(apoyoInfonavit)}
-          />
+          <div className="my-1 border-t border-[var(--border)]" />
+          <DerivadoRow label="(=) Descuento total" value={moneyFmt.format(descuentoTotal)} strong />
+        </div>
+        <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
+            Apoyo Infonavit · subsidio (no es descuento DILESA)
+            {tipoCredito ? ` · ${tipoCredito}` : ''}
+          </span>
+          <span className="text-xs font-semibold tabular-nums text-[var(--text)]/85">
+            {moneyFmt.format(apoyoInfonavit)}
+          </span>
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--text)]/50">
-          El descuento se deriva de la <strong>promoción</strong> elegida en la Solicitud de
-          Asignación (catálogo de promociones) y del <strong>sobreprecio</strong>; el apoyo
-          Infonavit sale del catálogo de tipos de crédito. Ninguno se captura aquí — los buckets
-          manuales del modelo viejo no aplican a esta venta.
+          El <strong>descuento por promoción</strong> es el bono autorizado del catálogo (tope{' '}
+          {moneyFmt.format(descuentoPromocion)}); el <strong>descuento por sobreprecio</strong> es
+          lo que DILESA concede de más subiendo el precio. Juntos son el descuento real frente al
+          valor escriturado ({moneyFmt.format(descuentoTotal)}).
+          {sobreprecioPorCapturar > 0.5
+            ? ` Falta formalizar ${moneyFmt.format(sobreprecioPorCapturar)} de sobreprecio como Máxima Aportación en la solicitud.`
+            : ''}
         </p>
       </section>
     );
@@ -265,11 +297,25 @@ export function CuadraturaAjustes({
   );
 }
 
-function DerivadoRow({ label, value }: { label: string; value: string }) {
+function DerivadoRow({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-[var(--text)]/65">{label}</span>
-      <span className="font-medium tabular-nums text-[var(--text)]">{value}</span>
+      <span className={strong ? 'font-medium text-[var(--text)]/80' : 'text-[var(--text)]/65'}>
+        {label}
+      </span>
+      <span
+        className={`tabular-nums text-[var(--text)] ${strong ? 'text-base font-semibold' : 'font-medium'}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

@@ -45,6 +45,9 @@ export function CuadraturaPanel({
   chequeCapturado,
   hayFacturaCfdi,
 }: CuadraturaPanelProps) {
+  // Cobertura del presupuesto notarial COMPLETO: el motor (`coberturaGastos`) ya
+  // trae todos los componentes y el saldo — fuente única, el panel no recalcula.
+  const cob = c.coberturaGastos;
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (
@@ -165,27 +168,26 @@ export function CuadraturaPanel({
         </Bloque>
       )}
 
-      {/* Cobertura del presupuesto notarial — las 4 fuentes (ADR-045) */}
-      {c.tieneDesglose && c.coberturaGastos ? (
+      {/* Cobertura del presupuesto notarial COMPLETO (ADR-045). Gastos brutos =
+          subsidio Infonavit + aportación DILESA (promoción) + enganche +
+          sobreprecio + pagaré → saldo 0. */}
+      {c.tieneDesglose && cob ? (
         <Bloque titulo="Cobertura del presupuesto notarial">
-          <Fila
-            label="Presupuesto notarial (neto de apoyo Infonavit)"
-            value={money(c.coberturaGastos.gastosNetos)}
-            strong
-          />
+          <Fila label="Gastos notariales (completos)" value={money(cob.gastosBrutos)} strong />
           <div className="my-1 border-t border-dashed border-[var(--border)]" />
-          <Fila label="(−) Promoción DILESA (bono)" value={money(c.coberturaGastos.promocion)} />
-          <Fila label="(−) Enganche del cliente" value={money(c.coberturaGastos.engancheCliente)} />
-          <Fila
-            label="(−) Sobreprecio (productos adicionales)"
-            value={money(c.coberturaGastos.sobreprecio)}
-          />
+          {cob.apoyoInfonavit > 0 ? (
+            <Fila label="(−) Subsidio Infonavit" value={money(cob.apoyoInfonavit)} />
+          ) : null}
+          <Fila label="(−) Aportación DILESA (promoción)" value={money(cob.aportacionPromocion)} />
+          <Fila label="(−) Enganche del cliente" value={money(cob.engancheCliente)} />
+          <Fila label="(−) Sobreprecio" value={money(cob.sobreprecioCobertura)} />
+          <Fila label="(−) Pagaré del cliente" value={money(c.montoCreditoDirecto)} />
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
-            label="(=) Pagaré necesario del cliente"
-            value={money(c.coberturaGastos.pagareNecesario)}
+            label={Math.abs(cob.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
+            value={money(cob.saldoCobertura)}
             strong
-            tone={c.coberturaGastos.pagareNecesario > 0 ? 'warn' : 'ok'}
+            tone={Math.abs(cob.saldoCobertura) <= 2 ? 'ok' : 'warn'}
           />
         </Bloque>
       ) : null}
@@ -250,11 +252,24 @@ export function CuadraturaPanel({
       </Bloque>
 
       <p className="text-[11px] leading-relaxed text-[var(--text)]/45">
-        Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva como
-        Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda los estima
-        como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda aproximado
-        hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de descuento
-        otorgado.
+        {c.tieneDesglose ? (
+          <>
+            Modelo desglosado (Michelle/Ale): el <strong>Valor real venta Dilesa</strong> es lo que
+            DILESA realiza neto del cheque a notaría (detonación + enganche − cheque + pagaré); la{' '}
+            <strong>Nota de Crédito</strong> = Valor Facturado − Valor real; el{' '}
+            <strong>Descuento real</strong> = Escrituración − Valor real; y las comisiones van sobre
+            el Valor real menos productos adicionales. Con factura emitida, el Valor Facturado es el
+            del CFDI; antes de facturar se estima con el valor de escrituración («sugerido»).
+          </>
+        ) : (
+          <>
+            Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva
+            como Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda
+            los estima como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda
+            aproximado hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de
+            descuento otorgado.
+          </>
+        )}
       </p>
     </div>
   );

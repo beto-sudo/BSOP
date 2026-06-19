@@ -1,12 +1,21 @@
 /**
- * Motor de cuadratura de una venta DILESA.
+ * Motor de cuadratura de una venta DILESA. Función pura y testeable, fuente
+ * única de verdad para la mini-cuadratura del Expediente de Operación, la
+ * pestaña Cuadratura y el copiloto de cierre (iniciativa
+ * `dilesa-ventas-expediente`).
  *
- * Replica el modelo financiero que vivía en Coda (tabla Clientes,
- * grid-mMIXWCSfyr) como una función pura y testeable. Es la fuente única de
- * verdad para la mini-cuadratura del Expediente de Operación, la pestaña
- * Cuadratura y el copiloto de cierre (iniciativa `dilesa-ventas-expediente`).
+ * DOS MODELOS según `tieneDesglose`:
+ *  - DESGLOSADO (ADR-045 — ventas activas/nuevas, marcador `promocionGastos`/
+ *    `precioBase`): sigue el modelo operativo de Michelle (Notas de crédito) y
+ *    Ale (participación), alineado el 2026-06-18. Valor Real = detonación +
+ *    enganche − cheque a notaría + pagaré; NC = Facturado − Valor Real;
+ *    Descuento Real = Escrituración − Valor Real; comisiones sobre Valor Real −
+ *    productos adicionales. La cobertura del presupuesto notarial se desglosa en
+ *    sus fuentes (aportación DILESA + enganche + sobreprecio + pagaré).
+ *  - LEGACY (ventas cerradas/Coda sin desglose): réplica del modelo de Coda
+ *    (tabla Clientes, grid-mMIXWCSfyr). Fallback que NO altera nada histórico.
  *
- * Fórmulas (de Coda):
+ * Fórmulas (legacy de Coda; el desglosado las sobreescribe donde se indica):
  *   Depósitos Recibidos       = Σ todos los depósitos del cliente.
  *   Monto Disponible          = Σ depósitos(Directo Cliente) + crédito titular
  *                               + crédito co-titular + pagaré autorizado (CD).
@@ -164,8 +173,16 @@ export type Cuadratura = {
   /** Cheque a notaría CAPTURADO (0 si aún no se gira). Distinto del calculado. */
   chequePagado: number;
   /** true si el descuento autorizado + el disponible cubren la escrituración
-   *  (saldo efectivo ≤ TOLERANCIA_SALDO). */
+   *  (saldo efectivo ≤ TOLERANCIA_SALDO). LEGACY: en ventas desglosadas mezcla
+   *  precio + descuento; para gates usar `operacionCubierta`. */
   cubierta: boolean;
+  /** Cobertura model-aware de TODA la operación (fuente única para el copiloto y
+   *  gates). Desglose: crédito cubre precio Y fuentes cubren el presupuesto
+   *  notarial. Legacy: = `cubierta`. */
+  operacionCubierta: boolean;
+  /** Saldo a mostrar cuando la operación NO está cubierta (faltante de precio o
+   *  residual de gastos en desglose; saldo efectivo en legacy). */
+  saldoOperacion: number;
   /** Cheque a notaría sugerido por la fórmula (vs el capturado). */
   chequeNotariaCalculado: number;
   /** Cheque usado para los derivados: el capturado si existe, si no el calculado. */
@@ -192,17 +209,34 @@ export type Cuadratura = {
    * cuando `tieneDesglose`. `null` en ventas legacy/cerradas. Para el panel.
    */
   coberturaGastos: {
+    /** Gastos notariales COMPLETOS (brutos, antes del subsidio Infonavit). */
+    gastosBrutos: number;
     /** Gastos de escrituración netos del apoyo Infonavit (= cheque a notaría). */
     gastosNetos: number;
+    /** Subsidio Infonavit a gastos (por tipo de crédito). 0 si no hay. */
     apoyoInfonavit: number;
-    /** Promoción/bono de gastos (costo de DILESA). */
+    /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones; costo DILESA).
+     *  Es el TOPE; lo realmente usado para cubrir gastos es `aportacionPromocion`. */
     promocion: number;
+    /** Promoción USADA para cubrir el presupuesto (= promo topada al faltante de
+     *  gastos del lado DILESA). La línea "Aportación DILESA (promoción)" de la card. */
+    aportacionPromocion: number;
     /** Enganche/depósitos del cliente. */
     engancheCliente: number;
-    /** Sobreprecio (productos adicionales) — lo paga el crédito. */
+    /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. */
     sobreprecio: number;
-    /** Pagaré necesario = faltante tras promoción + enganche + sobreprecio. */
+    /** Sobreprecio EFECTIVO que cubre el presupuesto (faltante del lado DILESA −
+     *  promoción usada). Puede exceder a `sobreprecio` capturado: lo que DILESA
+     *  concede de más subiendo el precio, pendiente de formalizar (Máx. Aportación). */
+    sobreprecioCobertura: number;
+    /** Pagaré necesario = faltante tras promoción autorizada + enganche + sobreprecio
+     *  (lo que el cliente debería financiar si DILESA solo aporta la promo). Para
+     *  la fase 10 / gate. NO es el pagaré real: cuando DILESA absorbe más que la
+     *  promo (Máxima Aportación) el pagaré del cliente es menor (o 0). */
     pagareNecesario: number;
+    /** Saldo de la cobertura: gastos brutos − subsidio − promoción − enganche −
+     *  sobreprecio − pagaré. ≈ 0 cuando las fuentes cubren el presupuesto. */
+    saldoCobertura: number;
   } | null;
   /**
    * Formación del precio de escrituración (ADR-045 + geometría desglosada
@@ -292,6 +326,25 @@ export function topeDescuentoAutorizado(
   return esLegacy ? null : 0;
 }
 
+/**
+ * Parte el descuento real (= Escrituración − Valor Real, columna "Descuento" de
+ * Michelle) en sus dos orígenes, para las cards de la cuadratura:
+ *  - `promocion`: el bono autorizado del catálogo, usado hasta el total (topado
+ *    al máximo autorizado).
+ *  - `sobreprecio`: el resto, que DILESA concede subiendo el precio (pendiente de
+ *    formalizar como Máxima Aportación en la solicitud).
+ * Con descuento ≥ 0 se cumple `promocion + sobreprecio = descuentoReal`.
+ */
+export function partirDescuento(
+  descuentoReal: number,
+  promocionAutorizada: number | null | undefined
+): { promocion: number; sobreprecio: number } {
+  const total = round2(descuentoReal);
+  const promocion = total <= 0 ? 0 : round2(Math.min(total, n(promocionAutorizada)));
+  const sobreprecio = round2(Math.max(0, total - promocion));
+  return { promocion, sobreprecio };
+}
+
 export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const valorEscrituracion = n(i.valorEscrituracion);
   const creditoInstitucion = n(i.montoCreditoTitular) + n(i.montoCreditoCotitular);
@@ -351,10 +404,17 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
   const cubierta = saldoCliente <= TOLERANCIA_SALDO;
 
-  // ADR-045: desglose de las 4 fuentes que cubren el presupuesto notarial
-  // (gastos netos). Solo con desglose poblado; el pagaré es el faltante tras
-  // promoción + enganche del cliente + sobreprecio.
+  // ADR-045: desglose de las fuentes que cubren el presupuesto notarial COMPLETO.
+  // Solo con desglose poblado. Gastos BRUTOS = subsidio Infonavit + aportación
+  // DILESA (promoción) + enganche + sobreprecio + pagaré → saldo 0. El split del
+  // lado DILESA (lo que cubre tras el enganche y el pagaré) se hace con
+  // `partirDescuento`: promoción (bono autorizado, topado) + sobreprecio (el resto).
+  // Fuente ÚNICA para la card de cuadratura y el mini-resumen (no recalcular).
   const gastosNetosR = round2(gastosNetos);
+  const gastosBrutosR = round2(n(i.gastosEscrituracion));
+  // `pagareNecesario`: faltante si DILESA solo aportara la promoción AUTORIZADA
+  // (para la fase 10 / gate). NO es el pagaré real: cuando DILESA absorbe más que
+  // la promo (Máxima Aportación) el pagaré del cliente es menor (o 0).
   const pagareNecesario = tieneDesglose
     ? round2(
         Math.max(
@@ -363,14 +423,33 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         )
       )
     : 0;
+  // Lo que DILESA debe cubrir del presupuesto tras el enganche y el pagaré del
+  // cliente, partido en promoción (topada al bono) + sobreprecio (el resto).
+  const faltanteGastosDilesa = round2(gastosNetosR - depositosDirectoCliente - montoCreditoDirecto);
+  const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
+    faltanteGastosDilesa,
+    promocionGastos
+  );
+  const saldoCobertura = round2(
+    gastosBrutosR -
+      n(i.apoyoInfonavit) -
+      aportacionPromocion -
+      depositosDirectoCliente -
+      sobreprecioCobertura -
+      montoCreditoDirecto
+  );
   const coberturaGastos = tieneDesglose
     ? {
+        gastosBrutos: gastosBrutosR,
         gastosNetos: gastosNetosR,
         apoyoInfonavit: round2(n(i.apoyoInfonavit)),
         promocion: round2(promocionGastos),
+        aportacionPromocion,
         engancheCliente: round2(depositosDirectoCliente),
         sobreprecio: round2(sobreprecioAdicionales),
+        sobreprecioCobertura,
         pagareNecesario,
+        saldoCobertura,
       }
     : null;
 
@@ -408,6 +487,24 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoPrecioEscrituracion = tieneDesglose
     ? round2(valorEscrituracion - creditoInstitucion)
     : null;
+
+  // Cobertura model-aware de TODA la operación — fuente ÚNICA para el copiloto de
+  // cierre y otros gates. NO el `saldoCliente`/`cubierta` legacy, que en ventas
+  // desglosadas mezcla precio + descuento y deja un saldo fantasma (Arizpe:
+  // 18,313 cheque − 15,000 descuento = 3,313 que NO es deuda). Desglose: el crédito
+  // cubre el precio Y las fuentes cubren el presupuesto notarial. Legacy: el saldo
+  // efectivo ≤ tolerancia.
+  const operacionCubierta = tieneDesglose
+    ? (saldoPrecioEscrituracion ?? 0) <= TOLERANCIA_SALDO &&
+      Math.abs(saldoCobertura) <= TOLERANCIA_SALDO
+    : cubierta;
+  // Saldo a mostrar cuando NO está cubierta: el faltante de precio si el crédito
+  // no alcanza, si no el residual de gastos. Legacy: el saldo efectivo del cliente.
+  const saldoOperacion = tieneDesglose
+    ? (saldoPrecioEscrituracion ?? 0) > TOLERANCIA_SALDO
+      ? (saldoPrecioEscrituracion ?? 0)
+      : saldoCobertura
+    : saldoCliente;
 
   // El crédito directo (pagaré) queda fuera: sus pagos sí son del cliente.
   const posibleDobleConteo =
@@ -501,6 +598,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     descuentoAplicado: round2(descuentoAplicado),
     chequePagado,
     cubierta,
+    operacionCubierta,
+    saldoOperacion: round2(saldoOperacion),
     chequeNotariaCalculado,
     chequeNotariaUsado,
     valorRealVentaDilesa,
