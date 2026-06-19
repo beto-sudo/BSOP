@@ -3,11 +3,11 @@
 **Slug:** `registro-ia`
 **Empresas:** todas (capa transversal; hoy la IA productiva vive en cross + DILESA)
 **Schemas afectados:** principalmente código (`lib/ai/` capa única + registry); Sprint 2 agrega `core` (tablas `ai_config` override de modelo, `ai_invocaciones` log de uso/costo). Lectura de `core.usuarios` para autoría.
-**Estado:** in_progress
-**Próximo hito:** Beto revisa el Vercel Preview de [#962](https://github.com/beto-sudo/BSOP/pull/962) (Configuración → IA) y mergea. Con eso los 3 sprints quedan en prod y la iniciativa cierra. Sprint 1 (#960) + Sprint 2 (#961, migración aplicada a prod) ya vivos.
+**Estado:** done
+**Próximo hito:** — (cerrada; los 3 sprints en prod: #960 capa+guard+bump, #961 override+log, #962 UI de Configuración).
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-19 (S1 + S2 en prod; S3 construido — PR #962 en review de Preview)
+**Última actualización:** 2026-06-19 (cerrada — los 3 sprints en prod, validados; #960/#961/#962)
 
 ## Problema
 
@@ -68,3 +68,4 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 - **2026-06-19** — Sprint 2 construido: migración `20260619174421_core_ai_config_y_invocaciones.sql` (2 tablas + RLS deny-all + revoke anon + índices) + `resolveModel` lee el override (cache 60s + fail-open) + wrappers loggean uso/costo (fail-open) + `lib/ai/pricing.ts`. Tests nuevos (config/pricing/run = override, costo, wiring de logging, fail-open). **Migración NO aplicada a prod** (toca `core` + RLS → OK de Beto); código fail-open seguro de deployar antes.
 - **2026-06-19** — **Sprint 2 aplicado + mergeado** (#961): Beto dio OK; `supabase db push` aplicó la migración a prod (verificado: ambas tablas con RLS on + 0 policies; ledger 1:1 sin drift), regen de SCHEMA_REF + types, CI verde (Supabase Preview aplicó la migración limpia), auto-merge. `core.ai_config` + `core.ai_invocaciones` vivas en prod.
 - **2026-06-19** — **Sprint 3 construido** ([#962](https://github.com/beto-sudo/BSOP/pull/962)): pantalla admin-only `/settings/ia` (page + client + actions) + entrada en el nav + `MODELOS_POR_PROVEEDOR` en `pricing.ts` + fix del sync test de nav-config. typecheck/lint/format limpios, 1909 tests verdes. **Sin migración.** Sin auto-merge (UI → Beto revisa el Preview y mergea; cierra la iniciativa).
+- **2026-06-19** — **#962 mergeado → iniciativa CERRADA.** Los 3 sprints en prod. Resultado: la IA de BSOP pasó de dispersa-y-sin-registro a (1) una capa única `lib/ai/` con drift-guard que no deja que envejezca, (2) modelo cambiable sin redeploy desde **Configuración → IA**, (3) costo y conteo atribuidos por empresa/proceso. Fast-follows opcionales (no bloqueantes): threading del `empresa_id` real en runtime para partir el costo de los usos `cross` por empresa; tightening de los casts `as any` ahora que `core.ai_config`/`ai_invocaciones` están en los tipos generados.
