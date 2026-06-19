@@ -59,6 +59,11 @@ const TABS = [
     href: '/dilesa/ventas/promociones',
     module: 'dilesa.ventas.promociones',
   },
+  {
+    label: 'Reportes',
+    href: '/dilesa/ventas/reportes',
+    module: 'dilesa.ventas.reportes',
+  },
 ] as const;
 
 export default function VentasLayout({ children }: { children: ReactNode }) {

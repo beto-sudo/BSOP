@@ -311,6 +311,12 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.ventas.estado_cuenta',
   'dilesa.ventas.documentos',
   'dilesa.ventas.bitacora',
+  // Tab Reportes del hub Ventas (iniciativa `dilesa-reportes`, ADR-047).
+  // Permisos clonados del padre `dilesa.ventas` en la migración
+  // 20260619*_modulos_dilesa_reportes.sql.
+  'dilesa.ventas.reportes',
+  // Hub-índice de Reportes (módulo propio, misma migración).
+  'dilesa.reportes',
   // Cobranza (CxC) — hub con 2 tabs. Migración
   // 20260601192607_modulo_dilesa_cobranza.sql.
   'dilesa.cobranza',

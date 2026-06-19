@@ -110,6 +110,10 @@ export const NAV_ITEMS: NavItem[] = [
           // Atención a Clientes — bandeja de Ciori (recepción de obra →
           // pre-entrega → entrega → conformidad). Iniciativa `dilesa-atencion-clientes`.
           { label: 'Atención a Clientes', href: '/dilesa/atencion-clientes' },
+          // Reportes — hub-índice de reportes operativos (catálogo + buscador).
+          // Los reportes viven en su módulo; aquí se descubren. Iniciativa
+          // `dilesa-reportes`, ADR-047.
+          { label: 'Reportes', href: '/dilesa/reportes' },
         ],
       },
     ],
