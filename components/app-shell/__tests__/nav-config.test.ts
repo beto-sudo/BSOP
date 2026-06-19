@@ -63,6 +63,7 @@ describe('flattenNavChildren', () => {
     expect(flat.map((c) => c.href)).toEqual([
       '/settings/acceso',
       '/settings/notificaciones',
+      '/settings/ia',
       '/settings/empresas',
       '/settings/integraciones',
       '/settings/preferencias',

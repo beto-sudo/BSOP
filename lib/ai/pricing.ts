@@ -35,3 +35,13 @@ export function estimarCostoUsd(modelo: string, tokensIn: number, tokensOut: num
   if (!p) return 0;
   return (tokensIn * p.input + tokensOut * p.output) / 1_000_000;
 }
+
+/**
+ * Modelos seleccionables por proveedor (para el editor de override de la UI,
+ * Sprint 3). Derivado de PRICING → se mantiene en sync solo. Un override solo
+ * puede apuntar a un modelo del mismo proveedor que el uso.
+ */
+export const MODELOS_POR_PROVEEDOR: Record<'anthropic' | 'openai', string[]> = {
+  anthropic: Object.keys(PRICING).filter((m) => m.startsWith('claude-')),
+  openai: Object.keys(PRICING).filter((m) => m.startsWith('text-embedding-')),
+};

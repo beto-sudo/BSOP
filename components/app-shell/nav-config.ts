@@ -189,6 +189,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Acceso', href: '/settings/acceso' },
       { label: 'Notificaciones', href: '/settings/notificaciones' },
+      { label: 'IA', href: '/settings/ia' },
       { label: 'Empresas', href: '/settings/empresas' },
       { label: 'Integraciones', href: '/settings/integraciones' },
       { label: 'Preferencias', href: '/settings/preferencias' },
