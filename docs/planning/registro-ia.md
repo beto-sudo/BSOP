@@ -4,10 +4,10 @@
 **Empresas:** todas (capa transversal; hoy la IA productiva vive en cross + DILESA)
 **Schemas afectados:** principalmente código (`lib/ai/` capa única + registry); Sprint 2 agrega `core` (tablas `ai_config` override de modelo, `ai_invocaciones` log de uso/costo). Lectura de `core.usuarios` para autoría.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 en review — refactor de centralización (`lib/ai/` único entry point + registry + drift-guard en CI) + bump `claude-opus-4-7 → claude-opus-4-8`. Validar extracción de un doc real por tipo en Preview antes de mergear.
+**Próximo hito:** Beto valida la extracción de un doc real por tipo en el Preview de [#960](https://github.com/beto-sudo/BSOP/pull/960) y mergea (CI verde). Luego Sprint 2 — `core.ai_config` (override de modelo runtime) + `core.ai_invocaciones` (log de costo/uso por empresa/proceso).
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-19 (promovida + Sprint 1 en curso)
+**Última actualización:** 2026-06-19 (Sprint 1 entregado — PR #960 verde, en review)
 
 ## Problema
 
@@ -60,3 +60,4 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 ## Bitácora
 
 - **2026-06-19** — Promovida desde conversación con Beto (estrés de la idea con el inventario real del código). Arranca Sprint 1.
+- **2026-06-19** — Sprint 1 entregado en [#960](https://github.com/beto-sudo/BSOP/pull/960): capa `lib/ai` (registry tipado + `runGenerateObject`/`runEmbed` + `resolveModel` async como seam del override) + drift-guard en CI + bump `claude-opus-4-7 → claude-opus-4-8` + ADR-046. 7 call-sites migrados (documentos, CSF, planos, PLD informe+acuse, estados de cuenta, búsqueda semántica); `extraccion_modelo`/`modelo` ahora = `resolveModel(usoId)` (fix del literal stale en planos). 1896 tests verdes, CI verde. **Sin auto-merge**: Beto valida la extracción en Preview antes de mergear (cambio de comportamiento en rutas sensibles; rollback = 1 línea en `lib/ai/models.ts`).
