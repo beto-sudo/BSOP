@@ -63,6 +63,9 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.ventas.inventario': [],
   'dilesa.ventas.vendedores': [],
   'dilesa.ventas.promociones': [],
+  // Tab Reportes del hub Ventas (iniciativa `dilesa-reportes`, ADR-047): tab
+  // hermano, gobierna su propio contenido; no depende de la lista.
+  'dilesa.ventas.reportes': [],
 
   // ── DILESA · Proyectos ─────────────────────────────────────────────────────
   // El tab Gasto vive bajo el detalle del proyecto (/dilesa/proyectos/[id]/gasto),
@@ -100,6 +103,9 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.portafolio.inventario': [],
   'dilesa.portafolio.evaluacion': [],
   'dilesa.proveedores': [],
+  // Hub-índice de Reportes (iniciativa `dilesa-reportes`, ADR-047): top-level,
+  // solo descubre y enlaza; sin dependencias.
+  'dilesa.reportes': [],
   'dilesa.ruv': [],
   'dilesa.saldos-bancos': [],
   'dilesa.saldos-bancos.saldos': [],

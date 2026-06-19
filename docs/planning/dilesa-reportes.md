@@ -3,11 +3,11 @@
 **Slug:** `dilesa-reportes`
 **Empresas:** DILESA (arranca en Ventas; el patrón es replicable módulo-por-módulo y a las otras empresas)
 **Schemas afectados:** Principalmente UI + lectura — **sin schema nuevo en v1** (los presets viven como config en código, versionados). Lee de `dilesa` (`ventas`, `unidades`, `proyectos`, `productos`, `venta_fases`), `erp` (`personas`, `cxc_cargos`/`cxc_pagos` para cartera) y `core` (RBAC). Nuevo sub-slug RBAC por sección de reportes (ADR-014/030, con backfill defensivo de permisos). PDF vía `@react-pdf/renderer` (ya en deps) o patrón print ADR-021. Diferido a fase 2: tabla de «vistas guardadas» del usuario.
-**Estado:** planned
-**Próximo hito:** Sprint 1 — ADR del patrón «reporte = preset + vista + PDF» + hub `/dilesa/reportes` (catálogo + buscador + RBAC) + el reporte **Pipeline por fase** end-to-end (pantalla + PDF) como golden replicable.
+**Estado:** in_progress
+**Próximo hito:** Beto revisa el preview del Sprint 1 (Pipeline por fase + hub `/dilesa/reportes`); al OK, aplicar la migración RBAC `20260619223958_modulos_dilesa_reportes.sql` y arrancar Sprint 2 (Ventas del periodo + Productividad por vendedor).
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-19 (promoción — alcance v1 cerrado en conversación de diseño)
+**Última actualización:** 2026-06-19 (Sprint 1 construido — patrón ADR-047 + hub + Pipeline por fase end-to-end con PDF; en preview para revisión de Beto)
 
 > Detonante: Beto quiere generar reportes de los módulos de DILESA, **empezando por Ventas**, y no tenía claro el modelo de presentación (¿filtros libres? ¿presets? ¿una página de reportes por módulo o un módulo central?). Esta iniciativa cierra ese modelo y lo aterriza en los primeros reportes de Ventas.
 
@@ -88,7 +88,8 @@ Un set de **reportes de Ventas con nombre** que abren ya armados (preset), se af
 
 ## Bitácora
 
-- **2026-06-19** — Promovida. Conversación de diseño: se ordenó "reportes" en 4 tipos (vista operativa / gestión recurrente / documento formal / analítico cross-módulo). Mapa del estado actual de DILESA (18 módulos; Ventas ya con KPIs+filtros+tabla; 2 printables por-registro; sin presets ni export). Beto eligió audiencia **operativa por área**, salida **pantalla + PDF** (sin Excel), arquitectura **híbrida** (hub-índice + reporte en su módulo). Arranca por Ventas con 3 reportes núcleo (Pipeline por fase · Ventas del periodo · Productividad por vendedor); demás departamentos después.
+- **2026-06-19** — Promovida. Conversación de diseño: se ordenó "reportes" en 4 tipos (vista operativa / gestión recurrente / documento formal / analítico cross-módulo). Mapa del estado actual de DILESA (18 módulos; Ventas ya con KPIs+filtros+tabla; 2 printables por-registro; sin presets ni export). Beto eligió audiencia **operativa por área**, salida **pantalla + PDF** (sin Excel), arquitectura **híbrida** (hub-índice + reporte en su módulo). Arranca por Ventas con 3 reportes núcleo (Pipeline por fase · Ventas del periodo · Productividad por vendedor); demás departamentos después. PR de promoción: [#964](https://github.com/beto-sudo/BSOP/pull/964) (merged).
+- **2026-06-19 (Sprint 1 — patrón + golden)** — Construido el molde completo y el primer reporte end-to-end. **Patrón** ([ADR-047](../adr/047_reportes_preset_vista_pdf.md)): `reporte = preset (ReporteDef en registry, config en código) + vista + PDF`, con motor puro compartido por pantalla y PDF (paridad garantizada), cáscara reutilizable (`<ReporteCatalogo>` + `<ReporteShell>`), y la regla híbrida (reporte en su módulo + hub-índice). **Reporte golden «Pipeline por fase»** (Ventas): fetch enfocado de `venta_fase_catalogo` + ventas activas, agrupación por fase con conteo/monto/%, filtros proyecto/vendedor/mes en la URL, KPIs, tabla-embudo, y export PDF con branding DILESA (reusa `lib/dilesa/pdf` + route `renderToBuffer`). **Hub** `/dilesa/reportes` (catálogo + buscador filtrado por RBAC) + **tab Reportes** en Ventas. **RBAC**: 2 módulos nuevos (`dilesa.reportes`, `dilesa.ventas.reportes`) en los 4 lugares (nav-config, ROUTE_TO_MODULE, EXPECTED_DB_MODULE_SLUGS, migración con backfill desde `dilesa.ventas.lista`). Motor con 9 tests. Migración `20260619223958_modulos_dilesa_reportes.sql` **dejada como archivo** (otorga permisos → la aplica Beto); preview revisable como admin. Sin auto-merge: Beto revisa el preview.
 
 ## Decisiones registradas
 
@@ -97,3 +98,6 @@ Un set de **reportes de Ventas con nombre** que abren ya armados (preset), se af
 - **2026-06-19** — **Arquitectura híbrida.** Reportes de un módulo viven en el módulo (con sub-slug RBAC, reusando sus componentes); `/dilesa/reportes` es catálogo + buscador y casa de los cross-módulo. Se **descarta** el módulo-central-monolítico (duplica lógica/permisos, se desincroniza).
 - **2026-06-19** — **Presets = config en código en v1** (versionados, sin migración). «Vistas guardadas» del usuario = fase 2 (tabla).
 - **2026-06-19** — **Límite vs `analytics`/Metabase:** reportes curados en la app ≠ exploración ad-hoc libre. No se construye BI ad-hoc aquí.
+- **2026-06-19 (Sprint 1)** — **Motor puro compartido pantalla↔PDF** (ADR-047 R2): el filtrado y la agregación viven en funciones puras (`filtrarVentas`, `construirPipelinePorFase`) que consumen ambas superficies → el PDF refleja exactamente lo que se ve. Es la garantía de paridad y lo testeable.
+- **2026-06-19 (Sprint 1)** — **El reporte vive en su módulo** (`/dilesa/ventas/reportes/<id>`), con sub-slug `dilesa.ventas.reportes`; el hub `/dilesa/reportes` (módulo `dilesa.reportes`) solo lo descubre. Backfill de ambos desde `dilesa.ventas.lista` (quien ve la lista de ventas, ve sus reportes y el hub).
+- **2026-06-19 (Sprint 1)** — **Gate del endpoint PDF por RLS + auth, no por sub-slug** (como los PDFs de estimaciones). El dato ya es visible en otras pantallas de ventas; el gate fino de endpoint es mejora futura (anotado en ADR-047).
