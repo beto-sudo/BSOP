@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { embed } from 'ai';
-import { openai } from '@ai-sdk/openai';
 
+import { EMBEDDING_DIMS, runEmbed } from '@/lib/ai';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 // Límites elegidos para contener costo — $0.0001 por query (text-embedding-3-large).
@@ -47,13 +46,12 @@ export async function POST(req: NextRequest) {
   // 1) Embedding del query
   let embedding: number[];
   try {
-    const result = await embed({
-      model: openai.embedding('text-embedding-3-large'),
+    embedding = await runEmbed({
+      usoId: 'busqueda-semantica',
       value: parsed.query,
-      providerOptions: { openai: { dimensions: 1536 } },
+      dimensions: EMBEDDING_DIMS,
       maxRetries: 2,
     });
-    embedding = result.embedding;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: `Embedding falló: ${msg}` }, { status: 502 });

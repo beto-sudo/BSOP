@@ -34,12 +34,12 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { generateObject } from 'ai';
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
-import { anthropic, ensurePdfFitsForClaude, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
+import { resolveModel, runGenerateObject } from '@/lib/ai';
+import { ensurePdfFitsForClaude } from '@/lib/documentos/extraction-core';
 import { getNotaria } from '@/lib/dilesa/notarios';
 import { getAdjuntoPath } from '@/lib/adjuntos';
 import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
@@ -379,7 +379,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         fase: FASE,
         adjunto_id: pld.id,
         adjunto_acuse_id: acuse?.id ?? null,
-        modelo: MODELO_CLAUDE,
+        modelo: await resolveModel('dilesa-pld-informe'),
         ejecutado_por: userId,
         ...fila,
       })
@@ -409,8 +409,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
       informe = ExtraccionPldSchema.parse(extraccionPrevia);
     } else {
       const pdfInforme = await descargarPdf(pld);
-      const r = await generateObject({
-        model: anthropic(MODELO_CLAUDE),
+      informe = await runGenerateObject({
+        usoId: 'dilesa-pld-informe',
         schema: ExtraccionPldSchema,
         maxRetries: 2,
         messages: [
@@ -423,7 +423,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
           },
         ],
       });
-      informe = r.object;
     }
     const checks: RevisionCheck[] = cruzarPldConExpediente(informe, expediente);
 
@@ -431,8 +430,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
     let extraccionAcuse: unknown = null;
     if (acuse) {
       const pdfAcuse = await descargarPdf(acuse);
-      const { object: acuseExt } = await generateObject({
-        model: anthropic(MODELO_CLAUDE),
+      const acuseExt = await runGenerateObject({
+        usoId: 'dilesa-pld-acuse',
         schema: ExtraccionAcuseSchema,
         maxRetries: 2,
         messages: [

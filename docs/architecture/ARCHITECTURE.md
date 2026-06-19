@@ -357,6 +357,7 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 | Sub-module permissions (sub-slugs) | [ADR-030](../adr/030_submodule_permissions.md)        | sub-slugs `<padre>.<sub>` + `<RoutedModuleTabs module>` filter (SS1-SS7) |
 | Workflow CC owns planning          | [ADR-012](../adr/012_workflow_cc_owns_planning.md)    | meta-decisión sobre roles                                                |
 | Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)        | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M8)  |
+| Capa única de acceso a IA          | [ADR-046](../adr/046_capa_unica_acceso_ia.md)         | `lib/ai` único entry point + registry + drift-guard (registro-ia)        |
 
 ### Data / DB
 

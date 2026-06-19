@@ -14,9 +14,9 @@
  *
  * Iniciativa dilesa-ventas-expediente.
  */
-import { generateObject } from 'ai';
 import { z } from 'zod';
-import { anthropic, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
+
+import { runGenerateObject } from '@/lib/ai';
 
 export const NotarialExtraccionSchema = z.object({
   tipo_documento: z.enum(['carta_instruccion', 'condiciones_financieras', 'otro']),
@@ -63,8 +63,8 @@ const PROMPT =
   `Los montos van como número sin símbolos ni comas (ej. 835566.99).`;
 
 export async function extraerDocNotarial(pdfBytes: Uint8Array): Promise<NotarialExtraccion> {
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
+  return runGenerateObject({
+    usoId: 'dilesa-notarial-venta',
     schema: NotarialExtraccionSchema,
     maxRetries: 3,
     messages: [
@@ -77,5 +77,4 @@ export async function extraerDocNotarial(pdfBytes: Uint8Array): Promise<Notarial
       },
     ],
   });
-  return object;
 }

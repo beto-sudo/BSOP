@@ -19,13 +19,14 @@
  *   6) UPDATE el jsonb + analizado_en timestamp.
  *
  * Cost approx: ~$0.01-0.05 por análisis dependiendo del tamaño del
- * plano. Claude Opus 4.7 con vision.
+ * plano. Modelo de visión del registry (uso `dilesa-plano`, lib/ai).
  */
 
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { resolveModel } from '@/lib/ai';
 import { analizarPlanoConClaude } from '@/lib/dilesa/plano-ai/analizar';
 import { normalizarAnalisis } from '@/lib/dilesa/plano-ai/schema';
 
@@ -164,7 +165,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ planoI
     archivo_nombre: adjunto.nombre,
     archivo_adjunto_id: adjunto.id,
     analizado_en: new Date().toISOString(),
-    modelo: 'claude-opus-4-7',
+    modelo: await resolveModel('dilesa-plano'),
   };
 
   const { error: upErr } = await sb

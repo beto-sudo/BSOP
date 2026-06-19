@@ -35,8 +35,8 @@ import {
   embedContent,
   extractWithClaude,
   extraccionToDocumentoUpdates,
-  MODELO_CLAUDE,
 } from '@/lib/documentos/extraction-core';
+import { resolveModel } from '@/lib/ai';
 import {
   buildStandardFilename,
   buildStandardTitulo,
@@ -199,7 +199,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       contenido_embedding: embedding,
       extraccion_status: 'completado',
       extraccion_fecha: new Date().toISOString(),
-      extraccion_modelo: MODELO_CLAUDE,
+      extraccion_modelo: await resolveModel('documentos-extraccion'),
       extraccion_error: null,
       updated_at: new Date().toISOString(),
     };
