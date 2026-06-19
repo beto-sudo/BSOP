@@ -201,6 +201,36 @@ export const CAPTURAR_SLUG_BY_POSICION: Record<number, string> = {
 };
 
 /**
+ * Módulo de permiso (write) que gobierna la captura de cada fase — fuente de
+ * verdad: el `<RequireAccess modulo=… write>` de cada
+ * `app/dilesa/ventas/[id]/capturar/<slug>/page.tsx`. Se centraliza aquí para
+ * que el botón "Capturar siguiente fase" (cabecera del expediente) pueda
+ * ocultarse cuando el usuario no tiene el permiso de esa fase, sin navegar
+ * hasta el gate de la página. Mantener en sync con esas páginas.
+ *
+ * Nota: la Fase 2 (Asignada) se gobierna con `dilesa.ventas.autorizar` (la
+ * autorización de Dirección), no con un `faseNN_*`.
+ */
+export const CAPTURA_MODULO_BY_POSICION: Record<number, string> = {
+  2: 'dilesa.ventas.autorizar',
+  3: 'dilesa.ventas.fase03_formalizada',
+  4: 'dilesa.ventas.fase04_solicitud_avaluo',
+  5: 'dilesa.ventas.fase05_avaluo_cerrado',
+  6: 'dilesa.ventas.fase06_inscrita',
+  7: 'dilesa.ventas.fase07_solicitud_dictamen',
+  8: 'dilesa.ventas.fase08_dictaminada',
+  9: 'dilesa.ventas.fase09_validacion_patronal',
+  10: 'dilesa.ventas.fase10_firmas_programadas',
+  11: 'dilesa.ventas.fase11_escriturada',
+  12: 'dilesa.ventas.fase12_detonada',
+  13: 'dilesa.ventas.fase13_facturada',
+  14: 'dilesa.ventas.fase14_preparada_entrega',
+  15: 'dilesa.ventas.fase15_entregada',
+  16: 'dilesa.ventas.fase16_conformidad',
+  17: 'dilesa.ventas.fase17_operacion_terminada',
+};
+
+/**
  * Gate de apertura por fase cuando NO es la inmediata anterior. Beto
  * (2026-06-10): la preparación de entrega (14) arranca desde que se registra
  * la escritura (11) — no espera Detonada (12) ni Facturada (13).
