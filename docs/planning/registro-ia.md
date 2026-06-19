@@ -4,10 +4,10 @@
 **Empresas:** todas (capa transversal; hoy la IA productiva vive en cross + DILESA)
 **Schemas afectados:** principalmente código (`lib/ai/` capa única + registry); Sprint 2 agrega `core` (tablas `ai_config` override de modelo, `ai_invocaciones` log de uso/costo). Lectura de `core.usuarios` para autoría.
 **Estado:** in_progress
-**Próximo hito:** Beto aplica la migración del Sprint 2 a prod (`core.ai_config` + `core.ai_invocaciones`; toca `core` + RLS → requiere su OK) y mergea el PR. Sprint 1 (#960) ya en prod y validado (4-8 = 4-7 en 6 docs reales). Luego Sprint 3 (UI de Configuración).
+**Próximo hito:** Beto revisa el Vercel Preview de [#962](https://github.com/beto-sudo/BSOP/pull/962) (Configuración → IA) y mergea. Con eso los 3 sprints quedan en prod y la iniciativa cierra. Sprint 1 (#960) + Sprint 2 (#961, migración aplicada a prod) ya vivos.
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-19 (Sprint 1 en prod + validado; Sprint 2 construido, migración pendiente de OK)
+**Última actualización:** 2026-06-19 (S1 + S2 en prod; S3 construido — PR #962 en review de Preview)
 
 ## Problema
 
@@ -37,7 +37,7 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 
 - [x] **Sprint 1 — Capa única + registry + drift-guard (refactor, sin DB).** `lib/ai/` como único entry point (clients, models, registry declarativo, `resolveModel` async, wrappers `runGenerateObject`/`runEmbed`). 7 call-sites migrados. Drift-guard en CI. `usoId` tipado contra el registry. Bump `claude-opus-4-7 → claude-opus-4-8`. ADR-046. **En prod (#960), validado contra 6 docs reales.**
 - [~] **Sprint 2 — Override de modelo + log de uso/costo.** Migración `core.ai_config` (override por uso) + `core.ai_invocaciones` (modelo, proceso, empresa, tokens in/out, costo estimado). `resolveModel` lee el override (cache 60s + fail-open); los wrappers loggean cada llamada (fail-open). Pricing autoritativo en `lib/ai/pricing.ts`. **Código construido + migración como archivo; pendiente: OK de Beto para aplicar a prod.**
-- [ ] **Sprint 3 — UI en Configuración.** Tabla de usos (auto-generada del registry) + panel de costo/conteo por empresa y proceso + editor de `ai_config` (cambiar modelo desde ahí, surte sin redeploy).
+- [~] **Sprint 3 — UI en Configuración.** Página admin-only `/settings/ia` (#962): tabla de usos (del registry) + modelo efectivo con editor de override (escribe `core.ai_config`, surte sin redeploy) + KPIs de costo/conteo + costo por empresa (de `core.ai_invocaciones`). Embeddings read-only con aviso de reindex. **Sin migración** (settings = admin-gated; lee/escribe vía admin client sobre el RLS deny-all). En review de Preview.
 
 ## Riesgos
 
@@ -60,10 +60,11 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 - **2026-06-19 (S2)** — **RLS deny-all** en `ai_config`/`ai_invocaciones` (sin policies; service_role bypassa; revoke a anon/authenticated). La UI del Sprint 3 lee vía route handler con admin client. Evita depender de `fn_is_admin` y cierra el perímetro como en blindaje-financiero.
 - **2026-06-19 (S2)** — **Atribución de empresa v1 = slug estático del registry** (`cross`/`dilesa`), no el `empresa_id` real en runtime. Da costo por proceso (siempre) y por dilesa-vs-cross sin tocar los 7 call-sites. El threading del `empresa_id` real (para partir el costo de los usos `cross` por empresa) queda como fast-follow.
 - **2026-06-19 (S2)** — El código es **fail-open** (resolveModel y logInvocacion caen al default / no-op si la tabla no existe) → se puede deployar **antes** de aplicar la migración a prod sin romper nada; el Preview branch la corre y la valida.
-
-## Bitácora
+- **2026-06-19 (S3)** — La UI vive en **`/settings/ia` (admin-gated), NO como módulo RBAC** → cero migración, cero touchpoints de ADR-014. Lee/escribe vía admin client (bypassa el RLS deny-all del S2). Mismo patrón que `/settings/notificaciones`. El editor del cliente importa solo de `registry`/`pricing` (puros) para no arrastrar `@ai-sdk` al bundle. Embeddings sin editor (read-only + aviso de reindex).
 
 - **2026-06-19** — Promovida desde conversación con Beto (estrés de la idea con el inventario real del código). Arranca Sprint 1.
 - **2026-06-19** — Sprint 1 entregado en [#960](https://github.com/beto-sudo/BSOP/pull/960): capa `lib/ai` (registry tipado + `runGenerateObject`/`runEmbed` + `resolveModel` async como seam del override) + drift-guard en CI + bump `claude-opus-4-7 → claude-opus-4-8` + ADR-046. 7 call-sites migrados (documentos, CSF, planos, PLD informe+acuse, estados de cuenta, búsqueda semántica); `extraccion_modelo`/`modelo` ahora = `resolveModel(usoId)` (fix del literal stale en planos). 1896 tests verdes, CI verde. **Sin auto-merge**: Beto valida la extracción en Preview antes de mergear (cambio de comportamiento en rutas sensibles; rollback = 1 línea en `lib/ai/models.ts`).
 - **2026-06-19** — **Validación del bump 4-7→4-8 hecha por CC** (Beto delegó: "haz las pruebas"). Script throwaway que bajó PDFs reales de prod y corrió la extracción con 4-8, diffeando contra el baseline 4-7 guardado: 2 escrituras (tipo_operacion + n_partes ✓), 2 planos (tipología + lotes exactos: 163 y 354, área exacta ✓), 2 CSF (RFC exacto NIG070412DB7 / DIE030904866 ✓). **0 regresión** → #960 mergeado a main (4-8 en prod).
 - **2026-06-19** — Sprint 2 construido: migración `20260619174421_core_ai_config_y_invocaciones.sql` (2 tablas + RLS deny-all + revoke anon + índices) + `resolveModel` lee el override (cache 60s + fail-open) + wrappers loggean uso/costo (fail-open) + `lib/ai/pricing.ts`. Tests nuevos (config/pricing/run = override, costo, wiring de logging, fail-open). **Migración NO aplicada a prod** (toca `core` + RLS → OK de Beto); código fail-open seguro de deployar antes.
+- **2026-06-19** — **Sprint 2 aplicado + mergeado** (#961): Beto dio OK; `supabase db push` aplicó la migración a prod (verificado: ambas tablas con RLS on + 0 policies; ledger 1:1 sin drift), regen de SCHEMA_REF + types, CI verde (Supabase Preview aplicó la migración limpia), auto-merge. `core.ai_config` + `core.ai_invocaciones` vivas en prod.
+- **2026-06-19** — **Sprint 3 construido** ([#962](https://github.com/beto-sudo/BSOP/pull/962)): pantalla admin-only `/settings/ia` (page + client + actions) + entrada en el nav + `MODELOS_POR_PROVEEDOR` en `pricing.ts` + fix del sync test de nav-config. typecheck/lint/format limpios, 1909 tests verdes. **Sin migración.** Sin auto-merge (UI → Beto revisa el Preview y mergea; cierra la iniciativa).
