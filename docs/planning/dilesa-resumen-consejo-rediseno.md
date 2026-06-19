@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 — cutover + closeout (smoke E2E lado a lado + revisar preview con Beto + cerrar iniciativa). Sprint 4 (absorción + meses de inventario + backlog de escrituración) en preview de revisión de Beto.
 **Dueño:** Beto
 **Creada:** 2026-06-13
-**Última actualización:** 2026-06-16 (Sprint 4 en preview — absorción/meses de inventario/backlog en JS puro)
+**Última actualización:** 2026-06-19 (fix del pipeline vivo: valor de escrituración con fallback a precio_asignación en fases previas a Dictaminada — antes salía $0 en Asignada/Formalizada)
 
 > **Continuación de** [`dilesa-resumen-consejo`](dilesa-resumen-consejo.md) (cerrada 2026-06-08, v1 = paridad 1:1 con Coda). Aquella es la **referencia técnica** del correo (7 bloques, vistas, cron, guard de domingo, fechas DST). Esta iniciativa es la **Fase 2** que aquel doc dejó anotada: pasar de "réplica de Coda" a un reporte que el Consejo espere a diario.
 
@@ -140,6 +140,21 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 - 100% de envíos trazables en `core.notification_log` (heredado de v1).
 
 ## Bitácora
+
+- **2026-06-19 (fix del pipeline vivo — valor desde la asignación)** — Beto notó que
+  en el correo las primeras fases (Solicitud de Asignación, Asignada) y parte de
+  Formalizada mostraban **$0 de valor de escrituración**. Causa: `valor_escrituracion`
+  no se captura hasta la **Fase 8 (Dictaminada)**, pero `armarTuberiaSplit` sumaba
+  `valor_escrituracion ?? 0` (la función hermana `armarBacklog` ya usaba el fallback
+  correcto — inconsistencia entre dos funciones del mismo archivo). **Fix:** el
+  pipeline vivo ahora usa `valor_escrituracion ?? precio_asignacion ?? 0` — el valor
+  comprometido congelado al asignar. **Sin tocar datos.** Efecto medido en prod:
+  Asignada $0→$4.75M, Formalizada $21.8M→$26.5M, Solicitud de Dictaminación +$0.93M.
+  ("Solicitud de Asignación" sigue $0: es pre-asignación, aún no hay precio congelado.)
+  Se descartó escribir `valor_escrituracion` en la DB desde la asignación (adelantaría
+  un dato que la captura de Fase 8 pisaría y mezclaría semántica). +1 test del fallback.
+  Pulido del correo dentro del rediseño, no Sprint nuevo. (El backfill de 6 ventas
+  nativas con columnas de desglose en NULL se hizo en paralelo, en `dilesa-cuadratura-sobreprecio`.)
 
 - **2026-06-16 (auditoría de consistencia "casas en obra" + blindaje + fix de avance)** —
   Beto detectó números distintos para los mismos conceptos comparando el módulo

@@ -235,28 +235,83 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
 
   it('agrupa activas por fase (solo con clientes) y manda terminadas al histórico', () => {
     const { viva, historico } = armarTuberiaSplit(CAT, [
-      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 1000 },
-      { estado: 'activa', fase_actual: 'Asignada', valor_escrituracion: 500 },
-      { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 2000 },
-      { estado: 'terminada', fase_actual: 'Operación Terminada', valor_escrituracion: 1000 },
+      {
+        estado: 'activa',
+        fase_actual: 'Asignada',
+        valor_escrituracion: 1000,
+        precio_asignacion: 9999,
+      },
+      {
+        estado: 'activa',
+        fase_actual: 'Asignada',
+        valor_escrituracion: 500,
+        precio_asignacion: 9999,
+      },
+      {
+        estado: 'terminada',
+        fase_actual: 'Operación Terminada',
+        valor_escrituracion: 2000,
+        precio_asignacion: 9999,
+      },
+      {
+        estado: 'terminada',
+        fase_actual: 'Operación Terminada',
+        valor_escrituracion: 1000,
+        precio_asignacion: 9999,
+      },
     ]);
     // Solo la fase con clientes vivos; las fases en 0 se filtran del funnel.
+    // `valor_escrituracion` tiene precedencia sobre `precio_asignacion` (el 9999 se ignora).
     expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 1500 }]);
     expect(historico).toEqual({ clientes: 2, valor: 3000 });
   });
 
+  it('usa precio_asignacion cuando aún no hay valor_escrituracion (fases previas a Dictaminada)', () => {
+    const { viva } = armarTuberiaSplit(CAT, [
+      {
+        estado: 'activa',
+        fase_actual: 'Asignada',
+        valor_escrituracion: null,
+        precio_asignacion: 800,
+      },
+      {
+        estado: 'activa',
+        fase_actual: 'Asignada',
+        valor_escrituracion: 1200,
+        precio_asignacion: 1000,
+      },
+    ]);
+    // 800 (fallback a precio_asignacion) + 1200 (valor_escrituracion gana) = 2000.
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 2000 }]);
+  });
+
   it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
     const { viva } = armarTuberiaSplit(CAT, [
-      { estado: 'activa', fase_actual: null, valor_escrituracion: null },
-      { estado: 'activa', fase_actual: 'Solicitud de Asignacion', valor_escrituracion: 700 },
+      { estado: 'activa', fase_actual: null, valor_escrituracion: null, precio_asignacion: null },
+      {
+        estado: 'activa',
+        fase_actual: 'Solicitud de Asignacion',
+        valor_escrituracion: 700,
+        precio_asignacion: null,
+      },
     ]);
     expect(viva[viva.length - 1]).toEqual({ fase: 'Sin fase asignada', clientes: 2, valor: 700 });
   });
 
   it('excluye desasignadas/expiradas: no entran ni al funnel ni al histórico', () => {
     const { viva, historico } = armarTuberiaSplit(CAT, [
-      { estado: 'desasignada', fase_actual: 'Asignada', valor_escrituracion: 999 },
-      { estado: 'expirada', fase_actual: 'Asignada', valor_escrituracion: 111 },
+      {
+        estado: 'desasignada',
+        fase_actual: 'Asignada',
+        valor_escrituracion: 999,
+        precio_asignacion: 999,
+      },
+      {
+        estado: 'expirada',
+        fase_actual: 'Asignada',
+        valor_escrituracion: 111,
+        precio_asignacion: 111,
+      },
     ]);
     expect(viva).toEqual([]);
     expect(historico).toEqual({ clientes: 0, valor: 0 });

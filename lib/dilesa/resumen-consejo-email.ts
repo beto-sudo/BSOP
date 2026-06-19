@@ -59,6 +59,7 @@ export type VentaTuberiaInput = {
   estado: string | null;
   fase_actual: string | null;
   valor_escrituracion: number | null;
+  precio_asignacion: number | null;
 };
 
 /**
@@ -80,7 +81,11 @@ export function armarTuberiaSplit(
   const sinFase = { clientes: 0, valor: 0 };
   const historico = { clientes: 0, valor: 0 };
   for (const v of ventas) {
-    const valor = Number(v.valor_escrituracion ?? 0);
+    // `valor_escrituracion` no se captura hasta la Fase 8 (Dictaminada). Antes de
+    // eso (Asignada/Formalizada/…) el valor comprometido ya existe: es el
+    // `precio_asignacion` congelado al asignar. Sin este fallback, el pipeline
+    // mostraba $0 en las fases tempranas. Mismo criterio que `armarBacklog`.
+    const valor = Number(v.valor_escrituracion ?? v.precio_asignacion ?? 0);
     if (v.estado === 'terminada') {
       historico.clientes += 1;
       historico.valor += valor;
