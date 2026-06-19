@@ -14,6 +14,83 @@ export type Database = {
   }
   core: {
     Tables: {
+      ai_config: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          modelo: string
+          nota: string | null
+          uso_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          modelo: string
+          nota?: string | null
+          uso_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          modelo?: string
+          nota?: string | null
+          uso_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_config_actualizado_por_fkey"
+            columns: ["actualizado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_invocaciones: {
+        Row: {
+          costo_estimado_usd: number
+          created_at: string
+          duracion_ms: number | null
+          empresa: string | null
+          error: string | null
+          exito: boolean
+          id: string
+          modelo: string
+          proveedor: string
+          tokens_in: number
+          tokens_out: number
+          uso_id: string
+        }
+        Insert: {
+          costo_estimado_usd?: number
+          created_at?: string
+          duracion_ms?: number | null
+          empresa?: string | null
+          error?: string | null
+          exito?: boolean
+          id?: string
+          modelo: string
+          proveedor: string
+          tokens_in?: number
+          tokens_out?: number
+          uso_id: string
+        }
+        Update: {
+          costo_estimado_usd?: number
+          created_at?: string
+          duracion_ms?: number | null
+          empresa?: string | null
+          error?: string | null
+          exito?: boolean
+          id?: string
+          modelo?: string
+          proveedor?: string
+          tokens_in?: number
+          tokens_out?: number
+          uso_id?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           accion: string

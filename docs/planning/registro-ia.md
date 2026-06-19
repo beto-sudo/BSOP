@@ -4,10 +4,10 @@
 **Empresas:** todas (capa transversal; hoy la IA productiva vive en cross + DILESA)
 **Schemas afectados:** principalmente código (`lib/ai/` capa única + registry); Sprint 2 agrega `core` (tablas `ai_config` override de modelo, `ai_invocaciones` log de uso/costo). Lectura de `core.usuarios` para autoría.
 **Estado:** in_progress
-**Próximo hito:** Beto valida la extracción de un doc real por tipo en el Preview de [#960](https://github.com/beto-sudo/BSOP/pull/960) y mergea (CI verde). Luego Sprint 2 — `core.ai_config` (override de modelo runtime) + `core.ai_invocaciones` (log de costo/uso por empresa/proceso).
+**Próximo hito:** Beto aplica la migración del Sprint 2 a prod (`core.ai_config` + `core.ai_invocaciones`; toca `core` + RLS → requiere su OK) y mergea el PR. Sprint 1 (#960) ya en prod y validado (4-8 = 4-7 en 6 docs reales). Luego Sprint 3 (UI de Configuración).
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-19 (Sprint 1 entregado — PR #960 verde, en review)
+**Última actualización:** 2026-06-19 (Sprint 1 en prod + validado; Sprint 2 construido, migración pendiente de OK)
 
 ## Problema
 
@@ -35,8 +35,8 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 
 ## Alcance v1 (sprints)
 
-- [ ] **Sprint 1 — Capa única + registry + drift-guard (refactor, sin DB).** `lib/ai/` como único entry point (clients, models, registry declarativo, `resolveModel` async, wrappers `runGenerateObject`/`runEmbed`). Migrar los 7 call-sites. Test guard: ningún `@ai-sdk/*` ni `from 'ai'` fuera de `lib/ai/`. `usoId` tipado contra el registry (un typo = error de compilación → el registro está completo por construcción). Bump del default `claude-opus-4-7 → claude-opus-4-8` en un solo lugar (validar 1 doc real por tipo en Preview). ADR-046.
-- [ ] **Sprint 2 — Override de modelo + log de uso/costo.** Migración `core.ai_config` (override por uso, fail-open al default del registry) + `core.ai_invocaciones` (modelo, proceso, empresa, tokens in/out, costo estimado con pricing semilla de `data/models.json`). El wrapper resuelve el override y loguea cada llamada. RLS admin/Dirección.
+- [x] **Sprint 1 — Capa única + registry + drift-guard (refactor, sin DB).** `lib/ai/` como único entry point (clients, models, registry declarativo, `resolveModel` async, wrappers `runGenerateObject`/`runEmbed`). 7 call-sites migrados. Drift-guard en CI. `usoId` tipado contra el registry. Bump `claude-opus-4-7 → claude-opus-4-8`. ADR-046. **En prod (#960), validado contra 6 docs reales.**
+- [~] **Sprint 2 — Override de modelo + log de uso/costo.** Migración `core.ai_config` (override por uso) + `core.ai_invocaciones` (modelo, proceso, empresa, tokens in/out, costo estimado). `resolveModel` lee el override (cache 60s + fail-open); los wrappers loggean cada llamada (fail-open). Pricing autoritativo en `lib/ai/pricing.ts`. **Código construido + migración como archivo; pendiente: OK de Beto para aplicar a prod.**
 - [ ] **Sprint 3 — UI en Configuración.** Tabla de usos (auto-generada del registry) + panel de costo/conteo por empresa y proceso + editor de `ai_config` (cambiar modelo desde ahí, surte sin redeploy).
 
 ## Riesgos
@@ -56,8 +56,14 @@ El objetivo de Beto: _"tener muy claro el día que alguno deje de funcionar para
 
 - **2026-06-19** — Alcance v1 acordado con Beto (3 bifurcaciones): (1) **solo IA embebida en BSOP** (no relevamiento manual de SaaS/empleados ni tooling personal); (2) **log propio por llamada** para costo atribuible por empresa/proceso; (3) continuidad = **inventario + modelo configurable** (no failover automático ni alertas en v1).
 - **2026-06-19** — La tabla `core.ai_config` (override runtime) + el log se mueven a Sprint 2 (no Sprint 1): se acoplan con el código de logging y requieren migración aplicada a prod (OK de Beto). Sprint 1 queda como refactor puro sin DB → cero riesgo de migración, CI verde autónomo, y deja `resolveModel` async como seam drop-in.
+- **2026-06-19 (S2)** — **Pricing autoritativo** en `lib/ai/pricing.ts` (no `data/models.json`, que está stale y no trae 4-8 ni el embedding): opus-4-8 = $5/$25 por 1M (fuente Anthropic), text-embedding-3-large = $0.13/1M (OpenAI). Los **tokens loggeados son factuales**; el costo es derivado → si el pricing cambia, se actualiza ahí y se recomputa desde los tokens.
+- **2026-06-19 (S2)** — **RLS deny-all** en `ai_config`/`ai_invocaciones` (sin policies; service_role bypassa; revoke a anon/authenticated). La UI del Sprint 3 lee vía route handler con admin client. Evita depender de `fn_is_admin` y cierra el perímetro como en blindaje-financiero.
+- **2026-06-19 (S2)** — **Atribución de empresa v1 = slug estático del registry** (`cross`/`dilesa`), no el `empresa_id` real en runtime. Da costo por proceso (siempre) y por dilesa-vs-cross sin tocar los 7 call-sites. El threading del `empresa_id` real (para partir el costo de los usos `cross` por empresa) queda como fast-follow.
+- **2026-06-19 (S2)** — El código es **fail-open** (resolveModel y logInvocacion caen al default / no-op si la tabla no existe) → se puede deployar **antes** de aplicar la migración a prod sin romper nada; el Preview branch la corre y la valida.
 
 ## Bitácora
 
 - **2026-06-19** — Promovida desde conversación con Beto (estrés de la idea con el inventario real del código). Arranca Sprint 1.
 - **2026-06-19** — Sprint 1 entregado en [#960](https://github.com/beto-sudo/BSOP/pull/960): capa `lib/ai` (registry tipado + `runGenerateObject`/`runEmbed` + `resolveModel` async como seam del override) + drift-guard en CI + bump `claude-opus-4-7 → claude-opus-4-8` + ADR-046. 7 call-sites migrados (documentos, CSF, planos, PLD informe+acuse, estados de cuenta, búsqueda semántica); `extraccion_modelo`/`modelo` ahora = `resolveModel(usoId)` (fix del literal stale en planos). 1896 tests verdes, CI verde. **Sin auto-merge**: Beto valida la extracción en Preview antes de mergear (cambio de comportamiento en rutas sensibles; rollback = 1 línea en `lib/ai/models.ts`).
+- **2026-06-19** — **Validación del bump 4-7→4-8 hecha por CC** (Beto delegó: "haz las pruebas"). Script throwaway que bajó PDFs reales de prod y corrió la extracción con 4-8, diffeando contra el baseline 4-7 guardado: 2 escrituras (tipo_operacion + n_partes ✓), 2 planos (tipología + lotes exactos: 163 y 354, área exacta ✓), 2 CSF (RFC exacto NIG070412DB7 / DIE030904866 ✓). **0 regresión** → #960 mergeado a main (4-8 en prod).
+- **2026-06-19** — Sprint 2 construido: migración `20260619174421_core_ai_config_y_invocaciones.sql` (2 tablas + RLS deny-all + revoke anon + índices) + `resolveModel` lee el override (cache 60s + fail-open) + wrappers loggean uso/costo (fail-open) + `lib/ai/pricing.ts`. Tests nuevos (config/pricing/run = override, costo, wiring de logging, fail-open). **Migración NO aplicada a prod** (toca `core` + RLS → OK de Beto); código fail-open seguro de deployar antes.
