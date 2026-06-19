@@ -86,8 +86,6 @@ function CapturarFase12Body() {
     (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [clienteNombre, setClienteNombre] = useState<string>('');
-  const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [fase11Cerrada, setFase11Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
@@ -133,55 +131,15 @@ function CapturarFase12Body() {
       if (v.fecha_detonacion) setFechaDetonacion(v.fecha_detonacion);
       if (v.monto_detonado != null) setMontoDetonado(String(v.monto_detonado));
 
-      const [pRes, uRes, fRes] = await Promise.all([
-        sb
-          .schema('erp')
-          .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
-          .eq('id', v.persona_id)
-          .maybeSingle(),
-        v.unidad_id
-          ? sb
-              .schema('dilesa')
-              .from('unidades')
-              .select('identificador, producto_id')
-              .eq('id', v.unidad_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        sb
-          .schema('dilesa')
-          .from('venta_fases')
-          .select('posicion')
-          .eq('venta_id', v.id)
-          .is('deleted_at', null),
-      ]);
+      const { data: fRows } = await sb
+        .schema('dilesa')
+        .from('venta_fases')
+        .select('posicion')
+        .eq('venta_id', v.id)
+        .is('deleted_at', null);
       if (!activo) return;
 
-      if (pRes.data) {
-        setClienteNombre(
-          [pRes.data.nombre, pRes.data.apellido_paterno, pRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ') || '(sin nombre)'
-        );
-      }
-      if (uRes.data) {
-        const prodSufijo = uRes.data.producto_id
-          ? (
-              await sb
-                .schema('dilesa')
-                .from('productos')
-                .select('nombre')
-                .eq('id', uRes.data.producto_id)
-                .maybeSingle()
-            ).data?.nombre
-              ?.split('-')
-              .pop()
-          : '';
-        setIdentificacionInv(
-          prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
-        );
-      }
-      const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
+      const posiciones = (fRows ?? []).map((f) => f.posicion as number);
       setFase11Cerrada(posiciones.includes(11));
       setYaCerrada(posiciones.includes(12));
 
@@ -263,7 +221,7 @@ function CapturarFase12Body() {
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -273,14 +231,8 @@ function CapturarFase12Body() {
 
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={12}
-          faseNombre="Detonada"
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={12} faseNombre="Detonada" />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -289,11 +241,8 @@ function CapturarFase12Body() {
   }
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={venta.id}
-        clienteNombre={clienteNombre}
-        identificacionInventario={identificacionInv}
         faseposicion={12}
         faseNombre="Detonada"
         descripcion="Registra la detonación del crédito (el depósito recibido) y sube el comprobante."

@@ -263,7 +263,7 @@ function CapturarFase2Body() {
 
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-32 w-full" />
       </div>
@@ -271,14 +271,8 @@ function CapturarFase2Body() {
   }
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={2}
-          faseNombre="Asignada"
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={2} faseNombre="Asignada" />
         <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
           {error ?? 'Venta no encontrada.'}
         </p>
@@ -287,14 +281,11 @@ function CapturarFase2Body() {
   }
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       {/* Header compartido: monta la cabecera del expediente (cliente con
           CURP/INE, vivienda, comercial y mini-cuadratura) — el contexto que
           el autorizador necesita para revisar antes de asignar. */}
       <CapturarFaseHeader
-        ventaId={ventaId}
-        clienteNombre={null}
-        identificacionInventario={null}
         faseposicion={2}
         faseNombre="Asignada"
         descripcion="Revisa el expediente completo y los datos de la operación, y autoriza la asignación de la unidad."

@@ -13,16 +13,19 @@
  *     navegación entre tabs no recarga) + `VentaExpedienteShell` (back-link +
  *     cabecera + ficha + tabs). Gate umbrella `dilesa.ventas.lista`; cada
  *     tab-page añade su sub-slug fino.
- *   - Rama captura: solo la barra de tabs encima del formulario de fase, que
- *     ya trae su propio header/ficha (`CapturarFaseHeader`) y gate de fase. No
- *     se monta el provider pesado: la captura no necesita CxC/adjuntos.
+ *   - Rama captura: `VentaCapturaShell` monta la misma Zona A persistente
+ *     (back-link + ficha + tabs, mismo `max-w-6xl`) por encima del formulario
+ *     de fase — la captura se ve idéntica al expediente. No se monta el
+ *     provider pesado: la captura no necesita CxC/adjuntos. El gate de fase es
+ *     el `<RequireAccess>` de cada page.
  */
 
 import type { ReactNode } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { RequireAccess } from '@/components/require-access';
 import { VentaDetalleProvider } from '@/components/dilesa/venta-detalle/provider';
-import { VentaExpedienteShell, VentaExpedienteTabs } from '@/components/dilesa/venta-detalle/shell';
+import { VentaExpedienteShell } from '@/components/dilesa/venta-detalle/shell';
+import { VentaCapturaShell } from '@/components/dilesa/venta-detalle/captura-shell';
 
 export default function VentaDetalleLayout({ children }: { children: ReactNode }) {
   const { id } = useParams<{ id: string }>();
@@ -30,14 +33,7 @@ export default function VentaDetalleLayout({ children }: { children: ReactNode }
   const isCaptura = pathname?.includes('/capturar/') ?? false;
 
   if (isCaptura) {
-    return (
-      <>
-        <div className="container mx-auto max-w-3xl px-4 pt-4 sm:px-6">
-          <VentaExpedienteTabs id={id} />
-        </div>
-        {children}
-      </>
-    );
+    return <VentaCapturaShell id={id}>{children}</VentaCapturaShell>;
   }
 
   return (

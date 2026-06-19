@@ -58,8 +58,6 @@ function CapturarFase7Body() {
   const ventaId = params.id;
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [clienteNombre, setClienteNombre] = useState<string>('');
-  const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [fase6Cerrada, setFase6Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
@@ -104,21 +102,7 @@ function CapturarFase7Body() {
       setVenta(v);
       if (v.notario_id) setNotarioId(v.notario_id);
 
-      const [pRes, uRes, fRes, notarias] = await Promise.all([
-        sb
-          .schema('erp')
-          .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
-          .eq('id', v.persona_id)
-          .maybeSingle(),
-        v.unidad_id
-          ? sb
-              .schema('dilesa')
-              .from('unidades')
-              .select('identificador, producto_id')
-              .eq('id', v.unidad_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+      const [fRes, notarias] = await Promise.all([
         sb
           .schema('dilesa')
           .from('venta_fases')
@@ -129,30 +113,6 @@ function CapturarFase7Body() {
       ]);
       if (!activo) return;
 
-      if (pRes.data) {
-        setClienteNombre(
-          [pRes.data.nombre, pRes.data.apellido_paterno, pRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ') || '(sin nombre)'
-        );
-      }
-      if (uRes.data) {
-        const prodSufijo = uRes.data.producto_id
-          ? (
-              await sb
-                .schema('dilesa')
-                .from('productos')
-                .select('nombre')
-                .eq('id', uRes.data.producto_id)
-                .maybeSingle()
-            ).data?.nombre
-              ?.split('-')
-              .pop()
-          : '';
-        setIdentificacionInv(
-          prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
-        );
-      }
       const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
       setFase6Cerrada(posiciones.includes(6));
       setYaCerrada(posiciones.includes(7));
@@ -235,7 +195,7 @@ function CapturarFase7Body() {
 
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -245,14 +205,8 @@ function CapturarFase7Body() {
 
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={7}
-          faseNombre="Solicitud de Dictaminación"
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={7} faseNombre="Solicitud de Dictaminación" />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -263,11 +217,8 @@ function CapturarFase7Body() {
   const notarioSeleccionado = notarios.find((n) => n.proveedorId === notarioId) ?? null;
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={venta.id}
-        clienteNombre={clienteNombre}
-        identificacionInventario={identificacionInv}
         faseposicion={7}
         faseNombre="Solicitud de Dictaminación"
         descripcion="Asigna una notaría y dispara el email con los datos del cliente, inmueble y crédito."

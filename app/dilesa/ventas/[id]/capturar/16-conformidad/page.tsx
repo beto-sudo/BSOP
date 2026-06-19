@@ -76,8 +76,6 @@ function CapturarFase16Body() {
   const ventaId = params.id;
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [clienteNombre, setClienteNombre] = useState<string>('');
-  const [identificacionInv, setIdentificacionInv] = useState<string | null>(null);
   const [fase15Cerrada, setFase15Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
   const [encuesta, setEncuesta] = useState<Encuesta | null>(null);
@@ -121,21 +119,7 @@ function CapturarFase16Body() {
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
 
-      const [pRes, uRes, fRes, eRes] = await Promise.all([
-        sb
-          .schema('erp')
-          .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
-          .eq('id', v.persona_id)
-          .maybeSingle(),
-        v.unidad_id
-          ? sb
-              .schema('dilesa')
-              .from('unidades')
-              .select('identificador, producto_id')
-              .eq('id', v.unidad_id)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
+      const [fRes, eRes] = await Promise.all([
         sb
           .schema('dilesa')
           .from('venta_fases')
@@ -146,30 +130,6 @@ function CapturarFase16Body() {
       ]);
       if (!activo) return;
 
-      if (pRes.data) {
-        setClienteNombre(
-          [pRes.data.nombre, pRes.data.apellido_paterno, pRes.data.apellido_materno]
-            .filter(Boolean)
-            .join(' ') || '(sin nombre)'
-        );
-      }
-      if (uRes.data) {
-        const prodSufijo = uRes.data.producto_id
-          ? (
-              await sb
-                .schema('dilesa')
-                .from('productos')
-                .select('nombre')
-                .eq('id', uRes.data.producto_id)
-                .maybeSingle()
-            ).data?.nombre
-              ?.split('-')
-              .pop()
-          : '';
-        setIdentificacionInv(
-          prodSufijo ? `${uRes.data.identificador}-${prodSufijo}` : uRes.data.identificador
-        );
-      }
       const posiciones = (fRes.data ?? []).map((f) => f.posicion as number);
       setFase15Cerrada(posiciones.includes(15));
       setYaCerrada(posiciones.includes(16));
@@ -354,7 +314,7 @@ function CapturarFase16Body() {
 
   if (loading) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -364,14 +324,8 @@ function CapturarFase16Body() {
 
   if (error || !venta) {
     return (
-      <div className="container mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader
-          ventaId={ventaId}
-          clienteNombre={null}
-          identificacionInventario={null}
-          faseposicion={16}
-          faseNombre="Conformidad del Cliente"
-        />
+      <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
+        <CapturarFaseHeader faseposicion={16} faseNombre="Conformidad del Cliente" />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -383,11 +337,8 @@ function CapturarFase16Body() {
     encuesta != null && (encuesta.estado === 'respondida' || encuesta.estado === 'manual');
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
-        ventaId={venta.id}
-        clienteNombre={clienteNombre}
-        identificacionInventario={identificacionInv}
         faseposicion={16}
         faseNombre="Conformidad del Cliente"
         descripcion="Encuesta posventa: se envía sola tras la entrega; aquí se monitorea el ciclo y se captura por teléfono si hace falta."

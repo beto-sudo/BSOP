@@ -11,8 +11,8 @@
  * que antes vivía en el monolito `[id]/page.tsx` — las páginas de tab solo se
  * montan cuando la venta ya está lista.
  *
- * `VentaExpedienteTabs` se exporta aparte para reusarse en la rama de captura
- * del layout (los tabs persisten encima del formulario de fase).
+ * La barra de tabs vive en `./tabs` (`VentaExpedienteTabs`) para compartirse
+ * con el shell de captura sin arrastrar el `VentaDetalleProvider`.
  */
 
 import type { ReactNode } from 'react';
@@ -20,30 +20,10 @@ import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
 import { Badge } from '@/components/ui/badge';
 import { VENTA_ESTADO_CONFIG } from '@/lib/status-tokens';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RoutedModuleTabs } from '@/components/module-page';
 import { useVentaDetalle } from './provider';
 import { BackLink, HoldBanner } from './ui';
+import { VentaExpedienteTabs } from './tabs';
 import { FASES_ORDEN } from './types';
-
-export function VentaExpedienteTabs({ id }: { id: string }) {
-  const base = `/dilesa/ventas/${id}`;
-  return (
-    <RoutedModuleTabs
-      tabs={[
-        { label: 'Operación', href: base, exact: true, module: 'dilesa.ventas.operacion' },
-        { label: 'Pipeline', href: `${base}/pipeline`, module: 'dilesa.ventas.pipeline' },
-        { label: 'Cuadratura', href: `${base}/cuadratura`, module: 'dilesa.ventas.cuadratura' },
-        {
-          label: 'Estado de cuenta',
-          href: `${base}/estado-cuenta`,
-          module: 'dilesa.ventas.estado_cuenta',
-        },
-        { label: 'Documentos', href: `${base}/documentos`, module: 'dilesa.ventas.documentos' },
-        { label: 'Bitácora', href: `${base}/bitacora`, module: 'dilesa.ventas.bitacora' },
-      ]}
-    />
-  );
-}
 
 export function VentaExpedienteShell({ children }: { children: ReactNode }) {
   const d = useVentaDetalle();
