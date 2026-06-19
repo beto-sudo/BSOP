@@ -58,11 +58,14 @@ import {
   extractWithClaude,
   extraccionToDocumentoUpdates,
   formatMB,
-  MODELO_CLAUDE,
-  MODELO_EMBEDDING,
-  EMBEDDING_DIMS,
   type Extraccion,
 } from '../lib/documentos/extraction-core';
+import {
+  DEFAULT_CLAUDE_MODEL,
+  DEFAULT_EMBEDDING_MODEL,
+  EMBEDDING_DIMS,
+  resolveModel,
+} from '../lib/ai';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -82,15 +85,10 @@ if (!process.env.OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Constantes del pipeline (MODELO_CLAUDE, EMBEDDING_DIMS, PDF_*) y helpers
-// puros (extractWithClaude, embedContent, ensurePdfFitsForClaude) viven en
-// `lib/documentos/extraction-core.ts` y se reutilizan en el API route
-// `/api/documentos/[id]/extract`. Ver ese módulo para detalles de schema Zod
-// y prompt engineering.
-
-// ─── Referencias útiles (antes definidas aquí, ahora vienen de la lib) ───────
-void MODELO_EMBEDDING;
-void EMBEDDING_DIMS;
+// Los helpers puros (extractWithClaude, embedContent, ensurePdfFitsForClaude) y
+// el schema/prompt viven en `lib/documentos/extraction-core.ts`; el modelo y las
+// constantes de embedding, en `lib/ai` (iniciativa registro-ia). Ese módulo se
+// reutiliza en el API route `/api/documentos/[id]/extract`.
 
 // ─── Tipos de datos ──────────────────────────────────────────────────────────
 
@@ -229,7 +227,7 @@ async function writeResult(id: string, extraccion: Extraccion, embedding: number
       contenido_embedding: embedding as any,
       extraccion_status: 'completado',
       extraccion_fecha: new Date().toISOString(),
-      extraccion_modelo: MODELO_CLAUDE,
+      extraccion_modelo: await resolveModel('documentos-extraccion'),
       extraccion_error: null,
     })
     .eq('id', id);
@@ -337,8 +335,8 @@ async function main() {
   console.log(` ONLY_ID      = ${ONLY_ID ?? '-'}`);
   console.log(` EMPRESA_ID   = ${EMPRESA_ID ?? '(todas)'}`);
   console.log(` CONCURRENCY  = ${CONCURRENCY}`);
-  console.log(` MODELO       = ${MODELO_CLAUDE}`);
-  console.log(` EMBEDDING    = ${MODELO_EMBEDDING} @ ${EMBEDDING_DIMS} dims`);
+  console.log(` MODELO       = ${DEFAULT_CLAUDE_MODEL}`);
+  console.log(` EMBEDDING    = ${DEFAULT_EMBEDDING_MODEL} @ ${EMBEDDING_DIMS} dims`);
   console.log('');
 
   const docs = await fetchPendingDocs();

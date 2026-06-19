@@ -200,7 +200,6 @@ vi.mock('@/lib/adjuntos', () => ({
 }));
 
 vi.mock('@/lib/documentos/extraction-core', () => ({
-  MODELO_CLAUDE: 'claude-test',
   ensurePdfFitsForClaude: async (raw: Uint8Array) => raw,
   extractWithClaude: async (..._args: unknown[]) => extractWithClaudeImpl(),
   embedContent: async (..._args: unknown[]) => embedContentImpl(),

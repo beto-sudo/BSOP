@@ -7,10 +7,9 @@
  * candidatos, bajar del bucket) vive en los call sites, no aquí.
  */
 
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
-import { embed, generateObject } from 'ai';
 import { z } from 'zod';
+
+import { EMBEDDING_DIMS, runEmbed, runGenerateObject } from '@/lib/ai';
 
 // Ghostscript via WebAssembly (~16 MB de bundle, pero funciona en cualquier
 // runtime: Mac local, Vercel Functions, Linux CI, etc. Antes usábamos spawn
@@ -26,20 +25,16 @@ type GsModuleFactory = (init?: unknown) => Promise<{
 }>;
 
 // ─── Configuración ───────────────────────────────────────────────────────────
-
-export const MODELO_CLAUDE = 'claude-opus-4-7';
-export const MODELO_EMBEDDING = 'text-embedding-3-large';
-export const EMBEDDING_DIMS = 1536;
+//
+// El modelo (antes `MODELO_CLAUDE` / `MODELO_EMBEDDING`) y el cliente Anthropic
+// viven ahora en `lib/ai` (iniciativa registro-ia, ADR-046): único módulo que
+// toca los SDK de IA. Acá quedan solo los límites de PDF, propios de la
+// compresión Ghostscript de este módulo.
 
 // Anthropic recomienda <32 MB por PDF (base64 infla ~33%). Dejamos margen
 // comprimiendo desde 20 MB; rechazamos si ni /screen baja de 28 MB.
 export const PDF_COMPRESS_THRESHOLD_BYTES = 20 * 1024 * 1024;
 export const PDF_MAX_AFTER_COMPRESS_BYTES = 28 * 1024 * 1024;
-
-// baseURL explícito — evita que una ANTHROPIC_BASE_URL del shell (ej. cuando
-// este código corre dentro de Claude Code) rompa las llamadas. Coincide con
-// el default oficial.
-export const anthropic = createAnthropic({ baseURL: 'https://api.anthropic.com/v1' });
 
 // ─── Zod schema compartido ───────────────────────────────────────────────────
 //
@@ -439,8 +434,8 @@ export async function ensurePdfFitsForClaude(
 // ─── Llamadas a los providers ─────────────────────────────────────────────────
 
 export async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): Promise<Extraccion> {
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
+  return runGenerateObject({
+    usoId: 'documentos-extraccion',
     schema: ExtraccionSchema,
     maxRetries: 4,
     messages: [
@@ -488,7 +483,6 @@ export async function extractWithClaude(pdfBytes: Uint8Array, titulo: string): P
       },
     ],
   });
-  return object;
 }
 
 export async function embedContent(contenido: string): Promise<number[]> {
@@ -497,10 +491,10 @@ export async function embedContent(contenido: string): Promise<number[]> {
   const MAX_CHARS = 28000;
   const truncated = contenido.length > MAX_CHARS ? contenido.slice(0, MAX_CHARS) : contenido;
 
-  const { embedding } = await embed({
-    model: openai.embedding(MODELO_EMBEDDING),
+  const embedding = await runEmbed({
+    usoId: 'documentos-embedding',
     value: truncated,
-    providerOptions: { openai: { dimensions: EMBEDDING_DIMS } },
+    dimensions: EMBEDDING_DIMS,
     maxRetries: 2,
   });
 

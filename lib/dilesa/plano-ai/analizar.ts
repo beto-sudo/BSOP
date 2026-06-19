@@ -2,9 +2,8 @@
  * Análisis con IA del plano del anteproyecto vía Claude vision.
  * Sprint 4E de `dilesa-proyectos-checklist-inline`.
  *
- * Reusa la infraestructura de `lib/documentos/extraction-core.ts`:
- * cliente Anthropic con baseURL explícito + modelo
- * `claude-opus-4-7` con vision capability. Pasamos el plano en
+ * Pasa por la capa `lib/ai` (registro-ia): el modelo de visión sale del
+ * registry/override del uso `dilesa-plano`. Pasamos el plano en
  * `content.type='file'` (PDF) o `content.type='image'` según
  * extensión.
  *
@@ -18,8 +17,7 @@
  *   - Listar recomendaciones concretas para el desarrollo.
  */
 
-import { generateObject } from 'ai';
-import { anthropic, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
+import { runGenerateObject } from '@/lib/ai';
 import { PlanoAiAnalisisSchema, type PlanoAiAnalisis } from './schema';
 
 const PROMPT = `Eres analista inmobiliario senior de DILESA, una desarrolladora
@@ -99,8 +97,8 @@ export async function analizarPlanoConClaude(
   mediaType: string
 ): Promise<PlanoAiAnalisis> {
   const isImage = mediaType.startsWith('image/');
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
+  return runGenerateObject({
+    usoId: 'dilesa-plano',
     schema: PlanoAiAnalisisSchema,
     maxRetries: 3,
     messages: [
@@ -115,5 +113,4 @@ export async function analizarPlanoConClaude(
       },
     ],
   });
-  return object;
 }

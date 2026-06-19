@@ -13,10 +13,9 @@
  * del repo); los conteos llegan como number y se redondean al persistir.
  */
 
-import { generateObject } from 'ai';
 import { z } from 'zod';
 
-import { anthropic, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
+import { runGenerateObject } from '@/lib/ai';
 
 export const ExtraccionEstadoCuentaSchema = z.object({
   banco: z
@@ -96,8 +95,8 @@ const PROMPT =
  * estructurada. El caller decide qué hacer con ella (prellenar el form).
  */
 export async function extraerEstadoCuentaIA(pdfBytes: Uint8Array): Promise<ExtraccionEstadoCuenta> {
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
+  return runGenerateObject({
+    usoId: 'dilesa-estado-cuenta',
     schema: ExtraccionEstadoCuentaSchema,
     maxRetries: 3,
     messages: [
@@ -110,5 +109,4 @@ export async function extraerEstadoCuentaIA(pdfBytes: Uint8Array): Promise<Extra
       },
     ],
   });
-  return object;
 }

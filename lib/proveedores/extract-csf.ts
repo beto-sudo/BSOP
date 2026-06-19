@@ -1,20 +1,18 @@
 /**
  * Extracción IA de Constancia de Situación Fiscal (CSF) del SAT.
  *
- * Reutiliza la infraestructura del módulo de Documentos
- * (`lib/documentos/extraction-core.ts`): cliente Anthropic con baseURL
- * explícito, compresión Ghostscript-WASM si el PDF excede 20 MB, modelo
- * Claude Opus 4.7 vía Vercel AI SDK.
+ * Pasa por la capa `lib/ai` (registro-ia): el modelo sale del registry/override
+ * del uso `csf-extraccion`. La compresión Ghostscript-WASM (si el PDF excede
+ * 20 MB) sigue en `lib/documentos/extraction-core.ts`.
  *
  * El schema y el prompt son específicos de CSF — no comparten estructura
  * con el schema de documentos notariales. La salida calza 1:1 con el
  * modelo DB definido en ADR-007 (erp.personas + erp.personas_datos_fiscales).
  */
 
-import { generateObject } from 'ai';
 import { z } from 'zod';
 
-import { anthropic, MODELO_CLAUDE } from '@/lib/documentos/extraction-core';
+import { runGenerateObject } from '@/lib/ai';
 
 // ─── Helper para campos opcionales sin generar union en JSON Schema ─────────
 //
@@ -338,8 +336,8 @@ Reglas:
 `.trim();
 
 export async function extractCsfWithClaude(pdfBytes: Uint8Array): Promise<CsfExtraccion> {
-  const { object } = await generateObject({
-    model: anthropic(MODELO_CLAUDE),
+  return runGenerateObject({
+    usoId: 'csf-extraccion',
     schema: CsfExtraccionSchema,
     maxRetries: 4,
     messages: [
@@ -356,5 +354,4 @@ export async function extractCsfWithClaude(pdfBytes: Uint8Array): Promise<CsfExt
       },
     ],
   });
-  return object;
 }
