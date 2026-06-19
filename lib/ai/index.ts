@@ -21,3 +21,4 @@ export {
 } from './registry';
 export { resolveModel } from './config';
 export { runGenerateObject, runEmbed } from './run';
+export { PRICING, estimarCostoUsd, type Precio } from './pricing';
