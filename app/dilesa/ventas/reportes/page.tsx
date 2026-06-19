@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * @module Ventas · Reportes (DILESA)
  * @responsive desktop-only
@@ -5,6 +7,11 @@
  * Tab «Reportes» del hub Ventas (ADR-047): catálogo de los reportes que viven
  * en Ventas. El reporte vive en su módulo (aquí), no en un módulo central; el
  * hub-índice global (`/dilesa/reportes`) solo lo descubre y enlaza.
+ *
+ * `'use client'` (como el hub): cada `ReporteDef` lleva un `icon` (componente
+ * lucide = función) que no se puede serializar al cruzar de un Server Component
+ * a `<ReporteCatalogo>` (client). Manteniendo la página en cliente, el icono
+ * viaja client→client sin tocar el límite RSC.
  *
  * Gate: sub-slug `dilesa.ventas.reportes` (ADR-030 SS5).
  */

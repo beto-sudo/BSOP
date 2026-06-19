@@ -1,10 +1,14 @@
+'use client';
+
 /**
  * @module Ventas · Reporte Pipeline por fase (DILESA)
  * @responsive desktop-only
  *
  * Reporte golden del patrón ADR-047 (preset + vista + PDF). El cuerpo usa
  * `useUrlFilters` (useSearchParams) → se separa en `<PipelinePorFaseView>`
- * envuelto en Suspense para evitar el bailout de CSR de Next 16.
+ * envuelto en Suspense para evitar el bailout de CSR de Next 16. La página es
+ * `'use client'` (como `app/dilesa/ventas/fases/page.tsx`): una página RSC con
+ * `useSearchParams` en el subárbol cliente rompe el prerender estático.
  *
  * Gate: sub-slug `dilesa.ventas.reportes` (ADR-030 SS5).
  */
