@@ -9,7 +9,7 @@
  * Los demás reportes de Ventas (del planning) y de otros módulos se suman en
  * los siguientes sprints calcando este molde.
  */
-import { GitBranch } from 'lucide-react';
+import { CalendarRange, GitBranch, Trophy } from 'lucide-react';
 import type { ReporteDef } from './tipos';
 
 /** Sub-slug RBAC del tab «Reportes» de Ventas. */
@@ -26,6 +26,28 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/pipeline-por-fase',
     icon: GitBranch,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'ventas-periodo',
+    nombre: 'Ventas del periodo',
+    descripcion:
+      'Ventas escrituradas en un rango de fechas, con desglose por mes y detalle por operación. El cierre comercial del periodo.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/ventas-periodo',
+    icon: CalendarRange,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'productividad-vendedor',
+    nombre: 'Productividad por vendedor',
+    descripcion:
+      'Scorecard por vendedor: cartera, pipeline en proceso, escrituradas, % de cierre y monto. Base para reconocimiento y comisiones.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/productividad-vendedor',
+    icon: Trophy,
     tipo: 'modulo',
     pdf: true,
   },
