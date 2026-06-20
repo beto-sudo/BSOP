@@ -1,8 +1,8 @@
 ---
 titulo: 'Atención a Clientes'
 modulo: dilesa.atencion_clientes
-version: '1.0.0'
-actualizado: '2026-06-16'
+version: '1.1.0'
+actualizado: '2026-06-20'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -54,8 +54,11 @@ La tira de indicadores resume cómo va el departamento:
 - **Abrir un pendiente** — clic en cualquier tarjeta para ir a la pantalla donde
   se trabaja (la obra o la fase correspondiente de la venta).
 - **Recibir la obra** — desde la tarjeta de "Obras por recibir" llegas a la obra,
-  donde programas la cita y levantas el **acta de recepción** (con o sin
-  observaciones). Eso es lo que mueve la unidad hacia la entrega.
+  donde programas la cita, **imprimes el formato en blanco**, lo marcas y firmas
+  en papel durante la visita, y subes el **acta firmada escaneada**. Si la visita
+  deja detalles, registras las observaciones y reprogramas (el ciclo se repite
+  hasta que todo quede bien). Subir el acta es lo que da la obra por recibida y
+  mueve la unidad hacia la entrega.
 
 ## Preguntas frecuentes
 
@@ -64,8 +67,10 @@ Porque su pre-entrega (Fase 14) ya se cerró. Las colas siguen el orden del
 proceso: una venta baja a la siguiente cola conforme cierras su fase.
 
 **Marqué una obra como recibida pero sigue en "Obras por recibir".**
-Revisa que el acta de recepción haya quedado guardada en la obra. Mientras la
-recepción no se cierre, la unidad permanece en la cola.
+Revisa que hayas subido el **acta firmada escaneada** en la obra: es obligatoria
+y es lo único que cierra la recepción. Si la última visita quedó "con
+observaciones", la obra sigue en la cola hasta que reprogrames, el contratista
+corrija y recibas con el acta.
 
 **¿El NPS y la satisfacción de dónde salen?**
 De las encuestas de conformidad (Fase 16) que los clientes responden. Solo
