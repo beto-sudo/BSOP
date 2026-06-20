@@ -5271,6 +5271,7 @@ export type Database = {
           fase_actual: string | null
           fase_posicion: number | null
           fecha_avaluo_cerrado: string | null
+          fecha_desasignacion: string | null
           fecha_detonacion: string | null
           fecha_dictaminada: string | null
           fecha_escritura: string | null
@@ -5367,6 +5368,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
@@ -5463,6 +5465,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null

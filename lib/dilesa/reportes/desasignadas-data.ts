@@ -14,6 +14,8 @@ export type DesasignadaRaw = {
   valor_escrituracion: number | null;
   valor_comercial: number | null;
   motivo_desasignacion: string | null;
+  /** Fecha real de desasignación (Coda / notas; backfill 2026-06-20). */
+  fecha_desasignacion: string | null;
   updated_at: string | null;
   created_at: string;
 };
@@ -52,7 +54,7 @@ export type DesasignadasBundle = {
 };
 
 export const DESASIGNADAS_SELECT =
-  'id, persona_id, unidad_id, vendedor, vendedor_usuario_id, valor_escrituracion, valor_comercial, motivo_desasignacion, updated_at, created_at';
+  'id, persona_id, unidad_id, vendedor, vendedor_usuario_id, valor_escrituracion, valor_comercial, motivo_desasignacion, fecha_desasignacion, updated_at, created_at';
 
 export function normalizarDesasignadas(b: DesasignadasBundle): DesasignadaRow[] {
   const unidadMap = new Map(
@@ -75,7 +77,9 @@ export function normalizarDesasignadas(b: DesasignadasBundle): DesasignadaRow[] 
 
   return b.ventas.map((v) => {
     const u = v.unidad_id ? unidadMap.get(v.unidad_id) : null;
-    const fecha = (v.updated_at ?? v.created_at).slice(0, 10);
+    // Fecha REAL de desasignación (Coda/notas, backfill); fallback al timestamp
+    // genérico solo si una fila quedara sin poblar.
+    const fecha = (v.fecha_desasignacion ?? v.updated_at ?? v.created_at).slice(0, 10);
     return {
       id: v.id,
       cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
