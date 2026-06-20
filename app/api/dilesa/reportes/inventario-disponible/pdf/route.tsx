@@ -18,6 +18,10 @@ export async function GET(req: Request) {
   const filtros = {
     proyecto: url.searchParams.get('proyecto') ?? '',
     prototipo: url.searchParams.get('prototipo') ?? '',
+    caracteristica: (url.searchParams.get('caracteristica') ?? '') as
+      | ''
+      | 'esquina'
+      | 'frente_verde',
   };
 
   const { unidades, error } = await cargarInventarioServer();
@@ -30,6 +34,11 @@ export async function GET(req: Request) {
   const partes = [
     filtros.proyecto ? `Proyecto: ${filtros.proyecto}` : null,
     filtros.prototipo ? `Prototipo: ${filtros.prototipo}` : null,
+    filtros.caracteristica === 'esquina'
+      ? 'Solo esquinas'
+      : filtros.caracteristica === 'frente_verde'
+        ? 'Solo frente verde'
+        : null,
   ].filter(Boolean);
 
   const meta: InventarioPdfMeta = {

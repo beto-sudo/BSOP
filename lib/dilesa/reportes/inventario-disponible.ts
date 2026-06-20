@@ -1,76 +1,57 @@
 /**
  * Motor del reporte «Inventario disponible» (DILESA · Ventas) — ADR-047.
  *
- * Agrupa las unidades vendibles por proyecto + prototipo, con el desglose
- * en construcción / terminadas. Es el panorama de "qué tengo para ofrecer y
- * dónde". Pura y testeable; la comparten la vista y el PDF.
+ * Lista cada unidad vendible con su precio DESGLOSADO (base + excedente de
+ * terreno + esquina + frente verde + venta futuro = total) — el mismo desglose
+ * que el módulo Inventario, para cotizar de un vistazo. Pura y testeable.
  */
-import type { UnidadDisponible } from './inventario-data';
+import type { UnidadDetalle } from './inventario-data';
 
-export type FiltrosInventario = { proyecto: string; prototipo: string };
-
-export const FILTROS_INVENTARIO_VACIOS: FiltrosInventario = { proyecto: '', prototipo: '' };
-
-export type GrupoInventario = {
+export type FiltrosInventario = {
   proyecto: string;
   prototipo: string;
-  disponibles: number;
-  enConstruccion: number;
-  terminadas: number;
+  caracteristica: '' | 'esquina' | 'frente_verde';
+};
+
+export const FILTROS_INVENTARIO_VACIOS: FiltrosInventario = {
+  proyecto: '',
+  prototipo: '',
+  caracteristica: '',
 };
 
 export type InventarioResult = {
-  /** Una fila por (proyecto, prototipo), ordenada por proyecto y luego prototipo. */
-  grupos: GrupoInventario[];
+  /** Unidades filtradas, ordenadas por proyecto y luego identificador. */
+  unidades: UnidadDetalle[];
   totalDisponibles: number;
-  totalEnConstruccion: number;
-  totalTerminadas: number;
-  /** Cuántos proyectos distintos tienen inventario. */
-  totalProyectos: number;
+  enConstruccion: number;
+  terminadas: number;
+  /** Suma de los precios totales (valor del inventario disponible). */
+  valorTotal: number;
 };
 
-const SIN_PROTOTIPO = '(sin prototipo)';
-
 export function construirInventarioDisponible(
-  unidades: readonly UnidadDisponible[],
+  unidades: readonly UnidadDetalle[],
   filtros: FiltrosInventario
 ): InventarioResult {
   const filtradas = unidades.filter((u) => {
     if (filtros.proyecto && u.proyectoNombre !== filtros.proyecto) return false;
-    if (filtros.prototipo && (u.prototipo ?? SIN_PROTOTIPO) !== filtros.prototipo) return false;
+    if (filtros.prototipo && u.prototipo !== filtros.prototipo) return false;
+    if (filtros.caracteristica === 'esquina' && !u.esEsquina) return false;
+    if (filtros.caracteristica === 'frente_verde' && !u.tieneFrenteVerde) return false;
     return true;
   });
 
-  const map = new Map<string, GrupoInventario>();
-  const proyectosSet = new Set<string>();
-  for (const u of filtradas) {
-    const proyecto = u.proyectoNombre || '(sin proyecto)';
-    const prototipo = u.prototipo ?? SIN_PROTOTIPO;
-    proyectosSet.add(proyecto);
-    const key = `${proyecto}::${prototipo}`;
-    const cur = map.get(key) ?? {
-      proyecto,
-      prototipo,
-      disponibles: 0,
-      enConstruccion: 0,
-      terminadas: 0,
-    };
-    cur.disponibles += 1;
-    if (u.estado === 'en_construccion') cur.enConstruccion += 1;
-    else if (u.estado === 'terminada') cur.terminadas += 1;
-    map.set(key, cur);
-  }
-
-  const grupos = [...map.values()].sort(
+  const lista = [...filtradas].sort(
     (a, b) =>
-      a.proyecto.localeCompare(b.proyecto, 'es') || a.prototipo.localeCompare(b.prototipo, 'es')
+      a.proyectoNombre.localeCompare(b.proyectoNombre, 'es') ||
+      a.identificadorCompleto.localeCompare(b.identificadorCompleto, 'es')
   );
 
   return {
-    grupos,
-    totalDisponibles: filtradas.length,
-    totalEnConstruccion: filtradas.filter((u) => u.estado === 'en_construccion').length,
-    totalTerminadas: filtradas.filter((u) => u.estado === 'terminada').length,
-    totalProyectos: proyectosSet.size,
+    unidades: lista,
+    totalDisponibles: lista.length,
+    enConstruccion: lista.filter((u) => u.estado === 'en_construccion').length,
+    terminadas: lista.filter((u) => u.estado === 'terminada').length,
+    valorTotal: lista.reduce((acc, u) => acc + (u.precio.total ?? 0), 0),
   };
 }
