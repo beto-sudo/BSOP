@@ -271,6 +271,7 @@ async function main() {
         uso_efectivo: str(pick(v, cm, 'Uso de Efectivo')),
         conocimiento_dueno_beneficiario: str(pick(v, cm, 'Conocimiento Dueño Beneficiario')),
         motivo_desasignacion: str(pick(v, cm, 'Motivo por el cual se libera inventario')),
+        fecha_desasignacion: dateStr(pick(v, cm, 'F📅Desasigna🚫')),
       };
 
       const fases = FASES.map((f) => ({

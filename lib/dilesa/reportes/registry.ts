@@ -9,7 +9,16 @@
  * Los demás reportes de Ventas (del planning) y de otros módulos se suman en
  * los siguientes sprints calcando este molde.
  */
-import { CalendarRange, GitBranch, Trophy } from 'lucide-react';
+import {
+  Boxes,
+  CalendarClock,
+  CalendarRange,
+  Clock,
+  CreditCard,
+  GitBranch,
+  Trophy,
+  UserMinus,
+} from 'lucide-react';
 import type { ReporteDef } from './tipos';
 
 /** Sub-slug RBAC del tab «Reportes» de Ventas. */
@@ -48,6 +57,61 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/productividad-vendedor',
     icon: Trophy,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'escrituracion-programada',
+    nombre: 'Escrituración programada',
+    descripcion:
+      'La agenda de firmas (fase 10) con su estado (pendiente / escriturada), por fecha. El calendario del cierre notarial.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/escrituracion-programada',
+    icon: CalendarClock,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'por-tipo-credito',
+    nombre: 'Por tipo de crédito',
+    descripcion:
+      'Distribución de la cartera por tipo de crédito (INFONAVIT / FOVISSSTE / bancario / contado): conteo, monto y participación.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/por-tipo-credito',
+    icon: CreditCard,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'inventario-disponible',
+    nombre: 'Inventario disponible',
+    descripcion:
+      'Unidades vendibles hoy (en construcción o terminadas) agrupadas por proyecto y prototipo. Qué hay para ofrecer y dónde.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/inventario-disponible',
+    icon: Boxes,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'desasignadas',
+    nombre: 'Ventas desasignadas',
+    descripcion:
+      'Ventas que se dieron de baja, con su motivo, separadas en reubicaciones (el cliente se mueve a otra unidad) y bajas reales.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/desasignadas',
+    icon: UserMinus,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'estancadas',
+    nombre: 'Ventas estancadas',
+    descripcion:
+      'El pipeline vivo ordenado por antigüedad en la fase actual: las que llevan más tiempo sin avanzar quedan arriba. Alerta temprana.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/estancadas',
+    icon: Clock,
     tipo: 'modulo',
     pdf: true,
   },

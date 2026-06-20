@@ -16,6 +16,9 @@ function row(p: Partial<VentaReporteRow>): VentaReporteRow {
     unidadIdentificador: null,
     cliente: p.cliente ?? '',
     vendedor: p.vendedor ?? null,
+    tipoCredito: null,
+    fechaFirmaProgramada: null,
+    horaFirmaProgramada: null,
     mesCreacion: '2026-01',
     mesEscritura: p.mesEscritura ?? null,
   };

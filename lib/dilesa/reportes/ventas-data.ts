@@ -25,6 +25,11 @@ export type VentaReporteRow = {
   unidadIdentificador: string | null;
   cliente: string;
   vendedor: string | null;
+  tipoCredito: string | null;
+  /** Fecha de firma programada `YYYY-MM-DD` (fase 10; null si no agendada). */
+  fechaFirmaProgramada: string | null;
+  /** Hora de firma programada (null si no agendada). */
+  horaFirmaProgramada: string | null;
   /** Mes de creación `YYYY-MM`. */
   mesCreacion: string;
   /** Mes de escrituración `YYYY-MM` (null si no ha escriturado). */
@@ -44,6 +49,9 @@ export type VentaRaw = {
   fecha_escritura: string | null;
   vendedor: string | null;
   vendedor_usuario_id: string | null;
+  tipo_credito: string | null;
+  fecha_firma_programada: string | null;
+  hora_firma_programada: string | null;
   created_at: string;
 };
 
@@ -67,7 +75,7 @@ export type VentasRawBundle = {
 
 /** El SELECT de ventas que necesitan los reportes (mantener en sync con VentaRaw). */
 export const VENTAS_SELECT =
-  'id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, unidad_id, persona_id, numero_escritura, fecha_escritura, vendedor, vendedor_usuario_id, created_at';
+  'id, estado, fase_actual, fase_posicion, valor_escrituracion, valor_comercial, unidad_id, persona_id, numero_escritura, fecha_escritura, vendedor, vendedor_usuario_id, tipo_credito, fecha_firma_programada, hora_firma_programada, created_at';
 
 /**
  * Normaliza el bundle crudo a filas de reporte. Pura: la usan tanto el fetch
@@ -109,6 +117,9 @@ export function normalizarVentas(b: VentasRawBundle): VentaReporteRow[] {
       vendedor: v.vendedor_usuario_id
         ? (usuarioMap.get(v.vendedor_usuario_id) ?? v.vendedor)
         : v.vendedor,
+      tipoCredito: v.tipo_credito,
+      fechaFirmaProgramada: v.fecha_firma_programada,
+      horaFirmaProgramada: v.hora_firma_programada,
       mesCreacion: v.created_at.slice(0, 7),
       mesEscritura: v.fecha_escritura ? v.fecha_escritura.slice(0, 7) : null,
     };

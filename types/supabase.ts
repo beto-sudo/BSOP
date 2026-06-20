@@ -4961,6 +4961,13 @@ export type Database = {
             foreignKeyName: "venta_encuestas_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: true
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
@@ -5070,6 +5077,13 @@ export type Database = {
             foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
@@ -5128,6 +5142,13 @@ export type Database = {
             columns: ["venta_id"]
             isOneToOne: false
             referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
           {
@@ -5198,6 +5219,13 @@ export type Database = {
             foreignKeyName: "venta_pagos_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
@@ -5243,6 +5271,7 @@ export type Database = {
           fase_actual: string | null
           fase_posicion: number | null
           fecha_avaluo_cerrado: string | null
+          fecha_desasignacion: string | null
           fecha_detonacion: string | null
           fecha_dictaminada: string | null
           fecha_escritura: string | null
@@ -5339,6 +5368,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
@@ -5435,6 +5465,7 @@ export type Database = {
           fase_actual?: string | null
           fase_posicion?: number | null
           fecha_avaluo_cerrado?: string | null
+          fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
           fecha_escritura?: string | null
@@ -5535,6 +5566,13 @@ export type Database = {
             columns: ["venta_id"]
             isOneToOne: true
             referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
           {
@@ -5889,6 +5927,55 @@ export type Database = {
           venta_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ventas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_ventas_pipeline_antiguedad: {
+        Row: {
+          cliente: string | null
+          dias_en_fase: number | null
+          empresa_id: string | null
+          fase_actual: string | null
+          fase_posicion: number | null
+          fecha_fase_actual: string | null
+          persona_id: string | null
+          precio: number | null
+          proyecto_id: string | null
+          proyecto_nombre: string | null
+          unidad_id: string | null
+          unidad_identificador: string | null
+          vendedor: string | null
+          vendedor_usuario_id: string | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ventas_unidad_id_fkey"
             columns: ["unidad_id"]
