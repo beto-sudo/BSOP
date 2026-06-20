@@ -9,7 +9,7 @@
  * Los demás reportes de Ventas (del planning) y de otros módulos se suman en
  * los siguientes sprints calcando este molde.
  */
-import { CalendarClock, CalendarRange, CreditCard, GitBranch, Trophy } from 'lucide-react';
+import { Boxes, CalendarClock, CalendarRange, CreditCard, GitBranch, Trophy } from 'lucide-react';
 import type { ReporteDef } from './tipos';
 
 /** Sub-slug RBAC del tab «Reportes» de Ventas. */
@@ -55,7 +55,7 @@ export const REPORTES: readonly ReporteDef[] = [
     id: 'escrituracion-programada',
     nombre: 'Escrituración programada',
     descripcion:
-      'Firmas agendadas pendientes (fase 10) por fecha: qué se va a escriturar y cuándo. Agenda del cierre notarial.',
+      'La agenda de firmas (fase 10) con su estado (pendiente / escriturada), por fecha. El calendario del cierre notarial.',
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/escrituracion-programada',
     icon: CalendarClock,
@@ -70,6 +70,17 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/por-tipo-credito',
     icon: CreditCard,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'inventario-disponible',
+    nombre: 'Inventario disponible',
+    descripcion:
+      'Unidades vendibles hoy (en construcción o terminadas) agrupadas por proyecto y prototipo. Qué hay para ofrecer y dónde.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/inventario-disponible',
+    icon: Boxes,
     tipo: 'modulo',
     pdf: true,
   },

@@ -27,15 +27,19 @@ export function ReporteEscrituracionProgramadaPDF({
     <Document title="Escrituración programada — DILESA">
       <Page size="LETTER" style={styles.page}>
         <HeaderBand title="ESCRITURACIÓN PROGRAMADA" fecha={meta.fechaTexto} />
-        <Text style={s.subtitle}>Firmas agendadas pendientes · {meta.filtrosTexto}</Text>
+        <Text style={s.subtitle}>Agenda de firmas · {meta.filtrosTexto}</Text>
 
         <View style={s.resumenRow}>
           <View style={s.resumenCard}>
             <Text style={s.resumenLabel}>Firmas agendadas</Text>
             <Text style={s.resumenValue}>{result.totalFirmas}</Text>
           </View>
+          <View style={s.resumenCard}>
+            <Text style={s.resumenLabel}>Pendientes</Text>
+            <Text style={s.resumenValue}>{result.totalPendientes}</Text>
+          </View>
           <View style={s.resumenCardWide}>
-            <Text style={s.resumenLabel}>Monto por escriturar</Text>
+            <Text style={s.resumenLabel}>Monto agendado</Text>
             <Text style={s.resumenValue}>{m(result.totalMonto)}</Text>
           </View>
         </View>
@@ -45,6 +49,7 @@ export function ReporteEscrituracionProgramadaPDF({
           <Text style={[s.th, s.colHora]}>Hora</Text>
           <Text style={[s.th, s.colCliente]}>Comprador</Text>
           <Text style={[s.th, s.colProy]}>Proyecto / unidad</Text>
+          <Text style={[s.th, s.colEstado]}>Estado</Text>
           <Text style={[s.thNum, s.colMonto]}>Monto</Text>
         </View>
         {result.firmas.map((f) => (
@@ -55,14 +60,20 @@ export function ReporteEscrituracionProgramadaPDF({
             <Text style={[s.tdMuted, s.colProy]}>
               {[f.proyectoNombre, f.unidadIdentificador].filter(Boolean).join(' · ') || '—'}
             </Text>
+            <Text style={[f.escriturada ? s.estadoOk : s.estadoPend, s.colEstado]}>
+              {f.escriturada ? 'Escriturada' : 'Pendiente'}
+            </Text>
             <Text style={[s.tdNum, s.colMonto]}>{m(f.monto)}</Text>
           </View>
         ))}
         <View style={s.trTotal} wrap={false}>
           <Text style={[s.tdTotal, s.colFecha]}>Total</Text>
           <Text style={[s.tdTotal, s.colHora]}> </Text>
-          <Text style={[s.tdTotal, s.colCliente]}>({result.totalFirmas} firmas)</Text>
+          <Text style={[s.tdTotal, s.colCliente]}>
+            ({result.totalFirmas} firmas · {result.totalPendientes} pend.)
+          </Text>
           <Text style={[s.tdTotal, s.colProy]}> </Text>
+          <Text style={[s.tdTotal, s.colEstado]}> </Text>
           <Text style={[s.tdTotalNum, s.colMonto]}>{m(result.totalMonto)}</Text>
         </View>
 
@@ -85,7 +96,7 @@ const s = StyleSheet.create({
     marginRight: 8,
   },
   resumenCardWide: {
-    flex: 1.6,
+    flex: 1.4,
     borderWidth: 0.5,
     borderColor: colors.border,
     borderRadius: 3,
@@ -120,6 +131,8 @@ const s = StyleSheet.create({
   tdStrong: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: colors.text },
   tdMuted: { fontSize: 8, color: colors.textMuted },
   tdNum: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: colors.text, textAlign: 'right' },
+  estadoOk: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: colors.primary },
+  estadoPend: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#b45309' },
   trTotal: {
     flexDirection: 'row',
     paddingVertical: 5,
@@ -135,9 +148,10 @@ const s = StyleSheet.create({
     color: colors.primary,
     textAlign: 'right',
   },
-  colFecha: { width: '15%' },
-  colHora: { width: '10%' },
-  colCliente: { width: '33%' },
-  colProy: { width: '27%' },
-  colMonto: { width: '15%' },
+  colFecha: { width: '14%' },
+  colHora: { width: '9%' },
+  colCliente: { width: '28%' },
+  colProy: { width: '23%' },
+  colEstado: { width: '13%' },
+  colMonto: { width: '13%' },
 });

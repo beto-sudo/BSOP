@@ -27,29 +27,41 @@ function row(p: Partial<VentaReporteRow>): VentaReporteRow {
 const SIN_FILTRO = { desde: '', hasta: '', proyecto: '' };
 
 describe('construirEscrituracionProgramada', () => {
-  it('solo cuenta agendadas (fecha) que aún no escrituraron', () => {
+  it('cuenta todas las agendadas (con fecha) y marca el estado de escrituración', () => {
     const rows = [
-      row({ id: 'a', fechaFirmaProgramada: '2026-07-01', precio: 100 }),
-      row({ id: 'b', fechaFirmaProgramada: null, precio: 999 }), // sin agenda
-      row({ id: 'c', fechaFirmaProgramada: '2026-07-02', numeroEscritura: 'E', precio: 999 }), // ya escrituró
+      row({ id: 'a', fechaFirmaProgramada: '2026-07-01', precio: 100 }), // pendiente
+      row({ id: 'b', fechaFirmaProgramada: null, precio: 999 }), // sin agenda → fuera
+      row({ id: 'c', fechaFirmaProgramada: '2026-07-02', numeroEscritura: 'E', precio: 200 }), // escriturada
+    ];
+    const r = construirEscrituracionProgramada(rows, SIN_FILTRO);
+    expect(r.totalFirmas).toBe(2);
+    expect(r.totalPendientes).toBe(1);
+    expect(r.totalMonto).toBe(300);
+    expect(r.firmas.find((f) => f.id === 'a')!.escriturada).toBe(false);
+    expect(r.firmas.find((f) => f.id === 'c')!.escriturada).toBe(true);
+  });
+
+  it('excluye desasignadas y ventas sin fecha de firma', () => {
+    const rows = [
+      row({ id: 'a', fechaFirmaProgramada: '2026-07-01' }),
+      row({ id: 'b', fechaFirmaProgramada: '2026-07-01', estado: 'desasignada' }),
     ];
     const r = construirEscrituracionProgramada(rows, SIN_FILTRO);
     expect(r.totalFirmas).toBe(1);
     expect(r.firmas[0].id).toBe('a');
-    expect(r.totalMonto).toBe(100);
   });
 
-  it('ordena por fecha y luego por hora', () => {
+  it('ordena por fecha y hora descendente (lo más reciente arriba)', () => {
     const rows = [
-      row({ id: 'a', fechaFirmaProgramada: '2026-07-02', horaFirmaProgramada: '10:00' }),
-      row({ id: 'b', fechaFirmaProgramada: '2026-07-01', horaFirmaProgramada: '15:00' }),
-      row({ id: 'c', fechaFirmaProgramada: '2026-07-01', horaFirmaProgramada: '09:00' }),
+      row({ id: 'a', fechaFirmaProgramada: '2026-07-01', horaFirmaProgramada: '09:00' }),
+      row({ id: 'b', fechaFirmaProgramada: '2026-07-02', horaFirmaProgramada: '10:00' }),
+      row({ id: 'c', fechaFirmaProgramada: '2026-07-01', horaFirmaProgramada: '15:00' }),
     ];
     const r = construirEscrituracionProgramada(rows, SIN_FILTRO);
-    expect(r.firmas.map((f) => f.id)).toEqual(['c', 'b', 'a']);
+    expect(r.firmas.map((f) => f.id)).toEqual(['b', 'c', 'a']);
   });
 
-  it('agrupa por fecha', () => {
+  it('agrupa por fecha (ascendente)', () => {
     const rows = [
       row({ fechaFirmaProgramada: '2026-07-01', precio: 100 }),
       row({ fechaFirmaProgramada: '2026-07-01', precio: 200 }),

@@ -2,12 +2,13 @@
 
 /**
  * Vista del reporte «Escrituración programada» (DILESA · Ventas) — ADR-047.
- * Firmas agendadas pendientes (fase 10) en un rango; export PDF con los filtros.
+ * La agenda de firmas (fase 10) con su estado; export PDF con los filtros.
  * Datos vía `useVentasReporte`; cálculo vía el motor puro.
  */
 import { useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { formatCurrency } from '@/lib/format';
@@ -34,13 +35,13 @@ export function EscrituracionProgramadaView() {
   const kpis = useMemo<readonly ModuleKpi[]>(
     () => [
       { key: 'firmas', label: 'Firmas agendadas', value: result.totalFirmas },
+      { key: 'pendientes', label: 'Pendientes', value: result.totalPendientes },
       {
         key: 'monto',
-        label: 'Monto por escriturar',
+        label: 'Monto agendado',
         value: result.totalMonto === 0 ? '—' : formatCurrency(result.totalMonto, { compact: true }),
       },
-      { key: 'proxima', label: 'Próxima firma', value: result.firmas[0]?.fecha ?? '—' },
-      { key: 'fechas', label: 'Días con firmas', value: result.porFecha.length },
+      { key: 'ultima', label: 'Fecha más reciente', value: result.firmas[0]?.fecha ?? '—' },
     ],
     [result]
   );
@@ -126,7 +127,7 @@ export function EscrituracionProgramadaView() {
         <Skeleton className="h-96 w-full rounded-xl" />
       ) : result.totalFirmas === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-10 text-center text-sm text-[var(--text)]/50">
-          Sin firmas agendadas pendientes para los filtros seleccionados.
+          Sin firmas programadas para los filtros seleccionados.
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--border)]">
@@ -137,6 +138,7 @@ export function EscrituracionProgramadaView() {
                 <th className="hidden px-3 py-2.5 font-medium sm:table-cell">Hora</th>
                 <th className="px-3 py-2.5 font-medium">Comprador</th>
                 <th className="hidden px-3 py-2.5 font-medium md:table-cell">Proyecto / unidad</th>
+                <th className="px-3 py-2.5 font-medium">Estado</th>
                 <th className="px-3 py-2.5 text-right font-medium">Monto</th>
               </tr>
             </thead>
@@ -156,6 +158,11 @@ export function EscrituracionProgramadaView() {
                   <td className="hidden px-3 py-2.5 text-[var(--text)]/70 md:table-cell">
                     {[f.proyectoNombre, f.unidadIdentificador].filter(Boolean).join(' · ') || '—'}
                   </td>
+                  <td className="px-3 py-2.5">
+                    <Badge tone={f.escriturada ? 'success' : 'warning'}>
+                      {f.escriturada ? 'Escriturada' : 'Pendiente'}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-[var(--text)]">
                     {formatCurrency(f.monto)}
                   </td>
@@ -164,8 +171,8 @@ export function EscrituracionProgramadaView() {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-[var(--accent)]/40 bg-[var(--bg)]/40 font-semibold">
-                <td className="px-3 py-2.5 text-[var(--text)]" colSpan={4}>
-                  Total ({result.totalFirmas} firmas)
+                <td className="px-3 py-2.5 text-[var(--text)]" colSpan={5}>
+                  Total ({result.totalFirmas} firmas · {result.totalPendientes} pendientes)
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-[var(--accent)]">
                   {formatCurrency(result.totalMonto)}

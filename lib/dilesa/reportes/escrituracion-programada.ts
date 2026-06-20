@@ -1,9 +1,15 @@
 /**
  * Motor del reporte «Escrituración programada» (DILESA · Ventas) — ADR-047.
  *
- * Las firmas agendadas (fase 10: `fecha_firma_programada`) que aún NO han
- * escriturado — qué se va a escriturar y cuándo. Agrupa por fecha y ordena
- * cronológicamente. Pura y testeable; la comparten la vista y el PDF.
+ * La agenda de firmas: ventas con `fecha_firma_programada` (capturada en fase 10),
+ * con su estado (pendiente de escriturar vs. ya escriturada). Ordenadas por fecha
+ * descendente (lo más reciente/próximo arriba). Pura y testeable; la comparten la
+ * vista y el PDF.
+ *
+ * Decisión (2026-06-20): se muestran TODAS las agendadas, no solo las pendientes
+ * — en la práctica el flujo avanza rápido de fase 10 a escriturada, así que filtrar
+ * a "pendientes" dejaba el reporte vacío. El estado por fila distingue cuáles
+ * siguen pendientes; las futuras pendientes destacan arriba cuando existan.
  */
 import type { VentaReporteRow } from './ventas-data';
 
@@ -29,21 +35,22 @@ export type FirmaProgramadaRow = {
   fecha: string;
   hora: string | null;
   monto: number;
+  /** ¿Ya escrituró? (tiene número de escritura) */
+  escriturada: boolean;
 };
 
 export type EscrituracionProgramadaResult = {
-  /** Firmas agendadas pendientes, ordenadas por fecha/hora ascendente. */
+  /** Firmas agendadas, ordenadas por fecha/hora descendente. */
   firmas: FirmaProgramadaRow[];
   /** Agrupado por fecha de firma, ascendente. */
   porFecha: Array<{ fecha: string; firmas: number; monto: number }>;
   totalFirmas: number;
+  /** Agendadas que aún no escrituran. */
+  totalPendientes: number;
   totalMonto: number;
 };
 
-/**
- * Construye el reporte. Solo cuenta ventas con `fecha_firma_programada` que aún
- * NO han escriturado (las ya escrituradas cumplieron) y no están desasignadas.
- */
+/** Construye el reporte. Toma las ventas no desasignadas con fecha de firma agendada. */
 export function construirEscrituracionProgramada(
   rows: readonly VentaReporteRow[],
   filtros: FiltrosEscrituracionProgramada
@@ -51,7 +58,6 @@ export function construirEscrituracionProgramada(
   const filtradas = rows.filter((r) => {
     if (r.estado === 'desasignada') return false;
     if (!r.fechaFirmaProgramada) return false; // solo agendadas
-    if (r.numeroEscritura) return false; // ya escrituró → cumplida
     if (filtros.desde && r.fechaFirmaProgramada < filtros.desde) return false;
     if (filtros.hasta && r.fechaFirmaProgramada > filtros.hasta) return false;
     if (filtros.proyecto && r.proyectoId !== filtros.proyecto) return false;
@@ -68,8 +74,9 @@ export function construirEscrituracionProgramada(
       fecha: r.fechaFirmaProgramada!,
       hora: r.horaFirmaProgramada,
       monto: r.precio ?? 0,
+      escriturada: !!r.numeroEscritura,
     }))
-    .sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.hora ?? '').localeCompare(b.hora ?? ''));
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.hora ?? '').localeCompare(a.hora ?? ''));
 
   const fechaMap = new Map<string, { firmas: number; monto: number }>();
   for (const f of firmas) {
@@ -86,6 +93,7 @@ export function construirEscrituracionProgramada(
     firmas,
     porFecha,
     totalFirmas: firmas.length,
+    totalPendientes: firmas.filter((f) => !f.escriturada).length,
     totalMonto: firmas.reduce((acc, f) => acc + f.monto, 0),
   };
 }
