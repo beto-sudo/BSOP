@@ -4,10 +4,10 @@
 **Empresas:** DILESA (arranca en Ventas; el patrón es replicable módulo-por-módulo y a las otras empresas)
 **Schemas afectados:** Principalmente UI + lectura — **sin schema nuevo en v1** (los presets viven como config en código, versionados). Lee de `dilesa` (`ventas`, `unidades`, `proyectos`, `productos`, `venta_fases`), `erp` (`personas`, `cxc_cargos`/`cxc_pagos` para cartera) y `core` (RBAC). Nuevo sub-slug RBAC por sección de reportes (ADR-014/030, con backfill defensivo de permisos). PDF vía `@react-pdf/renderer` (ya en deps) o patrón print ADR-021. Diferido a fase 2: tabla de «vistas guardadas» del usuario.
 **Estado:** in_progress
-**Próximo hito:** Beto revisa y mergea #967 (cierra los **8 reportes de Ventas**: pipeline, ventas del periodo, productividad, escrituración, tipo de crédito, inventario, estancadas, desasignadas). Siguiente ola (cuando Beto lo pida): replicar el molde a otros departamentos/módulos de DILESA.
+**Próximo hito:** Los **8 reportes de Ventas están en prod** (#967 mergeado). Próximo: Beto elige el siguiente módulo donde replicar el molde (Compras · Construcción · Cobranza · …) — el patrón `reporte = preset + vista + PDF` (ADR-047) ya está probado end-to-end y los 3 patrones de loader (compartido / propio-tabla / vista-DB) cubren los casos.
 **Dueño:** Beto
 **Creada:** 2026-06-19
-**Última actualización:** 2026-06-20 (Sprints 1 #965 y 2 #966 mergeados; migración RBAC + vista `v_ventas_pipeline_antiguedad` aplicadas a prod; #967 completa los 8 reportes de Ventas; en preview)
+**Última actualización:** 2026-06-20 (#967 mergeado — los 8 reportes de Ventas en prod, con el desglose de inventario y la fecha real de desasignación de Coda; molde listo para replicar a otros módulos)
 
 > Detonante: Beto quiere generar reportes de los módulos de DILESA, **empezando por Ventas**, y no tenía claro el modelo de presentación (¿filtros libres? ¿presets? ¿una página de reportes por módulo o un módulo central?). Esta iniciativa cierra ese modelo y lo aterriza en los primeros reportes de Ventas.
 
