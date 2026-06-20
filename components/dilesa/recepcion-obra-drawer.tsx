@@ -1,28 +1,27 @@
 'use client';
 
 /**
- * RecepcionObraDrawer — recorrido de RECEPCIÓN DE OBRA al contratista
- * (Atención a Clientes / EVAP), desde el detalle de construcción DILESA.
+ * RecepcionObraDrawer — RECEPCIÓN DE OBRA al contratista (Atención a Clientes /
+ * EVAP), flujo "papel-primero" desde el detalle de construcción DILESA.
  *
- * Flujo con candados (S1d):
- *   1. La recepción se PROGRAMA antes (estado 'programada') — este drawer solo
- *      se abre cuando ya está programada.
- *   2. Ciori recorre el checklist (Cumple / Con observación / N/A + nota).
- *   3. "Guardar avance" persiste sin cerrar (queda 'con_observaciones' si hay
- *      observaciones, 'programada' si va en verde).
- *   4. Con todo en verde: se imprime el acta llena (vista print), se firma y se
- *      sube el escaneado (rol 'acta_recepcion').
- *   5. "Marcar recibida" — habilitado solo con todo verde + acta subida. Llama
- *      `dilesa.fn_recepcion_cerrar`, que revalida (previas completas + sin
- *      observaciones + acta) y marca la tarea recepcion_final -> obra terminada.
+ * Flujo (S4 — recepción en papel + ciclo de re-inspección):
+ *   1. La recepción se PROGRAMA antes (estado 'programada').
+ *   2. Se imprime el formato EN BLANCO ("Imprimir formato"), se recorre la
+ *      vivienda marcando A MANO en la hoja y se firma físico en campo.
+ *   3a. Si hubo detalles -> "Registrar observaciones y reprogramar": se captura
+ *       la observación + evidencia + nueva fecha y el compromiso del
+ *       contratista. La obra NO se recibe; el ciclo se repite.
+ *   3b. Si todo bien -> se escanea el acta firmada, se SUBE (obligatorio) y se
+ *       "Recibe la obra". El escaneo es el gate único del cierre.
  *
- * El gate de rol vive en la RPC + trigger; la UI espeja los candados para guiar.
+ * El gate de rol vive en las RPC + trigger; la UI espeja los candados.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ClipboardCheck, Printer, Save } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { CheckCircle2, ClipboardCheck, FileUp, History, Printer } from 'lucide-react';
 
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -30,17 +29,22 @@ import { useToast } from '@/components/ui/toast';
 import { WizardFileSlot } from '@/components/wizard/wizard-file-slot';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { buildAdjuntoPath } from '@/lib/storage/path';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
+import { buildAdjuntoPath, type AdjuntoEntidad } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
-import {
-  RECEPCION_CHECKLIST,
-  RECEPCION_ITEM_ESTADO_LABEL,
-  type RecepcionChecklistRespuesta,
-  type RecepcionItemEstado,
-} from '@/lib/dilesa/recepcion-checklist';
 
 type EstadoRecepcion = 'programada' | 'con_observaciones' | 'recibida' | 'rechazada';
-type RespuestaUI = { estado: RecepcionItemEstado; nota: string };
+
+type AdjuntoRef = { nombre: string; url: string };
+type Visita = {
+  id: string;
+  fecha_visita: string;
+  resultado: 'con_observaciones' | 'recibida';
+  observaciones: string | null;
+  fecha_reprograma: string | null;
+  compromiso_contratista: string | null;
+  evidencias: AdjuntoRef[];
+};
 
 export type RecepcionObraDrawerProps = {
   open: boolean;
@@ -50,18 +54,38 @@ export type RecepcionObraDrawerProps = {
   onDone: () => void;
 };
 
-const ITEM_ESTADOS: RecepcionItemEstado[] = ['cumple', 'observacion', 'na'];
-
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function buildInitial(): Record<string, RespuestaUI> {
-  const map: Record<string, RespuestaUI> = {};
-  for (const sec of RECEPCION_CHECKLIST) {
-    for (const item of sec.items) map[item.clave] = { estado: 'cumple', nota: '' };
-  }
-  return map;
+/** Sube un archivo a Storage + registra el adjunto en erp.adjuntos. */
+async function subirAdjunto(
+  sb: ReturnType<typeof createSupabaseBrowserClient>,
+  entidad: AdjuntoEntidad,
+  entidadId: string,
+  rol: string,
+  file: File
+): Promise<string | null> {
+  const path = buildAdjuntoPath({ empresa: 'dilesa', entidad, entidadId, filename: file.name });
+  const { error: upErr } = await sb.storage.from('adjuntos').upload(path, file, {
+    contentType: file.type || 'application/octet-stream',
+    upsert: false,
+  });
+  if (upErr) return getSupabaseErrorMessage(upErr, 'No se pudo subir el archivo.');
+  const { error: adjErr } = await sb
+    .schema('erp')
+    .from('adjuntos')
+    .insert({
+      empresa_id: DILESA_EMPRESA_ID,
+      entidad_tipo: entidad,
+      entidad_id: entidadId,
+      rol,
+      nombre: file.name,
+      url: path,
+      tipo_mime: file.type || null,
+    });
+  if (adjErr) return getSupabaseErrorMessage(adjErr, 'Archivo subido pero no registrado.');
+  return null;
 }
 
 export function RecepcionObraDrawer({
@@ -75,159 +99,154 @@ export function RecepcionObraDrawer({
   const [recepcionId, setRecepcionId] = useState<string | null>(null);
   const [estado, setEstado] = useState<EstadoRecepcion>('programada');
   const [fechaProgramada, setFechaProgramada] = useState<string | null>(null);
-  const [notas, setNotas] = useState('');
-  const [respuestas, setRespuestas] = useState<Record<string, RespuestaUI>>(buildInitial);
-  const [seccionNA, setSeccionNA] = useState<Record<string, boolean>>({});
+  const [visitas, setVisitas] = useState<Visita[]>([]);
   const [actaSubida, setActaSubida] = useState(false);
   const [actaFile, setActaFile] = useState<File | null>(null);
   const [cargada, setCargada] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    let activo = true;
-    (async () => {
-      const sb = createSupabaseBrowserClient();
-      const { data } = await sb
-        .schema('dilesa')
-        .from('recepcion_obra')
-        .select('id, estado, fecha_recepcion, fecha_programada, checklist, notas')
-        .eq('construccion_id', construccionId)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (!activo) return;
-      const base = buildInitial();
-      const naSec: Record<string, boolean> = {};
-      if (data) {
-        const prev = (data.checklist ?? []) as RecepcionChecklistRespuesta[];
-        for (const r of prev)
-          if (base[r.clave]) base[r.clave] = { estado: r.estado, nota: r.nota ?? '' };
-        for (const sec of RECEPCION_CHECKLIST) {
-          if (sec.opcional && sec.items.every((i) => base[i.clave]?.estado === 'na')) {
-            naSec[sec.clave] = true;
-          }
-        }
-        setRecepcionId(data.id as string);
-        setEstado((data.estado as EstadoRecepcion) ?? 'programada');
-        setFechaProgramada((data.fecha_programada as string | null) ?? null);
-        setNotas((data.notas as string) ?? '');
-        // ¿Ya hay acta firmada subida?
-        const { count } = await sb
-          .schema('erp')
-          .from('adjuntos')
-          .select('id', { count: 'exact', head: true })
-          .eq('entidad_tipo', 'recepcion_obra')
-          .eq('entidad_id', data.id)
-          .eq('rol', 'acta_recepcion');
-        if (activo) setActaSubida((count ?? 0) > 0);
-      }
-      setRespuestas(base);
-      setSeccionNA(naSec);
-      setActaFile(null);
-      setCargada(true);
-    })();
-    return () => {
-      activo = false;
-    };
-  }, [open, construccionId]);
+  // Form "registrar observaciones y reprogramar"
+  const [obsTexto, setObsTexto] = useState('');
+  const [obsFecha, setObsFecha] = useState('');
+  const [obsCompromiso, setObsCompromiso] = useState('');
+  const [obsFiles, setObsFiles] = useState<File[]>([]);
 
-  const resumen = useMemo(() => {
-    let cumple = 0;
-    let obs = 0;
-    let na = 0;
-    for (const sec of RECEPCION_CHECKLIST) {
-      for (const item of sec.items) {
-        const r = respuestas[item.clave];
-        if (!r) continue;
-        if (r.estado === 'cumple') cumple += 1;
-        else if (r.estado === 'observacion') obs += 1;
-        else na += 1;
+  const cargar = useCallback(async () => {
+    const sb = createSupabaseBrowserClient();
+    const { data } = await sb
+      .schema('dilesa')
+      .from('recepcion_obra')
+      .select('id, estado, fecha_programada')
+      .eq('construccion_id', construccionId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!data) {
+      setCargada(true);
+      return;
+    }
+    const recId = data.id as string;
+    setRecepcionId(recId);
+    setEstado((data.estado as EstadoRecepcion) ?? 'programada');
+    setFechaProgramada((data.fecha_programada as string | null) ?? null);
+
+    // Historial de visitas + sus evidencias
+    const { data: vis } = await sb
+      .schema('dilesa')
+      .from('recepcion_visitas')
+      .select(
+        'id, fecha_visita, resultado, observaciones, fecha_reprograma, compromiso_contratista'
+      )
+      .eq('recepcion_id', recId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+    const visitaRows = (vis ?? []) as Omit<Visita, 'evidencias'>[];
+
+    const evidenciasByVisita = new Map<string, AdjuntoRef[]>();
+    if (visitaRows.length > 0) {
+      const { data: adj } = await sb
+        .schema('erp')
+        .from('adjuntos')
+        .select('entidad_id, nombre, url')
+        .eq('entidad_tipo', 'recepcion_visita')
+        .in(
+          'entidad_id',
+          visitaRows.map((v) => v.id)
+        );
+      for (const a of (adj ?? []) as { entidad_id: string; nombre: string; url: string }[]) {
+        const list = evidenciasByVisita.get(a.entidad_id) ?? [];
+        list.push({ nombre: a.nombre, url: a.url });
+        evidenciasByVisita.set(a.entidad_id, list);
       }
     }
-    return { cumple, obs, na };
-  }, [respuestas]);
+    setVisitas(visitaRows.map((v) => ({ ...v, evidencias: evidenciasByVisita.get(v.id) ?? [] })));
 
-  const todoVerde = resumen.obs === 0;
+    // ¿Acta firmada subida?
+    const { count } = await sb
+      .schema('erp')
+      .from('adjuntos')
+      .select('id', { count: 'exact', head: true })
+      .eq('entidad_tipo', 'recepcion_obra')
+      .eq('entidad_id', recId)
+      .eq('rol', 'acta_recepcion');
+    setActaSubida((count ?? 0) > 0);
+    setCargada(true);
+  }, [construccionId]);
 
-  function setItem(clave: string, patch: Partial<RespuestaUI>) {
-    setRespuestas((prev) => ({ ...prev, [clave]: { ...prev[clave], ...patch } }));
-  }
-
-  function toggleSeccionNA(secClave: string, next: boolean) {
-    setSeccionNA((prev) => ({ ...prev, [secClave]: next }));
-    const sec = RECEPCION_CHECKLIST.find((s) => s.clave === secClave);
-    if (!sec) return;
-    setRespuestas((prev) => {
-      const copy = { ...prev };
-      for (const item of sec.items) {
-        copy[item.clave] = { estado: next ? 'na' : 'cumple', nota: copy[item.clave]?.nota ?? '' };
-      }
-      return copy;
-    });
-  }
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      await cargar();
+    })();
+  }, [open, cargar]);
 
   function handleOpenChange(next: boolean) {
-    if (!next) setCargada(false);
+    // Reset al cerrar (no en el effect, para no disparar setState síncrono).
+    if (!next) {
+      setCargada(false);
+      setObsTexto('');
+      setObsFecha('');
+      setObsCompromiso('');
+      setObsFiles([]);
+      setActaFile(null);
+    }
     onOpenChange(next);
   }
 
-  function buildChecklist(): RecepcionChecklistRespuesta[] {
-    return RECEPCION_CHECKLIST.flatMap((s) =>
-      s.items.map((i) => {
-        const r = respuestas[i.clave] ?? { estado: 'cumple', nota: '' };
-        return {
-          clave: i.clave,
-          estado: r.estado,
-          ...(r.nota.trim() ? { nota: r.nota.trim() } : {}),
-        };
-      })
-    );
-  }
-
-  function validarObservaciones(): boolean {
-    const sinNota = RECEPCION_CHECKLIST.flatMap((s) => s.items).find((i) => {
-      const r = respuestas[i.clave];
-      return r?.estado === 'observacion' && !r.nota.trim();
-    });
-    if (sinNota) {
-      toast.add({
-        title: 'Falta describir una observación',
-        description: `Anota la ubicación/detalle del daño en "${sinNota.etiqueta}".`,
-        type: 'error',
-      });
-      return false;
+  /** 3a — registra una visita con observaciones + reprograma. */
+  async function registrarObservaciones() {
+    if (!obsTexto.trim()) {
+      toast.add({ title: 'Describe las observaciones encontradas', type: 'error' });
+      return;
     }
-    return true;
-  }
-
-  /** Guarda el recorrido sin cerrar (queda en proceso). */
-  async function guardarAvance() {
-    if (!validarObservaciones()) return;
+    if (!obsFecha) {
+      toast.add({ title: 'Indica la nueva fecha programada', type: 'error' });
+      return;
+    }
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
-    const { error } = await sb.schema('dilesa').rpc('fn_recepcion_cerrar', {
-      p_construccion_id: construccionId,
-      p_checklist: buildChecklist(),
-      p_notas: notas.trim() || undefined,
-      p_fecha: hoyISO(),
-      p_estado: todoVerde ? 'programada' : 'con_observaciones',
-    });
-    setSubmitting(false);
+    const { data: visitaId, error } = await sb
+      .schema('dilesa')
+      .rpc('fn_recepcion_registrar_visita', {
+        p_construccion_id: construccionId,
+        p_fecha_visita: hoyISO(),
+        p_observaciones: obsTexto.trim(),
+        p_fecha_reprograma: obsFecha,
+        p_compromiso: obsCompromiso.trim() || undefined,
+      });
     if (error) {
+      setSubmitting(false);
       toast.add({
-        title: 'No se pudo guardar el avance',
-        description: getSupabaseErrorMessage(error, 'Error al guardar.'),
+        title: 'No se pudo registrar la visita',
+        description: getSupabaseErrorMessage(error, 'Error al registrar.'),
         type: 'error',
       });
       return;
     }
-    toast.add({
-      title: 'Avance guardado',
-      description: todoVerde
-        ? 'Checklist en verde. Imprime el acta, fírmala y súbela para recibir.'
-        : 'Quedaron observaciones por corregir con el contratista.',
-      type: 'success',
-    });
+    // Subir evidencia ligada a la visita recién creada.
+    let evidenciaErr: string | null = null;
+    for (const f of obsFiles) {
+      const err = await subirAdjunto(sb, 'recepcion_visita', visitaId as string, 'evidencia', f);
+      if (err) evidenciaErr = err;
+    }
+    setSubmitting(false);
+    if (evidenciaErr) {
+      toast.add({
+        title: 'Visita registrada; falló alguna evidencia',
+        description: evidenciaErr,
+        type: 'error',
+      });
+    } else {
+      toast.add({
+        title: 'Visita registrada',
+        description: 'Quedaron observaciones por corregir; la recepción se reprogramó.',
+        type: 'success',
+      });
+    }
+    setObsTexto('');
+    setObsFecha('');
+    setObsCompromiso('');
+    setObsFiles([]);
+    await cargar();
     onDone();
   }
 
@@ -236,63 +255,21 @@ export function RecepcionObraDrawer({
     setActaFile(file);
     if (!file || !recepcionId) return;
     const sb = createSupabaseBrowserClient();
-    const path = buildAdjuntoPath({
-      empresa: 'dilesa',
-      entidad: 'recepcion_obra',
-      entidadId: recepcionId,
-      filename: file.name,
-    });
-    const { error: upErr } = await sb.storage.from('adjuntos').upload(path, file, {
-      contentType: file.type || 'application/octet-stream',
-      upsert: false,
-    });
-    if (upErr) {
-      toast.add({
-        title: 'No se pudo subir el acta',
-        description: getSupabaseErrorMessage(upErr, 'Reintenta.'),
-        type: 'error',
-      });
-      return;
-    }
-    const { error: adjErr } = await sb
-      .schema('erp')
-      .from('adjuntos')
-      .insert({
-        empresa_id: DILESA_EMPRESA_ID,
-        entidad_tipo: 'recepcion_obra',
-        entidad_id: recepcionId,
-        rol: 'acta_recepcion',
-        nombre: file.name,
-        url: path,
-        tipo_mime: file.type || null,
-      });
-    if (adjErr) {
-      toast.add({
-        title: 'Acta subida pero no registrada',
-        description: getSupabaseErrorMessage(adjErr, 'Reintenta.'),
-        type: 'error',
-      });
+    const err = await subirAdjunto(sb, 'recepcion_obra', recepcionId, 'acta_recepcion', file);
+    if (err) {
+      toast.add({ title: 'No se pudo subir el acta', description: err, type: 'error' });
       return;
     }
     setActaSubida(true);
     toast.add({ title: 'Acta firmada adjuntada', type: 'success' });
   }
 
-  /** Cierre final: marca recibida (la RPC revalida los candados). */
+  /** 3b — cierre final: marca recibida (la RPC revalida los candados). */
   async function marcarRecibida() {
-    if (!validarObservaciones()) return;
-    if (!todoVerde) {
-      toast.add({
-        title: 'Hay observaciones pendientes',
-        description: 'No puedes recibir con observaciones abiertas.',
-        type: 'error',
-      });
-      return;
-    }
     if (!actaSubida) {
       toast.add({
         title: 'Falta el acta firmada',
-        description: 'Imprime el acta, recábala firmada y súbela antes de recibir.',
+        description: 'Sube el acta escaneada y firmada antes de recibir.',
         type: 'error',
       });
       return;
@@ -301,8 +278,6 @@ export function RecepcionObraDrawer({
     const sb = createSupabaseBrowserClient();
     const { error } = await sb.schema('dilesa').rpc('fn_recepcion_cerrar', {
       p_construccion_id: construccionId,
-      p_checklist: buildChecklist(),
-      p_notas: notas.trim() || undefined,
       p_fecha: hoyISO(),
       p_estado: 'recibida',
     });
@@ -336,178 +311,220 @@ export function RecepcionObraDrawer({
     >
       <DetailDrawerContent>
         {!cargada ? (
-          <p className="py-8 text-center text-sm text-[var(--text)]/50">Cargando checklist…</p>
+          <p className="py-8 text-center text-sm text-[var(--text)]/50">Cargando recepción…</p>
         ) : (
           <div className="space-y-6">
+            {/* Cabecera: estado + próxima cita */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-xs">
               <span className="text-[var(--text)]/70">
-                {fechaProgramada ? `Programada para ${fechaProgramada}` : 'Recepción en proceso'}
+                {yaRecibida
+                  ? 'Obra recibida'
+                  : fechaProgramada
+                    ? `Próxima visita: ${fechaProgramada}`
+                    : 'Recepción en proceso'}
               </span>
-              <span>
-                <span className="font-medium text-emerald-600">{resumen.cumple} cumplen</span> ·{' '}
-                <span className="font-medium text-amber-600">{resumen.obs} obs.</span> ·{' '}
-                <span className="text-[var(--text)]/45">{resumen.na} N/A</span>
-              </span>
+              <Badge
+                tone={
+                  yaRecibida ? 'success' : estado === 'con_observaciones' ? 'warning' : 'neutral'
+                }
+              >
+                {yaRecibida
+                  ? 'Recibida'
+                  : estado === 'con_observaciones'
+                    ? 'Con observaciones'
+                    : 'Programada'}
+              </Badge>
             </div>
 
             {yaRecibida ? (
               <div className="flex items-start gap-2 rounded-lg border border-emerald-400/40 bg-emerald-50 p-3 text-xs text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>Esta obra ya fue recibida. Puedes consultar el checklist y el acta.</p>
+                <p>
+                  Esta obra ya fue recibida. Abajo queda el historial de visitas como evidencia.
+                </p>
               </div>
-            ) : null}
-
-            {RECEPCION_CHECKLIST.map((sec) => {
-              const na = seccionNA[sec.clave] === true;
-              return (
-                <section key={sec.clave} className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1">
-                    <h3 className="text-sm font-semibold text-[var(--text)]">{sec.titulo}</h3>
-                    {sec.opcional ? (
-                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text)]/60">
-                        <input
-                          type="checkbox"
-                          checked={na}
-                          disabled={yaRecibida}
-                          onChange={(e) => toggleSeccionNA(sec.clave, e.target.checked)}
-                        />
-                        No aplica (1 planta)
-                      </label>
-                    ) : null}
-                  </div>
-
-                  {na ? (
-                    <p className="text-xs italic text-[var(--text)]/40">
-                      Sección marcada como no aplica.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {sec.items.map((item) => {
-                        const r = respuestas[item.clave] ?? { estado: 'cumple', nota: '' };
-                        return (
-                          <li
-                            key={item.clave}
-                            className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-2.5"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-xs text-[var(--text)]">{item.etiqueta}</span>
-                              <div className="inline-flex overflow-hidden rounded-md border border-[var(--border)]">
-                                {ITEM_ESTADOS.map((est) => (
-                                  <button
-                                    key={est}
-                                    type="button"
-                                    disabled={yaRecibida}
-                                    onClick={() => setItem(item.clave, { estado: est })}
-                                    className={`px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-60 ${
-                                      r.estado === est
-                                        ? est === 'cumple'
-                                          ? 'bg-emerald-500 text-white'
-                                          : est === 'observacion'
-                                            ? 'bg-amber-500 text-white'
-                                            : 'bg-[var(--text)]/40 text-white'
-                                        : 'bg-[var(--panel)] text-[var(--text)]/60 hover:bg-[var(--bg)]/40'
-                                    }`}
-                                  >
-                                    {RECEPCION_ITEM_ESTADO_LABEL[est]}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            {r.estado === 'observacion' ? (
-                              <Input
-                                value={r.nota}
-                                disabled={yaRecibida}
-                                onChange={(e) => setItem(item.clave, { nota: e.target.value })}
-                                placeholder="Ubicación / detalle del daño…"
-                                className="mt-2 rounded-lg border-[var(--border)] bg-[var(--panel)] text-xs text-[var(--text)]"
-                              />
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
-
-            <div className="space-y-1.5">
-              <span className="text-xs font-medium text-[var(--text)]">
-                Observaciones no contempladas en el checklist
-              </span>
-              <Textarea
-                value={notas}
-                disabled={yaRecibida}
-                onChange={(e) => setNotas(e.target.value)}
-                rows={2}
-                placeholder="Opcional…"
-                className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
-              />
-            </div>
-
-            {/* Acta: imprimible en cualquier momento (para llevarla al recorrido o
-                recabar firmas); la recepción solo se cierra con el acta subida + verde. */}
-            {!yaRecibida ? (
-              <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)]/30 p-3">
+            ) : (
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)]/30 p-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--text)]">
-                    Acta de recepción firmada
-                  </span>
+                  <span className="font-medium text-[var(--text)]">Formato de recepción</span>
                   <a
                     href={`/dilesa/construccion/${construccionId}/acta-recepcion`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)] underline"
+                    className="inline-flex items-center gap-1 font-medium text-[var(--accent)] underline"
                   >
-                    <Printer className="h-3.5 w-3.5" /> Imprimir acta
+                    <Printer className="h-3.5 w-3.5" /> Imprimir formato
                   </a>
                 </div>
-                <p className="text-[11px] text-[var(--text)]/50">
-                  Imprime el acta (sale con lo capturado), recábala firmada por Supervisor de Obra,
-                  Contratista y Atención a Clientes, y súbela aquí. Es obligatoria para recibir.
+                <p className="mt-1 text-[11px] text-[var(--text)]/50">
+                  Imprime el formato <span className="font-medium">en blanco</span>, recórrelo en la
+                  vivienda marcando a mano y recaba las firmas (Supervisor, Contratista y Atención a
+                  Clientes) en campo.
                 </p>
-                <WizardFileSlot
-                  role="acta_recepcion"
-                  label={
-                    actaSubida ? 'Acta firmada adjuntada — reemplazar' : 'Sube el acta firmada'
-                  }
-                  file={actaFile}
-                  onChange={(f) => void subirActa(f)}
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
-                />
               </div>
+            )}
+
+            {/* Historial de visitas */}
+            {visitas.length > 0 ? (
+              <section className="space-y-2">
+                <h3 className="flex items-center gap-1.5 border-b border-[var(--border)] pb-1 text-sm font-semibold text-[var(--text)]">
+                  <History className="h-4 w-4" /> Historial de visitas
+                </h3>
+                <ol className="space-y-2">
+                  {visitas.map((v, i) => (
+                    <li
+                      key={v.id}
+                      className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-[var(--text)]">
+                          Visita {i + 1} · {v.fecha_visita}
+                        </span>
+                        <Badge tone={v.resultado === 'recibida' ? 'success' : 'warning'}>
+                          {v.resultado === 'recibida' ? 'Recibida' : 'Con observaciones'}
+                        </Badge>
+                      </div>
+                      {v.observaciones ? (
+                        <p className="mt-1.5 whitespace-pre-wrap text-[var(--text)]/80">
+                          {v.observaciones}
+                        </p>
+                      ) : null}
+                      {v.compromiso_contratista ? (
+                        <p className="mt-1 text-[var(--text)]/60">
+                          <span className="font-medium">Compromiso:</span>{' '}
+                          {v.compromiso_contratista}
+                        </p>
+                      ) : null}
+                      {v.fecha_reprograma ? (
+                        <p className="mt-1 text-[var(--text)]/60">
+                          <span className="font-medium">Reprogramada para:</span>{' '}
+                          {v.fecha_reprograma}
+                        </p>
+                      ) : null}
+                      {v.evidencias.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {v.evidencias.map((e) => (
+                            <a
+                              key={e.url}
+                              href={getAdjuntoProxyUrl(e.url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px] text-[var(--accent)] underline"
+                            >
+                              <FileUp className="h-3 w-3" /> {e.nombre}
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ) : null}
 
+            {/* Acciones de la visita actual */}
             {!yaRecibida ? (
-              <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] pt-4">
-                <button
-                  type="button"
-                  onClick={() => handleOpenChange(false)}
-                  className="text-sm text-muted-foreground hover:text-[var(--text)]"
-                >
-                  Cerrar
-                </button>
-                <Button
-                  variant="outline"
-                  onClick={() => void guardarAvance()}
-                  disabled={submitting}
-                >
-                  <Save className="mr-2 h-4 w-4" /> Guardar avance
-                </Button>
-                <Button
-                  onClick={() => void marcarRecibida()}
-                  disabled={submitting || !todoVerde || !actaSubida}
-                  title={
-                    !todoVerde
-                      ? 'Hay observaciones abiertas'
-                      : !actaSubida
-                        ? 'Falta subir el acta firmada'
-                        : undefined
-                  }
-                >
-                  <ClipboardCheck className="mr-2 h-4 w-4" /> Recibir obra
-                </Button>
-              </div>
+              <>
+                {/* 3a — Registrar observaciones y reprogramar */}
+                <section className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-50/40 p-3 dark:bg-amber-950/10">
+                  <h3 className="text-sm font-semibold text-[var(--text)]">
+                    ¿Encontraron detalles? Registrar observaciones y reprogramar
+                  </h3>
+                  <p className="text-[11px] text-[var(--text)]/55">
+                    Captura lo que falta corregir, sube la evidencia (la hoja marcada o fotos) y
+                    fija la nueva fecha con el compromiso del contratista. La obra no se recibe aún.
+                  </p>
+                  <Textarea
+                    value={obsTexto}
+                    onChange={(e) => setObsTexto(e.target.value)}
+                    rows={3}
+                    placeholder="Detalles encontrados / ubicación…"
+                    className="resize-none rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                  />
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className="space-y-1 text-[11px] text-[var(--text)]/70">
+                      <span>Nueva fecha programada</span>
+                      <Input
+                        type="date"
+                        value={obsFecha}
+                        min={hoyISO()}
+                        onChange={(e) => setObsFecha(e.target.value)}
+                        className="rounded-lg border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                      />
+                    </label>
+                    <label className="space-y-1 text-[11px] text-[var(--text)]/70">
+                      <span>Compromiso del contratista (opcional)</span>
+                      <Input
+                        value={obsCompromiso}
+                        onChange={(e) => setObsCompromiso(e.target.value)}
+                        placeholder="Ej. corrige y limpia para la fecha"
+                        className="rounded-lg border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+                      />
+                    </label>
+                  </div>
+                  <label className="block space-y-1 text-[11px] text-[var(--text)]/70">
+                    <span>Evidencia (hoja marcada / fotos — opcional)</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                      onChange={(e) => setObsFiles(Array.from(e.target.files ?? []))}
+                      className="block w-full text-[11px] text-[var(--text)]/70 file:mr-2 file:rounded-md file:border file:border-[var(--border)] file:bg-[var(--panel)] file:px-2 file:py-1 file:text-[11px]"
+                    />
+                    {obsFiles.length > 0 ? (
+                      <span className="text-[var(--text)]/50">
+                        {obsFiles.length} archivo(s) por subir
+                      </span>
+                    ) : null}
+                  </label>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => void registrarObservaciones()}
+                      disabled={submitting}
+                    >
+                      Registrar y reprogramar
+                    </Button>
+                  </div>
+                </section>
+
+                {/* 3b — Recibir obra */}
+                <section className="space-y-2 rounded-lg border border-emerald-400/40 bg-emerald-50/40 p-3 dark:bg-emerald-950/10">
+                  <h3 className="text-sm font-semibold text-[var(--text)]">
+                    ¿Todo correcto? Recibir obra
+                  </h3>
+                  <p className="text-[11px] text-[var(--text)]/55">
+                    Sube el acta firmada y escaneada (Supervisor, Contratista y Atención a
+                    Clientes). Es obligatoria: es lo que permite recibir y dar la obra por
+                    terminada.
+                  </p>
+                  <WizardFileSlot
+                    role="acta_recepcion"
+                    label={
+                      actaSubida ? 'Acta firmada adjuntada — reemplazar' : 'Sube el acta firmada'
+                    }
+                    file={actaFile}
+                    onChange={(f) => void subirActa(f)}
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                  />
+                  <div className="flex items-center justify-end gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChange(false)}
+                      className="text-sm text-muted-foreground hover:text-[var(--text)]"
+                    >
+                      Cerrar
+                    </button>
+                    <Button
+                      onClick={() => void marcarRecibida()}
+                      disabled={submitting || !actaSubida}
+                      title={!actaSubida ? 'Falta subir el acta firmada' : undefined}
+                    >
+                      <ClipboardCheck className="mr-2 h-4 w-4" /> Recibir obra
+                    </Button>
+                  </div>
+                </section>
+              </>
             ) : null}
           </div>
         )}

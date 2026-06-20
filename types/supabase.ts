@@ -4498,6 +4498,59 @@ export type Database = {
           },
         ]
       }
+      recepcion_visitas: {
+        Row: {
+          compromiso_contratista: string | null
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          fecha_reprograma: string | null
+          fecha_visita: string
+          id: string
+          observaciones: string | null
+          recepcion_id: string
+          registrado_por_user_id: string | null
+          resultado: string
+          updated_at: string
+        }
+        Insert: {
+          compromiso_contratista?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          fecha_reprograma?: string | null
+          fecha_visita?: string
+          id?: string
+          observaciones?: string | null
+          recepcion_id: string
+          registrado_por_user_id?: string | null
+          resultado: string
+          updated_at?: string
+        }
+        Update: {
+          compromiso_contratista?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          fecha_reprograma?: string | null
+          fecha_visita?: string
+          id?: string
+          observaciones?: string | null
+          recepcion_id?: string
+          registrado_por_user_id?: string | null
+          resultado?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recepcion_visitas_recepcion_id_fkey"
+            columns: ["recepcion_id"]
+            isOneToOne: false
+            referencedRelation: "recepcion_obra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ruv_documentos_catalogo: {
         Row: {
           activo: boolean
@@ -6114,6 +6167,16 @@ export type Database = {
       }
       fn_recepcion_programar: {
         Args: { p_construccion_id: string; p_fecha_programada: string }
+        Returns: string
+      }
+      fn_recepcion_registrar_visita: {
+        Args: {
+          p_compromiso?: string
+          p_construccion_id: string
+          p_fecha_reprograma: string
+          p_fecha_visita: string
+          p_observaciones: string
+        }
         Returns: string
       }
       fn_regresar_unidad_proyecto: {

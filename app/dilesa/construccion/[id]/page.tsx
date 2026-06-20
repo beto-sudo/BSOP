@@ -1068,7 +1068,7 @@ function DetailInner() {
           <div className="space-y-4">
             <p className="text-sm text-[var(--text)]/70">
               Todas las tareas de construcción están terminadas. Agenda la fecha de recepción para
-              abrir el checklist de revisión.
+              imprimir el formato y registrar la revisión.
             </p>
             <label className="block text-xs font-medium text-[var(--text)]">
               Fecha de recepción
@@ -1088,7 +1088,7 @@ function DetailInner() {
                 Cancelar
               </button>
               <Button onClick={() => void programarRecepcion()} disabled={programando}>
-                {programando ? 'Programando…' : 'Programar y abrir checklist'}
+                {programando ? 'Programando…' : 'Programar recepción'}
               </Button>
             </div>
           </div>
