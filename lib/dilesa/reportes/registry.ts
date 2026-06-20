@@ -9,7 +9,7 @@
  * Los demás reportes de Ventas (del planning) y de otros módulos se suman en
  * los siguientes sprints calcando este molde.
  */
-import { CalendarRange, GitBranch, Trophy } from 'lucide-react';
+import { CalendarClock, CalendarRange, CreditCard, GitBranch, Trophy } from 'lucide-react';
 import type { ReporteDef } from './tipos';
 
 /** Sub-slug RBAC del tab «Reportes» de Ventas. */
@@ -48,6 +48,28 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/productividad-vendedor',
     icon: Trophy,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'escrituracion-programada',
+    nombre: 'Escrituración programada',
+    descripcion:
+      'Firmas agendadas pendientes (fase 10) por fecha: qué se va a escriturar y cuándo. Agenda del cierre notarial.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/escrituracion-programada',
+    icon: CalendarClock,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'por-tipo-credito',
+    nombre: 'Por tipo de crédito',
+    descripcion:
+      'Distribución de la cartera por tipo de crédito (INFONAVIT / FOVISSSTE / bancario / contado): conteo, monto y participación.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/por-tipo-credito',
+    icon: CreditCard,
     tipo: 'modulo',
     pdf: true,
   },

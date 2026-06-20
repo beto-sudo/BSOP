@@ -23,6 +23,9 @@ function ventaRaw(p: Partial<VentasRawBundle['ventas'][number]>) {
     fecha_escritura: p.fecha_escritura ?? null,
     vendedor: p.vendedor ?? null,
     vendedor_usuario_id: p.vendedor_usuario_id ?? null,
+    tipo_credito: p.tipo_credito ?? null,
+    fecha_firma_programada: p.fecha_firma_programada ?? null,
+    hora_firma_programada: p.hora_firma_programada ?? null,
     created_at: p.created_at ?? '2026-03-15T10:00:00Z',
   };
 }
