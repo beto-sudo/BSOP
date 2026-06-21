@@ -1,8 +1,8 @@
 ---
 titulo: 'Construcción — Obras'
 modulo: dilesa.construccion.obras
-version: '1.1.0'
-actualizado: '2026-06-16'
+version: '1.2.0'
+actualizado: '2026-06-20'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -66,29 +66,33 @@ Abajo, un contador te dice **"X de Y obras"** (cuántas quedaron tras filtrar).
 ## Recepción de obra (Atención a Clientes)
 
 Una obra al **100% de avance no pasa sola a entrega**: primero hay que
-**recibirla al contratista**. Eso lo hace Atención a Clientes desde el **detalle
-de la obra**, con un botón que cambia según en qué punto va la recepción:
+**recibirla al contratista**. La revisión se hace **en papel** (se imprime el
+formato, se recorre la vivienda marcando a mano y se firma en campo) y la operas
+desde el **detalle de la obra**, con un botón que cambia según el punto:
 
 1. **Programar recepción** — agenda la fecha de la cita con el contratista.
    (Mientras la obra no llega al 100%, el botón aparece bloqueado e indica
    cuántas tareas faltan.)
-2. **Continuar recepción** — abre el recorrido: un **checklist** por zonas
-   (exterior, planta baja, planta alta, azotea, patio) donde marcas cada punto
-   como _cumple_, _con observación_ o _no aplica_, con notas. **Guardar avance**
-   lo deja a medias sin cerrar; si hay observaciones, la obra queda **"con
-   observaciones"** hasta que el contratista corrija.
-3. **Recibir obra** — solo se habilita cuando el checklist está todo en verde y
-   ya subiste el **acta de recepción firmada**. Al recibir, la obra se libera
-   para la entrega.
+2. **Imprimir formato** — dentro del recorrido imprimes el **formato en blanco**
+   (membrete DILESA, datos de la unidad, casillas para marcar a mano y espacios
+   de firma). Lo llevas impreso a la vivienda y ahí marcas cada punto a mano; si
+   todo queda bien, **se firma en campo** (Supervisor, Contratista y Atención a
+   Clientes) en un solo viaje.
+3. Según cómo salga la visita:
+   - **Si encontraste detalles → Registrar observaciones y reprogramar.** Anotas
+     lo que falta corregir, subes la **evidencia** (la hoja marcada o fotos),
+     fijas la **nueva fecha** y el **compromiso del contratista**. La obra **no
+     se recibe** y queda **"con observaciones"**. Cada visita se guarda en el
+     **historial**; el ciclo se repite las veces que haga falta hasta que todo
+     quede corregido.
+   - **Si todo quedó bien → Recibir obra.** Subes el **acta firmada escaneada**
+     y recibes. **Subir el acta es lo único que habilita "Recibir obra"** y lo
+     que da la obra por terminada y la libera para entrega.
 
-El **acta de recepción** se imprime desde el mismo recorrido (sale con el
-membrete de DILESA, los datos de la unidad, el checklist lleno y los espacios de
-firma de Supervisor, Contratista y Atención a Clientes); se firma en papel, se
-escanea y se sube.
-
-Los pendientes de recepción también aparecen en la bandeja de **Atención a
-Clientes** (cola "Obras por recibir"), con el badge _sin programar_ /
-_programada_ / _con observaciones_.
+Todo el **historial de visitas** (fechas, observaciones, compromisos y
+evidencias) queda guardado en la obra como respaldo. Los pendientes de recepción
+también aparecen en la bandeja de **Atención a Clientes** (cola "Obras por
+recibir"), con el badge _sin programar_ / _programada_ / _con observaciones_.
 
 ## Preguntas frecuentes
 

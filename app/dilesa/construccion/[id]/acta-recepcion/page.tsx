@@ -1,14 +1,17 @@
 'use client';
 
 /**
- * Acta de recepción de obra — vista imprimible (formato "CHECK LIST PRE-ENTREGA
- * VIVIENDA" de DILESA, LLENA con lo capturado). Se imprime, se firma
+ * Acta de recepción de obra — formato EN BLANCO imprimible (formato "CHECK LIST
+ * PRE-ENTREGA VIVIENDA" de DILESA). Se imprime ANTES del recorrido para llegar
+ * con la hoja lista; Atención a Clientes la marca a mano en campo, se firma
  * (Supervisor de Obra · Contratista · Atención a Clientes/EVAP) y el escaneado
- * se sube en el drawer de recepción. Iniciativa dilesa-atencion-clientes S1d.
+ * se sube en el drawer de recepción (carga obligatoria = gate del cierre).
+ *
+ * Iniciativa dilesa-atencion-clientes S4 (recepción papel-primero).
  */
 
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { PrintLayout } from '@/components/print';
@@ -16,12 +19,7 @@ import { useTriggerPrint } from '@/components/print/use-trigger-print';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import {
-  RECEPCION_CHECKLIST,
-  RECEPCION_ITEM_ESTADO_LABEL,
-  type RecepcionChecklistRespuesta,
-  type RecepcionItemEstado,
-} from '@/lib/dilesa/recepcion-checklist';
+import { RECEPCION_CHECKLIST } from '@/lib/dilesa/recepcion-checklist';
 
 type Datos = {
   codigo: string;
@@ -29,11 +27,18 @@ type Datos = {
   unidad: string | null;
   contratista: string | null;
   supervisor: string | null;
-  fechaRecepcion: string | null;
   fechaProgramada: string | null;
-  notas: string | null;
-  respuestas: Map<string, RecepcionChecklistRespuesta>;
 };
+
+/** Casilla vacía para marcar a mano (☐ C / O / N/A). */
+function Casilla({ letra }: { letra: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="inline-block h-3 w-3 border border-black align-middle" />
+      <span>{letra}</span>
+    </span>
+  );
+}
 
 export default function ActaRecepcionPage() {
   return (
@@ -89,7 +94,7 @@ function ActaInner() {
         sb
           .schema('dilesa')
           .from('recepcion_obra')
-          .select('checklist, notas, fecha_recepcion, fecha_programada')
+          .select('fecha_programada')
           .eq('construccion_id', id)
           .is('deleted_at', null)
           .maybeSingle(),
@@ -117,21 +122,13 @@ function ActaInner() {
           ? [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ') || null
           : null;
 
-      const respuestas = new Map<string, RecepcionChecklistRespuesta>();
-      for (const r of (recRes.data?.checklist ?? []) as RecepcionChecklistRespuesta[]) {
-        respuestas.set(r.clave, r);
-      }
-
       setDatos({
         codigo: obra.codigo as string,
         proyecto,
         unidad: (uRes.data?.identificador as string | null) ?? null,
         contratista: nombre(contRes.data),
         supervisor: nombre(supRes.data),
-        fechaRecepcion: (recRes.data?.fecha_recepcion as string | null) ?? null,
         fechaProgramada: (recRes.data?.fecha_programada as string | null) ?? null,
-        notas: (recRes.data?.notas as string | null) ?? null,
-        respuestas,
       });
       setLoading(false);
     })();
@@ -139,11 +136,6 @@ function ActaInner() {
       activo = false;
     };
   }, [id]);
-
-  const estadoColor: Record<RecepcionItemEstado, string> = useMemo(
-    () => ({ cumple: 'text-emerald-700', observacion: 'text-amber-700', na: 'text-neutral-400' }),
-    []
-  );
 
   if (loading) {
     return (
@@ -160,7 +152,9 @@ function ActaInner() {
   return (
     <div className="container mx-auto max-w-[8.5in] px-4 py-6">
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <h1 className="text-lg font-semibold text-[var(--text)]">Acta de recepción de obra</h1>
+        <h1 className="text-lg font-semibold text-[var(--text)]">
+          Acta de recepción de obra (formato en blanco)
+        </h1>
         <Button onClick={triggerPrint}>
           <Printer className="mr-2 h-4 w-4" /> Imprimir
         </Button>
@@ -197,40 +191,55 @@ function ActaInner() {
             </div>
             <div>
               <span className="font-semibold">Fecha de recepción:</span>{' '}
-              {datos.fechaRecepcion ?? '—'}
+              <span className="inline-block w-32 border-b border-black" />
             </div>
           </div>
 
+          <p className="text-[10px] italic text-neutral-600">
+            Marque cada punto: <span className="font-semibold">C</span> = Cumple ·{' '}
+            <span className="font-semibold">O</span> = Con observación ·{' '}
+            <span className="font-semibold">N/A</span> = No aplica. Anote el detalle/ubicación del
+            daño en la columna de observaciones.
+          </p>
+
           {RECEPCION_CHECKLIST.map((sec) => (
             <div key={sec.clave} className="break-inside-avoid">
-              <div className="mb-1 bg-neutral-200 px-2 py-1 text-xs font-bold uppercase">
-                {sec.titulo}
+              <div className="mb-1 flex items-center justify-between bg-neutral-200 px-2 py-1 text-xs font-bold uppercase">
+                <span>{sec.titulo}</span>
+                {sec.opcional ? (
+                  <span className="text-[10px] font-normal normal-case">
+                    <span className="mr-1 inline-block h-3 w-3 border border-black align-middle" />
+                    No aplica (1 planta)
+                  </span>
+                ) : null}
               </div>
               <table className="w-full border-collapse text-[11px]">
                 <tbody>
-                  {sec.items.map((item) => {
-                    const r = datos.respuestas.get(item.clave);
-                    const est = r?.estado ?? 'cumple';
-                    return (
-                      <tr key={item.clave} className="border-b border-neutral-300">
-                        <td className="w-1/2 py-1 pr-2">{item.etiqueta}</td>
-                        <td className={`w-24 py-1 font-semibold ${estadoColor[est]}`}>
-                          {RECEPCION_ITEM_ESTADO_LABEL[est]}
-                        </td>
-                        <td className="py-1 text-neutral-600">{r?.nota ?? ''}</td>
-                      </tr>
-                    );
-                  })}
+                  {sec.items.map((item) => (
+                    <tr key={item.clave} className="border-b border-neutral-300">
+                      <td className="w-1/2 py-1.5 pr-2 align-top">{item.etiqueta}</td>
+                      <td className="w-28 py-1.5 align-top">
+                        <div className="flex gap-2">
+                          <Casilla letra="C" />
+                          <Casilla letra="O" />
+                          <Casilla letra="N/A" />
+                        </div>
+                      </td>
+                      <td className="py-1.5 align-top">
+                        <span className="block w-full border-b border-neutral-400">&nbsp;</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           ))}
 
-          {datos.notas ? (
-            <div className="text-xs">
-              <span className="font-semibold">Observaciones no contempladas:</span> {datos.notas}
-            </div>
-          ) : null}
+          <div className="space-y-1 text-xs break-inside-avoid">
+            <span className="font-semibold">Observaciones no contempladas en el checklist:</span>
+            <span className="block w-full border-b border-black">&nbsp;</span>
+            <span className="block w-full border-b border-black">&nbsp;</span>
+          </div>
 
           <div className="grid grid-cols-3 gap-6 pt-10 text-center text-[11px]">
             {[
@@ -239,7 +248,7 @@ function ActaInner() {
               { rol: 'Atención a Clientes (EVAP)', nombre: null },
             ].map((f) => (
               <div key={f.rol}>
-                <div className="mt-8 border-t border-black pt-1">{f.nombre ?? ' '}</div>
+                <div className="mt-8 border-t border-black pt-1">{f.nombre ?? ' '}</div>
                 <div className="font-semibold">{f.rol}</div>
                 <div className="text-[10px] text-neutral-500">Nombre y firma</div>
               </div>
