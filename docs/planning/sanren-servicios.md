@@ -4,10 +4,10 @@
 **Empresas:** SANREN (hub patrimonial familiar — personal de Beto)
 **Schemas afectados:** `sanren` (schema nuevo) — tablas `propiedades`, `servicios`, `recibos` + vista derivada `v_recibos`; RLS deny-all + lectura server-side con service-role (patrón Péptidos/Salud). `core` (RBAC del módulo, ver nota de routing en Sprint 3). Supabase Storage bucket `adjuntos` (recibos PDF + comprobantes de pago). Importer **read-only** desde Coda doc `MaXoDlRxXE` / tabla `grid-ItvEVXa37s` ("Recibos"). Sin librería de charts nueva (SVG a mano, patrón Playtomic/Health).
 **Estado:** in_progress
-**Próximo hito:** Beto revisa el Preview de S3 (UI de consulta) y mergea; luego Sprint 4 — tendencias (gráficas SVG: gasto/consumo/costo + bloque solar) **y** captura de recibos nuevos (form + upload con `<FileAttachments>`), con su feedback visual.
+**Próximo hito:** Beto valida S4 en prod (captura de recibos + gráficas de tendencia) → cierre del v1. Pendiente opcional: tarifa CFE (DAC / banco de energía) para volver exacto el ahorro solar (hoy se muestra el gasto real por año, que ya evidencia el efecto).
 **Dueño:** Beto
 **Creada:** 2026-06-21
-**Última actualización:** 2026-06-21 (Sprint 3 — UI de consulta `/servicios` en Preview para revisión)
+**Última actualización:** 2026-06-21 (Sprint 4 — captura de recibos + gráficas de tendencia)
 
 > Detonante: Beto lleva años el control de los recibos de servicios de su casa
 > en un doc de Coda y quiere traspasar el historial completo a BSOP para
@@ -207,6 +207,19 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   ajustado:** S3 quedó como UI de **consulta** (todo el historial visible); la
   **captura de recibos nuevos** se mueve a S4 para incorporarla con el feedback
   visual de Beto. PR **sin auto-merge** (UI → revisión en Vercel Preview).
+  Beto revisó el Preview ("vamos por muy buen camino") y autorizó el merge →
+  [#973](https://github.com/beto-sudo/BSOP/pull/973) en prod.
+- **2026-06-21** — Sprint 4 (captura + tendencias). (1) **Captura de recibos
+  nuevos**: botón "+ Nuevo recibo" → drawer con form (servicio/periodo/fecha/
+  monto/lecturas/folio/pagado/notas) → server action `createRecibo`
+  (`app/servicios/actions.ts`, service-role, admin-only, `assertNotInPreview`);
+  click en una fila abre el detalle con `<FileAttachments>` para subir/ver el
+  PDF y el comprobante (reusa los adjuntos ya migrados, `entidad_tipo='recibo'`).
+  (2) **Tendencias** (`components/sanren/servicios-tendencias.tsx`, SVG a mano,
+  toggle Recibos/Tendencias): gasto mensual por servicio (barras apiladas),
+  consumo vs. generación solar de Luz, y gasto de Luz por año (el efecto de los
+  paneles). `lib/sanren-servicios.ts` ahora expone `empresaId` para
+  `<FileAttachments>`. Sin migración DB.
 
 ## Decisiones registradas
 

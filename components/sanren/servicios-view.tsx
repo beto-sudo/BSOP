@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DataTable,
   ModuleKpiStrip,
@@ -10,6 +10,8 @@ import {
 } from '@/components/module-page';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import type { ServiciosData, ReciboVista } from '@/lib/sanren-servicios';
+import { ServiciosTendencias } from '@/components/sanren/servicios-tendencias';
+import { ReciboDrawer } from '@/components/sanren/recibo-drawer';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -48,6 +50,7 @@ function servicioBadge(tipo: string) {
 }
 
 const FILTER_DEFAULTS = {
+  tab: 'recibos',
   servicio: '',
   estadoPago: '',
   q: '',
@@ -56,8 +59,12 @@ const FILTER_DEFAULTS = {
 };
 
 export function ServiciosView({ data }: { data: ServiciosData }) {
-  const { recibos, errors } = data;
+  const { recibos, servicios, empresaId, errors } = data;
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(FILTER_DEFAULTS);
+  const [drawer, setDrawer] = useState<{
+    mode: 'nuevo' | 'detalle';
+    recibo: ReciboVista | null;
+  } | null>(null);
 
   const tiposPresentes = useMemo(
     () => Array.from(new Set(recibos.map((r) => r.servicio_tipo))).sort(),
@@ -214,6 +221,37 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
         ]}
       />
 
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex w-fit gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1 text-sm">
+          {[
+            { id: 'recibos', label: 'Recibos' },
+            { id: 'tendencias', label: 'Tendencias' },
+          ].map((t) => {
+            const active = (filters.tab || 'recibos') === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setFilter('tab', t.id)}
+                aria-pressed={active}
+                className={`rounded-md px-3 py-1 transition ${
+                  active
+                    ? 'bg-[var(--text)]/10 font-medium text-[var(--text)]'
+                    : 'text-[var(--text)]/60 hover:text-[var(--text)]'
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setDrawer({ mode: 'nuevo', recibo: null })}
+          className="rounded-lg bg-[var(--text)] px-3 py-1.5 text-sm font-medium text-[var(--bg)]"
+        >
+          + Nuevo recibo
+        </button>
+      </div>
+
       <ModuleFilters
         count={`${filtered.length} de ${recibos.length}`}
         actions={
@@ -274,13 +312,29 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
         />
       </ModuleFilters>
 
-      <DataTable<ReciboVista>
-        data={filtered}
-        columns={columns}
-        rowKey="id"
-        initialSort={{ key: 'periodo', dir: 'desc' }}
-        emptyTitle="Ningún recibo coincide"
-        emptyDescription="Ajusta los filtros."
+      {(filters.tab || 'recibos') === 'tendencias' ? (
+        <ServiciosTendencias recibos={filtered} />
+      ) : (
+        <DataTable<ReciboVista>
+          data={filtered}
+          columns={columns}
+          rowKey="id"
+          initialSort={{ key: 'periodo', dir: 'desc' }}
+          onRowClick={(r) => setDrawer({ mode: 'detalle', recibo: r })}
+          emptyTitle="Ningún recibo coincide"
+          emptyDescription="Ajusta los filtros."
+        />
+      )}
+
+      <ReciboDrawer
+        open={drawer !== null}
+        onOpenChange={(o) => {
+          if (!o) setDrawer(null);
+        }}
+        mode={drawer?.mode ?? 'nuevo'}
+        recibo={drawer?.recibo ?? null}
+        servicios={servicios}
+        empresaId={empresaId}
       />
     </div>
   );
