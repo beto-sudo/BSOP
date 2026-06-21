@@ -3,11 +3,11 @@
 **Slug:** `sanren-servicios`
 **Empresas:** SANREN (hub patrimonial familiar — personal de Beto)
 **Schemas afectados:** `sanren` (schema nuevo) — tablas `propiedades`, `servicios`, `recibos` + vista derivada `v_recibos`; RLS deny-all + lectura server-side con service-role (patrón Péptidos/Salud). `core` (RBAC del módulo, ver nota de routing en Sprint 3). Supabase Storage bucket `adjuntos` (recibos PDF + comprobantes de pago). Importer **read-only** desde Coda doc `MaXoDlRxXE` / tabla `grid-ItvEVXa37s` ("Recibos"). Sin librería de charts nueva (SVG a mano, patrón Playtomic/Health).
-**Estado:** planned
-**Próximo hito:** Sprint 1 — crear el schema `sanren` (propiedades/servicios/recibos + vista `v_recibos`, RLS deny-all) e importar las 73 filas de Coda con limpieza; certificar paridad por totales (monto y consumo por servicio/año). La migración se deja como archivo y se aplica a prod con OK verbal de Beto.
+**Estado:** in_progress
+**Próximo hito:** Sprint 2 — migrar los ~120 adjuntos (69 recibos PDF + 51 comprobantes de pago) de Coda al bucket `adjuntos` y ligarlos a cada recibo (puebla `recibo_adjunto_id`/`comprobante_adjunto_id`).
 **Dueño:** Beto
 **Creada:** 2026-06-21
-**Última actualización:** 2026-06-21 (promoción — alcance v1 cerrado con las 4 decisiones de la conversación)
+**Última actualización:** 2026-06-21 (Sprint 1 en prod — schema `sanren` + 73 recibos importados con paridad exacta)
 
 > Detonante: Beto lleva años el control de los recibos de servicios de su casa
 > en un doc de Coda y quiere traspasar el historial completo a BSOP para
@@ -171,7 +171,21 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   3 servicios, 2024-2026; perfil de columnas + suciedad documentado arriba).
   Alcance v1 cerrado con Beto (catálogo extensible · solar a fondo ·
   multi-propiedad por diseño · migrar adjuntos). Estado `planned`; siguiente:
-  Sprint 1.
+  Sprint 1. PR [#970](https://github.com/beto-sudo/BSOP/pull/970).
+- **2026-06-21** — Sprint 1 en prod. Migración
+  `20260621211906_sanren_servicios_schema.sql` aplicada con `supabase db push`
+  (ledger limpio, sin reconciliación): schema `sanren` (propiedades/servicios/
+  recibos + `v_recibos`, RLS deny-all, grants solo a `service_role`, `sanren`
+  expuesto en `pgrst.db_schemas`). Import de las 73 filas con
+  `scripts/import_sanren_recibos.ts --apply` → **paridad exacta** de Σ monto por
+  servicio (luz $55,663.15 · gas $25,190.00 · agua $74,170.00). Hallazgos: SIMAS
+  facturó 2 veces en dic-2024 → el modelo ya **no** fuerza un recibo por mes
+  (idempotencia por `coda_row_id`); CFE es **bimestral** (15 recibos vs 29 de
+  gas/agua); el efecto solar es nítido en `v_recibos` (saldo neto negativo =
+  excedente; gasto de luz/año 2024 $44,137 → 2025 $11,411 → 2026 $115 parcial).
+  `sanren` agregado a `db:types` + `gen-schema-ref` + workflow `db-types.yml`;
+  `SCHEMA_REF.md` y `types/supabase.ts` regenerados. Estado → `in_progress`;
+  siguiente: Sprint 2 (adjuntos).
 
 ## Decisiones registradas
 

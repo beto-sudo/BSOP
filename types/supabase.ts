@@ -15040,6 +15040,231 @@ export type Database = {
       [_ in never]: never
     }
   }
+  sanren: {
+    Tables: {
+      propiedades: {
+        Row: {
+          activo: boolean
+          created_at: string
+          direccion: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          tipo: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recibos: {
+        Row: {
+          coda_row_id: string | null
+          comprobante_adjunto_id: string | null
+          created_at: string
+          fecha_pago: string | null
+          fecha_recibo: string
+          folio: string | null
+          id: string
+          lectura_consumo: number | null
+          lectura_produccion: number | null
+          metodo_pago: string | null
+          moneda: string
+          monto: number | null
+          notas: string | null
+          pagado: boolean
+          periodo: string
+          recibo_adjunto_id: string | null
+          servicio_id: string
+          updated_at: string
+        }
+        Insert: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          fecha_pago?: string | null
+          fecha_recibo: string
+          folio?: string | null
+          id?: string
+          lectura_consumo?: number | null
+          lectura_produccion?: number | null
+          metodo_pago?: string | null
+          moneda?: string
+          monto?: number | null
+          notas?: string | null
+          pagado?: boolean
+          periodo: string
+          recibo_adjunto_id?: string | null
+          servicio_id: string
+          updated_at?: string
+        }
+        Update: {
+          coda_row_id?: string | null
+          comprobante_adjunto_id?: string | null
+          created_at?: string
+          fecha_pago?: string | null
+          fecha_recibo?: string
+          folio?: string | null
+          id?: string
+          lectura_consumo?: number | null
+          lectura_produccion?: number | null
+          metodo_pago?: string | null
+          moneda?: string
+          monto?: number | null
+          notas?: string | null
+          pagado?: boolean
+          periodo?: string
+          recibo_adjunto_id?: string | null
+          servicio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibos_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servicios: {
+        Row: {
+          activo: boolean
+          created_at: string
+          domiciliado: boolean
+          id: string
+          notas: string | null
+          numero_cuenta: string | null
+          numero_medidor: string | null
+          propiedad_id: string
+          proveedor: string | null
+          tiene_produccion: boolean
+          tipo: string
+          unidad_consumo: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          domiciliado?: boolean
+          id?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          numero_medidor?: string | null
+          propiedad_id: string
+          proveedor?: string | null
+          tiene_produccion?: boolean
+          tipo: string
+          unidad_consumo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          domiciliado?: boolean
+          id?: string
+          notas?: string | null
+          numero_cuenta?: string | null
+          numero_medidor?: string | null
+          propiedad_id?: string
+          proveedor?: string | null
+          tiene_produccion?: boolean
+          tipo?: string
+          unidad_consumo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicios_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      v_recibos: {
+        Row: {
+          coda_row_id: string | null
+          comprobante_adjunto_id: string | null
+          consumo_periodo: number | null
+          costo_unitario: number | null
+          delta_monto_mom: number | null
+          fecha_pago: string | null
+          fecha_recibo: string | null
+          folio: string | null
+          id: string | null
+          lectura_consumo: number | null
+          lectura_consumo_anterior: number | null
+          lectura_produccion: number | null
+          lectura_produccion_anterior: number | null
+          metodo_pago: string | null
+          moneda: string | null
+          monto: number | null
+          monto_anterior: number | null
+          notas: string | null
+          pagado: boolean | null
+          periodo: string | null
+          produccion_periodo: number | null
+          propiedad_id: string | null
+          propiedad_nombre: string | null
+          proveedor: string | null
+          recibo_adjunto_id: string | null
+          saldo_neto: number | null
+          servicio_id: string | null
+          servicio_tipo: string | null
+          tiene_produccion: boolean | null
+          unidad_consumo: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibos_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_propiedad_id_fkey"
+            columns: ["propiedad_id"]
+            isOneToOne: false
+            referencedRelation: "propiedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
@@ -15192,6 +15417,9 @@ export const Constants = {
     Enums: {},
   },
   rdb: {
+    Enums: {},
+  },
+  sanren: {
     Enums: {},
   },
 } as const
