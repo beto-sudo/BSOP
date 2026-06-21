@@ -4,10 +4,10 @@
 **Empresas:** SANREN (hub patrimonial familiar — personal de Beto)
 **Schemas afectados:** `sanren` (schema nuevo) — tablas `propiedades`, `servicios`, `recibos` + vista derivada `v_recibos`; RLS deny-all + lectura server-side con service-role (patrón Péptidos/Salud). `core` (RBAC del módulo, ver nota de routing en Sprint 3). Supabase Storage bucket `adjuntos` (recibos PDF + comprobantes de pago). Importer **read-only** desde Coda doc `MaXoDlRxXE` / tabla `grid-ItvEVXa37s` ("Recibos"). Sin librería de charts nueva (SVG a mano, patrón Playtomic/Health).
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — migrar los ~120 adjuntos (69 recibos PDF + 51 comprobantes de pago) de Coda al bucket `adjuntos` y ligarlos a cada recibo (puebla `recibo_adjunto_id`/`comprobante_adjunto_id`).
+**Próximo hito:** Sprint 3 — UI del módulo `/servicios` (listado + filtros + captura de recibo con upload de PDF/comprobante) + RBAC (nav SANREN + `ROUTE_TO_MODULE`) + KPIs.
 **Dueño:** Beto
 **Creada:** 2026-06-21
-**Última actualización:** 2026-06-21 (Sprint 1 en prod — schema `sanren` + 73 recibos importados con paridad exacta)
+**Última actualización:** 2026-06-21 (Sprint 2 en prod — 119 adjuntos migrados de Coda al bucket y ligados)
 
 > Detonante: Beto lleva años el control de los recibos de servicios de su casa
 > en un doc de Coda y quiere traspasar el historial completo a BSOP para
@@ -185,7 +185,15 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   excedente; gasto de luz/año 2024 $44,137 → 2025 $11,411 → 2026 $115 parcial).
   `sanren` agregado a `db:types` + `gen-schema-ref` + workflow `db-types.yml`;
   `SCHEMA_REF.md` y `types/supabase.ts` regenerados. Estado → `in_progress`;
-  siguiente: Sprint 2 (adjuntos).
+  siguiente: Sprint 2 (adjuntos). PR [#971](https://github.com/beto-sudo/BSOP/pull/971).
+- **2026-06-21** — Sprint 2 en prod. `scripts/import_sanren_adjuntos.ts` migró
+  **119 adjuntos** de Coda al bucket `adjuntos` (descarga del CDN público →
+  upload → `erp.adjuntos` con `entidad_tipo='recibo'` + `rol` recibo/comprobante
+  → link en `sanren.recibos`): 69 recibos PDF + 50 comprobantes, 0 fallos.
+  (El comprobante #51 del perfil era el texto "279375", no un archivo — ignorado
+  correctamente.) `lib/storage/path.ts` extendido con `EmpresaSlug` `sanren` y
+  entidad `recibos`. Sin migración DB (las columnas `*_adjunto_id` ya existían de
+  S1). Estado → `in_progress`; siguiente: Sprint 3 (UI + RBAC).
 
 ## Decisiones registradas
 

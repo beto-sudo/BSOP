@@ -20,7 +20,7 @@
  * uploaders. Use `lib/adjuntos.ts` for read flows (signed URLs, proxy).
  */
 
-export type EmpresaSlug = 'dilesa' | 'rdb' | 'ansa' | 'coagan';
+export type EmpresaSlug = 'dilesa' | 'rdb' | 'ansa' | 'coagan' | 'sanren';
 
 export type AdjuntoEntidad =
   | 'documentos'
@@ -49,7 +49,8 @@ export type AdjuntoEntidad =
   | 'presupuesto_partidas'
   | 'estados_cuenta'
   | 'recepcion_obra'
-  | 'recepcion_visita';
+  | 'recepcion_visita'
+  | 'recibos';
 
 export type BuildAdjuntoPathOpts = {
   empresa: EmpresaSlug;
