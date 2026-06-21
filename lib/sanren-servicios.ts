@@ -65,6 +65,7 @@ export type ReciboVista = {
 };
 
 export type ServiciosData = {
+  empresaId: string | null;
   propiedades: PropiedadSanren[];
   servicios: ServicioSanren[];
   recibos: ReciboVista[];
@@ -78,11 +79,25 @@ const toNum = (v: unknown): number | null => {
 };
 
 export async function getServiciosData(): Promise<ServiciosData> {
-  const empty: ServiciosData = { propiedades: [], servicios: [], recibos: [], errors: [] };
+  const empty: ServiciosData = {
+    empresaId: null,
+    propiedades: [],
+    servicios: [],
+    recibos: [],
+    errors: [],
+  };
   const admin = getSupabaseAdminClient();
   if (!admin) {
     return { ...empty, errors: ['Supabase service role key is not configured.'] };
   }
+
+  const { data: empRow } = await admin
+    .schema('core')
+    .from('empresas')
+    .select('id')
+    .eq('slug', 'sanren')
+    .maybeSingle();
+  const empresaId = (empRow?.id as string | undefined) ?? null;
 
   // Cast puntual del schema personal (igual que lib/peptides.ts).
   const sr = admin.schema('sanren' as never) as unknown as {
@@ -172,5 +187,5 @@ export async function getServiciosData(): Promise<ServiciosData> {
     };
   });
 
-  return { propiedades, servicios, recibos, errors };
+  return { empresaId, propiedades, servicios, recibos, errors };
 }
