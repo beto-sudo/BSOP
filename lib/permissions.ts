@@ -223,6 +223,7 @@ export const ROUTE_TO_EMPRESA: Record<string, string> = {
   '/travel': 'sanren',
   '/health': 'sanren',
   '/peptides': 'sanren',
+  '/servicios': 'sanren',
   '/personas-fisicas': 'personas_fisicas',
   '/settings': 'settings',
 };

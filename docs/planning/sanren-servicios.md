@@ -4,10 +4,10 @@
 **Empresas:** SANREN (hub patrimonial familiar — personal de Beto)
 **Schemas afectados:** `sanren` (schema nuevo) — tablas `propiedades`, `servicios`, `recibos` + vista derivada `v_recibos`; RLS deny-all + lectura server-side con service-role (patrón Péptidos/Salud). `core` (RBAC del módulo, ver nota de routing en Sprint 3). Supabase Storage bucket `adjuntos` (recibos PDF + comprobantes de pago). Importer **read-only** desde Coda doc `MaXoDlRxXE` / tabla `grid-ItvEVXa37s` ("Recibos"). Sin librería de charts nueva (SVG a mano, patrón Playtomic/Health).
 **Estado:** in_progress
-**Próximo hito:** Sprint 3 — UI del módulo `/servicios` (listado + filtros + captura de recibo con upload de PDF/comprobante) + RBAC (nav SANREN + `ROUTE_TO_MODULE`) + KPIs.
+**Próximo hito:** Beto revisa el Preview de S3 (UI de consulta) y mergea; luego Sprint 4 — tendencias (gráficas SVG: gasto/consumo/costo + bloque solar) **y** captura de recibos nuevos (form + upload con `<FileAttachments>`), con su feedback visual.
 **Dueño:** Beto
 **Creada:** 2026-06-21
-**Última actualización:** 2026-06-21 (Sprint 2 en prod — 119 adjuntos migrados de Coda al bucket y ligados)
+**Última actualización:** 2026-06-21 (Sprint 3 — UI de consulta `/servicios` en Preview para revisión)
 
 > Detonante: Beto lleva años el control de los recibos de servicios de su casa
 > en un doc de Coda y quiere traspasar el historial completo a BSOP para
@@ -193,7 +193,20 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   (El comprobante #51 del perfil era el texto "279375", no un archivo — ignorado
   correctamente.) `lib/storage/path.ts` extendido con `EmpresaSlug` `sanren` y
   entidad `recibos`. Sin migración DB (las columnas `*_adjunto_id` ya existían de
-  S1). Estado → `in_progress`; siguiente: Sprint 3 (UI + RBAC).
+  S1). Estado → `in_progress`; siguiente: Sprint 3 (UI + RBAC). PR
+  [#972](https://github.com/beto-sudo/BSOP/pull/972).
+- **2026-06-21** — Sprint 3 (UI de consulta) en Preview. Módulo `/servicios`:
+  página server (`app/servicios/page.tsx`, lectura service-role) + view client
+  (`components/sanren/servicios-view.tsx`) con KPIs (`<ModuleKpiStrip>`), filtros
+  URL-sync (servicio/estado de pago/rango de mes/búsqueda) y `<DataTable>`
+  (periodo, servicio, proveedor, monto, consumo, costo/u, saldo neto solar, pago,
+  links a recibo PDF + comprobante vía `/api/adjuntos`). Data layer
+  `lib/sanren-servicios.ts` (lee `v_recibos` + enriquece con adjuntos por
+  `entidad_tipo='recibo'`). RBAC: nav SANREN + `ROUTE_TO_EMPRESA['/servicios']='sanren'`
+  (sin migración: el slug `sanren` ya existe, como /health, /peptides). **Alcance
+  ajustado:** S3 quedó como UI de **consulta** (todo el historial visible); la
+  **captura de recibos nuevos** se mueve a S4 para incorporarla con el feedback
+  visual de Beto. PR **sin auto-merge** (UI → revisión en Vercel Preview).
 
 ## Decisiones registradas
 
