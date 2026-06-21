@@ -23,7 +23,7 @@
     "audit:a11y": "playwright test tests/e2e/a11y",
     "audit:ui": "npx tsx scripts/audit-ui.ts",
     "audit:ui:json": "npx tsx scripts/audit-ui.ts --json",
-    "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema health --schema playtomic --schema dilesa --schema maquinaria --schema peptides > types/supabase.ts",
+    "db:types": "supabase gen types typescript --project-id ybklderteyhuugzfmxbi --schema public --schema core --schema erp --schema rdb --schema health --schema playtomic --schema dilesa --schema maquinaria --schema peptides --schema sanren > types/supabase.ts",
     "db:check": "npm run db:types && git diff --exit-code types/supabase.ts",
     "db:new": "npx tsx scripts/new-migration.ts",
     "schema:ref": "npx tsx scripts/gen-schema-ref.ts",
