@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { RowActions } from '@/components/shared/row-actions';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -115,9 +115,15 @@ function toNum(s: string): number {
 export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const toast = useToast();
   const puedeEscribir =
     permissions.isAdmin || permissions.modulos.get('dilesa.compras.requisiciones')?.write === true;
+  // Requisitar y pedir cotizaciones quedan abiertos a las gerencias (D4). Generar
+  // la OC directa (compra sin RFQ) compromete dinero → solo Dirección/admin (D3,
+  // iniciativa dilesa-compras-flujo).
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const [rows, setRows] = useState<ReqRow[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
@@ -403,12 +409,11 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     : proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
 
   /**
-   * `autorizarAlCrear` (S4 dilesa-flujo-gasto): quien tiene permiso de
-   * autorizar (write en este módulo es el mismo gate del botón "Marcar
-   * autorizada") puede crear la requisición ya autorizada en un paso —
-   * evita el trámite consigo mismo cuando Dirección captura.
+   * Crea la requisición. Ya **no** hay paso de autorización de la requisición
+   * (D4, iniciativa dilesa-compras-flujo): cualquiera (gerencias) requisita; el
+   * candado vive en la emisión de la OC, que solo hace Dirección.
    */
-  async function onSubmit(autorizarAlCrear = false) {
+  async function onSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
@@ -425,7 +430,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         codigo: folio,
         solicitante_id: auth?.user?.id ?? null,
         justificacion: justificacion.trim() || null,
-        autorizada_at: autorizarAlCrear ? new Date().toISOString() : null,
+        autorizada_at: null,
       })
       .select('id')
       .single();
@@ -464,7 +469,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       return;
     }
     toast.add({
-      title: autorizarAlCrear ? 'Requisición creada y autorizada' : 'Requisición creada',
+      title: 'Requisición creada',
       description: folio,
       type: 'success',
     });
@@ -472,30 +477,6 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     setFormOpen(false);
     void cargar();
   }
-
-  const autorizar = useCallback(
-    async (req: ReqRow) => {
-      setAccionId(req.id);
-      const sb = createSupabaseBrowserClient();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('erp') as any)
-        .from('requisiciones')
-        .update({ autorizada_at: new Date().toISOString() })
-        .eq('id', req.id);
-      setAccionId(null);
-      if (e) {
-        toast.add({
-          title: 'Error',
-          description: getSupabaseErrorMessage(e, 'No se pudo autorizar.'),
-          type: 'error',
-        });
-        return;
-      }
-      toast.add({ title: 'Requisición autorizada', description: req.codigo, type: 'success' });
-      void cargar();
-    },
-    [toast, cargar]
-  );
 
   const cancelar = useCallback(
     async (req: ReqRow, motivo: string): Promise<boolean> => {
@@ -529,7 +510,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
    */
   const generarOC = useCallback(
     async (req: ReqRow) => {
-      if (!puedeGenerarOc(req) || accionId === req.id) return;
+      if (!esDireccion || !puedeGenerarOc(req) || accionId === req.id) return;
       setAccionId(req.id);
       const sb = createSupabaseBrowserClient();
       const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
@@ -543,7 +524,10 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           codigo: folio,
           requisicion_id: req.id,
           proveedor_id: null,
-          estado: 'borrador',
+          // Dirección emite en un acto (D2/D3): la OC directa nace `enviada` y
+          // compromete el presupuesto de inmediato (sin paso de re-autorización).
+          estado: 'enviada',
+          autorizada_at: new Date().toISOString(),
           total: validas.reduce((acc, l) => acc + l.cantidad * l.precioEstimado, 0),
         })
         .select('id')
@@ -591,13 +575,13 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         .eq('id', req.id);
       setAccionId(null);
       toast.add({
-        title: 'Orden generada',
+        title: 'Orden de compra emitida',
         description: `${folio} · desde ${req.codigo}`,
         type: 'success',
       });
       void cargar();
     },
-    [empresaId, accionId, toast, cargar]
+    [empresaId, accionId, toast, cargar, esDireccion]
   );
 
   /**
@@ -729,26 +713,18 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
                       : undefined
                   }
                 >
-                  {estado === 'pendiente' ? (
-                    <button
-                      type="button"
-                      onClick={() => void autorizar(r)}
-                      disabled={accionId === r.id}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
-                    >
-                      <ClipboardList className="h-3.5 w-3.5" /> Marcar autorizada
-                    </button>
-                  ) : null}
                   {puedeGenerarOc(r) ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => void generarOC(r)}
-                        disabled={accionId === r.id}
-                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
-                      >
-                        <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
-                      </button>
+                      {esDireccion ? (
+                        <button
+                          type="button"
+                          onClick={() => void generarOC(r)}
+                          disabled={accionId === r.id}
+                          className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => void pedirCotizaciones(r)}
@@ -959,13 +935,6 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => onSubmit(true)}
-              disabled={!canSubmit || submitting}
-            >
-              Crear y autorizar
-            </Button>
             <Button onClick={() => onSubmit()} disabled={!canSubmit || submitting}>
               {submitting ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -1001,8 +970,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         puedeEscribir={puedeEscribir}
+        esDireccion={esDireccion}
         accionBusy={accionId !== null}
-        onAutorizar={(r) => void autorizar(r)}
         onGenerarOc={(r) => void generarOC(r)}
         onPedirRfq={(r) => void pedirCotizaciones(r)}
         onCancelar={(r) => setCancelarReq(r)}
@@ -1038,8 +1007,8 @@ function ReqDetalleDrawer({
   open,
   onClose,
   puedeEscribir,
+  esDireccion,
   accionBusy,
-  onAutorizar,
   onGenerarOc,
   onPedirRfq,
   onCancelar,
@@ -1048,8 +1017,8 @@ function ReqDetalleDrawer({
   open: boolean;
   onClose: () => void;
   puedeEscribir: boolean;
+  esDireccion: boolean;
   accionBusy: boolean;
-  onAutorizar: (req: ReqRow) => void;
   onGenerarOc: (req: ReqRow) => void;
   onPedirRfq: (req: ReqRow) => void;
   onCancelar: (req: ReqRow) => void;
@@ -1067,16 +1036,13 @@ function ReqDetalleDrawer({
       footer={
         conAcciones ? (
           <div className="flex flex-wrap items-center gap-2">
-            {estado === 'pendiente' ? (
-              <Button variant="outline" onClick={() => onAutorizar(req)} disabled={accionBusy}>
-                <ClipboardList className="size-4" /> Marcar autorizada
-              </Button>
-            ) : null}
             {puedeGenerarOc(req) ? (
               <>
-                <Button onClick={() => onGenerarOc(req)} disabled={accionBusy}>
-                  <ShoppingCart className="size-4" /> Generar orden de compra
-                </Button>
+                {esDireccion ? (
+                  <Button onClick={() => onGenerarOc(req)} disabled={accionBusy}>
+                    <ShoppingCart className="size-4" /> Generar orden de compra
+                  </Button>
+                ) : null}
                 <Button variant="outline" onClick={() => onPedirRfq(req)} disabled={accionBusy}>
                   <FileSearch className="size-4" /> Pedir cotizaciones (RFQ)
                 </Button>

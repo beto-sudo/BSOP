@@ -142,3 +142,20 @@ dinero, y que los pendientes lleguen solos a quien los resuelve.**
   directa como excepción gateada, fin de "autorizar requisición", rechazo con
   motivo por solicitante+Dirección, aviso diario en el correo de tareas, sin
   umbral de monto. Plan de 3 sprints (UI → correo → blindaje server-side).
+- **2026-06-22 — Sprint 1 construido (UI, sin migración) — preview-first.**
+  Candado reordenado en los tres módulos de `components/compras/` + la bandeja
+  `components/gasto/te-toca-strip.tsx`: (D1) **adjudicar** solo Dirección/admin
+  (`esDireccion = isAdmin || direccionEmpresaIds`), con nota "lo realiza
+  Dirección" para quien captura; (D2) la OC adjudicada y la OC directa nacen
+  `enviada` + `autorizada_at` (comprometen en el acto), y "marcar enviada" de
+  Órdenes queda gateado a Dirección (guard en `cambiarEstado` + visibilidad);
+  (D3) "Generar OC" directa desde la requisición solo Dirección; (D4) eliminados
+  "Marcar autorizada" (lista + drawer) y "Crear y autorizar" del alta —
+  requisitar y pedir cotizaciones siguen abiertos a gerencias. Bandeja: fuera el
+  chip "requisiciones por autorizar"; "cotizaciones por adjudicar" y "órdenes
+  por emitir" pasan a `direccion: true`. 6 checks locales verdes (typecheck,
+  1965 tests, lint 0-err, format, initiatives; schema n/a — sin DB). **Diferido
+  a follow-up de S1** (no bloquea): gating de cancelar por solicitante (hoy
+  `puedeEscribir`; falta `solicitante_id` en `ReqRow`) y el pulido de
+  badge/KPI de requisición ("pendiente" → "abierta", quitar "Autorizadas" que
+  ahora queda en 0). Próximo: Sprint 2 (avisos en el correo).

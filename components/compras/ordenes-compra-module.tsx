@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { RowActions } from '@/components/shared/row-actions';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -106,9 +106,15 @@ function toNum(s: string): number {
 
 export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const toast = useToast();
   const puedeEscribir =
     permissions.isAdmin || permissions.modulos.get('dilesa.compras.ordenes')?.write === true;
+  // Emitir la OC (borrador → enviada) compromete el presupuesto → solo
+  // Dirección/admin (D2, iniciativa dilesa-compras-flujo). Editar/crear borrador
+  // sigue abierto a quien tiene escritura.
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const [rows, setRows] = useState<OcRow[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
@@ -534,6 +540,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
 
   const cambiarEstado = useCallback(
     async (oc: OcRow, estado: OcEstado, okMsg: string) => {
+      // Candado de dinero (D2): emitir (→ enviada) solo Dirección/admin.
+      if (estado === 'enviada' && !esDireccion) return;
       const sb = createSupabaseBrowserClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
@@ -551,7 +559,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       toast.add({ title: okMsg, description: oc.codigo, type: 'success' });
       void cargar();
     },
-    [toast, cargar]
+    [toast, cargar, esDireccion]
   );
 
   const cancelar = useCallback(
@@ -668,13 +676,15 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                     >
                       <Pencil className="h-3.5 w-3.5" /> Editar borrador
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                    >
-                      <Send className="h-3.5 w-3.5" /> Marcar enviada
-                    </button>
+                    {esDireccion ? (
+                      <button
+                        type="button"
+                        onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Marcar enviada
+                      </button>
+                    ) : null}
                   </>
                 ) : null}
                 {r.estado === 'enviada' || r.estado === 'parcial' ? (
@@ -921,6 +931,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         puedeEscribir={puedeEscribir}
+        esDireccion={esDireccion}
         onEditar={(r) => {
           setDrawerOpen(false);
           abrirEdicionOc(r);
@@ -961,6 +972,7 @@ function OcDetalleDrawer({
   open,
   onClose,
   puedeEscribir,
+  esDireccion,
   onEditar,
   onMarcarEnviada,
   onCerrarOrden,
@@ -970,6 +982,7 @@ function OcDetalleDrawer({
   open: boolean;
   onClose: () => void;
   puedeEscribir: boolean;
+  esDireccion: boolean;
   onEditar: (oc: OcRow) => void;
   onMarcarEnviada: (oc: OcRow) => void;
   onCerrarOrden: (oc: OcRow) => void;
@@ -997,9 +1010,11 @@ function OcDetalleDrawer({
                 <Button variant="outline" onClick={() => onEditar(oc)}>
                   <Pencil className="size-4" /> Editar borrador
                 </Button>
-                <Button onClick={() => onMarcarEnviada(oc)}>
-                  <Send className="size-4" /> Marcar enviada
-                </Button>
+                {esDireccion ? (
+                  <Button onClick={() => onMarcarEnviada(oc)}>
+                    <Send className="size-4" /> Marcar enviada
+                  </Button>
+                ) : null}
               </>
             ) : null}
             {oc.estado === 'enviada' || oc.estado === 'parcial' ? (

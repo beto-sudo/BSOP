@@ -4,12 +4,13 @@
  * TeTocaStrip — bandeja lite de pendientes por rol del ciclo de gasto
  * (iniciativa `dilesa-flujo-gasto` · Sprint 4, decisión D6 "v1 lite").
  *
- * Una fila de chips con conteos accionables: requisiciones por autorizar,
- * RFQs por adjudicar, OCs por enviar, recepciones pendientes, facturas por
+ * Una fila de chips con conteos accionables: cotizaciones por adjudicar y
+ * órdenes por emitir (ambas solo Dirección — ahí se compromete el dinero,
+ * iniciativa dilesa-compras-flujo), recepciones pendientes, facturas por
  * programar y pagos por aprobar. Cada chip linkea directo a la pantalla de la
  * acción; solo se muestran los chips con conteo > 0 Y para los que el usuario
- * tiene permiso de escritura en el módulo destino (o es admin). Si no hay
- * nada, el strip no se renderiza.
+ * tiene permiso de escritura en el módulo destino (o es Dirección/admin para
+ * los chips marcados `direccion`). Si no hay nada, el strip no se renderiza.
  *
  * Counts con `head: true` (sin payload). DILESA-first: los chips de Compras
  * asumen los sub-slugs `dilesa.compras.*`; en otras empresas solo aplican los
@@ -53,87 +54,74 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
         q.then((r) => (r.error ? 0 : (r.count ?? 0)));
 
       const esDilesa = empresa === 'dilesa';
-      const [reqs, rfqs, ocsBorrador, ocsRecibir, factsProgramar, pagosAprobar] = await Promise.all(
-        [
-          esDilesa
-            ? count(
-                erp
-                  .from('requisiciones')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('empresa_id', empresaId)
-                  .is('autorizada_at', null)
-                  .is('cancelada_at', null)
-                  .is('deleted_at', null)
-              )
-            : 0,
-          esDilesa
-            ? count(
-                erp
-                  .from('cotizaciones')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('empresa_id', empresaId)
-                  .in('estado', ['abierta', 'comparada'])
-                  .is('cancelada_at', null)
-                  .is('deleted_at', null)
-              )
-            : 0,
-          esDilesa
-            ? count(
-                erp
-                  .from('ordenes_compra')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('empresa_id', empresaId)
-                  .eq('estado', 'borrador')
-                  .is('deleted_at', null)
-              )
-            : 0,
-          esDilesa
-            ? count(
-                erp
-                  .from('ordenes_compra')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('empresa_id', empresaId)
-                  .in('estado', ['enviada', 'parcial'])
-                  .is('deleted_at', null)
-              )
-            : 0,
-          // Por programar = mismo criterio que la pantalla de Programación:
-          // saldo abierto MENOS lo comprometido en pagos vivos sin ejecutar
-          // (un count plano contaría facturas ya 100% programadas).
-          (async () => {
-            const [factsRes, aplsRes] = await Promise.all([
+      const [rfqs, ocsBorrador, ocsRecibir, factsProgramar, pagosAprobar] = await Promise.all([
+        esDilesa
+          ? count(
               erp
-                .from('facturas')
-                .select('id, saldo')
+                .from('cotizaciones')
+                .select('id', { count: 'exact', head: true })
                 .eq('empresa_id', empresaId)
-                .eq('flujo', 'egreso')
-                .in('estado_cxp', ['por_pagar', 'parcial'])
-                .gt('saldo', 0),
+                .in('estado', ['abierta', 'comparada'])
+                .is('cancelada_at', null)
+                .is('deleted_at', null)
+            )
+          : 0,
+        esDilesa
+          ? count(
               erp
-                .from('cxp_pago_aplicaciones')
-                .select(
-                  'factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)'
-                )
+                .from('ordenes_compra')
+                .select('id', { count: 'exact', head: true })
                 .eq('empresa_id', empresaId)
-                .in('pago.estado', ['programado', 'aprobado'])
-                .is('pago.deleted_at', null),
-            ]);
-            if (factsRes.error || aplsRes.error) return 0;
-            const facts = ((factsRes.data ?? []) as { id: string; saldo: number | null }[]).map(
-              (f) => ({ id: f.id, saldo: Number(f.saldo ?? 0) })
-            );
-            return pendientesDeProgramar(facts, (aplsRes.data ?? []) as AplicacionViva[]).length;
-          })(),
-          count(
+                .eq('estado', 'borrador')
+                .is('deleted_at', null)
+            )
+          : 0,
+        esDilesa
+          ? count(
+              erp
+                .from('ordenes_compra')
+                .select('id', { count: 'exact', head: true })
+                .eq('empresa_id', empresaId)
+                .in('estado', ['enviada', 'parcial'])
+                .is('deleted_at', null)
+            )
+          : 0,
+        // Por programar = mismo criterio que la pantalla de Programación:
+        // saldo abierto MENOS lo comprometido en pagos vivos sin ejecutar
+        // (un count plano contaría facturas ya 100% programadas).
+        (async () => {
+          const [factsRes, aplsRes] = await Promise.all([
             erp
-              .from('cxp_pagos')
-              .select('id', { count: 'exact', head: true })
+              .from('facturas')
+              .select('id, saldo')
               .eq('empresa_id', empresaId)
-              .eq('estado', 'programado')
-              .is('deleted_at', null)
-          ),
-        ]
-      );
+              .eq('flujo', 'egreso')
+              .in('estado_cxp', ['por_pagar', 'parcial'])
+              .gt('saldo', 0),
+            erp
+              .from('cxp_pago_aplicaciones')
+              .select(
+                'factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)'
+              )
+              .eq('empresa_id', empresaId)
+              .in('pago.estado', ['programado', 'aprobado'])
+              .is('pago.deleted_at', null),
+          ]);
+          if (factsRes.error || aplsRes.error) return 0;
+          const facts = ((factsRes.data ?? []) as { id: string; saldo: number | null }[]).map(
+            (f) => ({ id: f.id, saldo: Number(f.saldo ?? 0) })
+          );
+          return pendientesDeProgramar(facts, (aplsRes.data ?? []) as AplicacionViva[]).length;
+        })(),
+        count(
+          erp
+            .from('cxp_pagos')
+            .select('id', { count: 'exact', head: true })
+            .eq('empresa_id', empresaId)
+            .eq('estado', 'programado')
+            .is('deleted_at', null)
+        ),
+      ]);
       // Órdenes de cambio presupuestal pendientes (gobierno del baseline,
       // iniciativa dilesa-presupuesto-baseline): las resuelve Dirección en el
       // tab Gasto del proyecto. Sin head — los proyecto_id arman el href.
@@ -152,25 +140,20 @@ export function TeTocaStrip({ empresaId, empresa }: { empresaId: string; empresa
 
       setChips([
         {
-          key: 'autorizar',
-          count: reqs,
-          label: (n) => `${n} requisición${n === 1 ? '' : 'es'} por autorizar`,
-          href: '/dilesa/compras/requisiciones',
-          modulo: 'dilesa.compras.requisiciones',
-        },
-        {
           key: 'adjudicar',
           count: rfqs,
-          label: (n) => `${n} RFQ${n === 1 ? '' : 's'} en curso`,
+          label: (n) => `${n} cotización${n === 1 ? '' : 'es'} por adjudicar`,
           href: '/dilesa/compras/cotizaciones',
-          modulo: 'dilesa.compras.cotizaciones',
+          modulo: null,
+          direccion: true,
         },
         {
           key: 'enviar',
           count: ocsBorrador,
-          label: (n) => `${n} orden${n === 1 ? '' : 'es'} en borrador`,
+          label: (n) => `${n} orden${n === 1 ? '' : 'es'} por emitir`,
           href: '/dilesa/compras',
-          modulo: 'dilesa.compras.ordenes',
+          modulo: null,
+          direccion: true,
         },
         {
           key: 'recibir',
