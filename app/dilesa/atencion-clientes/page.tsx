@@ -36,6 +36,8 @@ type VentaEntrega = {
   unidad: string | null;
   proyecto: string | null;
   cola: 'pre_entrega' | 'entrega';
+  // F12 (Detonada) cerrada = pago recibido. Sin esto no se puede entregar.
+  pago_detonado: boolean | null;
 };
 type Encuesta = {
   encuesta_id: string;
@@ -207,6 +209,7 @@ function Body() {
             href={`/dilesa/ventas/${v.venta_id}/capturar/15-entregada`}
             titulo={v.cliente ?? '(cliente sin nombre)'}
             sub={[v.unidad, v.proyecto].filter(Boolean).join(' · ') || null}
+            right={!v.pago_detonado ? <Badge tone="danger">Falta pago</Badge> : null}
           />
         ))}
       </Cola>
