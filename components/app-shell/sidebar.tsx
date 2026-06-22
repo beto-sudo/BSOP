@@ -4,16 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  Home,
-  IdCard,
-  type LucideIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings as SettingsIcon,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useLocale } from '@/lib/i18n';
 import { usePermissions } from '@/components/providers';
 import {
@@ -26,42 +17,25 @@ import {
   NAV_ITEMS,
   NAV_TO_EMPRESA,
   type NavChild,
-  type NavIconKey,
   type NavItem,
   filterHiddenNavItems,
+  getActiveEmpresaHref,
   getActiveSection,
   hasNavSubItems,
+  isEmpresaNavItem,
   isItemActive,
   matchesPath,
 } from './nav-config';
-
-const LUCIDE_BY_KEY: Record<'home' | 'id-card' | 'settings', LucideIcon> = {
-  home: Home,
-  'id-card': IdCard,
-  settings: SettingsIcon,
-};
-
-const LOGO_BY_KEY: Record<
-  'dilesa-logo' | 'rdb-logo' | 'sanren-logo',
-  { src: string; alt: string }
-> = {
-  'dilesa-logo': { src: '/brand/dilesa/isotipo.png', alt: 'DILESA' },
-  'rdb-logo': { src: '/brand/rdb/isotipo.png', alt: 'RDB' },
-  'sanren-logo': { src: '/brand/sanren/isotipo.png', alt: 'SANREN' },
-};
-
-function NavIcon({ icon }: { icon: NavIconKey }) {
-  if (icon in LOGO_BY_KEY) {
-    const { src, alt } = LOGO_BY_KEY[icon as keyof typeof LOGO_BY_KEY];
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className="h-5 w-5 object-contain rounded-sm" />;
-  }
-  const Icon = LUCIDE_BY_KEY[icon as keyof typeof LUCIDE_BY_KEY];
-  return <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />;
-}
+import { NavIcon } from './nav-icon';
+import { EmpresaSwitcher } from './empresa-switcher';
 
 /**
- * Left sidebar: logo header, collapsible nav tree, footer credit.
+ * Left sidebar: logo header, empresa switcher, focused nav tree, footer credit.
+ *
+ * Focus mode (iniciativa `ux-consolidacion`): the tree renders only Inicio, the
+ * empresa you're currently in, and Configuración. Other empresas live behind
+ * the switcher chip — pick one and the tree re-focuses. This replaces the old
+ * manual per-empresa visibility toggles with automatic, route-driven focus.
  *
  * Owns these pieces of UI state locally:
  *   - which top-level section is expanded
@@ -158,8 +132,41 @@ export function Sidebar({
     // 2) Admin-managed global denylist (core.sidebar_oculto): hides top-level
     //    items from EVERYONE, admin included. Runs AFTER the RBAC filter, never
     //    instead of it — so a hidden item stays hidden but access is unchanged.
+    //    Backs the "Modo presentación" switch (hides SANREN / Personas Físicas).
     return filterHiddenNavItems(byPermissions, sidebarHidden);
   }, [permissions, sidebarHidden]);
+
+  // Which empresa owns the current route (null on Inicio / Configuración).
+  const activeEmpresaHref = useMemo(() => getActiveEmpresaHref(pathname), [pathname]);
+
+  // Split the RBAC-filtered nav into focus-mode pieces:
+  //   - empresaItems → the switcher dropdown (every empresa you can reach)
+  //   - the tree renders only Inicio + the active empresa + Configuración
+  const { inicioItem, settingsItem, empresaItems, activeEmpresaItem } = useMemo(() => {
+    let inicio: NavItem | undefined;
+    let settings: NavItem | undefined;
+    const empresas: NavItem[] = [];
+    for (const item of filteredNavItems) {
+      if (item.href === '/') inicio = item;
+      else if (NAV_TO_EMPRESA[item.href] === 'settings') settings = item;
+      else if (isEmpresaNavItem(item)) empresas.push(item);
+    }
+    return {
+      inicioItem: inicio,
+      settingsItem: settings,
+      empresaItems: empresas,
+      activeEmpresaItem: empresas.find((item) => item.href === activeEmpresaHref),
+    };
+  }, [filteredNavItems, activeEmpresaHref]);
+
+  // The tree, in render order: Inicio, the active empresa (if any), Configuración.
+  const treeItems = useMemo(
+    () =>
+      [inicioItem, activeEmpresaItem, settingsItem].filter((item): item is NavItem =>
+        Boolean(item)
+      ),
+    [inicioItem, activeEmpresaItem, settingsItem]
+  );
 
   // Re-expand the section that matches the current route on navigation.
   useEffect(() => {
@@ -217,86 +224,133 @@ export function Sidebar({
         {isLoadingPermissions ? (
           <NavSkeleton collapsed={collapsed} />
         ) : (
-          filteredNavItems.map((item) => {
-            const active = isItemActive(pathname, item);
-            const hasSubItems = hasNavSubItems(item);
-            const expanded = !collapsed && expandedSection === item.href;
-            const label = t(item.labelKey);
-
-            return (
-              <div key={item.href} className="group/item relative">
-                <div
-                  className={[
-                    'flex items-center rounded-2xl text-sm transition',
-                    active
-                      ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 dark:text-white text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-                      : 'border border-transparent dark:text-white/68 text-[var(--text)]/68 hover:border-[var(--border)] hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
-                    !collapsed && hasSubItems ? 'pr-1' : '',
-                  ].join(' ')}
-                >
-                  <Link
-                    href={item.href}
-                    onClick={() => {
-                      if (collapsed) setCollapsed(false);
-                    }}
-                    className={[
-                      'flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40',
-                      collapsed ? 'justify-center px-2' : '',
-                    ].join(' ')}
-                    title={collapsed ? label : undefined}
-                  >
-                    <NavIcon icon={item.icon} />
-                    {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
-                  </Link>
-                  {!collapsed && hasSubItems ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedSection(expanded ? null : item.href);
-                      }}
-                      aria-label={expanded ? `Contraer ${label}` : `Expandir ${label}`}
-                      aria-expanded={expanded}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg dark:text-white/45 text-[var(--text)]/45 transition-colors hover:dark:text-white hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
-                    >
-                      {expanded ? (
-                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 transition-transform duration-200" />
-                      )}
-                    </button>
-                  ) : null}
-                </div>
-
-                {!collapsed && hasSubItems ? (
-                  <div
-                    className={[
-                      'overflow-hidden transition-all duration-200 ease-in-out',
-                      expanded ? 'max-h-[60rem] opacity-100' : 'max-h-0 opacity-0',
-                    ].join(' ')}
-                  >
-                    <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
-                      <NavSubItems item={item} pathname={pathname} variant="expanded" />
-                    </div>
-                  </div>
-                ) : null}
-
-                {collapsed && hasSubItems ? (
-                  <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden min-w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 opacity-0 shadow-2xl transition duration-200 group-hover/item:pointer-events-auto group-hover/item:block group-hover/item:opacity-100 md:block">
-                    <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
-                      {label}
-                    </div>
-                    <div className="space-y-1">
-                      <NavSubItems item={item} pathname={pathname} variant="floating" />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })
+          <>
+            <EmpresaSwitcher
+              empresas={empresaItems}
+              activeHref={activeEmpresaHref}
+              collapsed={collapsed}
+              onAfterSelect={() => {
+                if (collapsed) setCollapsed(false);
+              }}
+            />
+            {treeItems.map((item) => (
+              <NavTreeItem
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                collapsed={collapsed}
+                setCollapsed={setCollapsed}
+                expanded={!collapsed && expandedSection === item.href}
+                onToggleExpand={() =>
+                  setExpandedSection((cur) => (cur === item.href ? null : item.href))
+                }
+                t={t}
+              />
+            ))}
+          </>
         )}
       </nav>
     </aside>
+  );
+}
+
+/**
+ * A single top-level nav entry (Inicio, the active empresa, or Configuración),
+ * with its expand/collapse machinery and floating submenu when collapsed.
+ *
+ * Extracted so the sidebar can render a curated subset of items (focus mode)
+ * without duplicating the row markup.
+ */
+function NavTreeItem({
+  item,
+  pathname,
+  collapsed,
+  setCollapsed,
+  expanded,
+  onToggleExpand,
+  t,
+}: {
+  item: NavItem;
+  pathname: string;
+  collapsed: boolean;
+  setCollapsed: Dispatch<SetStateAction<boolean>>;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  t: (key: string) => string;
+}) {
+  const active = isItemActive(pathname, item);
+  const hasSubItems = hasNavSubItems(item);
+  const label = t(item.labelKey);
+
+  return (
+    <div className="group/item relative">
+      <div
+        className={[
+          'flex items-center rounded-2xl text-sm transition',
+          active
+            ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/15 dark:text-white text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+            : 'border border-transparent dark:text-white/68 text-[var(--text)]/68 hover:border-[var(--border)] hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
+          !collapsed && hasSubItems ? 'pr-1' : '',
+        ].join(' ')}
+      >
+        <Link
+          href={item.href}
+          onClick={() => {
+            if (collapsed) setCollapsed(false);
+          }}
+          className={[
+            'flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40',
+            collapsed ? 'justify-center px-2' : '',
+          ].join(' ')}
+          title={collapsed ? label : undefined}
+        >
+          <NavIcon icon={item.icon} />
+          {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+        </Link>
+        {!collapsed && hasSubItems ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+            aria-label={expanded ? `Contraer ${label}` : `Expandir ${label}`}
+            aria-expanded={expanded}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg dark:text-white/45 text-[var(--text)]/45 transition-colors hover:dark:text-white hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+          >
+            {expanded ? (
+              <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+            ) : (
+              <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+            )}
+          </button>
+        ) : null}
+      </div>
+
+      {!collapsed && hasSubItems ? (
+        <div
+          className={[
+            'overflow-hidden transition-all duration-200 ease-in-out',
+            expanded ? 'max-h-[60rem] opacity-100' : 'max-h-0 opacity-0',
+          ].join(' ')}
+        >
+          <div className="ml-7 mt-1 space-y-1 border-l border-[var(--border)] pl-4 pb-1">
+            <NavSubItems item={item} pathname={pathname} variant="expanded" />
+          </div>
+        </div>
+      ) : null}
+
+      {collapsed && hasSubItems ? (
+        <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden min-w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 opacity-0 shadow-2xl transition duration-200 group-hover/item:pointer-events-auto group-hover/item:block group-hover/item:opacity-100 md:block">
+          <div className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
+            {label}
+          </div>
+          <div className="space-y-1">
+            <NavSubItems item={item} pathname={pathname} variant="floating" />
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
