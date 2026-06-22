@@ -159,15 +159,6 @@ export function Sidebar({
     };
   }, [filteredNavItems, activeEmpresaHref]);
 
-  // The tree, in render order: Inicio, the active empresa (if any), Configuración.
-  const treeItems = useMemo(
-    () =>
-      [inicioItem, activeEmpresaItem, settingsItem].filter((item): item is NavItem =>
-        Boolean(item)
-      ),
-    [inicioItem, activeEmpresaItem, settingsItem]
-  );
-
   // Re-expand the section that matches the current route on navigation.
   useEffect(() => {
     setExpandedSection(getActiveSection(pathname));
@@ -225,6 +216,21 @@ export function Sidebar({
           <NavSkeleton collapsed={collapsed} />
         ) : (
           <>
+            {inicioItem ? (
+              <NavTreeItem
+                item={inicioItem}
+                pathname={pathname}
+                collapsed={collapsed}
+                setCollapsed={setCollapsed}
+                expanded={false}
+                onToggleExpand={() => {}}
+                t={t}
+              />
+            ) : null}
+
+            {/* The empresa appears once — this chip is its header. Its modules
+                render directly below (inline when expanded); when collapsed the
+                chip's dropdown hosts them (no room inline). */}
             <EmpresaSwitcher
               empresas={empresaItems}
               activeHref={activeEmpresaHref}
@@ -232,21 +238,34 @@ export function Sidebar({
               onAfterSelect={() => {
                 if (collapsed) setCollapsed(false);
               }}
+              collapsedModules={
+                activeEmpresaItem ? (
+                  <NavSubItems item={activeEmpresaItem} pathname={pathname} variant="floating" />
+                ) : null
+              }
             />
-            {treeItems.map((item) => (
+
+            {activeEmpresaItem && !collapsed ? (
+              <div className="mt-0.5 space-y-1 pb-1">
+                <NavSubItems item={activeEmpresaItem} pathname={pathname} variant="expanded" />
+              </div>
+            ) : null}
+
+            {settingsItem ? (
               <NavTreeItem
-                key={item.href}
-                item={item}
+                item={settingsItem}
                 pathname={pathname}
                 collapsed={collapsed}
                 setCollapsed={setCollapsed}
-                expanded={!collapsed && expandedSection === item.href}
+                expanded={!collapsed && expandedSection === settingsItem.href}
                 onToggleExpand={() =>
-                  setExpandedSection((cur) => (cur === item.href ? null : item.href))
+                  setExpandedSection((cur) =>
+                    cur === settingsItem.href ? null : settingsItem.href
+                  )
                 }
                 t={t}
               />
-            ))}
+            ) : null}
           </>
         )}
       </nav>

@@ -1,37 +1,53 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Building2, Check, ChevronsUpDown } from 'lucide-react';
 import { useLocale } from '@/lib/i18n';
 import { NavIcon } from './nav-icon';
 import type { NavItem } from './nav-config';
 
 /**
- * Empresa switcher — the context selector that drives the sidebar's focus mode.
+ * Empresa switcher — the context selector AND header of the focused empresa.
  *
- * The sidebar tree only renders the empresa you're currently in; this chip is
- * how you jump to another. Click it and the empresas you have access to drop
- * down; pick one and it navigates + closes. Closes on outside-click or Escape.
+ * The empresa appears exactly once: this chip. Its modules render directly
+ * beneath it (inline when the sidebar is expanded). When the sidebar is
+ * collapsed there's no room inline, so the chip's dropdown also hosts the
+ * active empresa's modules (`collapsedModules`) above the switch list — one
+ * click gives you both navigate-within and switch-to-another.
  *
- * `empresas` arrives already filtered (RBAC + admin presentation denylist), so
- * the dropdown never offers something the tree wouldn't. Renders nothing when
- * there are no empresas to switch between (e.g. a settings-only user).
+ * Click toggles the dropdown; it closes on outside-click, Escape, or selecting
+ * anything. `empresas` arrives already filtered (RBAC + presentation denylist),
+ * so the dropdown never offers something the tree wouldn't. Renders nothing
+ * when there are no empresas to switch between (e.g. a settings-only user).
  */
 export function EmpresaSwitcher({
   empresas,
   activeHref,
   collapsed,
   onAfterSelect,
+  collapsedModules,
 }: {
   empresas: NavItem[];
   activeHref: string | null;
   collapsed: boolean;
   onAfterSelect?: () => void;
+  collapsedModules?: ReactNode;
 }) {
   const { t } = useLocale();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on navigation — covers picking an empresa OR a module link (collapsed
+  // flyout). Outside-click + Escape (below) cover dismiss-without-navigating.
+  // Syncing UI to the route change is the intended use of this effect; the
+  // setState is a one-shot dismiss, not a render cascade.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(false);
+  }, [pathname]);
 
   // Close on outside pointerdown + Escape while open.
   useEffect(() => {
@@ -59,6 +75,33 @@ export function EmpresaSwitcher({
     setOpen(false);
     onAfterSelect?.();
   };
+
+  const sectionHeader =
+    'px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]';
+
+  const switchList = empresas.map((item) => {
+    const isActive = item.href === activeHref;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        role="menuitem"
+        onClick={select}
+        className={[
+          'flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition',
+          isActive
+            ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
+            : 'dark:text-white/75 text-[var(--text)]/75 hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
+        ].join(' ')}
+      >
+        <NavIcon icon={item.icon} className="h-5 w-5" />
+        <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
+        {isActive ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+      </Link>
+    );
+  });
+
+  const showModulesInDropdown = collapsed && Boolean(collapsedModules);
 
   return (
     <div ref={containerRef} className="relative">
@@ -102,36 +145,21 @@ export function EmpresaSwitcher({
         <div
           role="menu"
           className={[
-            'z-50 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-1.5 shadow-2xl',
+            'z-50 max-h-[80vh] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-1.5 shadow-2xl',
             collapsed
               ? 'absolute left-full top-0 ml-2 min-w-56'
               : 'absolute inset-x-0 top-full mt-1.5',
           ].join(' ')}
         >
-          <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
-            {t('nav.switch_empresa')}
-          </div>
-          {empresas.map((item) => {
-            const isActive = item.href === activeHref;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                role="menuitem"
-                onClick={select}
-                className={[
-                  'flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition',
-                  isActive
-                    ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
-                    : 'dark:text-white/75 text-[var(--text)]/75 hover:bg-[var(--card)] dark:hover:text-white hover:text-[var(--text)]',
-                ].join(' ')}
-              >
-                <NavIcon icon={item.icon} className="h-5 w-5" />
-                <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
-                {isActive ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
-              </Link>
-            );
-          })}
+          {showModulesInDropdown ? (
+            <>
+              <div className={sectionHeader}>{chipLabel}</div>
+              <div className="space-y-1">{collapsedModules}</div>
+              <div className="my-1.5 border-t border-[var(--border)]" />
+            </>
+          ) : null}
+          <div className={sectionHeader}>{t('nav.switch_empresa')}</div>
+          {switchList}
         </div>
       ) : null}
     </div>
