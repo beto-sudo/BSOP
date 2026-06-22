@@ -126,7 +126,6 @@ export type ProyectoAvances = {
   casas_asignadas: number;
   casas_entregadas: number;
   casas_muestra: number;
-  inventario_formalizado: number;
   inventario_disponible_venta: number;
   lotes_comerciales: number;
   lotes_residenciales: number;
@@ -537,7 +536,7 @@ export function ProyectoDetalle({
       .schema('dilesa')
       .from('v_proyecto_avances')
       .select(
-        'lotes_total, lotes_construidos, lotes_vendidos, lotes_urbanizados, casas_terminadas, casas_en_construccion, casas_escrituradas, avance_urb_pct, avance_const_pct, avance_vts_pct, parque_disponible, ticket_promedio, ventas_totales, estado_sugerido, casas_asignadas, casas_entregadas, casas_muestra, inventario_formalizado, inventario_disponible_venta, lotes_comerciales, lotes_residenciales, tamano_lote_promedio_m2, densidad_vivienda'
+        'lotes_total, lotes_construidos, lotes_vendidos, lotes_urbanizados, casas_terminadas, casas_en_construccion, casas_escrituradas, avance_urb_pct, avance_const_pct, avance_vts_pct, parque_disponible, ticket_promedio, ventas_totales, estado_sugerido, casas_asignadas, casas_entregadas, casas_muestra, inventario_disponible_venta, lotes_comerciales, lotes_residenciales, tamano_lote_promedio_m2, densidad_vivienda'
       )
       .eq('proyecto_id', proyecto.id)
       .maybeSingle()
@@ -827,7 +826,6 @@ export function ProyectoDetalle({
                 <Stat label="Asignadas" value={fmtInt(avances.casas_asignadas)} />
                 <Stat label="Escrituradas" value={fmtInt(avances.casas_escrituradas)} />
                 <Stat label="Entregadas" value={fmtInt(avances.casas_entregadas)} />
-                <Stat label="Formalizadas" value={fmtInt(avances.inventario_formalizado)} />
                 <Stat label="Ticket promedio" value={fmtMoney(avances.ticket_promedio)} />
                 <Stat label="Ventas totales" value={fmtMoney(avances.ventas_totales)} />
               </dl>
