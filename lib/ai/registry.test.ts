@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { AI_USOS, AI_USO_IDS, getUso } from './registry';
 import { DEFAULT_CLAUDE_MODEL, DEFAULT_EMBEDDING_MODEL } from './models';
 
-// Inventario esperado al 2026-06-19 (Sprint 1). Mantener en sync con el código:
-// agregar un uso aquí cuando se registre uno nuevo en registry.ts.
+// Inventario esperado. Mantener en sync con el código: agregar un uso aquí
+// cuando se registre uno nuevo en registry.ts.
 const USOS_ESPERADOS = [
   'documentos-extraccion',
   'documentos-embedding',
@@ -20,6 +20,7 @@ const USOS_ESPERADOS = [
   'dilesa-notarial-venta',
   'dilesa-pld-informe',
   'dilesa-pld-acuse',
+  'sanren-recibo-extraccion',
 ] as const;
 
 describe('registro-ia · registry', () => {

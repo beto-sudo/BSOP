@@ -35,61 +35,143 @@ type Props = {
 export function ReciboDrawer({ open, onOpenChange, mode, recibo, servicios, empresaId }: Props) {
   if (mode === 'detalle' && recibo) {
     return (
-      <DetailDrawer
+      <ReciboDetalle
+        recibo={recibo}
+        empresaId={empresaId}
         open={open}
         onOpenChange={onOpenChange}
-        title={`${recibo.servicio_tipo} · ${recibo.periodo.slice(0, 7)}`}
-        description={recibo.proveedor ?? undefined}
-        size="md"
-      >
-        <DetailDrawerContent>
-          <DetailDrawerSection title="Datos del recibo">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <Dato k="Fecha" v={recibo.fecha_recibo} />
-              <Dato k="Folio" v={recibo.folio ?? '—'} />
-              <Dato k="Monto" v={money(recibo.monto)} />
-              <Dato k="Pago" v={recibo.pagado ? 'Pagado' : 'Pendiente'} />
-              <Dato
-                k="Consumo"
-                v={
-                  recibo.consumo_periodo != null
-                    ? `${recibo.consumo_periodo} ${recibo.unidad_consumo ?? ''}`
-                    : '—'
-                }
-              />
-              <Dato k="Costo/u" v={money(recibo.costo_unitario)} />
-              {recibo.tiene_produccion ? (
-                <>
-                  <Dato k="Generación" v={recibo.produccion_periodo?.toString() ?? '—'} />
-                  <Dato k="Saldo neto" v={recibo.saldo_neto?.toString() ?? '—'} />
-                </>
-              ) : null}
-            </dl>
-            {recibo.notas ? (
-              <p className="mt-3 text-sm text-[var(--text)]/70">{recibo.notas}</p>
-            ) : null}
-          </DetailDrawerSection>
-
-          <DetailDrawerSection title="Archivos">
-            {empresaId ? (
-              <FileAttachments
-                empresaId={empresaId}
-                empresaSlug="sanren"
-                entidad="recibos"
-                entidadId={recibo.id}
-                roles={ROLES}
-                defaultUploadRole="recibo"
-              />
-            ) : (
-              <p className="text-sm text-[var(--text)]/55">No se pudo resolver la empresa.</p>
-            )}
-          </DetailDrawerSection>
-        </DetailDrawerContent>
-      </DetailDrawer>
+      />
     );
   }
 
   return <NuevoReciboForm open={open} onOpenChange={onOpenChange} servicios={servicios} />;
+}
+
+function ReciboDetalle({
+  recibo,
+  empresaId,
+  open,
+  onOpenChange,
+}: {
+  recibo: ReciboVista;
+  empresaId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const [extrayendo, setExtrayendo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  async function extraer(auto: boolean) {
+    setExtrayendo(true);
+    setAviso(null);
+    try {
+      const res = await fetch(`/api/sanren/recibos/${recibo.id}/extraer`, { method: 'POST' });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (json.ok) {
+        setAviso('Leído con IA ✓');
+        router.refresh();
+      } else if (!auto) {
+        setAviso(json.error ?? 'No se pudo leer el recibo.');
+      }
+    } catch {
+      if (!auto) setAviso('Error al leer el recibo.');
+    } finally {
+      setExtrayendo(false);
+    }
+  }
+
+  const ex = recibo.extraccion;
+  return (
+    <DetailDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`${recibo.servicio_tipo} · ${recibo.periodo.slice(0, 7)}`}
+      description={recibo.proveedor ?? undefined}
+      size="md"
+      actions={
+        recibo.recibo_adjunto_path ? (
+          <button
+            onClick={() => extraer(false)}
+            disabled={extrayendo}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--text)]/5 disabled:opacity-40"
+          >
+            {extrayendo ? 'Leyendo…' : '✨ Leer con IA'}
+          </button>
+        ) : undefined
+      }
+    >
+      <DetailDrawerContent>
+        <DetailDrawerSection title="Datos del recibo">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <Dato k="Fecha" v={recibo.fecha_recibo} />
+            <Dato k="Vence" v={recibo.fecha_vencimiento ?? '—'} />
+            <Dato k="Folio" v={recibo.folio ?? '—'} />
+            <Dato k="Tarifa" v={recibo.tarifa ?? '—'} />
+            <Dato k="Monto" v={money(recibo.monto)} />
+            <Dato k="Pago" v={recibo.pagado ? 'Pagado' : 'Pendiente'} />
+            <Dato
+              k="Consumo"
+              v={
+                recibo.consumo_periodo != null
+                  ? `${recibo.consumo_periodo} ${recibo.unidad_consumo ?? ''}`
+                  : '—'
+              }
+            />
+            <Dato k="Costo/u" v={money(recibo.costo_unitario)} />
+            {recibo.tiene_produccion ? (
+              <>
+                <Dato k="Generación" v={recibo.produccion_periodo?.toString() ?? '—'} />
+                <Dato k="Saldo neto" v={recibo.saldo_neto?.toString() ?? '—'} />
+                {ex?.energia_acumulada_favor ? (
+                  <Dato k="Banco de energía" v={`${ex.energia_acumulada_favor} kWh a favor`} />
+                ) : null}
+              </>
+            ) : null}
+          </dl>
+          {recibo.notas ? (
+            <p className="mt-3 text-sm text-[var(--text)]/70">{recibo.notas}</p>
+          ) : null}
+        </DetailDrawerSection>
+
+        {ex?.conceptos && ex.conceptos.length > 0 ? (
+          <DetailDrawerSection title="Desglose">
+            <ul className="space-y-1 text-sm">
+              {ex.conceptos.map((c, i) => (
+                <li key={i} className="flex justify-between">
+                  <span className="text-[var(--text)]/70">{c.concepto}</span>
+                  <span>{money(c.importe)}</span>
+                </li>
+              ))}
+            </ul>
+          </DetailDrawerSection>
+        ) : null}
+
+        <DetailDrawerSection title="Archivos">
+          {empresaId ? (
+            <FileAttachments
+              empresaId={empresaId}
+              empresaSlug="sanren"
+              entidad="recibos"
+              entidadId={recibo.id}
+              roles={ROLES}
+              defaultUploadRole="recibo"
+              onChange={() => extraer(true)}
+            />
+          ) : (
+            <p className="text-sm text-[var(--text)]/55">No se pudo resolver la empresa.</p>
+          )}
+          {extrayendo ? (
+            <p className="mt-2 text-sm text-[var(--text)]/60">Leyendo el recibo con IA…</p>
+          ) : null}
+          {aviso ? <p className="mt-2 text-sm text-[var(--text)]/70">{aviso}</p> : null}
+          <p className="mt-2 text-xs text-[var(--text)]/45">
+            Al subir el PDF del recibo, la IA lo lee y completa los datos automáticamente.
+          </p>
+        </DetailDrawerSection>
+      </DetailDrawerContent>
+    </DetailDrawer>
+  );
 }
 
 function Dato({ k, v }: { k: string; v: string }) {

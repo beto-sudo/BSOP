@@ -32,13 +32,26 @@ export type ServicioSanren = {
   notas: string | null;
 };
 
+/** Subconjunto del jsonb `extraccion` que la UI muestra (el resto queda crudo). */
+export type ReciboExtraccion = {
+  conceptos?: { concepto: string; importe: number }[];
+  generacion?: number;
+  energia_acumulada_favor?: number;
+  numero_medidor?: string;
+  tarifa?: string;
+};
+
 /** Una fila de `sanren.v_recibos` enriquecida con los paths de sus adjuntos. */
 export type ReciboVista = {
   id: string;
   servicio_id: string;
   periodo: string;
   fecha_recibo: string;
+  fecha_vencimiento: string | null;
   monto: number | null;
+  subtotal: number | null;
+  iva: number | null;
+  tarifa: string | null;
   moneda: string;
   folio: string | null;
   lectura_consumo: number | null;
@@ -48,6 +61,7 @@ export type ReciboVista = {
   metodo_pago: string | null;
   notas: string | null;
   coda_row_id: string | null;
+  extraccion: ReciboExtraccion | null;
   // derivados de la vista
   servicio_tipo: string;
   proveedor: string | null;
@@ -162,9 +176,14 @@ export async function getServiciosData(): Promise<ServiciosData> {
       servicio_id: String(r.servicio_id),
       periodo: String(r.periodo),
       fecha_recibo: String(r.fecha_recibo),
+      fecha_vencimiento: (r.fecha_vencimiento as string) ?? null,
       monto: toNum(r.monto),
+      subtotal: toNum(r.subtotal),
+      iva: toNum(r.iva),
+      tarifa: (r.tarifa as string) ?? null,
       moneda: (r.moneda as string) ?? 'MXN',
       folio: (r.folio as string) ?? null,
+      extraccion: (r.extraccion as ReciboExtraccion | null) ?? null,
       lectura_consumo: toNum(r.lectura_consumo),
       lectura_produccion: toNum(r.lectura_produccion),
       pagado: Boolean(r.pagado),

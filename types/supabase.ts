@@ -15080,10 +15080,14 @@ export type Database = {
           coda_row_id: string | null
           comprobante_adjunto_id: string | null
           created_at: string
+          extraccion: Json | null
+          extraccion_at: string | null
           fecha_pago: string | null
           fecha_recibo: string
+          fecha_vencimiento: string | null
           folio: string | null
           id: string
+          iva: number | null
           lectura_consumo: number | null
           lectura_produccion: number | null
           metodo_pago: string | null
@@ -15094,16 +15098,22 @@ export type Database = {
           periodo: string
           recibo_adjunto_id: string | null
           servicio_id: string
+          subtotal: number | null
+          tarifa: string | null
           updated_at: string
         }
         Insert: {
           coda_row_id?: string | null
           comprobante_adjunto_id?: string | null
           created_at?: string
+          extraccion?: Json | null
+          extraccion_at?: string | null
           fecha_pago?: string | null
           fecha_recibo: string
+          fecha_vencimiento?: string | null
           folio?: string | null
           id?: string
+          iva?: number | null
           lectura_consumo?: number | null
           lectura_produccion?: number | null
           metodo_pago?: string | null
@@ -15114,16 +15124,22 @@ export type Database = {
           periodo: string
           recibo_adjunto_id?: string | null
           servicio_id: string
+          subtotal?: number | null
+          tarifa?: string | null
           updated_at?: string
         }
         Update: {
           coda_row_id?: string | null
           comprobante_adjunto_id?: string | null
           created_at?: string
+          extraccion?: Json | null
+          extraccion_at?: string | null
           fecha_pago?: string | null
           fecha_recibo?: string
+          fecha_vencimiento?: string | null
           folio?: string | null
           id?: string
+          iva?: number | null
           lectura_consumo?: number | null
           lectura_produccion?: number | null
           metodo_pago?: string | null
@@ -15134,6 +15150,8 @@ export type Database = {
           periodo?: string
           recibo_adjunto_id?: string | null
           servicio_id?: string
+          subtotal?: number | null
+          tarifa?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -15211,10 +15229,14 @@ export type Database = {
           consumo_periodo: number | null
           costo_unitario: number | null
           delta_monto_mom: number | null
+          extraccion: Json | null
+          extraccion_at: string | null
           fecha_pago: string | null
           fecha_recibo: string | null
+          fecha_vencimiento: string | null
           folio: string | null
           id: string | null
+          iva: number | null
           lectura_consumo: number | null
           lectura_consumo_anterior: number | null
           lectura_produccion: number | null
@@ -15234,6 +15256,8 @@ export type Database = {
           saldo_neto: number | null
           servicio_id: string | null
           servicio_tipo: string | null
+          subtotal: number | null
+          tarifa: string | null
           tiene_produccion: boolean | null
           unidad_consumo: string | null
         }
