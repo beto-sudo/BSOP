@@ -348,7 +348,7 @@ export function RecepcionObraDrawer({
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-[var(--text)]">Formato de recepción</span>
                   <a
-                    href={`/dilesa/construccion/${construccionId}/acta-recepcion`}
+                    href={`/api/dilesa/construccion/${construccionId}/acta-recepcion/pdf`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 font-medium text-[var(--accent)] underline"
