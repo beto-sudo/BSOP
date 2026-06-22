@@ -48,6 +48,11 @@ export function CuadraturaPanel({
   // Cobertura del presupuesto notarial COMPLETO: el motor (`coberturaGastos`) ya
   // trae todos los componentes y el saldo — fuente única, el panel no recalcula.
   const cob = c.coberturaGastos;
+  // Saldo del precio que el enganche pagado aún no cubre. Si el cliente no lo
+  // completa antes de escriturar, lo absorbe el bono de DILESA (entra al descuento).
+  const saldoPrecioPorCubrir = cob
+    ? Math.round(((c.saldoPrecioEscrituracion ?? 0) - cob.engancheAlPrecio) * 100) / 100
+    : 0;
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (
@@ -111,21 +116,46 @@ export function CuadraturaPanel({
             label="(−) Crédito institución (titular + co-titular)"
             value={money(c.creditoInstitucion)}
           />
-          <div className="my-1 border-t border-[var(--border)]" />
-          <Fila
-            label={
-              (c.saldoPrecioEscrituracion ?? 0) <= 0
-                ? '(=) Saldo del precio (cubierto)'
-                : '(=) Saldo del precio (a cargo del cliente)'
-            }
-            value={money(c.saldoPrecioEscrituracion)}
-            strong
-            tone={(c.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : undefined}
-          />
-          <p className="mt-1 text-[11px] text-[var(--text)]/45">
-            El precio lo cubren el crédito y el enganche del cliente; los gastos de escrituración se
-            desglosan abajo.
-          </p>
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          {(c.saldoPrecioEscrituracion ?? 0) > 0.5 && cob ? (
+            <>
+              <Fila
+                label="(=) Saldo del precio (a cargo del cliente)"
+                value={money(c.saldoPrecioEscrituracion)}
+                strong
+              />
+              <Fila
+                label="(−) Enganche pagado por el cliente"
+                value={money(cob.engancheAlPrecio)}
+              />
+              <div className="my-1 border-t border-[var(--border)]" />
+              <Fila
+                label={
+                  saldoPrecioPorCubrir > 0.5 ? '(=) Saldo por cubrir' : '(=) Precio cubierto ✓'
+                }
+                value={money(saldoPrecioPorCubrir)}
+                strong
+                tone={saldoPrecioPorCubrir > 0.5 ? 'warn' : 'ok'}
+              />
+              <p className="mt-1 text-[11px] text-[var(--text)]/45">
+                {saldoPrecioPorCubrir > 0.5
+                  ? 'Saldo pendiente del cliente. Si no lo completa antes de escriturar, lo absorbe el bono de DILESA (entra al descuento de la operación). Los gastos de escrituración se desglosan abajo.'
+                  : 'El precio queda cubierto entre el crédito y el enganche; los gastos de escrituración se desglosan abajo.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <Fila
+                label="(=) Saldo del precio (cubierto)"
+                value={money(c.saldoPrecioEscrituracion)}
+                strong
+                tone="ok"
+              />
+              <p className="mt-1 text-[11px] text-[var(--text)]/45">
+                El precio lo cubre el crédito; los gastos de escrituración se desglosan abajo.
+              </p>
+            </>
+          )}
         </Bloque>
       ) : (
         <Bloque titulo="Cobertura de la operación">
