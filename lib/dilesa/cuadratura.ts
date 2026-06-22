@@ -235,6 +235,11 @@ export type Cuadratura = {
      *  (crédito institución insuficiente); NO fondea gastos. Para la nota del
      *  panel — evita el doble conteo del enganche (precio + gastos). */
     engancheAlPrecio: number;
+    /** Faltante de cobranza del PRECIO: lo que el cliente AÚN debe del enganche
+     *  (saldo del precio − enganche pagado), a su cargo — NO es descuento de
+     *  DILESA. Mientras > 0, infla el "descuento real" (Michelle) por este monto;
+     *  al cobrarse, el descuento real baja a la pura aportación DILESA. */
+    pendienteCobranzaPrecio: number;
     /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. */
     sobreprecio: number;
     /** Sobreprecio EFECTIVO que cubre el presupuesto (faltante del lado DILESA −
@@ -466,6 +471,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         aportacionPromocion,
         engancheCliente: engancheAGastos,
         engancheAlPrecio,
+        pendienteCobranzaPrecio: round2(Math.max(0, saldoPrecioParaGastos - engancheAlPrecio)),
         sobreprecio: round2(sobreprecioAdicionales),
         sobreprecioCobertura,
         pagareNecesario,

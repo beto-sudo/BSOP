@@ -444,6 +444,7 @@ describe('calcularCuadratura', () => {
         aportacionPromocion: 15000, // usada para cubrir gastos
         engancheCliente: 35000, // FOVISSSTE: crédito cubre el precio → enganche completo a gastos
         engancheAlPrecio: 0, // nada del enganche se consume en el precio
+        pendienteCobranzaPrecio: 0, // crédito cubre el precio → nada pendiente
         sobreprecio: 24651, // productos capturados
         sobreprecioCobertura: 24651, // el que cubre el presupuesto
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
@@ -517,10 +518,15 @@ describe('calcularCuadratura', () => {
       expect(cob.pagareNecesario).toBe(0);
       expect(cob.saldoCobertura).toBe(0); // cuadra
       expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
-      // La card "Descuento de la operación" ya no inventa sobreprecio: el descuento
-      // real (13,361.42 = 12,569.42 DILESA + 792 por cobrar) se parte sin residual.
+      // El enganche (156,943) no alcanza el saldo del precio (157,735): faltan 792
+      // por cobrar — a cargo del cliente, NO descuento de DILESA.
+      expect(cob.pendienteCobranzaPrecio).toBe(792);
+      // Identidad que amarra las cards: descuento real = aportación DILESA + pendiente.
+      // 13,361.42 = 12,569.42 (lo que cede DILESA) + 792 (cobranza pendiente).
       expect(c.descuentoReal).toBe(13361.42);
-      expect(partirDescuento(c.descuentoReal, cob.promocion).sobreprecio).toBe(0);
+      expect(cob.aportacionPromocion + cob.sobreprecioCobertura + cob.pendienteCobranzaPrecio).toBe(
+        c.descuentoReal
+      );
     });
 
     // Infonavit con enganche MAYOR que el saldo del precio: el excedente sí fondea
