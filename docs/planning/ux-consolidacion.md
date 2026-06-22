@@ -3,11 +3,11 @@
 **Slug:** `ux-consolidacion`
 **Empresas:** todas (cross-empresa por diseño)
 **Schemas afectados:** principalmente UI (Next.js); lectura — sin cambios de schema salvo vistas para paginación/perf (`v_ventas_lista` y similares)
-**Estado:** proposed
-**Próximo hito:** Beto aprueba alcance v1 → arrancar Sprint 1 (búsqueda global Cmd+K filtrada por RBAC — el quick-win de mayor apalancamiento)
+**Estado:** in_progress
+**Próximo hito:** Beto revisa el Vercel Preview del switcher de empresa (Sprint Sidebar foco) y mergea; decidir si se suma el peek por hover en desktop. Luego elegir el siguiente sprint (Cmd+K es el quick-win de mayor apalancamiento).
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-06-12 (promovida desde la revisión general 2026-06-12 — ver [reporte](../strategy/REVISION-GENERAL-BSOP-2026-06-12.md))
+**Última actualización:** 2026-06-21 (arranca el Sprint «Sidebar con foco contextual» — switcher de empresa que reemplaza los toggles manuales de visibilidad)
 
 ## Problema
 
@@ -32,6 +32,7 @@ Y un puñado de **fixes de performance de alto ROI** que tocan la misma superfic
 
 ## Alcance v1 (sprints propuestos — pendientes de aprobación)
 
+- [~] **Sprint Sidebar foco — Switcher de empresa (en revisión).** El sidebar deja de listar las 4 empresas siempre: muestra solo Inicio + la empresa en la que estás (derivada de la ruta) + Configuración. Un chip-switcher arriba del árbol despliega las empresas accesibles (reusa el filtro RBAC + denylist que ya calcula el sidebar) y al elegir una re-enfoca. Cierra por click-afuera/Escape; funciona colapsado, en teclado y mobile. Reemplaza los toggles manuales `core.sidebar_oculto` por enfoque automático; el panel de Configuración → Empresas se reduce a un solo switch **«Modo presentación»** (esconde SANREN + Personas Físicas para presentar BSOP a empleados — único caso que el switcher no cubre). Sin schema nuevo. Decidido con Beto: switcher por click (no hover puro), comportamiento para todos los operadores. Va a Preview sin auto-merge (UI visible).
 - [ ] **Sprint 1 — Cmd+K global (la joya).** Command palette en el header: rutas de `NAV_ITEMS` filtradas por `canSeeNavRoute` (la lógica ya existe) + segundo nivel con entidades frecuentes (ventas por cliente/unidad, proveedores, obras) usando las queries que los módulos ya tienen. El primitivo y el RBAC están listos; es ensamblar.
 - [ ] **Sprint 2 — Enforcement en CI.** `audit-ui.ts` corre en CI con checks nuevos: pills `rounded-full + bg-*-100` fuera de `ui/`, `@responsive` declarado en toda page, h1 fuera de la clase canónica. Los 2 specs `axe` actualizados (quitar `/dilesa/terrenos`, agregar 1 fase + 1 hub) corriendo nightly sin self-skip silencioso.
 - [ ] **Sprint 3 — Barridos mecánicos.** `alert()`→toast/feedback (48 sitios); pills→`<Badge tone>` en las fases 10-17; `window.confirm`→`ConfirmDialog` (4 sitios); `@responsive` en las 22 pages (token-públicas → mobile-first); regla ESLint `no-restricted-globals` (confirm/alert/prompt).
@@ -53,8 +54,11 @@ Y un puñado de **fixes de performance de alto ROI** que tocan la misma superfic
 
 ## Decisiones registradas
 
-- _(pendiente — se registran al ejecutar)_
+- **2026-06-21 — Enfoque del sidebar por empresa (switcher), no toggles manuales.** Beto pidió reemplazar los toggles de «Visibilidad del menú lateral» (prender/apagar cada empresa, tedioso a diario) por enfoque automático contextual. Razón: opera una empresa a la vez; el ruido de ver las 4 siempre no aporta. Mecanismo elegido: **switcher por click** (chip que despliega las empresas accesibles), descartado el hover puro porque se rompe en touch/teclado y es nervioso. La empresa activa se deriva de la ruta (`getActiveEmpresaHref`); la lista del dropdown reusa el filtro RBAC + denylist que el sidebar ya calculaba.
+- **2026-06-21 — El panel viejo se reduce a «Modo presentación» (no se elimina).** Los toggles `core.sidebar_oculto` resolvían un caso real que el switcher no cubre: esconder los módulos personales (SANREN + Personas Físicas) al presentar BSOP a empleados. Se conserva ese caso como un único switch sobre el mismo denylist, en vez de 4 toggles per-empresa.
+- **2026-06-21 — Comportamiento para todos los operadores, no preferencia personal.** El foco contextual aplica igual a Beto, Alejandra y Michelle (todos operan multi-empresa). Más simple que una preferencia por-usuario y el beneficio es el mismo.
 
 ## Bitácora
 
+- **2026-06-21** — Arranca el Sprint «Sidebar con foco contextual». Switcher de empresa (`components/app-shell/empresa-switcher.tsx`) + `NavIcon` extraído a `nav-icon.tsx` + helpers puros `isEmpresaNavItem`/`getActiveEmpresaHref` (con tests) + sidebar refactorizado a foco (Inicio + empresa activa + Configuración) + panel «Modo presentación» (`modo-presentacion-panel.tsx`, reemplaza `visibilidad-sidebar-panel.tsx`). Sin schema. PR a Preview sin auto-merge para revisión visual de Beto.
 - **2026-06-12** — Promovida desde la revisión general 2026-06-12 (dimensiones ui-ux + performance). El reporte identificó `cxp-facturas-module` como best-in-class a canonizar y juntas/cobranza/fases de captura como mayor drift.
