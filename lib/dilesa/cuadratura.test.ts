@@ -442,7 +442,9 @@ describe('calcularCuadratura', () => {
         apoyoInfonavit: 0,
         promocion: 15000, // autorizada (tope)
         aportacionPromocion: 15000, // usada para cubrir gastos
-        engancheCliente: 35000,
+        engancheCliente: 35000, // FOVISSSTE: crédito cubre el precio → enganche completo a gastos
+        engancheAlPrecio: 0, // nada del enganche se consume en el precio
+        pendienteCobranzaPrecio: 0, // crédito cubre el precio → nada pendiente
         sobreprecio: 24651, // productos capturados
         sobreprecioCobertura: 24651, // el que cubre el presupuesto
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
@@ -484,6 +486,71 @@ describe('calcularCuadratura', () => {
       const split = partirDescuento(c.descuentoReal, cob.promocion);
       expect(split.promocion).toBe(15000);
       expect(split.sobreprecio).toBe(3313.29);
+    });
+
+    // Infonavit con crédito < precio: el enganche del cliente cubre el saldo del
+    // precio, NO los gastos. Antes el motor lo restaba de los gastos (doble conteo)
+    // → saldo de cobertura negativo absurdo y un "descuento por sobreprecio"
+    // fantasma. Caso real corregido M3-L9 (Juan Antonio).
+    it('Infonavit crédito < precio: el enganche va al PRECIO, no a gastos — Juan Antonio (M3-L9)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 920000,
+        montoCreditoTitular: 762265, // crédito Infonavit: NO cubre el precio
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 42569.42, // Anexo B: titulación 12,569.42 + impuestos 30,000
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioAdicionales: 0, // SIN sobreprecio
+        promocionGastos: 15000,
+        depositos: [{ monto: 156943, directoCliente: true, tieneRecibo: false }],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      const cob = c.coberturaGastos!;
+      expect(cob.gastosBrutos).toBe(42569.42);
+      expect(cob.apoyoInfonavit).toBe(30000);
+      expect(cob.engancheAlPrecio).toBe(156943); // el enganche cubre el saldo del precio
+      expect(cob.engancheCliente).toBe(0); // nada del enganche fondea gastos
+      expect(cob.aportacionPromocion).toBe(12569.42); // DILESA solo aporta del bono (< 15k)
+      expect(cob.sobreprecioCobertura).toBe(0); // NO se deriva sobreprecio fantasma
+      expect(cob.pagareNecesario).toBe(0);
+      expect(cob.saldoCobertura).toBe(0); // cuadra
+      expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
+      // El enganche (156,943) no alcanza el saldo del precio (157,735): faltan 792
+      // por cobrar — a cargo del cliente, NO descuento de DILESA.
+      expect(cob.pendienteCobranzaPrecio).toBe(792);
+      // Identidad que amarra las cards: descuento real = aportación DILESA + pendiente.
+      // 13,361.42 = 12,569.42 (lo que cede DILESA) + 792 (cobranza pendiente).
+      expect(c.descuentoReal).toBe(13361.42);
+      expect(cob.aportacionPromocion + cob.sobreprecioCobertura + cob.pendienteCobranzaPrecio).toBe(
+        c.descuentoReal
+      );
+    });
+
+    // Infonavit con enganche MAYOR que el saldo del precio: el excedente sí fondea
+    // los gastos. Caso real M20-L34 (cuadra en 0 con enganche 42,500 + bono 15,000).
+    it('Infonavit con enganche > saldo del precio: el excedente fondea los gastos — M20-L34', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 1332652,
+        montoCreditoTitular: 1309247,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 87500, // bruto; apoyo 30,000 → neto 57,500
+        apoyoInfonavit: 30000,
+        precioBase: 1332652,
+        sobreprecioAdicionales: 0,
+        promocionGastos: 15000,
+        depositos: [{ monto: 65905, directoCliente: true, tieneRecibo: false }],
+      });
+      const cob = c.coberturaGastos!;
+      expect(cob.engancheAlPrecio).toBe(23405); // cubre el saldo del precio (1,332,652 − 1,309,247)
+      expect(cob.engancheCliente).toBe(42500); // el excedente (65,905 − 23,405) va a gastos
+      expect(cob.aportacionPromocion).toBe(15000); // DILESA aporta el bono completo
+      expect(cob.sobreprecioCobertura).toBe(0);
+      expect(cob.saldoCobertura).toBe(0); // 87,500 − 30,000 − 15,000 − 42,500
     });
 
     it('calcula el pagaré necesario aunque aún no se capture el crédito directo', () => {

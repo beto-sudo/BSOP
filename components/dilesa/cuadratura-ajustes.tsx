@@ -6,11 +6,11 @@
  *
  * - CON DESGLOSE (ADR-045 — ventas activas y nuevas): el descuento ya NO se
  *   captura aquí; se deriva. Muestra el DESCUENTO REAL (= Escrituración − Valor
- *   Real, la columna "Descuento" de Michelle) partido en dos: el "descuento por
- *   promoción" (el bono autorizado del catálogo `dilesa.promociones`, topado al
- *   máximo) y el "descuento por sobreprecio" (el resto, que DILESA concede
- *   subiendo el precio — pendiente de formalizar como Máxima Aportación en la
- *   solicitud). Los 4 buckets viejos ya no aplican al modelo desglosado.
+ *   Real, la columna "Descuento" de Michelle) separado en lo que DILESA cede
+ *   genuinamente — la "aportación DILESA" = promoción usada del bono + sobreprecio
+ *   — y el "pendiente de cobrar al cliente" (enganche que aún debe del precio, NO
+ *   descuento; al cobrarse, el descuento real baja a la pura aportación). Los 4
+ *   buckets viejos ya no aplican al modelo desglosado.
  *
  * - LEGACY (ventas viejas de Coda sin desglose): editor de los 4 buckets. El
  *   total se AUTO-CALCULA como la suma de los buckets (ya no se captura aparte —
@@ -30,7 +30,6 @@ import { Input } from '@/components/ui/input';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useToast } from '@/components/ui/toast';
-import { partirDescuento } from '@/lib/dilesa/cuadratura';
 
 export type CuadraturaInputsStr = {
   /** Total del descuento. Con buckets = su suma (auto); legacy total-only = lo capturado en Coda. */
@@ -58,6 +57,8 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente,
   tieneDesglose,
   descuentoPromocion,
+  aportacionPromocion,
+  sobreprecioCobertura,
   descuentoReal,
   sobreprecioCapturado,
 }: {
@@ -75,12 +76,18 @@ export function CuadraturaAjustes({
   descuentoMaximoFuente: string | null;
   /** Si la venta usa el modelo desglosado (ADR-045). */
   tieneDesglose: boolean;
-  /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones). Es el TOPE
-   *  del "descuento por promoción"; el resto del descuento real es sobreprecio. */
+  /** Promoción/bono de gastos AUTORIZADA (catálogo de promociones). El TOPE del
+   *  bono; lo realmente aportado es `aportacionPromocion`. */
   descuentoPromocion: number;
+  /** Promoción USADA para cubrir los gastos (≤ el bono autorizado). Es la línea
+   *  "Aportación DILESA (promoción)" de la cobertura del presupuesto notarial. */
+  aportacionPromocion: number;
+  /** Sobreprecio efectivo que cubre los gastos. Junto con `aportacionPromocion`
+   *  = lo que DILESA cede genuinamente (su costo). */
+  sobreprecioCobertura: number;
   /** Descuento real = Escrituración − Valor Real (columna "Descuento" de
-   *  Michelle). El total que se parte en promoción (topada al autorizado) +
-   *  sobreprecio (el resto que DILESA concede subiendo el precio). */
+   *  Michelle) = aportación DILESA + pendiente de cobrar del cliente. El pendiente
+   *  (faltante del enganche) NO es descuento; se separa en la card. */
   descuentoReal: number;
   /** Sobreprecio YA capturado como productos adicionales (precio inflado). Sirve
    *  para señalar cuánto del descuento por sobreprecio falta formalizar como
@@ -90,20 +97,22 @@ export function CuadraturaAjustes({
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
-  // ── Modo DESGLOSE: el descuento total (= Escrituración − Valor Real, columna
-  //    "Descuento" de Michelle) se PARTE en promoción (bono autorizado, topado al
-  //    máximo) + sobreprecio (el resto, que DILESA concede subiendo el precio).
-  //    No se captura aquí; se deriva. ──
+  // ── Modo DESGLOSE: el descuento real (= Escrituración − Valor Real, columna
+  //    "Descuento" de Michelle) se separa en lo que DILESA cede genuinamente
+  //    (aportación = promoción usada + sobreprecio) y el pendiente de cobrar al
+  //    cliente (enganche que aún debe del precio, NO descuento). No se captura
+  //    aquí; se deriva del motor. ──
   if (tieneDesglose) {
     const descuentoTotal = Math.round(descuentoReal * 100) / 100;
-    // Parte el descuento real en promoción (bono autorizado, topado) + sobreprecio
-    // (el resto). Mismo helper que la card de cobertura del presupuesto notarial.
-    const { promocion: descuentoPorPromocion, sobreprecio: descuentoPorSobreprecio } =
-      partirDescuento(descuentoReal, descuentoPromocion);
-    // Cuánto del sobreprecio aún no está formalizado como productos adicionales
-    // (precio inflado) → pendiente de capturar como Máxima Aportación.
+    // Lo que DILESA cede genuinamente (su costo): promoción usada + sobreprecio.
+    const aportacionDilesa = Math.round((aportacionPromocion + sobreprecioCobertura) * 100) / 100;
+    // El resto del descuento real es enganche que el cliente AÚN debe del precio —
+    // NO es descuento. Mientras > 0 infla el descuento real; al cobrarse, el
+    // descuento real baja a la pura aportación DILESA.
+    const pendienteCobranza = Math.round((descuentoTotal - aportacionDilesa) * 100) / 100;
+    // Cuánto del sobreprecio aún no está formalizado como productos adicionales.
     const sobreprecioPorCapturar =
-      Math.round((descuentoPorSobreprecio - sobreprecioCapturado) * 100) / 100;
+      Math.round((sobreprecioCobertura - sobreprecioCapturado) * 100) / 100;
     return (
       <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
@@ -111,15 +120,31 @@ export function CuadraturaAjustes({
         </h3>
         <div className="space-y-1">
           <DerivadoRow
-            label="Descuento por promoción (bono autorizado)"
-            value={moneyFmt.format(descuentoPorPromocion)}
+            label="Descuento por promoción (del bono)"
+            value={moneyFmt.format(aportacionPromocion)}
           />
           <DerivadoRow
             label="(+) Descuento por sobreprecio"
-            value={moneyFmt.format(descuentoPorSobreprecio)}
+            value={moneyFmt.format(sobreprecioCobertura)}
           />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <DerivadoRow
+            label="(=) Aportación DILESA (lo que cede)"
+            value={moneyFmt.format(aportacionDilesa)}
+            strong
+          />
+          {pendienteCobranza > 0.5 ? (
+            <DerivadoRow
+              label="(+) Pendiente de cobrar al cliente"
+              value={moneyFmt.format(pendienteCobranza)}
+            />
+          ) : null}
           <div className="my-1 border-t border-[var(--border)]" />
-          <DerivadoRow label="(=) Descuento total" value={moneyFmt.format(descuentoTotal)} strong />
+          <DerivadoRow
+            label="(=) Descuento real vs escrituración"
+            value={moneyFmt.format(descuentoTotal)}
+            strong
+          />
         </div>
         <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
           <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
@@ -131,10 +156,12 @@ export function CuadraturaAjustes({
           </span>
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--text)]/50">
-          El <strong>descuento por promoción</strong> es el bono autorizado del catálogo (tope{' '}
-          {moneyFmt.format(descuentoPromocion)}); el <strong>descuento por sobreprecio</strong> es
-          lo que DILESA concede de más subiendo el precio. Juntos son el descuento real frente al
-          valor escriturado ({moneyFmt.format(descuentoTotal)}).
+          La <strong>aportación DILESA</strong> es lo que la empresa cede de los gastos (promoción
+          del bono, tope {moneyFmt.format(descuentoPromocion)}
+          {sobreprecioCobertura > 0.5 ? ', más sobreprecio' : ''}).
+          {pendienteCobranza > 0.5
+            ? ` El pendiente de cobrar (${moneyFmt.format(pendienteCobranza)}) es enganche que el cliente aún debe del precio — no es descuento; al cobrarse, el descuento real baja a ${moneyFmt.format(aportacionDilesa)}.`
+            : ''}
           {sobreprecioPorCapturar > 0.5
             ? ` Falta formalizar ${moneyFmt.format(sobreprecioPorCapturar)} de sobreprecio como Máxima Aportación en la solicitud.`
             : ''}
