@@ -39,6 +39,42 @@ describe('construirVentasPeriodo', () => {
     expect(r.ventas[0].id).toBe('a');
   });
 
+  it('excluye ventas no vigentes (desasignada/expirada) aunque tengan escritura', () => {
+    const rows = [
+      row({
+        id: 'a',
+        estado: 'activa',
+        numeroEscritura: 'E1',
+        fechaEscritura: '2026-05-10',
+        precio: 100,
+      }),
+      row({
+        id: 'b',
+        estado: 'terminada',
+        numeroEscritura: 'E2',
+        fechaEscritura: '2026-05-11',
+        precio: 200,
+      }),
+      row({
+        id: 'c',
+        estado: 'desasignada',
+        numeroEscritura: '-1250',
+        fechaEscritura: '2025-08-20',
+        precio: 999,
+      }),
+      row({
+        id: 'd',
+        estado: 'expirada',
+        numeroEscritura: 'E4',
+        fechaEscritura: '2026-05-12',
+        precio: 999,
+      }),
+    ];
+    const r = construirVentasPeriodo(rows, SIN_FILTRO);
+    expect(r.ventas.map((v) => v.id).sort()).toEqual(['a', 'b']);
+    expect(r.totalMonto).toBe(300);
+  });
+
   it('filtra por rango de fecha de escritura (inclusivo)', () => {
     const rows = [
       row({ id: 'a', numeroEscritura: 'E', fechaEscritura: '2026-04-30', precio: 1 }),
