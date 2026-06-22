@@ -4,10 +4,10 @@
 **Empresas:** SANREN (hub patrimonial familiar — personal de Beto)
 **Schemas afectados:** `sanren` (schema nuevo) — tablas `propiedades`, `servicios`, `recibos` + vista derivada `v_recibos`; RLS deny-all + lectura server-side con service-role (patrón Péptidos/Salud). `core` (RBAC del módulo, ver nota de routing en Sprint 3). Supabase Storage bucket `adjuntos` (recibos PDF + comprobantes de pago). Importer **read-only** desde Coda doc `MaXoDlRxXE` / tabla `grid-ItvEVXa37s` ("Recibos"). Sin librería de charts nueva (SVG a mano, patrón Playtomic/Health).
 **Estado:** in_progress
-**Próximo hito:** Beto valida S4 en prod (captura de recibos + gráficas de tendencia) → cierre del v1. Pendiente opcional: tarifa CFE (DAC / banco de energía) para volver exacto el ahorro solar (hoy se muestra el gasto real por año, que ya evidencia el efecto).
+**Próximo hito:** Beto revisa S5 en Preview (lectura automática de recibos por IA al subir) y mergea → cierre del v1. El pendiente de la tarifa CFE / banco de energía lo resuelve la extracción IA (los lee del recibo: tarifa `1E`, 9,567 kWh a favor).
 **Dueño:** Beto
 **Creada:** 2026-06-21
-**Última actualización:** 2026-06-21 (Sprint 4 — captura de recibos + gráficas de tendencia)
+**Última actualización:** 2026-06-22 (Sprint 5 — extracción de recibos por IA al subir + re-extracción del histórico)
 
 > Detonante: Beto lleva años el control de los recibos de servicios de su casa
 > en un doc de Coda y quiere traspasar el historial completo a BSOP para
@@ -219,7 +219,25 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   toggle Recibos/Tendencias): gasto mensual por servicio (barras apiladas),
   consumo vs. generación solar de Luz, y gasto de Luz por año (el efecto de los
   paneles). `lib/sanren-servicios.ts` ahora expone `empresaId` para
-  `<FileAttachments>`. Sin migración DB.
+  `<FileAttachments>`. Sin migración DB. PR
+  [#974](https://github.com/beto-sudo/BSOP/pull/974) (Beto: "muy buen camino",
+  mergeado).
+- **2026-06-22** — Sprint 5 (lectura de recibos por IA). Motor
+  `lib/sanren/recibo-extraccion.ts` (Claude visión vía `lib/ai`, usoId
+  `sanren-recibo-extraccion`): extrae proveedor, titular, no. de cuenta/medidor,
+  **tarifa**, periodo, **fecha de vencimiento**, lecturas de consumo Y
+  **producción** (el segundo renglón del recibo CFE NETMET, que Beto señaló — se
+  perdía en la v1), **generación** + **banco de energía** (kWh a favor), subtotal/
+  IVA/total y desglose de conceptos. Sanitiza el prefijo `"Recibo: "` de los PDF
+  de SIMAS y reconstruye la lectura de producción cuando el layout CFE la trunca
+  (104,711 leído como 4,711). Migración `20260622124726` (columnas
+  `fecha_vencimiento`/`subtotal`/`iva`/`tarifa`/`extraccion` jsonb/`extraccion_at`
+  - vista recreada) aplicada a prod. Re-extracción de los **69 recibos con PDF**:
+    **68 ok / 1 fail** (PDF no disponible en bucket); 56 con vencimiento/tarifa/IVA,
+    6 de luz con banco de energía. **UI**: al subir el PDF la IA lo lee
+    automáticamente (`<FileAttachments onChange>` → `POST /api/sanren/recibos/[id]/
+extraer`) + botón "✨ Leer con IA" + muestra vencimiento/tarifa/desglose/banco.
+    Política: la IA completa vacíos, **no pisa** lo capturado de Coda.
 
 ## Decisiones registradas
 
@@ -232,3 +250,8 @@ del periodo, producción del periodo, costo por unidad, saldo del periodo.
   verdad, sin riesgo de desincronía. Mismo patrón que `v_proyecto_avances`.
 - **2026-06-21** — Gráficas en **SVG a mano** (patrón Playtomic/Health), sin
   agregar librería de charts. Razón: cero deps nuevas, control total del theme.
+- **2026-06-22** — La extracción IA **prellena, no decide** (patrón D4 del repo):
+  completa solo los campos vacíos del recibo y **nunca pisa** lo capturado/migrado
+  de Coda; el humano confirma. Razón: los datos de Coda son confiables y la IA
+  puede equivocarse (p.ej. el layout CFE trunca la lectura de producción — se
+  reconstruye desde la generación impresa, que sí es fiable).

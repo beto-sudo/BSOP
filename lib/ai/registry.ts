@@ -14,7 +14,7 @@
 import { DEFAULT_CLAUDE_MODEL, DEFAULT_EMBEDDING_MODEL } from './models';
 
 export type AiProveedor = 'anthropic' | 'openai';
-export type AiEmpresa = 'cross' | 'dilesa' | 'rdb' | 'ansa' | 'coagan' | 'nigropetense';
+export type AiEmpresa = 'cross' | 'dilesa' | 'rdb' | 'ansa' | 'coagan' | 'nigropetense' | 'sanren';
 export type AiModalidad = 'vision-extraccion' | 'embedding';
 /** alta = romper este uso detiene un flujo operativo crítico. */
 export type AiCriticidad = 'alta' | 'media' | 'baja';
@@ -144,6 +144,18 @@ export const AI_USOS = {
     criticidad: 'alta',
     descripcion: 'Extrae el Acuse de envío PLD que cierra el ciclo (presentado ante el SPPLD).',
     archivo: 'app/api/dilesa/ventas/[ventaId]/revision-pld/route.ts',
+  },
+  'sanren-recibo-extraccion': {
+    label: 'Extracción de recibos de servicios (SANREN)',
+    empresa: 'sanren',
+    proveedor: 'anthropic',
+    modalidad: 'vision-extraccion',
+    modeloDefault: DEFAULT_CLAUDE_MODEL,
+    envVar: 'ANTHROPIC_API_KEY',
+    criticidad: 'baja',
+    descripcion:
+      'Lee el PDF/imagen del recibo (CFE/SIMAS/Conagas) y extrae montos, lecturas, vencimiento, tarifa y desglose para prellenar la captura.',
+    archivo: 'lib/sanren/recibo-extraccion.ts',
   },
 } as const satisfies Record<string, AiUso>;
 
