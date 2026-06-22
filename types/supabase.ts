@@ -5669,6 +5669,7 @@ export type Database = {
           empresa_id: string | null
           fase_actual: string | null
           fase_posicion: number | null
+          pago_detonado: boolean | null
           proyecto: string | null
           unidad: string | null
           venta_id: string | null

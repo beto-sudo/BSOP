@@ -1,8 +1,8 @@
 ---
 titulo: 'Fase 15 — Entregada'
 modulo: dilesa.ventas.fase15_entregada
-version: '1.1.0'
-actualizado: '2026-06-16'
+version: '1.2.0'
+actualizado: '2026-06-22'
 ---
 
 ## ¿Qué es esta fase?
@@ -15,10 +15,15 @@ Atención a Clientes, y se sube el documento firmado.
 
 ## Requisitos
 
-Fase 14 (Preparada para Entrega) cerrada.
+- **Fase 14 (Preparada para Entrega) cerrada.**
+- **Fase 12 (Detonada) cerrada — el pago ya recibido.** No se entrega la vivienda
+  sin que haya entrado el pago. Si falta, la pantalla lo bloquea con un aviso y un
+  atajo para registrar el abono en el estado de cuenta; al detonarse el crédito se
+  desbloquea la entrega.
 
 > Este pendiente aparece en la bandeja de **Atención a Clientes** (cola
-> "Entrega"), que te trae directo a esta pantalla.
+> "Entrega"), que te trae directo a esta pantalla. Si todavía falta el pago, la
+> tarjeta sale marcada con un badge rojo **"Falta pago"**.
 
 ## Cómo se trabaja
 

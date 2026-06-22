@@ -68,6 +68,8 @@ function CapturarFase15Body() {
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [fase14Cerrada, setFase14Cerrada] = useState<boolean | null>(null);
+  // F12 (Detonada) = el pago recibido. No se entrega sin pago.
+  const [fase12Cerrada, setFase12Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
@@ -117,6 +119,7 @@ function CapturarFase15Body() {
 
       const posiciones = (fRows ?? []).map((f) => f.posicion as number);
       setFase14Cerrada(posiciones.includes(14));
+      setFase12Cerrada(posiciones.includes(12));
       setYaCerrada(posiciones.includes(15));
 
       setLoading(false);
@@ -227,6 +230,26 @@ function CapturarFase15Body() {
               className="mt-3 inline-block text-sm font-medium text-[var(--accent)] underline"
             >
               Volver al detalle
+            </Link>
+          }
+        />
+      ) : !fase12Cerrada ? (
+        <Banner
+          tone="warning"
+          title="Falta el pago (Fase 12 — Detonada)"
+          body={
+            <>
+              No se puede entregar la vivienda sin haber recibido el pago. Registra el abono de la
+              institución en el estado de cuenta; al detonarse el crédito (Fase 12) se desbloquea la
+              entrega.
+            </>
+          }
+          extra={
+            <Link
+              href={`/dilesa/ventas/${venta.id}?abono=1`}
+              className="mt-3 inline-block text-sm font-medium text-[var(--accent)] underline"
+            >
+              Registrar abono en el estado de cuenta
             </Link>
           }
         />

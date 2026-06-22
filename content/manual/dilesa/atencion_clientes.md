@@ -1,8 +1,8 @@
 ---
 titulo: 'Atención a Clientes'
 modulo: dilesa.atencion_clientes
-version: '1.1.0'
-actualizado: '2026-06-20'
+version: '1.2.0'
+actualizado: '2026-06-22'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -33,7 +33,8 @@ muestra "Nada pendiente aquí 🎉".
 - **Pre-entrega pendiente** — ventas ya escrituradas, listas para la **revisión
   pre-entrega**. La tarjeta abre la **Fase 14** de esa venta.
 - **Entrega pendiente** — la pre-entrega ya se hizo; falta **entregar la
-  vivienda** al cliente. La tarjeta abre la **Fase 15**.
+  vivienda** al cliente. La tarjeta abre la **Fase 15**. Si todavía no entra el
+  pago, sale marcada con un badge rojo **"Falta pago"**: no se entrega sin el pago.
 - **Encuesta sin responder** — la conformidad del cliente está pendiente de
   respuesta. La tarjeta abre la **Fase 16**. El badge dice si la encuesta está
   _programada_ o ya _enviada_ (y cuántos intentos de envío lleva).
@@ -65,6 +66,12 @@ La tira de indicadores resume cómo va el departamento:
 **¿Por qué una venta aparece en "Entrega" y no en "Pre-entrega"?**
 Porque su pre-entrega (Fase 14) ya se cerró. Las colas siguen el orden del
 proceso: una venta baja a la siguiente cola conforme cierras su fase.
+
+**Una venta en "Entrega" dice "Falta pago". ¿Qué hago?**
+La pre-entrega ya está, pero todavía no se registra el pago (la **Fase 12,
+Detonada**). No se puede entregar la vivienda sin el pago: registra el abono de
+la institución en el estado de cuenta de la venta y, al detonarse el crédito, la
+entrega se desbloquea sola.
 
 **Marqué una obra como recibida pero sigue en "Obras por recibir".**
 Revisa que hayas subido el **acta firmada escaneada** en la obra: es obligatoria
