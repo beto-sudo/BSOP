@@ -189,6 +189,13 @@ export function CuadraturaPanel({
             strong
             tone={Math.abs(cob.saldoCobertura) <= 2 ? 'ok' : 'warn'}
           />
+          {cob.engancheAlPrecio > 0 ? (
+            <p className="mt-1 text-[11px] text-[var(--text)]/45">
+              El enganche del cliente ({money(cob.engancheAlPrecio + cob.engancheCliente)}) se
+              aplica primero al saldo del precio ({money(cob.engancheAlPrecio)}, ver arriba); aquí
+              solo cuenta el excedente que fondea los gastos.
+            </p>
+          ) : null}
         </Bloque>
       ) : null}
 

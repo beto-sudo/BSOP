@@ -63,6 +63,14 @@ cubierta            = promoción + enganche + sobreprecio + pagaré ≈ gastos_n
 
 **D7 — El motor distingue por presencia del desglose (fallback).** Si la venta tiene las columnas nuevas pobladas (es nueva o se está operando) → usa el **modelo desglosado**. Si están en `null` (ventas ya cerradas / legacy) → usa el **modelo viejo** (`descuento_total`) tal cual. Garantiza que **ninguna venta histórica cambia su cuadratura**; el rediseño solo aplica de aquí en adelante. No hay backfill masivo (ver Alcance).
 
+**D8 — El enganche se aplica PRIMERO al precio; solo el excedente fondea los gastos** (corrección 2026-06-22, detonada por la venta **M3-L9 Juan Antonio**, Infonavit Tradicional). El "enganche aplicado a gastos" de D4 se define como:
+
+```
+enganche_aplicado = max(0, enganche − max(0, valor_escrituracion − crédito_institución))
+```
+
+Razón: en **FOVISSSTE/IMSS** el +6% infla escrituración y crédito juntos, el crédito cubre el precio (saldo ≤ 0) y todo el enganche va a gastos — el supuesto de MAYRA. Pero en **Infonavit con crédito < precio**, el enganche del cliente cubre el **saldo del precio**, NO los gastos; restarlo de los gastos era un **doble conteo** (el mismo enganche cubría el precio en la card "Cobertura del precio" Y los gastos en la card "Cobertura del presupuesto notarial"), dejando un saldo de cobertura negativo absurdo (M3-L9: −124,782) y un **"descuento por sobreprecio" fantasma** (17,953 sin que `productos_adicionales` existiera). El motor expone `coberturaGastos.engancheCliente` (= aplicado a gastos) y `engancheAlPrecio` (= consumido por el precio, para la nota del panel). Verificado contra prod: las FOVISSSTE **no cambian**; 12 ventas Infonavit (activas + 1 terminada) pasan de saldo negativo a 0; ninguna venta cuadrada se descuadra.
+
 ## Spec de campos
 
 | Concepto                                | Hogar de datos                                                             | Captura / Deriva                             | Estado hoy                                                                               |

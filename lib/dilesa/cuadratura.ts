@@ -63,7 +63,12 @@
  */
 
 const n = (v: number | null | undefined): number => (v == null ? 0 : Number(v));
-const round2 = (v: number): number => Math.round((v + Number.EPSILON) * 100) / 100;
+const round2 = (v: number): number => {
+  const r = Math.round((v + Number.EPSILON) * 100) / 100;
+  // Normaliza −0 → 0: una resta que cuadra exacto (p.ej. saldo de cobertura) puede
+  // dar −0, que se formatea como "-$0.00" y rompe comparaciones `=== 0`.
+  return r === 0 ? 0 : r;
+};
 
 export type DepositoCuadratura = {
   monto: number | null;
@@ -221,8 +226,15 @@ export type Cuadratura = {
     /** Promoción USADA para cubrir el presupuesto (= promo topada al faltante de
      *  gastos del lado DILESA). La línea "Aportación DILESA (promoción)" de la card. */
     aportacionPromocion: number;
-    /** Enganche/depósitos del cliente. */
+    /** Enganche/depósitos del cliente aplicado a GASTOS: el excedente sobre el
+     *  saldo del precio (el crédito institución cubre el precio primero; solo lo
+     *  que sobra del enganche fondea el presupuesto notarial). En FOVISSSTE/IMSS
+     *  el crédito ya cubre el precio → es el enganche completo. */
     engancheCliente: number;
+    /** Enganche del cliente consumido por el saldo del PRECIO de escrituración
+     *  (crédito institución insuficiente); NO fondea gastos. Para la nota del
+     *  panel — evita el doble conteo del enganche (precio + gastos). */
+    engancheAlPrecio: number;
     /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. */
     sobreprecio: number;
     /** Sobreprecio EFECTIVO que cubre el presupuesto (faltante del lado DILESA −
@@ -412,20 +424,27 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // Fuente ÚNICA para la card de cuadratura y el mini-resumen (no recalcular).
   const gastosNetosR = round2(gastosNetos);
   const gastosBrutosR = round2(n(i.gastosEscrituracion));
+  // El enganche del cliente cubre PRIMERO el saldo del precio (lo que el crédito
+  // institución no alcanza); solo el EXCEDENTE fondea el presupuesto notarial.
+  // En FOVISSSTE/IMSS el crédito ya cubre el precio (saldo ≤ 0) → todo el enganche
+  // va a gastos (comportamiento previo intacto). En Infonavit con crédito < precio
+  // el enganche va al precio y NO debe restarse de los gastos: era un DOBLE CONTEO
+  // (el mismo enganche cubría el precio en una card y los gastos en otra → saldo
+  // de cobertura negativo absurdo, p.ej. −124,782). El crédito directo (pagaré) es
+  // fuente de gastos, no de precio, así que no entra en el saldo del precio.
+  const saldoPrecioParaGastos = Math.max(0, valorEscrituracion - creditoInstitucion);
+  const engancheAGastos = round2(Math.max(0, depositosDirectoCliente - saldoPrecioParaGastos));
+  const engancheAlPrecio = round2(depositosDirectoCliente - engancheAGastos);
   // `pagareNecesario`: faltante si DILESA solo aportara la promoción AUTORIZADA
   // (para la fase 10 / gate). NO es el pagaré real: cuando DILESA absorbe más que
   // la promo (Máxima Aportación) el pagaré del cliente es menor (o 0).
   const pagareNecesario = tieneDesglose
-    ? round2(
-        Math.max(
-          0,
-          gastosNetosR - promocionGastos - depositosDirectoCliente - sobreprecioAdicionales
-        )
-      )
+    ? round2(Math.max(0, gastosNetosR - promocionGastos - engancheAGastos - sobreprecioAdicionales))
     : 0;
-  // Lo que DILESA debe cubrir del presupuesto tras el enganche y el pagaré del
-  // cliente, partido en promoción (topada al bono) + sobreprecio (el resto).
-  const faltanteGastosDilesa = round2(gastosNetosR - depositosDirectoCliente - montoCreditoDirecto);
+  // Lo que DILESA debe cubrir del presupuesto tras el enganche (excedente del
+  // precio) y el pagaré del cliente, partido en promoción (topada al bono) +
+  // sobreprecio (el resto).
+  const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - montoCreditoDirecto);
   const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
     faltanteGastosDilesa,
     promocionGastos
@@ -434,7 +453,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     gastosBrutosR -
       n(i.apoyoInfonavit) -
       aportacionPromocion -
-      depositosDirectoCliente -
+      engancheAGastos -
       sobreprecioCobertura -
       montoCreditoDirecto
   );
@@ -445,7 +464,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         apoyoInfonavit: round2(n(i.apoyoInfonavit)),
         promocion: round2(promocionGastos),
         aportacionPromocion,
-        engancheCliente: round2(depositosDirectoCliente),
+        engancheCliente: engancheAGastos,
+        engancheAlPrecio,
         sobreprecio: round2(sobreprecioAdicionales),
         sobreprecioCobertura,
         pagareNecesario,
