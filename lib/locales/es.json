@@ -9,6 +9,8 @@
   "nav.family": "SANREN",
   "nav.personas_fisicas": "Personas Físicas",
   "nav.settings": "Configuración",
+  "nav.choose_empresa": "Elegir empresa",
+  "nav.switch_empresa": "Cambiar de empresa",
 
   "header.no_events": "Sin eventos próximos",
   "header.today": "Hoy",

@@ -263,6 +263,33 @@ export function getActiveSection(pathname: string) {
   );
 }
 
+/**
+ * True if a top-level nav item represents a switchable empresa.
+ *
+ * That's any item with a `NAV_TO_EMPRESA` mapping EXCEPT `settings` (the system
+ * bucket — Acceso/Notificaciones/Empresas, always visible, never a switch
+ * target) and Inicio (no mapping). The empresa switcher (focus mode) shows
+ * exactly these in its dropdown; the sidebar tree only renders the active one.
+ */
+export function isEmpresaNavItem(item: NavItem): boolean {
+  const slug = NAV_TO_EMPRESA[item.href];
+  return Boolean(slug) && slug !== 'settings';
+}
+
+/**
+ * Returns the href of the empresa nav item that owns the current route, or
+ * `null` when no empresa is active (e.g. Inicio `/` or `/settings/*`).
+ *
+ * Unlike `getActiveSection`, this also matches empresa items WITHOUT sub-items
+ * (Personas Físicas) and honors `matchPaths` (SANREN spans /health, /peptides,
+ * /servicios, /family). It's the source of "which empresa is in focus".
+ */
+export function getActiveEmpresaHref(pathname: string): string | null {
+  return (
+    NAV_ITEMS.find((item) => isEmpresaNavItem(item) && isItemActive(pathname, item))?.href ?? null
+  );
+}
+
 export function getSectionLabelKey(pathname: string) {
   return NAV_ITEMS.find((item) => isItemActive(pathname, item))?.labelKey ?? 'nav.overview';
 }

@@ -3,9 +3,11 @@ import {
   NAV_ITEMS,
   filterHiddenNavItems,
   flattenNavChildren,
+  getActiveEmpresaHref,
   getActiveSection,
   getSectionLabelKey,
   hasNavSubItems,
+  isEmpresaNavItem,
   isItemActive,
   matchesPath,
   type NavItem,
@@ -97,6 +99,43 @@ describe('getActiveSection', () => {
 
   it('returns null when path matches a top-level item without sub-items (overview)', () => {
     expect(getActiveSection('/')).toBe(null);
+  });
+});
+
+describe('isEmpresaNavItem', () => {
+  it('is true for switchable empresas (DILESA, RDB, SANREN, Personas Físicas)', () => {
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.href === '/dilesa')!)).toBe(true);
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.href === '/rdb')!)).toBe(true);
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.labelKey === 'SANREN')!)).toBe(true);
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.href === '/personas-fisicas')!)).toBe(true);
+  });
+
+  it('is false for Inicio (no empresa mapping) and Configuración (system bucket)', () => {
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.href === '/')!)).toBe(false);
+    expect(isEmpresaNavItem(NAV_ITEMS.find((i) => i.href === '/settings')!)).toBe(false);
+  });
+});
+
+describe('getActiveEmpresaHref', () => {
+  it('returns the empresa href for a route inside it', () => {
+    expect(getActiveEmpresaHref('/dilesa/ventas')).toBe('/dilesa');
+    expect(getActiveEmpresaHref('/rdb')).toBe('/rdb');
+  });
+
+  it('matches empresas without sub-items (Personas Físicas)', () => {
+    expect(getActiveEmpresaHref('/personas-fisicas')).toBe('/personas-fisicas');
+  });
+
+  it('honors SANREN matchPaths (/health, /servicios, /peptides → /family)', () => {
+    expect(getActiveEmpresaHref('/health/labs')).toBe('/family');
+    expect(getActiveEmpresaHref('/servicios')).toBe('/family');
+    expect(getActiveEmpresaHref('/peptides')).toBe('/family');
+  });
+
+  it('returns null on Inicio, Configuración, and unknown routes', () => {
+    expect(getActiveEmpresaHref('/')).toBe(null);
+    expect(getActiveEmpresaHref('/settings/acceso')).toBe(null);
+    expect(getActiveEmpresaHref('/unknown/route')).toBe(null);
   });
 });
 
