@@ -1,3 +1,14 @@
+// ==============================================================================
+// Auto-generated Supabase database types.
+// Last regenerated: 2026-06-22T12:43:24Z
+// Project ref: ybklderteyhuugzfmxbi
+// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides
+//
+// DO NOT EDIT BY HAND. Regenerate via:
+//   - GitHub Actions: trigger 'DB Types' workflow manually
+//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)
+// ==============================================================================
+
 export type Json =
   | string
   | number
