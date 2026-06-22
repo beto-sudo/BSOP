@@ -444,7 +444,6 @@ describe('calcularCuadratura', () => {
         aportacionPromocion: 15000, // usada para cubrir gastos
         engancheCliente: 35000, // FOVISSSTE: crédito cubre el precio → enganche completo a gastos
         engancheAlPrecio: 0, // nada del enganche se consume en el precio
-        pendienteCobranzaPrecio: 0, // crédito cubre el precio → nada pendiente
         sobreprecio: 24651, // productos capturados
         sobreprecioCobertura: 24651, // el que cubre el presupuesto
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
@@ -518,15 +517,13 @@ describe('calcularCuadratura', () => {
       expect(cob.pagareNecesario).toBe(0);
       expect(cob.saldoCobertura).toBe(0); // cuadra
       expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
-      // El enganche (156,943) no alcanza el saldo del precio (157,735): faltan 792
-      // por cobrar — a cargo del cliente, NO descuento de DILESA.
-      expect(cob.pendienteCobranzaPrecio).toBe(792);
-      // Identidad que amarra las cards: descuento real = aportación DILESA + pendiente.
-      // 13,361.42 = 12,569.42 (lo que cede DILESA) + 792 (cobranza pendiente).
+      // Descuento real = 13,361.42 < 15,000 → todo bono (promoción), sin sobreprecio.
+      // El "$17,953 de sobreprecio fantasma" del reporte original venía solo de los
+      // gastos inflados (62,161); con los gastos correctos del Anexo B (42,569.42) se va.
       expect(c.descuentoReal).toBe(13361.42);
-      expect(cob.aportacionPromocion + cob.sobreprecioCobertura + cob.pendienteCobranzaPrecio).toBe(
-        c.descuentoReal
-      );
+      const split = partirDescuento(c.descuentoReal, cob.promocion);
+      expect(split.promocion).toBe(13361.42);
+      expect(split.sobreprecio).toBe(0);
     });
 
     // Infonavit con enganche MAYOR que el saldo del precio: el excedente sí fondea

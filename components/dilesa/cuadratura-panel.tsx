@@ -111,45 +111,21 @@ export function CuadraturaPanel({
             label="(−) Crédito institución (titular + co-titular)"
             value={money(c.creditoInstitucion)}
           />
-          <div className="my-1 border-t border-dashed border-[var(--border)]" />
-          {(c.saldoPrecioEscrituracion ?? 0) > 0.5 && cob ? (
-            <>
-              <Fila
-                label="(=) Saldo del precio (a cargo del cliente)"
-                value={money(c.saldoPrecioEscrituracion)}
-                strong
-              />
-              <Fila label="(−) Enganche del cliente pagado" value={money(cob.engancheAlPrecio)} />
-              <div className="my-1 border-t border-[var(--border)]" />
-              <Fila
-                label={
-                  cob.pendienteCobranzaPrecio > 0.5
-                    ? '(=) Pendiente por cobrar al cliente'
-                    : '(=) Precio cubierto ✓'
-                }
-                value={money(cob.pendienteCobranzaPrecio)}
-                strong
-                tone={cob.pendienteCobranzaPrecio > 0.5 ? 'warn' : 'ok'}
-              />
-              <p className="mt-1 text-[11px] text-[var(--text)]/45">
-                {cob.pendienteCobranzaPrecio > 0.5
-                  ? 'Lo pendiente sigue a cargo del cliente (no es descuento de DILESA). Los gastos de escrituración se desglosan abajo.'
-                  : 'El precio queda cubierto entre crédito y enganche; los gastos de escrituración se desglosan abajo.'}
-              </p>
-            </>
-          ) : (
-            <>
-              <Fila
-                label="(=) Saldo del precio (cubierto)"
-                value={money(c.saldoPrecioEscrituracion)}
-                strong
-                tone="ok"
-              />
-              <p className="mt-1 text-[11px] text-[var(--text)]/45">
-                El precio lo cubre el crédito; los gastos de escrituración se desglosan abajo.
-              </p>
-            </>
-          )}
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Fila
+            label={
+              (c.saldoPrecioEscrituracion ?? 0) <= 0
+                ? '(=) Saldo del precio (cubierto)'
+                : '(=) Saldo del precio (a cargo del cliente)'
+            }
+            value={money(c.saldoPrecioEscrituracion)}
+            strong
+            tone={(c.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : undefined}
+          />
+          <p className="mt-1 text-[11px] text-[var(--text)]/45">
+            El precio lo cubren el crédito y el enganche del cliente; los gastos de escrituración se
+            desglosan abajo.
+          </p>
         </Bloque>
       ) : (
         <Bloque titulo="Cobertura de la operación">
@@ -216,15 +192,10 @@ export function CuadraturaPanel({
           />
           {cob.engancheAlPrecio > 0 ? (
             <p className="mt-1 text-[11px] text-[var(--text)]/45">
-              El enganche del cliente ({money(cob.engancheAlPrecio + cob.engancheCliente)}) se
-              aplica primero al saldo del precio ({money(cob.engancheAlPrecio)}, ver arriba); aquí
-              solo cuenta el excedente que fondea los gastos.
+              El enganche del cliente ({money(cob.engancheAlPrecio + cob.engancheCliente)}) cubre
+              primero el precio; aquí solo cuenta el excedente que fondea los gastos.
             </p>
           ) : null}
-          <p className="mt-1 text-[11px] text-[var(--text)]/45">
-            Gastos = gastos de titulación + impuestos y derechos (Anexo B del dictamen notarial). El
-            costo del avalúo lo paga el cliente por separado y no entra aquí.
-          </p>
         </Bloque>
       ) : null}
 
