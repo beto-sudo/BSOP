@@ -50,6 +50,10 @@ export function construirVentasPeriodo(
 ): VentasPeriodoResult {
   const filtradas = rows.filter((r) => {
     if (!r.numeroEscritura || !r.fechaEscritura) return false; // solo escrituradas
+    // Excluir ventas no vigentes (desasignada/expirada): una venta que se soltó
+    // conserva su número de escritura en la fila, pero no es un cierre del
+    // periodo. Sin esto, una venta desasignada con escritura basura infla el conteo.
+    if (r.estado !== 'activa' && r.estado !== 'terminada') return false;
     if (filtros.desde && r.fechaEscritura < filtros.desde) return false;
     if (filtros.hasta && r.fechaEscritura > filtros.hasta) return false;
     if (filtros.proyecto && r.proyectoId !== filtros.proyecto) return false;
