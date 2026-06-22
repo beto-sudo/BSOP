@@ -17,9 +17,9 @@ Atención a Clientes, y se sube el documento firmado.
 
 - **Fase 14 (Preparada para Entrega) cerrada.**
 - **Fase 12 (Detonada) cerrada — el pago ya recibido.** No se entrega la vivienda
-  sin que haya entrado el pago. Si falta, la pantalla lo bloquea con un aviso y un
-  atajo para registrar el abono en el estado de cuenta; al detonarse el crédito se
-  desbloquea la entrega.
+  sin que haya entrado el pago. Si falta, la pantalla lo bloquea con un aviso. El
+  pago lo registra **Cobranza** (no es paso de Atención a Clientes); al detonarse
+  el crédito la entrega se desbloquea sola.
 
 > Este pendiente aparece en la bandeja de **Atención a Clientes** (cola
 > "Entrega"), que te trae directo a esta pantalla. Si todavía falta el pago, la

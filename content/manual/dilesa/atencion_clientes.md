@@ -68,10 +68,10 @@ Porque su pre-entrega (Fase 14) ya se cerró. Las colas siguen el orden del
 proceso: una venta baja a la siguiente cola conforme cierras su fase.
 
 **Una venta en "Entrega" dice "Falta pago". ¿Qué hago?**
-La pre-entrega ya está, pero todavía no se registra el pago (la **Fase 12,
-Detonada**). No se puede entregar la vivienda sin el pago: registra el abono de
-la institución en el estado de cuenta de la venta y, al detonarse el crédito, la
-entrega se desbloquea sola.
+La pre-entrega ya está, pero todavía no entra el pago (la **Fase 12, Detonada**).
+No se puede entregar la vivienda sin el pago, y ese registro **no es tuyo**: lo
+hace **Cobranza** cuando recibe el depósito de la institución. En cuanto se
+detone el crédito, la venta se desbloquea sola y podrás cerrar la entrega.
 
 **Marqué una obra como recibida pero sigue en "Obras por recibir".**
 Revisa que hayas subido el **acta firmada escaneada** en la obra: es obligatoria

@@ -239,17 +239,17 @@ function CapturarFase15Body() {
           title="Falta el pago (Fase 12 — Detonada)"
           body={
             <>
-              No se puede entregar la vivienda sin haber recibido el pago. Registra el abono de la
-              institución en el estado de cuenta; al detonarse el crédito (Fase 12) se desbloquea la
-              entrega.
+              No se puede entregar la vivienda sin haber recibido el pago. El pago lo registra
+              Cobranza cuando entra el depósito de la institución; al detonarse el crédito (Fase 12)
+              la entrega se desbloquea sola.
             </>
           }
           extra={
             <Link
-              href={`/dilesa/ventas/${venta.id}?abono=1`}
+              href={`/dilesa/ventas/${venta.id}`}
               className="mt-3 inline-block text-sm font-medium text-[var(--accent)] underline"
             >
-              Registrar abono en el estado de cuenta
+              Volver al detalle
             </Link>
           }
         />
