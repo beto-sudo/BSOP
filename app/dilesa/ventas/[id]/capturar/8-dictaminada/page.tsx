@@ -61,6 +61,10 @@ type VentaCtx = {
   monto_credito_cotitular: number | null;
   gastos_escrituracion: number | null;
   valor_escrituracion: number | null;
+  // Re-firma de documentos (ADR-048 D5): si el precio dictaminado difiere del que
+  // tienen los documentos firmados vigentes, hay que re-firmar Solicitud + Promesa.
+  precio_asignacion: number | null;
+  precio_documentos_firmados: number | null;
   // Crédito directo (pagaré) — se captura aquí desde el rediseño ADR-048.
   monto_credito_directo: number | null;
   cd_plan_pagos: PlanPagoJson[] | null;
@@ -133,6 +137,11 @@ function CapturarFase8Body() {
   // El crédito directo (pagaré) reporta su estado "guardado" para el gate del
   // cierre de la fase cuando hay saldo.
   const [cdGuardado, setCdGuardado] = useState(false);
+  // Re-firma de documentos (ADR-048 D5): los 2 PDF firmados que sube el gerente
+  // cuando el precio dictaminado cambió respecto al de los documentos firmados.
+  const [archivoSolicitudRef, setArchivoSolicitudRef] = useState<File | null>(null);
+  const [archivoPromesaRef, setArchivoPromesaRef] = useState<File | null>(null);
+  const [confirmandoRefirma, setConfirmandoRefirma] = useState(false);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
   const [fase7Cerrada, setFase7Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
@@ -297,7 +306,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, empresa_id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -395,6 +404,22 @@ function CapturarFase8Body() {
           title: 'Falta configurar el crédito directo',
           description:
             'Hay un saldo por cubrir. Guarda el crédito directo (pagaré) antes de cerrar la fase.',
+          type: 'error',
+        });
+        return;
+      }
+      // Re-firma pendiente (ADR-048 D5): si el precio dictaminado difiere del de los
+      // documentos firmados, no se avanza hasta re-firmar Solicitud + Promesa.
+      const valorN = Number(valorEscrituracion) || 0;
+      if (
+        venta.precio_documentos_firmados != null &&
+        valorN > 0 &&
+        Math.abs(valorN - venta.precio_documentos_firmados) > 0.5
+      ) {
+        toast.add({
+          title: 'Re-firma de documentos pendiente',
+          description:
+            'El precio cambió: re-firma la Solicitud y la Promesa con el precio nuevo antes de avanzar.',
           type: 'error',
         });
         return;
@@ -582,6 +607,112 @@ function CapturarFase8Body() {
     ]
   );
 
+  // Re-firma de documentos (ADR-048 D5): sube los 2 documentos firmados nuevos,
+  // marca los anteriores como sustituidos (no se borran — auditoría LFPIORPI) y
+  // actualiza el snapshot al precio dictaminado para que no se vuelva a pedir.
+  const confirmarRefirma = useCallback(async () => {
+    if (!venta) return;
+    const valorNum = Number(valorEscrituracion) || 0;
+    if (valorNum <= 0) return;
+    if (!archivoSolicitudRef || !archivoPromesaRef) {
+      toast.add({
+        title: 'Faltan los documentos firmados',
+        description: 'Sube la Solicitud de Asignación y la Promesa de Compraventa firmadas.',
+        type: 'error',
+      });
+      return;
+    }
+    setConfirmandoRefirma(true);
+    const { data: userRes } = await sb.auth.getUser();
+    const userId = userRes?.user?.id ?? null;
+
+    // 1. Documentos vigentes (no sustituidos) de estos 2 roles = los que se reemplazan.
+    const { data: vigentes } = await sb
+      .schema('erp')
+      .from('adjuntos')
+      .select('id')
+      .eq('entidad_tipo', 'venta')
+      .eq('entidad_id', venta.id)
+      .in('rol', ['solicitud_asignacion', 'contrato_promesa'])
+      .is('sustituido_at', null);
+    const idsViejos = (vigentes ?? []).map((a) => a.id as string);
+
+    // 2. Subir los 2 documentos nuevos.
+    const subir = async (archivo: File, rol: string): Promise<boolean> => {
+      const path = buildAdjuntoPath({
+        empresa: 'dilesa',
+        entidad: 'ventas',
+        entidadId: venta.id,
+        filename: archivo.name,
+      });
+      const { error: upErr } = await sb.storage
+        .from('adjuntos')
+        .upload(path, archivo, { contentType: archivo.type || 'application/pdf', upsert: false });
+      if (upErr) return false;
+      const { error: insErr } = await sb
+        .schema('erp')
+        .from('adjuntos')
+        .insert({
+          empresa_id: DILESA_EMPRESA_ID,
+          entidad_tipo: 'venta',
+          entidad_id: venta.id,
+          rol,
+          nombre: archivo.name,
+          url: path,
+          tipo_mime: archivo.type || null,
+          tamano_bytes: archivo.size,
+          uploaded_by: userId,
+        });
+      return !insErr;
+    };
+    const okS = await subir(archivoSolicitudRef, 'solicitud_asignacion');
+    const okP = await subir(archivoPromesaRef, 'contrato_promesa');
+    if (!okS || !okP) {
+      setConfirmandoRefirma(false);
+      toast.add({
+        title: 'No se pudieron subir los documentos',
+        description: 'Intenta de nuevo.',
+        type: 'error',
+      });
+      return;
+    }
+
+    // 3. Marcar los anteriores como sustituidos (siguen en el expediente).
+    if (idsViejos.length > 0) {
+      await sb
+        .schema('erp')
+        .from('adjuntos')
+        .update({ sustituido_at: new Date().toISOString() })
+        .in('id', idsViejos);
+    }
+
+    // 4. Snapshot = precio dictaminado (cierra la re-firma) + persiste el valor.
+    const { error: upVErr } = await sb
+      .schema('dilesa')
+      .from('ventas')
+      .update({ precio_documentos_firmados: valorNum, valor_escrituracion: valorNum })
+      .eq('id', venta.id);
+    setConfirmandoRefirma(false);
+    if (upVErr) {
+      toast.add({
+        title: 'No se pudo cerrar la re-firma',
+        description: getSupabaseErrorMessage(upVErr, 'Error desconocido.'),
+        type: 'error',
+      });
+      return;
+    }
+    setVenta((v) =>
+      v ? { ...v, precio_documentos_firmados: valorNum, valor_escrituracion: valorNum } : v
+    );
+    setArchivoSolicitudRef(null);
+    setArchivoPromesaRef(null);
+    toast.add({
+      title: 'Re-firma confirmada',
+      description: 'Documentos actualizados con el precio nuevo. Ya puedes avanzar la fase.',
+      type: 'success',
+    });
+  }, [archivoPromesaRef, archivoSolicitudRef, sb, toast, valorEscrituracion, venta]);
+
   // Gate de Dirección (ADR-048): solo Dirección (o admin) cuadra y cierra la
   // fase. Gerencia sube el dictamen + pre-llena, pero el cierre lo hace Dirección.
   const esDireccion =
@@ -592,6 +723,14 @@ function CapturarFase8Body() {
   const cobGastos = cuadratura?.coberturaGastos ?? null;
   const saldoCD = cobGastos ? cobGastos.pagareNecesario : 0;
   const aplicaCD = saldoCD > 0.0049;
+
+  // Re-firma de documentos (ADR-048 D5): el precio dictaminado capturado difiere
+  // del que tienen los documentos firmados vigentes → hay que re-firmar Solicitud
+  // + Promesa antes de avanzar. El snapshot se actualiza al confirmar la re-firma.
+  const valorEscrNum = Number(valorEscrituracion) || 0;
+  const precioDocs = venta?.precio_documentos_firmados ?? null;
+  const precioCambio =
+    valorEscrNum > 0 && precioDocs != null && Math.abs(valorEscrNum - precioDocs) > 0.5;
 
   if (loading) {
     return (
@@ -613,6 +752,73 @@ function CapturarFase8Body() {
       </div>
     );
   }
+
+  // Re-firma de documentos (ADR-048 D5): solo cuando el precio dictaminado difiere
+  // del de los documentos firmados. Se reusa en ambos forms (cierre y "ya cerrada").
+  const refirmaSection = precioCambio ? (
+    <Section title="Re-firma de documentos requerida">
+      <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+        El precio cambió de <strong>{money(precioDocs ?? 0)}</strong> a{' '}
+        <strong>{money(valorEscrNum)}</strong>. La Solicitud de Asignación y la Promesa de
+        Compraventa firmadas quedaron desactualizadas — re-fírmalas con el precio nuevo antes de
+        avanzar la fase.
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <a
+          href={`/api/dilesa/ventas/${venta.id}/pdf/solicitud-asignacion`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
+        >
+          <Upload className="h-3.5 w-3.5" /> Imprimir Solicitud (precio nuevo)
+        </a>
+        <a
+          href={`/api/dilesa/ventas/${venta.id}/pdf/promesa-compraventa`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
+        >
+          <Upload className="h-3.5 w-3.5" /> Imprimir Promesa (precio nuevo)
+        </a>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <FileSlot
+          label="Solicitud de Asignación firmada *"
+          archivo={archivoSolicitudRef}
+          onChange={setArchivoSolicitudRef}
+        />
+        <FileSlot
+          label="Promesa de Compraventa firmada *"
+          archivo={archivoPromesaRef}
+          onChange={setArchivoPromesaRef}
+        />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          onClick={confirmarRefirma}
+          disabled={
+            confirmandoRefirma || !esDireccion || !archivoSolicitudRef || !archivoPromesaRef
+          }
+        >
+          {confirmandoRefirma ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" /> Confirmando…
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 size-4" /> Confirmar re-firma
+            </>
+          )}
+        </Button>
+        {!esDireccion ? (
+          <span className="text-xs text-amber-700 dark:text-amber-300">
+            Solo Dirección confirma la re-firma.
+          </span>
+        ) : null}
+      </div>
+    </Section>
+  ) : null;
 
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -743,6 +949,8 @@ function CapturarFase8Body() {
                 />
               </Section>
             ) : null}
+
+            {refirmaSection}
 
             <div className="flex items-center justify-end gap-3">
               {!esDireccion ? (
@@ -941,6 +1149,8 @@ function CapturarFase8Body() {
               />
             </Section>
           ) : null}
+
+          {refirmaSection}
 
           <div className="flex items-center justify-end gap-3">
             {!esDireccion ? (
