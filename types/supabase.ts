@@ -303,6 +303,7 @@ export type Database = {
           color_primario_dark: string | null
           color_secundario: string | null
           color_texto_titulo: string | null
+          compras_emision_requiere_direccion: boolean
           config_inventario: Json
           created_at: string | null
           csf_fecha_emision: string | null
@@ -363,6 +364,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          compras_emision_requiere_direccion?: boolean
           config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          compras_emision_requiere_direccion?: boolean
           config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
@@ -5366,6 +5369,7 @@ export type Database = {
           productos_adicionales: number
           promocion_gastos_monto: number | null
           promocion_id: string | null
+          sobreprecio_gastos_escrituracion: number
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -5463,6 +5467,7 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          sobreprecio_gastos_escrituracion?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -5560,6 +5565,7 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          sobreprecio_gastos_escrituracion?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -6090,16 +6096,28 @@ export type Database = {
         Args: { p_construccion_id: string }
         Returns: number
       }
-      fn_calcular_precio_venta: {
-        Args: {
-          p_monto_credito_cotitular?: number
-          p_monto_credito_titular?: number
-          p_productos_adicionales?: number
-          p_tipo_credito_id?: string
-          p_unidad_id: string
-        }
-        Returns: Json
-      }
+      fn_calcular_precio_venta:
+        | {
+            Args: {
+              p_monto_credito_cotitular?: number
+              p_monto_credito_titular?: number
+              p_productos_adicionales?: number
+              p_tipo_credito_id?: string
+              p_unidad_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_monto_credito_cotitular?: number
+              p_monto_credito_titular?: number
+              p_productos_adicionales?: number
+              p_sobreprecio_gastos_escrituracion?: number
+              p_tipo_credito_id?: string
+              p_unidad_id: string
+            }
+            Returns: Json
+          }
       fn_construccion_capturar_costo_materiales: {
         Args: { p_construccion_id: string; p_costo: number }
         Returns: undefined
