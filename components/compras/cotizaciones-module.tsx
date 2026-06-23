@@ -37,7 +37,7 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { FileAttachments } from '@/components/file-attachments';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage, toSupabaseError } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
@@ -117,9 +117,14 @@ function toNum(s: string): number {
 
 export function CotizacionesModule({ empresaId }: { empresaId: string }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const toast = useToast();
   const puedeEscribir =
     permissions.isAdmin || permissions.modulos.get('dilesa.compras.cotizaciones')?.write === true;
+  // Adjudicar = donde se compromete el dinero → solo Dirección/admin (D1,
+  // iniciativa dilesa-compras-flujo). Capturar precios sigue abierto a gerencias.
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
 
   const [rows, setRows] = useState<CotizacionRowUI[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoOption[]>([]);
@@ -852,6 +857,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
           empresaId={empresaId}
           empresaSlug="dilesa"
           puedeEscribir={puedeEscribir}
+          esDireccion={esDireccion}
           proveedoresDisponibles={proveedores}
           onClose={() => setCapturaId(null)}
           onSaved={() => {
@@ -902,6 +908,7 @@ function CapturaPrecios({
   empresaId,
   empresaSlug,
   puedeEscribir,
+  esDireccion,
   proveedoresDisponibles,
   onClose,
   onSaved,
@@ -912,6 +919,7 @@ function CapturaPrecios({
   empresaId: string;
   empresaSlug: EmpresaSlug;
   puedeEscribir: boolean;
+  esDireccion: boolean;
   proveedoresDisponibles: ProveedorOption[];
   onClose: () => void;
   onSaved: () => void;
@@ -1143,6 +1151,9 @@ function CapturaPrecios({
   // marca la cotización 'adjudicada' y a los proveedores elegida/descartada.
   async function adjudicar(cotProveedorId: string) {
     setConfirmAdjId(null);
+    // Candado de dinero (D1): solo Dirección/admin adjudica. Guard defensivo
+    // además del gate visual — la adjudicación emite la OC y compromete.
+    if (!esDireccion) return;
     setAdjudicandoId(cotProveedorId);
     const sb = createSupabaseBrowserClient();
     const prov = cotizacion.proveedores.find((p) => p.id === cotProveedorId);
@@ -1162,7 +1173,10 @@ function CapturaPrecios({
             codigo: folio,
             cotizacion_id: cotizacion.id,
             proveedor_id: prov.proveedorId,
-            estado: 'borrador',
+            // Adjudicar = autorizar = emitir en un acto (D2): la OC nace
+            // `enviada` (compromete presupuesto), sin paso de re-autorización.
+            estado: 'enviada',
+            autorizada_at: new Date().toISOString(),
             total,
           })
           .select('id')
@@ -1260,7 +1274,7 @@ function CapturaPrecios({
         title: 'Cotización adjudicada',
         description:
           adjudicaA(cotizacion.tipo) === 'oc'
-            ? 'Orden de compra generada (borrador)'
+            ? 'Orden de compra emitida'
             : 'Contrato de obra generado',
         type: 'success',
       });
@@ -1515,8 +1529,20 @@ function CapturaPrecios({
         </div>
       </div>
 
-      {/* Comparación + adjudicación: ranking por total, elige el ganador → OC o contrato */}
-      {puedeAdjudicar(cotizacion) ? (
+      {/* Para quien captura pero no es Dirección: la RFQ ya está lista, pero
+          adjudicar/emitir la OC le toca a Dirección (D1). */}
+      {!esDireccion && puedeAdjudicar(cotizacion) ? (
+        <div className="mt-5 border-t border-[var(--border)] pt-4">
+          <p className="text-sm text-[var(--text)]/60">
+            Lista para adjudicar. La adjudicación —y la emisión de la orden de compra— la realiza
+            Dirección.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Comparación + adjudicación: ranking por total, elige el ganador → OC o contrato.
+          Solo Dirección/admin adjudica (D1); para los demás se muestra la nota de arriba. */}
+      {esDireccion && puedeAdjudicar(cotizacion) ? (
         <div className="mt-5 border-t border-[var(--border)] pt-4">
           <p className="mb-2 text-sm font-medium text-[var(--text)]/70">
             Adjudicar — genera{' '}
