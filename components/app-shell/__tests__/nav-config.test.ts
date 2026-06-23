@@ -33,9 +33,10 @@ describe('isItemActive', () => {
     expect(isItemActive('/dilesa/proveedores', item)).toBe(false);
   });
 
-  it('honors matchPaths overrides (SANREN matches /family and /health)', () => {
+  it('honors matchPaths overrides (SANREN matches /sanren, /family and /health)', () => {
     const sanren = NAV_ITEMS.find((i) => i.labelKey === 'SANREN')!;
     expect(isItemActive('/health/labs', sanren)).toBe(true);
+    expect(isItemActive('/sanren', sanren)).toBe(true);
     expect(isItemActive('/family/members', sanren)).toBe(true);
     expect(isItemActive('/rdb', sanren)).toBe(false);
   });
@@ -47,13 +48,13 @@ describe('hasNavSubItems', () => {
     expect(hasNavSubItems(NAV_ITEMS.find((i) => i.href === '/rdb')!)).toBe(true);
   });
 
-  it('returns true for items with flat children (Settings, SANREN)', () => {
+  it('returns true for items with flat children (Settings)', () => {
     expect(hasNavSubItems(NAV_ITEMS.find((i) => i.href === '/settings')!)).toBe(true);
-    expect(hasNavSubItems(NAV_ITEMS.find((i) => i.labelKey === 'SANREN')!)).toBe(true);
   });
 
-  it('returns false for items with neither (overview, personas-fisicas)', () => {
+  it('returns false for items with neither (overview, SANREN, personas-fisicas)', () => {
     expect(hasNavSubItems(NAV_ITEMS.find((i) => i.href === '/')!)).toBe(false);
+    expect(hasNavSubItems(NAV_ITEMS.find((i) => i.labelKey === 'SANREN')!)).toBe(false);
     expect(hasNavSubItems(NAV_ITEMS.find((i) => i.href === '/personas-fisicas')!)).toBe(false);
   });
 });
@@ -126,10 +127,11 @@ describe('getActiveEmpresaHref', () => {
     expect(getActiveEmpresaHref('/personas-fisicas')).toBe('/personas-fisicas');
   });
 
-  it('honors SANREN matchPaths (/health, /servicios, /peptides → /family)', () => {
-    expect(getActiveEmpresaHref('/health/labs')).toBe('/family');
-    expect(getActiveEmpresaHref('/servicios')).toBe('/family');
-    expect(getActiveEmpresaHref('/peptides')).toBe('/family');
+  it('honors SANREN matchPaths (/health, /servicios, /peptides → /sanren)', () => {
+    expect(getActiveEmpresaHref('/health/labs')).toBe('/sanren');
+    expect(getActiveEmpresaHref('/servicios')).toBe('/sanren');
+    expect(getActiveEmpresaHref('/peptides')).toBe('/sanren');
+    expect(getActiveEmpresaHref('/family')).toBe('/sanren');
   });
 
   it('returns null on Inicio, Configuración, and unknown routes', () => {
@@ -161,7 +163,7 @@ describe('filterHiddenNavItems', () => {
 
   it('hides SANREN when its nav slug is in the denylist', () => {
     const out = filterHiddenNavItems(NAV_ITEMS, new Set(['sanren']));
-    expect(slugOf(out)).not.toContain('/family');
+    expect(slugOf(out)).not.toContain('/sanren');
     // Other empresas stay.
     expect(slugOf(out)).toContain('/dilesa');
     expect(slugOf(out)).toContain('/rdb');
@@ -175,7 +177,7 @@ describe('filterHiddenNavItems', () => {
   it('hides multiple items at once and keeps the rest', () => {
     const out = filterHiddenNavItems(NAV_ITEMS, new Set(['sanren', 'personas_fisicas']));
     const hrefs = slugOf(out);
-    expect(hrefs).not.toContain('/family');
+    expect(hrefs).not.toContain('/sanren');
     expect(hrefs).not.toContain('/personas-fisicas');
     expect(hrefs).toContain('/'); // Inicio (no slug) is never hidden
     expect(hrefs).toContain('/dilesa');

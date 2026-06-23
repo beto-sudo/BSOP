@@ -27,7 +27,7 @@ export type NavIconKey =
  * Top-level nav entry. Has either `children` (flat list, no grouping) or
  * `sections` (grouped by labeled section). Mutually exclusive.
  *
- * - `children`: e.g. SANREN, Settings — small entries without grouping.
+ * - `children`: e.g. Settings — small entries without grouping.
  * - `sections`: e.g. DILESA, RDB — empresas with multiple module groups
  *   (Administración, RRHH, etc.). Sections with empty `children` after
  *   permission filtering are hidden by the sidebar render.
@@ -176,16 +176,10 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'id-card',
   },
   {
-    href: '/family',
+    href: '/sanren',
     labelKey: 'SANREN',
     icon: 'sanren-logo',
-    matchPaths: ['/family', '/health', '/peptides', '/servicios'],
-    children: [
-      { label: 'Salud', href: '/health' },
-      { label: 'Péptidos', href: '/peptides' },
-      { label: 'Servicios', href: '/servicios' },
-      { label: 'Familia', href: '/family' },
-    ],
+    matchPaths: ['/sanren', '/family', '/health', '/peptides', '/servicios'],
   },
   {
     href: '/settings',
@@ -206,7 +200,7 @@ export const NAV_ITEMS: NavItem[] = [
 export const NAV_TO_EMPRESA: Record<string, string> = {
   '/dilesa': 'dilesa',
   '/rdb': 'rdb',
-  '/family': 'sanren',
+  '/sanren': 'sanren',
   '/personas-fisicas': 'personas_fisicas',
   '/settings': 'settings',
 };
@@ -282,7 +276,7 @@ export function isEmpresaNavItem(item: NavItem): boolean {
  *
  * Unlike `getActiveSection`, this also matches empresa items WITHOUT sub-items
  * (Personas Físicas) and honors `matchPaths` (SANREN spans /health, /peptides,
- * /servicios, /family). It's the source of "which empresa is in focus".
+ * /servicios, /family, /sanren). It's the source of "which empresa is in focus".
  */
 export function getActiveEmpresaHref(pathname: string): string | null {
   return (

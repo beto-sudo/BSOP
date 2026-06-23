@@ -234,8 +234,9 @@ describe('route maps', () => {
     expect(ROUTE_TO_MODULE['/settings/acceso']).toBe('settings.acceso');
   });
 
-  it('maps nav hrefs to empresa slugs (family/travel/health/peptides all → sanren)', () => {
+  it('maps nav hrefs to empresa slugs (sanren/family/travel/health/peptides all → sanren)', () => {
     expect(ROUTE_TO_EMPRESA['/rdb']).toBe('rdb');
+    expect(ROUTE_TO_EMPRESA['/sanren']).toBe('sanren');
     expect(ROUTE_TO_EMPRESA['/family']).toBe('sanren');
     expect(ROUTE_TO_EMPRESA['/travel']).toBe('sanren');
     expect(ROUTE_TO_EMPRESA['/health']).toBe('sanren');
