@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón candado + avisos es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (`components/compras/*`, `components/gasto/te-toca-strip.tsx`, `app/api/cron/daily-task-summary`, `lib/task-summary-email`). Lectura de `erp` (cotizaciones/requisiciones/órdenes/partidas para el correo y los conteos) y `core` (gating de Dirección vía `usuarios_empresas`+`roles`; resolución de destinatarios del correo). **Sin cambios de modelo en Sprints 1-2.** Sprint 3 (opcional, con `blindaje-financiero`) agrega RPC de adjudicación/emisión con `audit_log`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 (sección "Compras por autorizar" + "Tus solicitudes" en el correo diario) en revisión de Beto (preview enviado); luego Sprint 3 (blindaje server-side del candado, con `blindaje-financiero`)
+**Próximo hito:** Sprint 3 — migración del guard server-side de emisión de OC (`erp.fn_guard_oc_emision` + flag `core.empresas`) escrita y validándose en el Supabase Preview; pendiente OK de Beto para aplicar a prod (cambio financiero)
 **Dueño:** Beto
 **Creada:** 2026-06-22
-**Última actualización:** 2026-06-22 (S1 mergeado #986; S2 construido y en revisión)
+**Última actualización:** 2026-06-23 (S1 #986 + S2 #987 mergeados; S3 migración escrita)
 
 ## Problema
 
@@ -177,3 +177,22 @@ dinero, y que los pendientes lleguen solos a quien los resuelve.**
   queda sin auto-merge; al mergear, las secciones salen en la corrida de la
   mañana siguiente. `TASK_SUMMARY_TEST_TO` permite una prueba dirigida antes.
   Próximo: Sprint 3 (blindaje server-side del candado).
+- **2026-06-23 — Sprint 2 mergeado (#987).** Avisos de compras en el correo
+  diario en prod (los dos cortes — "Compras por autorizar" a Dirección/admin y
+  "Tus solicitudes" al solicitante — salen en la corrida de las 07:00 CST).
+- **2026-06-23 — Sprint 3 (blindaje server-side) — migración escrita,
+  pendiente de aplicar a prod.** Cierra el hueco de que el candado de S1 vivía
+  solo en UI (RLS de `erp.ordenes_compra` permite a cualquier miembro de la
+  empresa hacer UPDATE de `estado`). Enfoque elegido: **trigger BEFORE
+  INSERT/UPDATE** `erp.fn_guard_oc_emision` (no RPC + rewiring) que cubre los 3
+  caminos de emisión (adjudicar, OC directa, marcar enviada) en un punto, sin
+  tocar UI. Gobernado por **flag nuevo `core.empresas.compras_emision_requiere_direccion`**
+  (true solo en DILESA → RDB y demás intactas; alinea con rollout-multiempresa).
+  Gate = `core.fn_is_admin() OR core.fn_user_has_role('Dirección', empresa)`
+  (mismo patrón que `cxp_pago_aprobar`); solo aplica a `auth.role()='authenticated'`
+  (service_role y migraciones pasan). Audita cada emisión en `core.audit_log`
+  (accion `oc_emitida`). Migración `20260623034751`. La recepción
+  (enviada→parcial/cerrada) y los borradores no disparan el guard. **Pendiente:
+  OK de Beto para aplicar a prod** (cambio financiero) → luego repair del ledger
+  - regen SCHEMA_REF/types. Follow-up opcional: guard espejo para el contrato de
+    obra (`dilesa.contratos_construccion`, otra ruta de compromiso por ADR-042).
