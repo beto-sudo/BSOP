@@ -696,6 +696,40 @@ function CapturarFase8Body() {
                 </Field>
               </div>
             </Section>
+
+            {/* Cuadratura + crédito directo también con la fase ya cerrada
+                (ADR-048): Dirección cuadra el pagaré con los datos reales del
+                dictamen. El crédito directo se guarda aparte (su propio botón). */}
+            {cuadratura ? (
+              <Section title="Cuadratura de la operación">
+                <CuadraturaPanel
+                  cuadratura={cuadratura}
+                  valorEscrituracion={Number(valorEscrituracion) || venta.valor_escrituracion}
+                  chequeCapturado={false}
+                  hayFacturaCfdi={false}
+                />
+              </Section>
+            ) : null}
+
+            {aplicaCD ? (
+              <Section title="Crédito directo (DILESA financia el saldo)">
+                <CreditoDirectoCaptura
+                  ventaId={venta.id}
+                  saldo={saldoCD}
+                  inicial={{
+                    monto: venta.monto_credito_directo,
+                    plan: venta.cd_plan_pagos,
+                    tiie: venta.cd_tiie28_pct,
+                    spread: venta.cd_spread_ordinario_pct,
+                    fechaSuscripcion: venta.cd_fecha_suscripcion,
+                    avalNombre: venta.cd_aval_nombre,
+                    avalDomicilio: venta.cd_aval_domicilio,
+                  }}
+                  onGuardadoChange={setCdGuardado}
+                />
+              </Section>
+            ) : null}
+
             <div className="flex items-center justify-end gap-3">
               <Link
                 href={`/dilesa/ventas/${venta.id}`}
