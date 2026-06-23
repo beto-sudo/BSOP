@@ -303,6 +303,7 @@ export type Database = {
           color_primario_dark: string | null
           color_secundario: string | null
           color_texto_titulo: string | null
+          compras_emision_requiere_direccion: boolean
           config_inventario: Json
           created_at: string | null
           csf_fecha_emision: string | null
@@ -363,6 +364,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          compras_emision_requiere_direccion?: boolean
           config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           color_primario_dark?: string | null
           color_secundario?: string | null
           color_texto_titulo?: string | null
+          compras_emision_requiere_direccion?: boolean
           config_inventario?: Json
           created_at?: string | null
           csf_fecha_emision?: string | null
