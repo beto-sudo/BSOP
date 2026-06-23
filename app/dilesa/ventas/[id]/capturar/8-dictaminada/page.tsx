@@ -1,16 +1,13 @@
 'use client';
 
 /**
- * Captura Fase 8 — Dictaminada (Sprint 7f, fallback manual + análisis IA).
+ * Captura Fase 8 — Dictaminada (cierre financiero, ADR-048).
  *
- * Cierra la fase de Dictaminación: Gerencia Ventas captura manualmente
- * la Carta de Instrucción Notarial cuando el notario no usa el magic
- * link (notario sin email, notario que prefiere entregar en papel, etc.).
- *
- * El flujo principal es que el notario suba via magic link
- * (`/dilesa/notario/dictamen/<token>`), que cierra F8 automáticamente.
- * Esta page es el fallback — y el lugar donde Gerencia sube las
- * Condiciones Financieras y captura los números.
+ * Gerencia/notario suben la Carta de Instrucción + el Anexo B (por el magic
+ * link del notario o aquí), la IA pre-llena los números y **Dirección cuadra la
+ * operación, define el crédito directo (pagaré) y cierra la fase** — aquí están
+ * los datos reales del crédito y los gastos notariales. El magic link YA NO
+ * avanza la fase: solo sube el dictamen; el cierre lo controla Dirección.
  *
  * Captura:
  *   - PDF Carta de Instrucción Notarial (rol `carta_instruccion_notarial`)
@@ -44,9 +41,17 @@ import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { useEffectiveUser } from '@/components/providers';
+import { useVentaCapturaResumen } from '@/components/dilesa/venta-detalle/captura-shell';
+import { CuadraturaPanel } from '@/components/dilesa/cuadratura-panel';
+import {
+  CreditoDirectoCaptura,
+  type PlanPagoJson,
+} from '@/components/dilesa/captura/credito-directo-captura';
 
 type VentaCtx = {
   id: string;
+  empresa_id: string;
   persona_id: string;
   unidad_id: string | null;
   notario_id: string | null;
@@ -56,6 +61,14 @@ type VentaCtx = {
   monto_credito_cotitular: number | null;
   gastos_escrituracion: number | null;
   valor_escrituracion: number | null;
+  // Crédito directo (pagaré) — se captura aquí desde el rediseño ADR-048.
+  monto_credito_directo: number | null;
+  cd_plan_pagos: PlanPagoJson[] | null;
+  cd_tiie28_pct: number | null;
+  cd_spread_ordinario_pct: number | null;
+  cd_fecha_suscripcion: string | null;
+  cd_aval_nombre: string | null;
+  cd_aval_domicilio: string | null;
 };
 
 type Verificaciones = {
@@ -111,8 +124,15 @@ function CapturarFase8Body() {
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
+  // Resumen liviano del shell de captura → cuadratura completa + saldo del
+  // pagaré (ADR-048: el cierre financiero se cuadra aquí, con los datos reales).
+  const resumen = useVentaCapturaResumen();
+  const { data: me } = useEffectiveUser();
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
+  // El crédito directo (pagaré) reporta su estado "guardado" para el gate del
+  // cierre de la fase cuando hay saldo.
+  const [cdGuardado, setCdGuardado] = useState(false);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
   const [fase7Cerrada, setFase7Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
@@ -277,7 +297,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion'
+          'id, empresa_id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -356,10 +376,36 @@ function CapturarFase8Body() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
-      if (!archivo) {
+      // ADR-048: solo Dirección cuadra y cierra la dictaminación.
+      const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+      if (!esDir) {
+        toast.add({
+          title: 'Solo Dirección cierra la dictaminación',
+          description:
+            'Gerencia sube el dictamen y captura los datos; Dirección cuadra y avanza la fase.',
+          type: 'error',
+        });
+        return;
+      }
+      // Si la cuadratura arroja un saldo, el crédito directo (pagaré) debe estar
+      // guardado antes de cerrar — se captura aquí, con el saldo real del Anexo B.
+      const cob = resumen.status === 'ready' ? resumen.props.cuadratura.coberturaGastos : null;
+      if (cob && cob.pagareNecesario > 0.0049 && !cdGuardado) {
+        toast.add({
+          title: 'Falta configurar el crédito directo',
+          description:
+            'Hay un saldo por cubrir. Guarda el crédito directo (pagaré) antes de cerrar la fase.',
+          type: 'error',
+        });
+        return;
+      }
+      // El notario pudo subir la carta por el magic link (ADR-048: sin avanzar la
+      // fase). Si ya está cargada, Dirección cierra sin re-subirla.
+      const cartaYaSubida = adjuntosNotariales.some((a) => a.rol === 'carta_instruccion_notarial');
+      if (!archivo && !cartaYaSubida) {
         toast.add({
           title: 'Falta la Carta de Instrucción',
-          description: 'Sube el PDF entregado por el notario.',
+          description: 'Sube el PDF entregado por el notario (o pídele que lo suba por su enlace).',
           type: 'error',
         });
         return;
@@ -370,7 +416,7 @@ function CapturarFase8Body() {
       const userId = userRes?.user?.id ?? null;
 
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
-      const docs = [{ rol: 'carta_instruccion_notarial', archivo }];
+      const docs = archivo ? [{ rol: 'carta_instruccion_notarial', archivo }] : [];
       if (archivoCondiciones)
         docs.push({ rol: 'condiciones_financieras', archivo: archivoCondiciones });
       const result = await marcarFase(sb, {
@@ -417,6 +463,10 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      adjuntosNotariales,
+      cdGuardado,
+      me,
+      resumen,
       router,
       sb,
       toast,
@@ -433,6 +483,17 @@ function CapturarFase8Body() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
+      // ADR-048: solo Dirección modifica/cuadra la dictaminación, también con la
+      // fase ya cerrada.
+      const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+      if (!esDir) {
+        toast.add({
+          title: 'Solo Dirección modifica la dictaminación',
+          description: 'El cierre financiero (cuadratura, pagaré, datos) lo controla Dirección.',
+          type: 'error',
+        });
+        return;
+      }
       setSubmitting(true);
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
@@ -513,12 +574,24 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      me,
       router,
       sb,
       toast,
       venta,
     ]
   );
+
+  // Gate de Dirección (ADR-048): solo Dirección (o admin) cuadra y cierra la
+  // fase. Gerencia sube el dictamen + pre-llena, pero el cierre lo hace Dirección.
+  const esDireccion =
+    !!me?.isAdmin || (venta != null && (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id));
+  // Cuadratura + saldo del pagaré desde el motor (resumen del shell). El saldo es
+  // el faltante de gastos que cubre el crédito directo (igual que en la fase 10).
+  const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
+  const cobGastos = cuadratura?.coberturaGastos ?? null;
+  const saldoCD = cobGastos ? cobGastos.pagareNecesario : 0;
+  const aplicaCD = saldoCD > 0.0049;
 
   if (loading) {
     return (
@@ -636,14 +709,54 @@ function CapturarFase8Body() {
                 </Field>
               </div>
             </Section>
+
+            {/* Cuadratura + crédito directo también con la fase ya cerrada
+                (ADR-048): Dirección cuadra el pagaré con los datos reales del
+                dictamen. El crédito directo se guarda aparte (su propio botón). */}
+            {cuadratura ? (
+              <Section title="Cuadratura de la operación">
+                <CuadraturaPanel
+                  cuadratura={cuadratura}
+                  valorEscrituracion={Number(valorEscrituracion) || venta.valor_escrituracion}
+                  chequeCapturado={false}
+                  hayFacturaCfdi={false}
+                />
+              </Section>
+            ) : null}
+
+            {aplicaCD ? (
+              <Section title="Crédito directo (DILESA financia el saldo)">
+                <CreditoDirectoCaptura
+                  ventaId={venta.id}
+                  saldo={saldoCD}
+                  inicial={{
+                    monto: venta.monto_credito_directo,
+                    plan: venta.cd_plan_pagos,
+                    tiie: venta.cd_tiie28_pct,
+                    spread: venta.cd_spread_ordinario_pct,
+                    fechaSuscripcion: venta.cd_fecha_suscripcion,
+                    avalNombre: venta.cd_aval_nombre,
+                    avalDomicilio: venta.cd_aval_domicilio,
+                  }}
+                  onGuardadoChange={setCdGuardado}
+                  canWrite={esDireccion}
+                />
+              </Section>
+            ) : null}
+
             <div className="flex items-center justify-end gap-3">
+              {!esDireccion ? (
+                <span className="text-xs text-amber-700 dark:text-amber-300">
+                  Solo Dirección modifica la dictaminación.
+                </span>
+              ) : null}
               <Link
                 href={`/dilesa/ventas/${venta.id}`}
                 className="text-sm text-muted-foreground hover:text-[var(--text)]"
               >
                 Volver al detalle
               </Link>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || !esDireccion}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
@@ -791,21 +904,64 @@ function CapturarFase8Body() {
             </div>
           </Section>
 
+          {/* Cuadratura completa (ADR-048): Dirección cuadra aquí, con los datos
+              reales del dictamen. Refleja lo persistido — guarda los datos de
+              arriba para que se recalcule. */}
+          {cuadratura ? (
+            <Section title="Cuadratura de la operación">
+              <p className="mb-3 text-xs text-[var(--text)]/60">
+                Con el crédito y los gastos del dictamen. Si ajustas algo arriba, ciérrala y vuelve
+                a abrir para refrescar los números.
+              </p>
+              <CuadraturaPanel
+                cuadratura={cuadratura}
+                valorEscrituracion={Number(valorEscrituracion) || venta.valor_escrituracion}
+                chequeCapturado={false}
+                hayFacturaCfdi={false}
+              />
+            </Section>
+          ) : null}
+
+          {aplicaCD ? (
+            <Section title="Crédito directo (DILESA financia el saldo)">
+              <CreditoDirectoCaptura
+                ventaId={venta.id}
+                saldo={saldoCD}
+                inicial={{
+                  monto: venta.monto_credito_directo,
+                  plan: venta.cd_plan_pagos,
+                  tiie: venta.cd_tiie28_pct,
+                  spread: venta.cd_spread_ordinario_pct,
+                  fechaSuscripcion: venta.cd_fecha_suscripcion,
+                  avalNombre: venta.cd_aval_nombre,
+                  avalDomicilio: venta.cd_aval_domicilio,
+                }}
+                onGuardadoChange={setCdGuardado}
+                canWrite={esDireccion}
+              />
+            </Section>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3">
+            {!esDireccion ? (
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                Solo Dirección cierra la dictaminación.
+              </span>
+            ) : null}
             <Link
               href={`/dilesa/ventas/${venta.id}`}
               className="text-sm text-muted-foreground hover:text-[var(--text)]"
             >
               Cancelar
             </Link>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || !esDireccion}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 size-4" /> Guardar fase
+                  <Save className="mr-2 size-4" /> Cuadrar y cerrar fase
                 </>
               )}
             </Button>

@@ -232,40 +232,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     }
   }
 
+  // ADR-048: el magic link sube el dictamen y registra su fecha, pero YA NO
+  // avanza la fase. Dirección cuadra y cierra la fase 8 (la cuadratura + el
+  // pagaré se definen ahí, con los datos reales del Anexo B). Antes este endpoint
+  // hacía `fase_posicion = 8` + INSERT en `venta_fases`; se quitó para que el
+  // cierre financiero lo controle Dirección. La nota del notario se preserva en
+  // el adjunto / la captura de Gerencia.
+  void notas;
   const { error: vUpErr } = await admin
     .schema('dilesa')
     .from('ventas')
     .update({
       fecha_dictaminada: fecha,
-      fase_actual: 'Dictaminada',
-      fase_posicion: 8,
     })
     .eq('id', ventaId);
   if (vUpErr) {
     console.warn('[notario-dictamen-upload] ventas update error:', vUpErr.message);
     return NextResponse.json(
-      { ok: false, error: 'Archivo subido pero no se cerró la fase.' },
-      { status: 500 }
-    );
-  }
-
-  // ── 6. INSERT en venta_fases ──────────────────────────────────────────
-  const { error: fErr } = await admin
-    .schema('dilesa')
-    .from('venta_fases')
-    .insert({
-      empresa_id: DILESA_EMPRESA_ID,
-      venta_id: ventaId,
-      fase: 'Dictaminada',
-      posicion: 8,
-      fecha: new Date().toISOString().slice(0, 10),
-      registrado_por: null,
-      notas,
-    });
-  if (fErr) {
-    console.warn('[notario-dictamen-upload] venta_fases insert error:', fErr.message);
-    return NextResponse.json(
-      { ok: false, error: 'Datos guardados pero no se cerró la fase. Avisa a Gerencia.' },
+      { ok: false, error: 'Archivo subido pero no se registró la fecha del dictamen.' },
       { status: 500 }
     );
   }
