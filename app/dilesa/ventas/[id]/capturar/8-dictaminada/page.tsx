@@ -1,16 +1,13 @@
 'use client';
 
 /**
- * Captura Fase 8 — Dictaminada (Sprint 7f, fallback manual + análisis IA).
+ * Captura Fase 8 — Dictaminada (cierre financiero, ADR-048).
  *
- * Cierra la fase de Dictaminación: Gerencia Ventas captura manualmente
- * la Carta de Instrucción Notarial cuando el notario no usa el magic
- * link (notario sin email, notario que prefiere entregar en papel, etc.).
- *
- * El flujo principal es que el notario suba via magic link
- * (`/dilesa/notario/dictamen/<token>`), que cierra F8 automáticamente.
- * Esta page es el fallback — y el lugar donde Gerencia sube las
- * Condiciones Financieras y captura los números.
+ * Gerencia/notario suben la Carta de Instrucción + el Anexo B (por el magic
+ * link del notario o aquí), la IA pre-llena los números y **Dirección cuadra la
+ * operación, define el crédito directo (pagaré) y cierra la fase** — aquí están
+ * los datos reales del crédito y los gastos notariales. El magic link YA NO
+ * avanza la fase: solo sube el dictamen; el cierre lo controla Dirección.
  *
  * Captura:
  *   - PDF Carta de Instrucción Notarial (rol `carta_instruccion_notarial`)
@@ -402,10 +399,13 @@ function CapturarFase8Body() {
         });
         return;
       }
-      if (!archivo) {
+      // El notario pudo subir la carta por el magic link (ADR-048: sin avanzar la
+      // fase). Si ya está cargada, Dirección cierra sin re-subirla.
+      const cartaYaSubida = adjuntosNotariales.some((a) => a.rol === 'carta_instruccion_notarial');
+      if (!archivo && !cartaYaSubida) {
         toast.add({
           title: 'Falta la Carta de Instrucción',
-          description: 'Sube el PDF entregado por el notario.',
+          description: 'Sube el PDF entregado por el notario (o pídele que lo suba por su enlace).',
           type: 'error',
         });
         return;
@@ -416,7 +416,7 @@ function CapturarFase8Body() {
       const userId = userRes?.user?.id ?? null;
 
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
-      const docs = [{ rol: 'carta_instruccion_notarial', archivo }];
+      const docs = archivo ? [{ rol: 'carta_instruccion_notarial', archivo }] : [];
       if (archivoCondiciones)
         docs.push({ rol: 'condiciones_financieras', archivo: archivoCondiciones });
       const result = await marcarFase(sb, {
@@ -463,6 +463,7 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      adjuntosNotariales,
       cdGuardado,
       me,
       resumen,
