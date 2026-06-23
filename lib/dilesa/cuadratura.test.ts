@@ -411,7 +411,7 @@ describe('calcularCuadratura', () => {
         apoyoInfonavit: 0,
         precioBase: 899000,
         incrementoCredito: 55419,
-        sobreprecioAdicionales: 24651,
+        sobreprecioGastos: 24651,
         promocionGastos: 15000,
         depositos: [{ monto: 35000, directoCliente: true, tieneRecibo: true }],
         proyectoNombre: 'Lomas de la Loma Este',
@@ -465,7 +465,7 @@ describe('calcularCuadratura', () => {
         gastosEscrituracion: 48313,
         apoyoInfonavit: 30000,
         precioBase: 909000,
-        sobreprecioAdicionales: 0,
+        sobreprecioGastos: 0,
         promocionGastos: 15000,
         depositos: [],
       });
@@ -502,7 +502,7 @@ describe('calcularCuadratura', () => {
         apoyoInfonavit: 30000,
         precioBase: 920000,
         incrementoCredito: 0,
-        sobreprecioAdicionales: 0, // SIN sobreprecio
+        sobreprecioGastos: 0, // SIN sobreprecio
         promocionGastos: 15000,
         depositos: [{ monto: 156943, directoCliente: true, tieneRecibo: false }],
         proyectoNombre: 'Lomas de los Encinos',
@@ -538,7 +538,7 @@ describe('calcularCuadratura', () => {
         gastosEscrituracion: 87500, // bruto; apoyo 30,000 → neto 57,500
         apoyoInfonavit: 30000,
         precioBase: 1332652,
-        sobreprecioAdicionales: 0,
+        sobreprecioGastos: 0,
         promocionGastos: 15000,
         depositos: [{ monto: 65905, directoCliente: true, tieneRecibo: false }],
       });
@@ -571,7 +571,7 @@ describe('calcularCuadratura', () => {
         gastosEscrituracion: 48313,
         apoyoInfonavit: 30000,
         precioBase: 909000,
-        sobreprecioAdicionales: 0,
+        sobreprecioGastos: 0,
         promocionGastos: 15000,
         depositos: [],
       });
@@ -581,7 +581,7 @@ describe('calcularCuadratura', () => {
       expect(c.saldoOperacion).toBe(0); // nada pendiente
     });
 
-    it('expone la formación del precio (cadena base → incremento → interno → adicionales)', () => {
+    it('expone la formación del precio (cadena base → incremento → interno → productos + sobreprecio)', () => {
       const c = mayra();
       expect(c.formacionPrecio).toEqual({
         precioBase: 899000,
@@ -592,8 +592,9 @@ describe('calcularCuadratura', () => {
         geometria: 0,
         incrementoCredito: 55419,
         precioInterno: 954419, // 899,000 + 0 geom + 55,419
-        adicionales: 24651,
-        valorEscrituracion: 979070, // 954,419 + 24,651
+        productos: 0, // sin productos reales en MAYRA
+        sobreprecioGastos: 24651, // el sobreprecio para gastos
+        valorEscrituracion: 979070, // 954,419 + 0 productos + 24,651 sobreprecio
       });
     });
 
@@ -611,18 +612,17 @@ describe('calcularCuadratura', () => {
         valorExcedenteTerreno: 36700,
         valorEsquina: 67008,
         incrementoCredito: 131862.48,
-        sobreprecioAdicionales: 0,
+        sobreprecioGastos: 0,
         promocionGastos: 15000,
         depositos: [],
       });
       expect(c.formacionPrecio?.geometria).toBe(103708); // 36,700 + 67,008
       expect(c.formacionPrecio?.precioInterno).toBe(2329570.48); // base + geom + incremento
-      // base + geometría + incremento + sobreprecio = escrituración (cuadra)
+      // base + geometría + incremento + productos + sobreprecio = escrituración (cuadra)
       const fp = c.formacionPrecio!;
-      expect(fp.precioBase + fp.geometria + fp.incrementoCredito + fp.adicionales).toBeCloseTo(
-        fp.valorEscrituracion,
-        2
-      );
+      expect(
+        fp.precioBase + fp.geometria + fp.incrementoCredito + fp.productos + fp.sobreprecioGastos
+      ).toBeCloseTo(fp.valorEscrituracion, 2);
     });
 
     it('deriva el cierre con el valor real neto del cheque (fórmula Michelle/Ale)', () => {
@@ -648,11 +648,27 @@ describe('calcularCuadratura', () => {
       expect(c.montoNotaCredito).toBe(74651);
     });
 
-    it('comisiones sobre el valor real − productos adicionales (base Michelle/Ale)', () => {
+    it('comisiones sobre el valor real − sobreprecio para gastos (base Michelle/Ale)', () => {
       const c = mayra();
-      // base = valor real 939,419 − PA 24,651 = 914,768.
+      // base = valor real 939,419 − sobreprecio 24,651 = 914,768. El sobreprecio
+      // para gastos NO comisiona; los productos reales (0 aquí) SÍ comisionarían.
       expect(c.comisionVendedor).toBe(9147.68); // 914,768 × 1.0%
       expect(c.comisionGerencia).toBe(4573.84); // 914,768 × 0.5%
+    });
+
+    it('productos reales SÍ comisionan; el sobreprecio para gastos NO (separación 20260623)', () => {
+      // MAYRA + 30,000 de productos reales (closets), con el crédito subido para
+      // cubrirlos. valorReal = 1,009,070 + 35,000 − 84,038 + 9,387 = 969,419.
+      // base = valorReal − sobreprecio 24,651 = 944,768 (los 30,000 de productos
+      // NO se restan → comisionan; +300 vs el caso sin productos).
+      const c = mayra({
+        productosAdicionales: 30000,
+        valorEscrituracion: 1009070,
+        montoCreditoTitular: 1009070,
+      });
+      expect(c.comisionVendedor).toBe(9447.68); // 944,768 × 1.0% (= 9,147.68 + 300)
+      expect(c.formacionPrecio?.productos).toBe(30000); // se muestran en la cadena
+      expect(c.formacionPrecio?.sobreprecioGastos).toBe(24651); // separado de los productos
     });
 
     it('usa el monto detonado real (no el crédito) para el valor real — caso Arizpe', () => {
@@ -669,7 +685,7 @@ describe('calcularCuadratura', () => {
         gastosEscrituracion: 48313,
         apoyoInfonavit: 30000,
         precioBase: 909000,
-        sobreprecioAdicionales: 0,
+        sobreprecioGastos: 0,
         promocionGastos: 15000,
         depositos: [],
       });
@@ -691,7 +707,7 @@ describe('calcularCuadratura', () => {
       // exponer coberturaGastos.
       const c = mayra({
         promocionGastos: null,
-        sobreprecioAdicionales: null,
+        sobreprecioGastos: null,
         precioBase: null,
         incrementoCredito: null,
         descuentoOtorgadoTotal: 39651, // promoción + sobreprecio mezclados (modelo viejo)
@@ -702,15 +718,16 @@ describe('calcularCuadratura', () => {
       expect(c.saldoCliente).toBe(0); // mismo resultado que el desglosado
     });
 
-    // Blindaje: `productos_adicionales` (→ sobreprecioAdicionales) está poblado
-    // en TODAS las ventas (legacy incluido). Por sí solo NO debe activar el
-    // modelo desglosado — si lo hiciera, le movería el saldo a todo el histórico.
-    it('NO activa el desglose si solo viene sobreprecioAdicionales (sin promoción/base)', () => {
+    // Blindaje: el sobreprecio para gastos (→ sobreprecioGastos) quedó poblado en
+    // las 56 ventas que tenían productos_adicionales (legacy/cerradas incluidas)
+    // tras el backfill 20260623. Por sí solo NO debe activar el modelo desglosado
+    // — si lo hiciera, le movería el saldo a esas ventas históricas.
+    it('NO activa el desglose si solo viene sobreprecioGastos (sin promoción/base)', () => {
       const c = mayra({
         promocionGastos: null,
         precioBase: null,
         incrementoCredito: null,
-        sobreprecioAdicionales: 24651, // poblado (productos_adicionales legacy)
+        sobreprecioGastos: 24651, // poblado (sobreprecio movido en el backfill)
         descuentoOtorgadoTotal: 0,
         descuentoMaximoAutorizado: null,
       });
