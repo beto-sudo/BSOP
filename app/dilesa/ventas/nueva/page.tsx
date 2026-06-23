@@ -39,6 +39,11 @@ import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { congelarDesglose } from '@/lib/dilesa/desglose-precio';
+import {
+  camposKycFaltantes,
+  buildPersonaKycPayload,
+  type PersonaKycSnapshot,
+} from '@/lib/dilesa/kyc-persona';
 
 type UnidadDisponible = {
   id: string;
@@ -67,16 +72,10 @@ type Promocion = {
   productos_aplicables: string[];
 };
 
-type PersonaExistente = {
-  id: string;
-  nombre: string | null;
-  apellido_paterno: string | null;
-  apellido_materno: string | null;
-  curp: string | null;
-  numero_credencial_ine: string | null;
-  telefono: string | null;
-  email: string | null;
-};
+// El catálogo de clientes trae el KYC completo para poder detectar al vuelo
+// si una persona existente tiene el expediente incompleto (y precargar el form
+// para completarlo). Ver `lib/dilesa/kyc-persona.ts`.
+type PersonaExistente = { id: string } & PersonaKycSnapshot;
 
 type CalculoPrecio = {
   valor_comercial: number;
@@ -266,7 +265,7 @@ function NuevaSolicitudForm() {
         .schema('erp')
         .from('personas')
         .select(
-          'id, nombre, apellido_paterno, apellido_materno, curp, numero_credencial_ine, telefono, email'
+          'id, nombre, apellido_paterno, apellido_materno, curp, rfc, numero_credencial_ine, telefono, email, fecha_nacimiento, nss, domicilio_calle, domicilio_numero_exterior, domicilio_numero_interior, domicilio_colonia, domicilio_codigo_postal, domicilio_ciudad, domicilio_estado, tipo_persona, nacionalidad, estado_civil, ocupacion, es_pep, forma_pago_kyc, uso_efectivo_kyc, conocimiento_dueno_beneficiario'
         )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .eq('tipo', 'cliente')
@@ -351,6 +350,115 @@ function NuevaSolicitudForm() {
         ? (personasExistentes.find((p) => p.id === personaIdSeleccionada) ?? null)
         : null,
     [personaIdSeleccionada, personasExistentes]
+  );
+
+  // Al elegir un cliente existente, precargar su KYC en los campos del form
+  // (para mostrar/completar lo que falte). Al deseleccionar — o en alta nueva —
+  // los campos vuelven a su default. Solo depende de `personaSeleccionadaInfo`:
+  // teclear en alta nueva no la cambia, así no se pisa lo capturado.
+  useEffect(() => {
+    const p = personaSeleccionadaInfo;
+    setNombre(p?.nombre ?? '');
+    setApellidoPaterno(p?.apellido_paterno ?? '');
+    setApellidoMaterno(p?.apellido_materno ?? '');
+    setCurp(p?.curp ?? '');
+    setRfc(p?.rfc ?? '');
+    setTelefono(p?.telefono ?? '');
+    setEmail(p?.email ?? '');
+    setFechaNacimiento(p?.fecha_nacimiento ?? '');
+    setNss(p?.nss ?? '');
+    setNumeroCredencialIne(p?.numero_credencial_ine ?? '');
+    setDomCalle(p?.domicilio_calle ?? '');
+    setDomNumExt(p?.domicilio_numero_exterior ?? '');
+    setDomNumInt(p?.domicilio_numero_interior ?? '');
+    setDomColonia(p?.domicilio_colonia ?? '');
+    setDomCp(p?.domicilio_codigo_postal ?? '');
+    setDomCiudad(p?.domicilio_ciudad ?? '');
+    setDomEstado(p?.domicilio_estado ?? '');
+    setTipoPersona(p?.tipo_persona === 'moral' ? 'moral' : 'fisica');
+    setNacionalidad(p?.nacionalidad ?? 'Mexicana');
+    setEstadoCivil(p?.estado_civil ?? '');
+    setOcupacion(p?.ocupacion ?? '');
+    setEsPep(p?.es_pep ?? false);
+    setFormaPagoKyc(p?.forma_pago_kyc ?? '');
+    setUsoEfectivoKyc(p?.uso_efectivo_kyc ?? '');
+    setConocimientoDuenoBeneficiario(p?.conocimiento_dueno_beneficiario ?? 'No');
+     
+  }, [personaSeleccionadaInfo]);
+
+  // Snapshot KYC de lo capturado en el form (claves = columnas de erp.personas).
+  const clienteFormSnapshot = useMemo<PersonaKycSnapshot>(
+    () => ({
+      nombre,
+      apellido_paterno: apellidoPaterno,
+      apellido_materno: apellidoMaterno,
+      curp,
+      rfc,
+      telefono,
+      email,
+      fecha_nacimiento: fechaNacimiento,
+      nss,
+      numero_credencial_ine: numeroCredencialIne,
+      domicilio_calle: domCalle,
+      domicilio_numero_exterior: domNumExt,
+      domicilio_numero_interior: domNumInt,
+      domicilio_colonia: domColonia,
+      domicilio_codigo_postal: domCp,
+      domicilio_ciudad: domCiudad,
+      domicilio_estado: domEstado,
+      tipo_persona: tipoPersona,
+      nacionalidad,
+      estado_civil: estadoCivil,
+      ocupacion,
+      es_pep: esPep,
+      forma_pago_kyc: formaPagoKyc,
+      uso_efectivo_kyc: usoEfectivoKyc,
+      conocimiento_dueno_beneficiario: conocimientoDuenoBeneficiario,
+    }),
+    [
+      nombre,
+      apellidoPaterno,
+      apellidoMaterno,
+      curp,
+      rfc,
+      telefono,
+      email,
+      fechaNacimiento,
+      nss,
+      numeroCredencialIne,
+      domCalle,
+      domNumExt,
+      domNumInt,
+      domColonia,
+      domCp,
+      domCiudad,
+      domEstado,
+      tipoPersona,
+      nacionalidad,
+      estadoCivil,
+      ocupacion,
+      esPep,
+      formaPagoKyc,
+      usoEfectivoKyc,
+      conocimientoDuenoBeneficiario,
+    ]
+  );
+
+  // ¿El cliente existente elegido arrancó con KYC incompleto? (decide si se
+  // muestra el form para completarlo). Se calcula contra el snapshot ORIGINAL
+  // de la persona para que el form no desaparezca a media captura.
+  const personaOriginalIncompleta = useMemo(
+    () =>
+      clienteModo === 'existente' &&
+      !!personaSeleccionadaInfo &&
+      camposKycFaltantes(personaSeleccionadaInfo).length > 0,
+    [clienteModo, personaSeleccionadaInfo]
+  );
+
+  // Lo que todavía falta capturar (contra lo que ya escribió el operador).
+  const faltantesPendientes = useMemo(
+    () => (personaOriginalIncompleta ? camposKycFaltantes(clienteFormSnapshot) : []),
+    [personaOriginalIncompleta, clienteFormSnapshot]
   );
 
   // ── Recalcular precio cuando cambian inputs ─────────────────────────────────
@@ -468,7 +576,13 @@ function NuevaSolicitudForm() {
     if (!unidadId || !tipoCreditoId) return false;
     if (montoCreditoTitular.trim() === '' || montoCreditoCotitular.trim() === '') return false;
     if (productosAdicionales.trim() === '') return false;
-    if (clienteModo === 'existente') return !!personaIdSeleccionada;
+    if (clienteModo === 'existente') {
+      if (!personaIdSeleccionada) return false;
+      // Persona con expediente KYC incompleto: exigir completar los campos
+      // faltantes (mismos que el alta) antes de arrancar la venta.
+      if (personaOriginalIncompleta && faltantesPendientes.length > 0) return false;
+      return true;
+    }
     // Cliente nuevo: 21 campos obligatorios + expediente PDF.
     const obligatoriosTexto = [
       nombre,
@@ -504,6 +618,8 @@ function NuevaSolicitudForm() {
     productosAdicionales,
     clienteModo,
     personaIdSeleccionada,
+    personaOriginalIncompleta,
+    faltantesPendientes,
     nombre,
     apellidoPaterno,
     apellidoMaterno,
@@ -542,6 +658,9 @@ function NuevaSolicitudForm() {
           .insert({
             empresa_id: DILESA_EMPRESA_ID,
             tipo: 'cliente',
+            // Sprint 7c-2 — KYC completo para FICU + EBR automático. Mismas
+            // columnas que `buildPersonaKycPayload` (usado al completar un
+            // cliente existente más abajo); mantener ambas en sync.
             nombre: nombre.trim(),
             apellido_paterno: apellidoPaterno.trim(),
             apellido_materno: apellidoMaterno.trim() || null,
@@ -549,7 +668,6 @@ function NuevaSolicitudForm() {
             rfc: rfc.trim().toUpperCase() || null,
             telefono: telefono.trim() || null,
             email: email.trim() || null,
-            // Sprint 7c-2 — 14 campos KYC para FICU + EBR automático.
             fecha_nacimiento: fechaNacimiento || null,
             nss: nss.trim() || null,
             numero_credencial_ine: numeroCredencialIne.trim() || null,
@@ -574,6 +692,20 @@ function NuevaSolicitudForm() {
         if (pErr || !ins)
           throw new Error(getSupabaseErrorMessage(pErr, 'No se pudo crear la persona.'));
         personaId = ins.id as string;
+      } else if (personaOriginalIncompleta) {
+        // Cliente existente con expediente incompleto: completar su ficha con lo
+        // capturado antes de arrancar la venta. Cierra el hueco por el que una
+        // persona migrada/dada de alta sin INE u otro KYC entraba a Fase 1 con
+        // el expediente incompleto (el form viejo solo pedía seleccionarla).
+        const { error: upErr } = await sb
+          .schema('erp')
+          .from('personas')
+          .update(buildPersonaKycPayload(clienteFormSnapshot))
+          .eq('id', personaId);
+        if (upErr)
+          throw new Error(
+            getSupabaseErrorMessage(upErr, 'No se pudo completar el expediente del cliente.')
+          );
       }
 
       // 2) Usuario actual (para vendedor_usuario_id) + snapshot del nombre
@@ -770,6 +902,66 @@ function NuevaSolicitudForm() {
 
   const unidadSel = unidades.find((u) => u.id === unidadId);
 
+  // Form de captura del cliente. Se usa en alta nueva y para completar el
+  // expediente de un cliente existente con KYC incompleto (mismos campos).
+  const clienteCapturaForm = (
+    <ClienteNuevoForm
+      // Personales
+      nombre={nombre}
+      setNombre={setNombre}
+      apellidoPaterno={apellidoPaterno}
+      setApellidoPaterno={setApellidoPaterno}
+      apellidoMaterno={apellidoMaterno}
+      setApellidoMaterno={setApellidoMaterno}
+      fechaNacimiento={fechaNacimiento}
+      setFechaNacimiento={setFechaNacimiento}
+      curp={curp}
+      setCurp={setCurp}
+      rfc={rfc}
+      setRfc={setRfc}
+      nss={nss}
+      setNss={setNss}
+      numeroCredencialIne={numeroCredencialIne}
+      setNumeroCredencialIne={setNumeroCredencialIne}
+      telefono={telefono}
+      setTelefono={setTelefono}
+      email={email}
+      setEmail={setEmail}
+      // Domicilio
+      domCalle={domCalle}
+      setDomCalle={setDomCalle}
+      domNumExt={domNumExt}
+      setDomNumExt={setDomNumExt}
+      domNumInt={domNumInt}
+      setDomNumInt={setDomNumInt}
+      domColonia={domColonia}
+      setDomColonia={setDomColonia}
+      domCp={domCp}
+      setDomCp={setDomCp}
+      domCiudad={domCiudad}
+      setDomCiudad={setDomCiudad}
+      domEstado={domEstado}
+      setDomEstado={setDomEstado}
+      // KYC
+      tipoPersona={tipoPersona}
+      setTipoPersona={setTipoPersona}
+      nacionalidad={nacionalidad}
+      setNacionalidad={setNacionalidad}
+      estadoCivil={estadoCivil}
+      setEstadoCivil={setEstadoCivil}
+      ocupacion={ocupacion}
+      setOcupacion={setOcupacion}
+      esPep={esPep}
+      setEsPep={setEsPep}
+      formaPagoKyc={formaPagoKyc}
+      setFormaPagoKyc={setFormaPagoKyc}
+      usoEfectivoKyc={usoEfectivoKyc}
+      setUsoEfectivoKyc={setUsoEfectivoKyc}
+      conocimientoDuenoBeneficiario={conocimientoDuenoBeneficiario}
+      setConocimientoDuenoBeneficiario={setConocimientoDuenoBeneficiario}
+    />
+  );
+
   return (
     <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
       <BackLink />
@@ -797,7 +989,11 @@ function NuevaSolicitudForm() {
           </button>
           <button
             type="button"
-            onClick={() => setClienteModo('nuevo')}
+            onClick={() => {
+              setClienteModo('nuevo');
+              setPersonaIdSeleccionada('');
+              setBusquedaPersona('');
+            }}
             className={`rounded-md border px-3 py-1.5 text-sm ${
               clienteModo === 'nuevo'
                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
@@ -872,7 +1068,11 @@ function NuevaSolicitudForm() {
                   Sin coincidencias.{' '}
                   <button
                     type="button"
-                    onClick={() => setClienteModo('nuevo')}
+                    onClick={() => {
+                      setClienteModo('nuevo');
+                      setPersonaIdSeleccionada('');
+                      setBusquedaPersona('');
+                    }}
                     className="underline"
                   >
                     Crear nuevo cliente
@@ -903,63 +1103,27 @@ function NuevaSolicitudForm() {
                 </ul>
               )}
             </div>
+            {personaOriginalIncompleta ? (
+              <div className="space-y-3 border-t border-[var(--border)] pt-4">
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                  <div className="font-medium text-amber-600 dark:text-amber-400">
+                    Expediente del cliente incompleto
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Este cliente no tiene completo el expediente KYC obligatorio para arrancar una
+                    venta. Completa los campos faltantes — se guardarán en su ficha al crear la
+                    solicitud.
+                    {faltantesPendientes.length > 0
+                      ? ` Faltan: ${faltantesPendientes.join(', ')}.`
+                      : ' ✓ Listo para continuar.'}
+                  </p>
+                </div>
+                {clienteCapturaForm}
+              </div>
+            ) : null}
           </div>
         ) : (
-          <ClienteNuevoForm
-            // Personales
-            nombre={nombre}
-            setNombre={setNombre}
-            apellidoPaterno={apellidoPaterno}
-            setApellidoPaterno={setApellidoPaterno}
-            apellidoMaterno={apellidoMaterno}
-            setApellidoMaterno={setApellidoMaterno}
-            fechaNacimiento={fechaNacimiento}
-            setFechaNacimiento={setFechaNacimiento}
-            curp={curp}
-            setCurp={setCurp}
-            rfc={rfc}
-            setRfc={setRfc}
-            nss={nss}
-            setNss={setNss}
-            numeroCredencialIne={numeroCredencialIne}
-            setNumeroCredencialIne={setNumeroCredencialIne}
-            telefono={telefono}
-            setTelefono={setTelefono}
-            email={email}
-            setEmail={setEmail}
-            // Domicilio
-            domCalle={domCalle}
-            setDomCalle={setDomCalle}
-            domNumExt={domNumExt}
-            setDomNumExt={setDomNumExt}
-            domNumInt={domNumInt}
-            setDomNumInt={setDomNumInt}
-            domColonia={domColonia}
-            setDomColonia={setDomColonia}
-            domCp={domCp}
-            setDomCp={setDomCp}
-            domCiudad={domCiudad}
-            setDomCiudad={setDomCiudad}
-            domEstado={domEstado}
-            setDomEstado={setDomEstado}
-            // KYC
-            tipoPersona={tipoPersona}
-            setTipoPersona={setTipoPersona}
-            nacionalidad={nacionalidad}
-            setNacionalidad={setNacionalidad}
-            estadoCivil={estadoCivil}
-            setEstadoCivil={setEstadoCivil}
-            ocupacion={ocupacion}
-            setOcupacion={setOcupacion}
-            esPep={esPep}
-            setEsPep={setEsPep}
-            formaPagoKyc={formaPagoKyc}
-            setFormaPagoKyc={setFormaPagoKyc}
-            usoEfectivoKyc={usoEfectivoKyc}
-            setUsoEfectivoKyc={setUsoEfectivoKyc}
-            conocimientoDuenoBeneficiario={conocimientoDuenoBeneficiario}
-            setConocimientoDuenoBeneficiario={setConocimientoDuenoBeneficiario}
-          />
+          clienteCapturaForm
         )}
       </Section>
 
