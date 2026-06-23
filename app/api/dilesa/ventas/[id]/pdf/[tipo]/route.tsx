@@ -106,7 +106,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, precio_asignacion, desglose_precio, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, sobreprecio_gastos_escrituracion, precio_asignacion, desglose_precio, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -857,6 +857,9 @@ export async function GET(
     valorVentaFuturo: Number(c?.valor_venta_futuro ?? 0),
     costoCreditoAdicional: Number(c?.costo_credito_adicional ?? 0),
     productosAdicionales: Number(c?.productos_adicionales ?? venta.productos_adicionales ?? 0),
+    sobreprecioGastos: Number(
+      c?.sobreprecio_gastos_escrituracion ?? venta.sobreprecio_gastos_escrituracion ?? 0
+    ),
     precioVenta: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),
     enganche1pct: Number(c?.enganche_1pct ?? 0),
     isai2pct: Number(c?.isai_2pct ?? 0),
