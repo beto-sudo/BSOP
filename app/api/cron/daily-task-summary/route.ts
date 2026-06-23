@@ -34,6 +34,12 @@ import {
   splitRecipientsExtra,
   writeNotificationLog,
 } from '@/lib/notifications';
+import {
+  buildComprasPorAutorizar,
+  buildSolicitudesPorUsuario,
+  type CompraPorAutorizar,
+  type SolicitudPropia,
+} from '@/lib/compras/avisos';
 
 // 300s cap for cron — tolera crecimiento hasta ~1000 buckets con sleep(220ms)
 // entre envíos y fetch a Resend. Si llegamos cerca del cap, migrar a Workflow
@@ -80,6 +86,10 @@ type Bucket = {
   firstName: string;
   email: string;
   tasks: TaskSummaryItem[];
+  /** Compras DILESA por autorizar (solo para Dirección/admin). */
+  porAutorizar?: CompraPorAutorizar[];
+  /** Solicitudes propias en curso (para el solicitante). */
+  tusSolicitudes?: SolicitudPropia[];
 };
 
 const MONTHS_ES = [
@@ -145,6 +155,7 @@ export async function GET(req: NextRequest) {
 
   const todayCst = getTodayCst();
   const subjectDate = formatSubjectDate(todayCst);
+  const nowMs = Date.now();
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -262,6 +273,300 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Compras DILESA (iniciativa dilesa-compras-flujo · S2, D6) ──────────────
+  // "Compras por autorizar" → para Dirección/admin (cotizaciones listas para
+  // adjudicar). "Tus solicitudes" → para quien las creó. Se fusiona a los
+  // buckets por email; Dirección recibe correo aunque no tenga tareas.
+  const dilesaRow = empresasRes.data.find((e) => e.slug === 'dilesa');
+  if (dilesaRow) {
+    const dilesaId = dilesaRow.id;
+    const erp = supabase.schema('erp');
+    const core = supabase.schema('core');
+
+    const cotsRaw =
+      (
+        await erp
+          .from('cotizaciones')
+          .select('id, codigo, descripcion, creado_por, created_at, estado')
+          .eq('empresa_id', dilesaId)
+          .in('estado', ['abierta', 'comparada'])
+          .is('cancelada_at', null)
+          .is('deleted_at', null)
+          .returns<
+            {
+              id: string;
+              codigo: string;
+              descripcion: string | null;
+              creado_por: string | null;
+              created_at: string | null;
+              estado: string | null;
+            }[]
+          >()
+      ).data ?? [];
+    const cotIds = cotsRaw.map((c) => c.id);
+
+    const lineasByCot = new Map<string, { partida_id: string | null }[]>();
+    const provByCot = new Map<string, { estado: string | null; monto_total: number | null }[]>();
+    if (cotIds.length) {
+      const lins =
+        (
+          await erp
+            .from('cotizacion_lineas')
+            .select('cotizacion_id, partida_id')
+            .in('cotizacion_id', cotIds)
+            .returns<{ cotizacion_id: string; partida_id: string | null }[]>()
+        ).data ?? [];
+      for (const l of lins) {
+        const arr = lineasByCot.get(l.cotizacion_id) ?? [];
+        arr.push({ partida_id: l.partida_id });
+        lineasByCot.set(l.cotizacion_id, arr);
+      }
+      const provs =
+        (
+          await erp
+            .from('cotizacion_proveedores')
+            .select('cotizacion_id, estado, monto_total')
+            .in('cotizacion_id', cotIds)
+            .returns<
+              { cotizacion_id: string; estado: string | null; monto_total: number | null }[]
+            >()
+        ).data ?? [];
+      for (const p of provs) {
+        const arr = provByCot.get(p.cotizacion_id) ?? [];
+        arr.push({ estado: p.estado, monto_total: p.monto_total });
+        provByCot.set(p.cotizacion_id, arr);
+      }
+    }
+
+    const reqsRaw =
+      (
+        await erp
+          .from('requisiciones')
+          .select('id, codigo, justificacion, solicitante_id, created_at')
+          .eq('empresa_id', dilesaId)
+          .is('cancelada_at', null)
+          .is('deleted_at', null)
+          .returns<
+            {
+              id: string;
+              codigo: string;
+              justificacion: string | null;
+              solicitante_id: string | null;
+              created_at: string | null;
+            }[]
+          >()
+      ).data ?? [];
+
+    const ocsRaw =
+      (
+        await erp
+          .from('ordenes_compra')
+          .select('requisicion_id, estado')
+          .eq('empresa_id', dilesaId)
+          .is('deleted_at', null)
+          .not('requisicion_id', 'is', null)
+          .returns<{ requisicion_id: string | null; estado: string | null }[]>()
+      ).data ?? [];
+    const reqConOc = new Set(
+      ocsRaw
+        .filter((o) => o.estado !== 'cancelada' && o.requisicion_id)
+        .map((o) => o.requisicion_id as string)
+    );
+
+    // Lookups: partida → concepto/proyecto, proyecto → nombre, usuario → nombre/email.
+    const partidaIds = [
+      ...new Set(
+        cotsRaw.flatMap((c) =>
+          (lineasByCot.get(c.id) ?? [])
+            .map((l) => l.partida_id)
+            .filter((x): x is string => Boolean(x))
+        )
+      ),
+    ];
+    const partidaMap = new Map<
+      string,
+      { conceptoTexto: string | null; proyectoId: string | null }
+    >();
+    let proyectoIds: string[] = [];
+    if (partidaIds.length) {
+      const parts =
+        (
+          await erp
+            .from('presupuesto_partidas')
+            .select('id, concepto_texto, proyecto_id')
+            .in('id', partidaIds)
+            .returns<{ id: string; concepto_texto: string | null; proyecto_id: string | null }[]>()
+        ).data ?? [];
+      for (const p of parts)
+        partidaMap.set(p.id, { conceptoTexto: p.concepto_texto, proyectoId: p.proyecto_id });
+      proyectoIds = [
+        ...new Set(parts.map((p) => p.proyecto_id).filter((x): x is string => Boolean(x))),
+      ];
+    }
+    const proyectoMap = new Map<string, string>();
+    if (proyectoIds.length) {
+      const proys =
+        (
+          await supabase
+            .schema('dilesa')
+            .from('proyectos')
+            .select('id, nombre')
+            .in('id', proyectoIds)
+            .returns<{ id: string; nombre: string | null }[]>()
+        ).data ?? [];
+      for (const p of proys) if (p.nombre) proyectoMap.set(p.id, p.nombre);
+    }
+
+    const userIds = [
+      ...new Set(
+        [...cotsRaw.map((c) => c.creado_por), ...reqsRaw.map((r) => r.solicitante_id)].filter(
+          (x): x is string => Boolean(x)
+        )
+      ),
+    ];
+    const userNameMap = new Map<string, string>();
+    const userEmailMap = new Map<string, string>();
+    if (userIds.length) {
+      const us =
+        (
+          await core
+            .from('usuarios')
+            .select('id, first_name, email')
+            .in('id', userIds)
+            .returns<{ id: string; first_name: string | null; email: string | null }[]>()
+        ).data ?? [];
+      for (const u of us) {
+        userNameMap.set(u.id, u.first_name?.trim() || '—');
+        if (u.email) userEmailMap.set(u.id, u.email);
+      }
+    }
+
+    const porAutorizar = buildComprasPorAutorizar(
+      cotsRaw.map((c) => ({
+        id: c.id,
+        codigo: c.codigo,
+        descripcion: c.descripcion,
+        creado_por: c.creado_por,
+        created_at: c.created_at,
+        lineas: lineasByCot.get(c.id) ?? [],
+        proveedores: provByCot.get(c.id) ?? [],
+      })),
+      { partida: partidaMap, proyecto: proyectoMap, usuario: userNameMap },
+      nowMs
+    );
+    const solicitudesPorUsuario = buildSolicitudesPorUsuario(
+      reqsRaw.map((r) => ({
+        id: r.id,
+        codigo: r.codigo,
+        justificacion: r.justificacion,
+        solicitante_id: r.solicitante_id,
+        created_at: r.created_at,
+        conOc: reqConOc.has(r.id),
+      })),
+      cotsRaw.map((c) => ({
+        id: c.id,
+        codigo: c.codigo,
+        descripcion: c.descripcion,
+        creado_por: c.creado_por,
+        created_at: c.created_at,
+        estado: c.estado,
+      })),
+      nowMs
+    );
+
+    // Destinatarios de "por autorizar": Dirección de DILESA + admins globales.
+    const dirRoles =
+      (
+        await core
+          .from('roles')
+          .select('id')
+          .eq('empresa_id', dilesaId)
+          .ilike('nombre', 'direcci%n')
+          .returns<{ id: string }[]>()
+      ).data ?? [];
+    let direccionUserIds: string[] = [];
+    if (dirRoles.length) {
+      const asgs =
+        (
+          await core
+            .from('usuarios_empresas')
+            .select('usuario_id')
+            .eq('empresa_id', dilesaId)
+            .eq('activo', true)
+            .in(
+              'rol_id',
+              dirRoles.map((r) => r.id)
+            )
+            .returns<{ usuario_id: string }[]>()
+        ).data ?? [];
+      direccionUserIds = asgs.map((a) => a.usuario_id);
+    }
+    const adminRows =
+      (
+        await core
+          .from('usuarios')
+          .select('id')
+          .eq('rol', 'admin')
+          .eq('activo', true)
+          .returns<{ id: string }[]>()
+      ).data ?? [];
+    const autorizadorIds = [...new Set([...direccionUserIds, ...adminRows.map((a) => a.id)])];
+    const autorizadores: { id: string; email: string; firstName: string }[] = [];
+    if (autorizadorIds.length) {
+      const us =
+        (
+          await core
+            .from('usuarios')
+            .select('id, email, first_name, activo')
+            .in('id', autorizadorIds)
+            .returns<
+              { id: string; email: string | null; first_name: string | null; activo: boolean }[]
+            >()
+        ).data ?? [];
+      for (const u of us)
+        if (u.activo && u.email)
+          autorizadores.push({
+            id: u.id,
+            email: u.email,
+            firstName: u.first_name?.trim() || 'colega',
+          });
+    }
+
+    // Fusión por email (un correo por persona·empresa); crea bucket si Dirección
+    // no tenía tareas.
+    const bucketByEmailEmpresa = new Map<string, Bucket>();
+    for (const b of buckets.values())
+      bucketByEmailEmpresa.set(`${b.email.toLowerCase()}:${b.empresaId}`, b);
+    const ensureBucket = (email: string, firstName: string, usuarioId: string): Bucket => {
+      const k = `${email.toLowerCase()}:${dilesaId}`;
+      let b = bucketByEmailEmpresa.get(k);
+      if (!b) {
+        b = {
+          key: `usuario:${usuarioId}:${dilesaId}`,
+          empleadoId: `usuario:${usuarioId}`,
+          empresaId: dilesaId,
+          firstName,
+          email,
+          tasks: [],
+        };
+        buckets.set(b.key, b);
+        bucketByEmailEmpresa.set(k, b);
+      }
+      return b;
+    };
+
+    if (porAutorizar.length) {
+      for (const a of autorizadores) {
+        ensureBucket(a.email, a.firstName, a.id).porAutorizar = porAutorizar;
+      }
+    }
+    for (const [usuarioId, items] of solicitudesPorUsuario) {
+      const email = userEmailMap.get(usuarioId);
+      if (!email) continue;
+      ensureBucket(email, userNameMap.get(usuarioId) || 'colega', usuarioId).tusSolicitudes = items;
+    }
+  }
+
   // Envío serializado con sleep 220ms → ≤5 req/s. Resend free = 5/s.
   let sent = 0;
   let failed = 0;
@@ -278,14 +583,18 @@ export async function GET(req: NextRequest) {
 
   let firstSend = true;
   for (const bucket of buckets.values()) {
-    if (bucket.tasks.length === 0) continue;
+    if (bucket.tasks.length === 0 && !bucket.porAutorizar?.length && !bucket.tusSolicitudes?.length)
+      continue;
 
     const empresaRow = empresaMap.get(bucket.empresaId);
     if (!empresaRow) continue; // already filtered above, defensive
     const branding = toBranding(empresaRow);
 
     const groups = groupTasksByUrgency(bucket.tasks, todayCst);
-    const html = generateTaskSummaryHtml(bucket.firstName, groups, todayCst, branding);
+    const html = generateTaskSummaryHtml(bucket.firstName, groups, todayCst, branding, {
+      porAutorizar: bucket.porAutorizar,
+      tusSolicitudes: bucket.tusSolicitudes,
+    });
 
     // Nombre del from: usa override de la definition si tiene, si no usa el
     // nombre de la empresa (comportamiento legacy: branding per-empresa).
