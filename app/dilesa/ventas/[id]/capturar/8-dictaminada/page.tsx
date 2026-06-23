@@ -55,6 +55,7 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   notario_id: string | null;
+  tipo_credito: string | null;
   credito_titular_ref: string | null;
   credito_cotitular_ref: string | null;
   monto_credito_titular: number | null;
@@ -306,7 +307,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, notario_id, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -431,6 +432,19 @@ function CapturarFase8Body() {
         toast.add({
           title: 'Falta la Carta de Instrucción',
           description: 'Sube el PDF entregado por el notario (o pídele que lo suba por su enlace).',
+          type: 'error',
+        });
+        return;
+      }
+      // Anexo B (Condiciones Financieras) obligatorio en créditos Infonavit
+      // (Beto 2026-06-23). De aquí en adelante; las ya cerradas se quedan.
+      const esInfonavit = (venta.tipo_credito ?? '').toLowerCase().includes('infonavit');
+      const condicionesSubida = adjuntosNotariales.some((a) => a.rol === 'condiciones_financieras');
+      if (esInfonavit && !archivoCondiciones && !condicionesSubida) {
+        toast.add({
+          title: 'Falta el Anexo B',
+          description:
+            'Las Condiciones Financieras (Anexo B) son obligatorias en créditos Infonavit.',
           type: 'error',
         });
         return;
@@ -731,6 +745,8 @@ function CapturarFase8Body() {
   const precioDocs = venta?.precio_documentos_firmados ?? null;
   const precioCambio =
     valorEscrNum > 0 && precioDocs != null && Math.abs(valorEscrNum - precioDocs) > 0.5;
+  // Anexo B obligatorio en créditos Infonavit (Beto 2026-06-23, de aquí en adelante).
+  const esInfonavitVenta = (venta?.tipo_credito ?? '').toLowerCase().includes('infonavit');
 
   if (loading) {
     return (
@@ -1016,7 +1032,11 @@ function CapturarFase8Body() {
                 }}
               />
               <FileSlot
-                label="Condiciones Financieras Definitivas — Anexo B (opcional)"
+                label={
+                  esInfonavitVenta
+                    ? 'Condiciones Financieras Definitivas — Anexo B *'
+                    : 'Condiciones Financieras Definitivas — Anexo B (opcional)'
+                }
                 archivo={archivoCondiciones}
                 onChange={(f) => {
                   setArchivoCondiciones(f);
