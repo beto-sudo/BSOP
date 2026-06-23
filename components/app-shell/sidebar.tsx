@@ -158,6 +158,7 @@ export function Sidebar({
       activeEmpresaItem: empresas.find((item) => item.href === activeEmpresaHref),
     };
   }, [filteredNavItems, activeEmpresaHref]);
+  const activeEmpresaHasSubItems = activeEmpresaItem ? hasNavSubItems(activeEmpresaItem) : false;
 
   // Re-expand the section that matches the current route on navigation.
   useEffect(() => {
@@ -239,13 +240,13 @@ export function Sidebar({
                 if (collapsed) setCollapsed(false);
               }}
               collapsedModules={
-                activeEmpresaItem ? (
+                activeEmpresaItem && activeEmpresaHasSubItems ? (
                   <NavSubItems item={activeEmpresaItem} pathname={pathname} variant="floating" />
                 ) : null
               }
             />
 
-            {activeEmpresaItem && !collapsed ? (
+            {activeEmpresaItem && activeEmpresaHasSubItems && !collapsed ? (
               <div className="mt-0.5 space-y-1 pb-1">
                 <NavSubItems item={activeEmpresaItem} pathname={pathname} variant="expanded" />
               </div>
@@ -377,7 +378,7 @@ type NavSubItemsVariant = 'expanded' | 'floating';
 
 /**
  * Renders the sub-items of a nav entry — either grouped sections (DILESA, RDB)
- * or a flat children list (SANREN, Settings, Personas Físicas).
+ * or a flat children list (Settings).
  *
  * Sections with empty `children` are NOT rendered here — they're already filtered
  * out upstream by the permission filter. Receiving an empty list is a no-op.

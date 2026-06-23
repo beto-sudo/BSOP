@@ -219,6 +219,7 @@ export const HUB_PARENT_BY_ROUTE: Record<string, string> = {
 /** Maps a nav section href to its empresa slug */
 export const ROUTE_TO_EMPRESA: Record<string, string> = {
   '/rdb': 'rdb',
+  '/sanren': 'sanren',
   '/family': 'sanren',
   '/travel': 'sanren',
   '/health': 'sanren',
