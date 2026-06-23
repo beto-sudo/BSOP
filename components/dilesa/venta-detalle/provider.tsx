@@ -775,6 +775,8 @@ export function VentaDetalleProvider({
         ['CURP', persona.curp],
         ['RFC', persona.rfc],
         ['NSS', persona.nss],
+        // INE efectivo: per-venta en ventas Coda, en la persona en capturas BSOP.
+        ['INE', kycEfectivo(persona, venta).ineNumero],
         ['Tel.', persona.telefono],
         ['Email', persona.email],
         ['Fecha de nacimiento', fmtFecha(persona.fecha_nacimiento)],
@@ -786,7 +788,7 @@ export function VentaDetalleProvider({
     )
       .filter((r): r is [string, string] => r[1] != null && r[1] !== '')
       .map(([label, value]) => ({ label, value }));
-  }, [persona]);
+  }, [persona, venta]);
 
   const kyc = useMemo<{ label: string; value: string }[]>(() => {
     if (!venta) return [];
@@ -797,7 +799,7 @@ export function VentaDetalleProvider({
       [
         ['PEP', pepConocido ? (kycResuelto.esPep ? 'Sí' : 'No') : null],
         ['Ocupación', kycResuelto.ocupacion],
-        ['INE', kycResuelto.ineNumero],
+        // INE se muestra en "Datos del cliente" (identidad), no aquí.
         ['Forma de pago', kycResuelto.formaPago],
         ['Uso de efectivo', kycResuelto.usoEfectivo],
         ['Dueño beneficiario', kycResuelto.conocimientoDuenoBeneficiario],
