@@ -34,6 +34,7 @@ const solicitudData = {
   valorVentaFuturo: 992200,
   costoCreditoAdicional: 12000,
   productosAdicionales: 0,
+  sobreprecioGastos: 0,
   precioVenta: 1004200,
   enganche1pct: 10042,
   isai2pct: 20084,

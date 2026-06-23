@@ -3,11 +3,11 @@
 **Slug:** `dilesa-compras-flujo`
 **Empresas:** DILESA (golden; el patrón candado + avisos es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (`components/compras/*`, `components/gasto/te-toca-strip.tsx`, `app/api/cron/daily-task-summary`, `lib/task-summary-email`). Lectura de `erp` (cotizaciones/requisiciones/órdenes/partidas para el correo y los conteos) y `core` (gating de Dirección vía `usuarios_empresas`+`roles`; resolución de destinatarios del correo). **Sin cambios de modelo en Sprints 1-2.** Sprint 3 (opcional, con `blindaje-financiero`) agrega RPC de adjudicación/emisión con `audit_log`.
-**Estado:** in_progress
-**Próximo hito:** Sprint 3 — migración del guard server-side de emisión de OC (`erp.fn_guard_oc_emision` + flag `core.empresas`) escrita y validándose en el Supabase Preview; pendiente OK de Beto para aplicar a prod (cambio financiero)
+**Estado:** done
+**Próximo hito:** — (cerrada 2026-06-23; S1 candado + S2 avisos + S3 blindaje server-side, todo en prod)
 **Dueño:** Beto
 **Creada:** 2026-06-22
-**Última actualización:** 2026-06-23 (S1 #986 + S2 #987 mergeados; S3 migración escrita)
+**Última actualización:** 2026-06-23 (**CERRADA** — S3 aplicado a prod y verificado: flag DILESA, trigger y función presentes; 3 usuarios Dirección activos)
 
 ## Problema
 
@@ -196,3 +196,17 @@ dinero, y que los pendientes lleguen solos a quien los resuelve.**
   OK de Beto para aplicar a prod** (cambio financiero) → luego repair del ledger
   - regen SCHEMA_REF/types. Follow-up opcional: guard espejo para el contrato de
     obra (`dilesa.contratos_construccion`, otra ruta de compromiso por ADR-042).
+- **2026-06-23 — CERRADA. S3 aplicado a prod + iniciativa completa.** Beto
+  mergeó #988 y dio OK; migración `20260623034751` aplicada con `supabase db
+push --yes` (timestamp de archivo → sin drift de ledger). Verificado en prod:
+  `core.empresas.compras_emision_requiere_direccion` = true solo en DILESA (11
+  empresas en false, RDB intacto), trigger `erp_oc_guard_emision` y función
+  `erp.fn_guard_oc_emision` presentes; el rol matchea exacto ('Dirección') y
+  DILESA tiene 3 usuarios Dirección activos → cero riesgo de auto-bloqueo.
+  `SCHEMA_REF`/`types` regenerados (solo la columna nueva; sin drift heredado).
+  **Iniciativa `dilesa-compras-flujo` completa**: S1 candado en la adjudicación
+  (#986) + S2 avisos en el correo (#987) + S3 blindaje server-side (#988 +
+  apply). Backlog vivo (no bloquea, queda como referencia): guard espejo del
+  contrato de obra; gating de cancelar por solicitante; pulido badge/KPI de
+  requisición; campana del header. Barrido de Reminders al cierre: sin
+  pendientes de la iniciativa.

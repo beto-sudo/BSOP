@@ -16,6 +16,7 @@ export type DesglosePrecio = {
   costo_credito_adicional: number;
   zcu_exento?: boolean;
   productos_adicionales: number;
+  sobreprecio_gastos_escrituracion: number;
   precio_venta_total: number;
   apoyo_infonavit: number;
   pago_directo: number;
