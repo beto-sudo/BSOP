@@ -383,7 +383,6 @@ function NuevaSolicitudForm() {
     setFormaPagoKyc(p?.forma_pago_kyc ?? '');
     setUsoEfectivoKyc(p?.uso_efectivo_kyc ?? '');
     setConocimientoDuenoBeneficiario(p?.conocimiento_dueno_beneficiario ?? 'No');
-     
   }, [personaSeleccionadaInfo]);
 
   // Snapshot KYC de lo capturado en el form (claves = columnas de erp.personas).
