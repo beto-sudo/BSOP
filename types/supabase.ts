@@ -6096,28 +6096,17 @@ export type Database = {
         Args: { p_construccion_id: string }
         Returns: number
       }
-      fn_calcular_precio_venta:
-        | {
-            Args: {
-              p_monto_credito_cotitular?: number
-              p_monto_credito_titular?: number
-              p_productos_adicionales?: number
-              p_tipo_credito_id?: string
-              p_unidad_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_monto_credito_cotitular?: number
-              p_monto_credito_titular?: number
-              p_productos_adicionales?: number
-              p_sobreprecio_gastos_escrituracion?: number
-              p_tipo_credito_id?: string
-              p_unidad_id: string
-            }
-            Returns: Json
-          }
+      fn_calcular_precio_venta: {
+        Args: {
+          p_monto_credito_cotitular?: number
+          p_monto_credito_titular?: number
+          p_productos_adicionales?: number
+          p_sobreprecio_gastos_escrituracion?: number
+          p_tipo_credito_id?: string
+          p_unidad_id: string
+        }
+        Returns: Json
+      }
       fn_construccion_capturar_costo_materiales: {
         Args: { p_construccion_id: string; p_costo: number }
         Returns: undefined
