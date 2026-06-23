@@ -117,18 +117,27 @@ export type CuadraturaInput = {
    * Desglose nuevo (ADR-045). El motor usa el MODELO DESGLOSADO cuando hay
    * marcador del desglose nuevo (`promocionGastos` o `precioBase` poblado): el
    * "descuento" que cubre gastos = `promocionGastos` (bono, costo DILESA) +
-   * `sobreprecioAdicionales` (lo paga el crédito). Sin marcador (cerradas/legacy)
-   * → modelo viejo (`descuentoOtorgadoTotal` topado), fallback que NO altera nada
-   * histórico. `precioBase`/`incrementoCredito` alimentan el panel de precio.
+   * `sobreprecioGastos` (el sobreprecio que sube el precio para que el crédito
+   * absorba los gastos; lo paga el crédito, NO comisiona). Sin marcador
+   * (cerradas/legacy) → modelo viejo (`descuentoOtorgadoTotal` topado), fallback
+   * que NO altera nada histórico. `precioBase`/`incrementoCredito` alimentan el
+   * panel de precio.
    *
-   * OJO: `sobreprecioAdicionales` se alimenta de `dilesa.ventas.productos_adicionales`,
-   * que YA estaba poblado en TODAS las ventas — por eso NO es marcador del
-   * desglose (lo sería todo el histórico). Solo entra al saldo cuando el desglose
-   * ya está activo por `promocionGastos`/`precioBase`.
+   * Dos renglones distintos que ambos suman al precio de escrituración (los
+   * separó la migración 20260623155819; antes se revolvían en un solo campo):
+   *  - `sobreprecioGastos` (= `dilesa.ventas.sobreprecio_gastos_escrituracion`):
+   *    fondea gastos, NO comisiona. Es el "sobreprecio" del modelo Michelle/Ale.
+   *  - `productosAdicionales` (= `dilesa.ventas.productos_adicionales`): productos
+   *    reales del paquete (closets/upgrades), SÍ comisionan (no se restan de la
+   *    base de comisión). 0 en todo el histórico tras el backfill.
+   * Ninguno es marcador del desglose.
    */
   precioBase?: number | null;
   incrementoCredito?: number | null;
-  sobreprecioAdicionales?: number | null;
+  /** Sobreprecio para gastos de escrituración (lo absorbe el crédito; NO comisiona). */
+  sobreprecioGastos?: number | null;
+  /** Productos reales del paquete (closets/upgrades); SÍ comisionan. */
+  productosAdicionales?: number | null;
   promocionGastos?: number | null;
   /**
    * Geometría del lote (premios congelados de la Solicitud de Asignación, ver
@@ -235,7 +244,7 @@ export type Cuadratura = {
      *  (crédito institución insuficiente); NO fondea gastos. Para la nota del
      *  panel — evita el doble conteo del enganche (precio + gastos). */
     engancheAlPrecio: number;
-    /** Sobreprecio (productos adicionales) ya capturado — lo paga el crédito. */
+    /** Sobreprecio para gastos de escrituración capturado — lo paga el crédito. */
     sobreprecio: number;
     /** Sobreprecio EFECTIVO que cubre el presupuesto (faltante del lado DILESA −
      *  promoción usada). Puede exceder a `sobreprecio` capturado: lo que DILESA
@@ -253,8 +262,8 @@ export type Cuadratura = {
   /**
    * Formación del precio de escrituración (ADR-045 + geometría desglosada
    * 20260618). La cadena: precioBase + geometría (excedente/frente verde/esquina/
-   * venta futuro) + incrementoCredito = precioInterno; + adicionales =
-   * valorEscrituracion. `null` en legacy/cerradas.
+   * venta futuro) + incrementoCredito = precioInterno; + productos reales +
+   * sobreprecio para gastos = valorEscrituracion. `null` en legacy/cerradas.
    */
   formacionPrecio: {
     precioBase: number;
@@ -267,7 +276,10 @@ export type Cuadratura = {
     incrementoCredito: number;
     /** Precio interno DILESA = base + geometría + incremento (su venta real). */
     precioInterno: number;
-    adicionales: number;
+    /** Productos reales del paquete (closets/upgrades); SÍ comisionan. */
+    productos: number;
+    /** Sobreprecio para gastos de escrituración (lo absorbe el crédito; NO comisiona). */
+    sobreprecioGastos: number;
     valorEscrituracion: number;
   } | null;
   /**
@@ -381,19 +393,22 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // histórico.
   //
   // La detección usa los marcadores del desglose NUEVO (`promocionGastos` /
-  // `precioBase`), que solo se pueblan al migrar/asignar. NO usa
-  // `sobreprecioAdicionales`: ese viene de `productos_adicionales`, que ya estaba
-  // poblado en TODAS las ventas (legacy incluido) — usarlo activaría el modelo
-  // nuevo en todo el histórico y le movería el saldo.
+  // `precioBase`), que solo se pueblan al migrar/asignar. NO usa el sobreprecio
+  // ni los productos: tras el backfill 20260623 ambos campos quedan 0 en el
+  // histórico, y usarlos como marcador sería frágil.
   const tieneDesglose = i.promocionGastos != null || i.precioBase != null;
   const promocionGastos = n(i.promocionGastos);
-  const sobreprecioAdicionales = n(i.sobreprecioAdicionales);
+  // Sobreprecio que fondea gastos (lo absorbe el crédito, NO comisiona) vs
+  // productos reales del paquete (closets/upgrades, SÍ comisionan). Separados por
+  // la migración 20260623155819; antes se revolvían en `productos_adicionales`.
+  const sobreprecioGastos = n(i.sobreprecioGastos);
+  const productosAdicionales = n(i.productosAdicionales);
   // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento
   // hasta el máximo CONFIABLE (promo de la solicitud). Sin tope confiable
   // (legacy) se aplica el otorgado completo. El exceso sobre el tope NO reduce
   // el saldo (queda como pendiente a revisar).
   const descuentoAplicado = tieneDesglose
-    ? round2(promocionGastos + sobreprecioAdicionales)
+    ? round2(promocionGastos + sobreprecioGastos)
     : i.descuentoMaximoAutorizado != null
       ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
       : descuentoOtorgadoTotal;
@@ -439,7 +454,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // (para la fase 10 / gate). NO es el pagaré real: cuando DILESA absorbe más que
   // la promo (Máxima Aportación) el pagaré del cliente es menor (o 0).
   const pagareNecesario = tieneDesglose
-    ? round2(Math.max(0, gastosNetosR - promocionGastos - engancheAGastos - sobreprecioAdicionales))
+    ? round2(Math.max(0, gastosNetosR - promocionGastos - engancheAGastos - sobreprecioGastos))
     : 0;
   // Lo que DILESA debe cubrir del presupuesto tras el enganche (excedente del
   // precio) y el pagaré del cliente, partido en promoción (topada al bono) +
@@ -466,7 +481,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         aportacionPromocion,
         engancheCliente: engancheAGastos,
         engancheAlPrecio,
-        sobreprecio: round2(sobreprecioAdicionales),
+        sobreprecio: round2(sobreprecioGastos),
         sobreprecioCobertura,
         pagareNecesario,
         saldoCobertura,
@@ -476,8 +491,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // ADR-045 + geometría 20260618: formación del precio de escrituración (cadena
   // congelada de la Solicitud de Asignación). precio_base + geometría del lote
   // (excedente/frente verde/esquina/venta futuro) + incremento_credito = precio
-  // interno DILESA (su venta real); + sobreprecio (productos adicionales) = valor
-  // de escrituración. Solo con desglose poblado.
+  // interno DILESA (su venta real); + productos reales (closets/upgrades) +
+  // sobreprecio para gastos = valor de escrituración. Solo con desglose poblado.
   const geometria = round2(
     n(i.valorExcedenteTerreno) + n(i.valorFrenteVerde) + n(i.valorEsquina) + n(i.valorVentaFuturo)
   );
@@ -494,7 +509,8 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         geometria,
         incrementoCredito: round2(n(i.incrementoCredito)),
         precioInterno,
-        adicionales: round2(sobreprecioAdicionales),
+        productos: round2(productosAdicionales),
+        sobreprecioGastos: round2(sobreprecioGastos),
         valorEscrituracion: round2(valorEscrituracion),
       }
     : null;
@@ -596,12 +612,13 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     : null;
 
   // Con desglose, las comisiones se calculan sobre el Valor Real Venta DILESA
-  // menos los productos adicionales (el sobreprecio no comisiona) — base operativa
-  // de Michelle/Ale (col "Venta Dilesa comisiones" = valor real − PA), alineada el
-  // 2026-06-18 (antes era el precio interno bruto). Sin desglose, sobre el valor
-  // de escrituración (fallback).
+  // menos el SOBREPRECIO para gastos (lo absorbe el crédito, NO comisiona) — base
+  // operativa de Michelle/Ale (col "Venta Dilesa comisiones" = valor real −
+  // sobreprecio), alineada el 2026-06-18. Los productos reales del paquete
+  // (closets/upgrades) SÍ comisionan, por eso NO se restan de la base. Sin
+  // desglose, sobre el valor de escrituración (fallback).
   const baseComision = tieneDesglose
-    ? round2(valorRealVentaDilesa - sobreprecioAdicionales)
+    ? round2(valorRealVentaDilesa - sobreprecioGastos)
     : valorEscrituracion;
   const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
   const comisionGerencia = round2(baseComision * 0.005);

@@ -89,6 +89,7 @@ type CalculoPrecio = {
   costo_credito_adicional: number;
   zcu_exento?: boolean;
   productos_adicionales: number;
+  sobreprecio_gastos_escrituracion: number;
   precio_venta_total: number;
   apoyo_infonavit: number;
   monto_credito_titular: number;
@@ -145,10 +146,16 @@ function NuevaSolicitudForm() {
   const [promocionId, setPromocionId] = useState<string>('');
   const [montoCreditoTitular, setMontoCreditoTitular] = useState<string>('');
   const [montoCreditoCotitular, setMontoCreditoCotitular] = useState<string>('');
-  // Productos adicionales (paridad Coda): monto $ de extras del paquete que no
-  // están en `dilesa.productos` (closets, upgrades, mejoras puntuales). Se
-  // suma al precio total en `fn_calcular_precio_venta`. 0 si no hay.
+  // Productos adicionales: extras REALES del paquete que se le venden al cliente
+  // (closets, upgrades, mejoras puntuales). Suma al precio total y SÍ comisionan.
+  // 0 si no hay.
   const [productosAdicionales, setProductosAdicionales] = useState<string>('');
+  // Sobreprecio para gastos de escrituración: sube el precio para que el CRÉDITO
+  // absorba los gastos que el cliente no alcanza (cuando el crédito supera el valor
+  // de venta). Suma al precio pero NO comisiona. En blanco por defecto — el vendedor
+  // lo captura solo si hace falta (guía "hasta $X" = margen del crédito). Separado de
+  // productos_adicionales por ADR-045 D9.
+  const [sobreprecioGastos, setSobreprecioGastos] = useState<string>('');
   // La fecha + hora de la solicitud la setea el servidor al guardar (now()).
   // Importante para orden FIFO en Fase 2 cuando hay inventario limitado.
 
@@ -361,6 +368,7 @@ function NuevaSolicitudForm() {
         p_monto_credito_titular: Number(montoCreditoTitular) || 0,
         p_monto_credito_cotitular: Number(montoCreditoCotitular) || 0,
         p_productos_adicionales: Number(productosAdicionales) || 0,
+        p_sobreprecio_gastos_escrituracion: Number(sobreprecioGastos) || 0,
       });
       if (!active) return;
       if (error) {
@@ -380,7 +388,19 @@ function NuevaSolicitudForm() {
     montoCreditoTitular,
     montoCreditoCotitular,
     productosAdicionales,
+    sobreprecioGastos,
   ]);
+
+  // Margen del crédito disponible para el sobreprecio: lo que el crédito supera al
+  // precio SIN sobreprecio. Es la guía "hasta $X" del campo — pasarse de aquí dejaría
+  // un faltante que el crédito ya no cubre. 0 ⇒ el crédito no supera el valor de venta.
+  const margenSobreprecio = useMemo(() => {
+    if (!calculo || calculo.error) return 0;
+    const credito = (Number(montoCreditoTitular) || 0) + (Number(montoCreditoCotitular) || 0);
+    const precioSinSobreprecio =
+      calculo.precio_venta_total - (calculo.sobreprecio_gastos_escrituracion ?? 0);
+    return Math.max(0, credito - precioSinSobreprecio);
+  }, [calculo, montoCreditoTitular, montoCreditoCotitular]);
 
   // ── Proyectos con unidades disponibles + unidades del proyecto elegido ────
   const proyectosConUnidades = useMemo(() => {
@@ -605,6 +625,7 @@ function NuevaSolicitudForm() {
           monto_credito_titular: Number(montoCreditoTitular) || null,
           monto_credito_cotitular: Number(montoCreditoCotitular) || null,
           productos_adicionales: Number(productosAdicionales) || 0,
+          sobreprecio_gastos_escrituracion: Number(sobreprecioGastos) || 0,
           enganche_requerido: calculo?.enganche_1pct ?? null,
           gastos_escrituracion: calculo?.gastos_notariales_6pct ?? null,
           // La promo elegida define el Descuento Máximo Autorizado de la
@@ -1041,14 +1062,29 @@ function NuevaSolicitudForm() {
               required
             />
           </Field>
-          <Field label="Productos adicionales *">
+          <Field label="Productos adicionales">
             <Input
               type="number"
               value={productosAdicionales}
               onChange={(e) => setProductosAdicionales(e.target.value)}
-              placeholder="0 si no hay productos adicionales"
-              required
+              placeholder="0 — closets, upgrades, mejoras"
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Extras reales que se le venden al cliente. <strong>Sí comisionan.</strong>
+            </p>
+          </Field>
+          <Field label="Sobreprecio para gastos de escrituración">
+            <Input
+              type="number"
+              value={sobreprecioGastos}
+              onChange={(e) => setSobreprecioGastos(e.target.value)}
+              placeholder="0 — solo si el crédito alcanza"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {margenSobreprecio > 0
+                ? `Hasta ${money(margenSobreprecio)} del crédito para cubrir gastos que el cliente no alcanza. No comisiona.`
+                : 'Se llena solo si el crédito supera el valor de venta. No comisiona.'}
+            </p>
           </Field>
         </div>
       </Section>
@@ -1082,6 +1118,10 @@ function NuevaSolicitudForm() {
               value={money(calculo.costo_credito_adicional)}
             />
             <Row label="Productos adicionales" value={money(calculo.productos_adicionales ?? 0)} />
+            <Row
+              label="Sobreprecio gastos esc."
+              value={money(calculo.sobreprecio_gastos_escrituracion ?? 0)}
+            />
             <Row label="Precio de venta" value={money(calculo.precio_venta_total)} highlight />
             <Row label="Apoyo Infonavit" value={`− ${money(calculo.apoyo_infonavit)}`} />
             <Row label="Pago directo cliente" value={money(calculo.pago_directo)} highlight />

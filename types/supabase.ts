@@ -5369,6 +5369,7 @@ export type Database = {
           productos_adicionales: number
           promocion_gastos_monto: number | null
           promocion_id: string | null
+          sobreprecio_gastos_escrituracion: number
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -5466,6 +5467,7 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          sobreprecio_gastos_escrituracion?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -5563,6 +5565,7 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          sobreprecio_gastos_escrituracion?: number
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -6098,6 +6101,7 @@ export type Database = {
           p_monto_credito_cotitular?: number
           p_monto_credito_titular?: number
           p_productos_adicionales?: number
+          p_sobreprecio_gastos_escrituracion?: number
           p_tipo_credito_id?: string
           p_unidad_id: string
         }
