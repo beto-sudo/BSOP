@@ -5366,6 +5366,7 @@ export type Database = {
           poliza_garantia_expedida_at: string | null
           precio_asignacion: number | null
           precio_base: number | null
+          precio_documentos_firmados: number | null
           productos_adicionales: number
           promocion_gastos_monto: number | null
           promocion_id: string | null
@@ -5464,6 +5465,7 @@ export type Database = {
           poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
           precio_base?: number | null
+          precio_documentos_firmados?: number | null
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
@@ -5562,6 +5564,7 @@ export type Database = {
           poliza_garantia_expedida_at?: string | null
           precio_asignacion?: number | null
           precio_base?: number | null
+          precio_documentos_firmados?: number | null
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
@@ -6380,6 +6383,7 @@ export type Database = {
           metadata: Json | null
           nombre: string
           rol: string
+          sustituido_at: string | null
           tamano_bytes: number | null
           tipo_mime: string | null
           uploaded_by: string | null
@@ -6394,6 +6398,7 @@ export type Database = {
           metadata?: Json | null
           nombre: string
           rol?: string
+          sustituido_at?: string | null
           tamano_bytes?: number | null
           tipo_mime?: string | null
           uploaded_by?: string | null
@@ -6408,6 +6413,7 @@ export type Database = {
           metadata?: Json | null
           nombre?: string
           rol?: string
+          sustituido_at?: string | null
           tamano_bytes?: number | null
           tipo_mime?: string | null
           uploaded_by?: string | null
