@@ -97,7 +97,18 @@ export function CuadraturaPanel({
             value={money(c.formacionPrecio.precioInterno)}
             strong
           />
-          <Fila label="(+) Adicionales (productos)" value={money(c.formacionPrecio.adicionales)} />
+          {c.formacionPrecio.productos > 0 ? (
+            <Fila
+              label="(+) Productos adicionales (closets, upgrades)"
+              value={money(c.formacionPrecio.productos)}
+            />
+          ) : null}
+          {c.formacionPrecio.sobreprecioGastos > 0 ? (
+            <Fila
+              label="(+) Sobreprecio para gastos de escrituración"
+              value={money(c.formacionPrecio.sobreprecioGastos)}
+            />
+          ) : null}
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
             label="(=) Precio de escrituración"

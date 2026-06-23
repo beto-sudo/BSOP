@@ -25,6 +25,7 @@ export type Venta = {
   valor_escrituracion: number | null;
   precio_asignacion: number | null;
   productos_adicionales: number | null;
+  sobreprecio_gastos_escrituracion: number | null;
   // Desglose nuevo (ADR-045): marcadores del modelo desglosado.
   precio_base: number | null;
   incremento_credito: number | null;

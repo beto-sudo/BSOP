@@ -40,11 +40,13 @@ type VentaCuadraturaRow = {
   descuento_nota_credito: number | null;
   promocion_id: string | null;
   coda_row_id: string | null;
-  // Desglose (ADR-045). `productos_adicionales` (sobreprecio) ya existía y está
-  // poblado; las otras 3 son del desglose nuevo (null en cerradas/legacy →
-  // motor con fallback). Las 4 de geometría (20260618) congelan el premio del
-  // lote de la Solicitud de Asignación.
+  // Desglose (ADR-045). `sobreprecio_gastos_escrituracion` (NO comisiona, fondea
+  // gastos) y `productos_adicionales` (productos reales, SÍ comisionan) — los
+  // separó la migración 20260623155819. Las otras 3 son del desglose nuevo (null
+  // en cerradas/legacy → motor con fallback). Las 4 de geometría (20260618)
+  // congelan el premio del lote de la Solicitud de Asignación.
   productos_adicionales: number | null;
+  sobreprecio_gastos_escrituracion: number | null;
   precio_base: number | null;
   incremento_credito: number | null;
   promocion_gastos_monto: number | null;
@@ -66,7 +68,7 @@ export async function cargarCuadraturaVenta(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_detonado, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, precio_base, incremento_credito, promocion_gastos_monto, valor_excedente_terreno, valor_frente_verde, valor_esquina, valor_venta_futuro'
+      'empresa_id, tipo_credito, unidad_id, precio_asignacion, valor_escrituracion, valor_facturado, monto_credito_titular, monto_credito_cotitular, monto_credito_directo, monto_detonado, monto_cheque_notaria, gastos_escrituracion, descuento_total, descuento_precio, descuento_equipamiento, descuento_gastos_escrituracion, descuento_nota_credito, promocion_id, coda_row_id, productos_adicionales, sobreprecio_gastos_escrituracion, precio_base, incremento_credito, promocion_gastos_monto, valor_excedente_terreno, valor_frente_verde, valor_esquina, valor_venta_futuro'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -180,12 +182,14 @@ export async function cargarCuadraturaVenta(
       !!venta.coda_row_id
     ),
     precioAsignacion: venta.precio_asignacion,
-    // Desglose (ADR-045): sobreprecio ← productos_adicionales (existente); base,
+    // Desglose (ADR-045): sobreprecio para gastos (NO comisiona) y productos
+    // reales (SÍ comisionan) son campos separados desde 20260623155819; base,
     // incremento y promoción ← columnas nuevas. Si el desglose está poblado, el
     // motor usa el modelo desglosado; si null, fallback al modelo viejo.
     precioBase: venta.precio_base,
     incrementoCredito: venta.incremento_credito,
-    sobreprecioAdicionales: venta.productos_adicionales,
+    sobreprecioGastos: venta.sobreprecio_gastos_escrituracion,
+    productosAdicionales: venta.productos_adicionales,
     promocionGastos: venta.promocion_gastos_monto,
     valorExcedenteTerreno: venta.valor_excedente_terreno,
     valorFrenteVerde: venta.valor_frente_verde,
