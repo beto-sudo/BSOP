@@ -8,6 +8,8 @@
 // Las secciones vacías no se renderizan. Si el empleado tiene cero tareas
 // en la empresa, el caller NO debe invocar esta función (no mandes correo vacío).
 
+import type { CompraPorAutorizar, SolicitudPropia } from '@/lib/compras/avisos';
+
 const MONTHS_ES = [
   'ene',
   'feb',
@@ -176,6 +178,91 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+const MXN = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 0,
+});
+
+function formatMoneyMXN(n: number | null): string {
+  return n == null ? 'monto por definir' : MXN.format(n);
+}
+
+function formatDiasLabel(dias: number): string {
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'hace 1 día';
+  return `hace ${dias} días`;
+}
+
+/**
+ * Sección "Compras por autorizar" (Dirección) — iniciativa dilesa-compras-flujo.
+ * Cada fila: concepto + (solicita · monto · partida/proyecto · antigüedad). El
+ * caller solo la pasa a Dirección/admin; vacía → no se renderiza.
+ */
+function renderComprasPorAutorizar(items: CompraPorAutorizar[], accent: string): string {
+  if (items.length === 0) return '';
+  const rows = items
+    .map((c) => {
+      const meta = [
+        `Solicita ${escapeHtml(c.solicitante)}`,
+        escapeHtml(formatMoneyMXN(c.monto)),
+        escapeHtml(c.proyecto !== '—' ? `${c.proyecto} · ${c.partida}` : c.partida),
+        formatDiasLabel(c.dias),
+      ].join(' · ');
+      return `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #eee">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr><td style="font-size:14px;font-weight:500;color:#1a1a1a;line-height:1.4">${escapeHtml(c.concepto)} <span style="color:#999;font-weight:400">· ${escapeHtml(c.codigo)}</span></td></tr>
+              <tr><td style="font-size:12px;color:#888;padding-top:2px">${meta}</td></tr>
+            </table>
+          </td>
+        </tr>`;
+    })
+    .join('');
+  return `
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding-top:20px">
+      <tr>
+        <td style="font-size:13px;font-weight:600;color:${accent};text-transform:uppercase;letter-spacing:0.5px;padding-bottom:6px">
+          🛒 Compras por autorizar (${items.length})
+        </td>
+      </tr>
+      ${rows}
+    </table>`;
+}
+
+/**
+ * Sección "Tus solicitudes" (el solicitante) — su pipeline en curso:
+ * requisiciones sin orden y cotizaciones abiertas/comparadas. Vacía → no se
+ * renderiza.
+ */
+function renderTusSolicitudes(items: SolicitudPropia[]): string {
+  if (items.length === 0) return '';
+  const rows = items
+    .map((s) => {
+      const meta = `${escapeHtml(s.estado)} · ${formatDiasLabel(s.dias)}`;
+      return `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #eee">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr><td style="font-size:14px;font-weight:500;color:#1a1a1a;line-height:1.4">${escapeHtml(s.concepto)} <span style="color:#999;font-weight:400">· ${escapeHtml(s.codigo)}</span></td></tr>
+              <tr><td style="font-size:12px;color:#888;padding-top:2px">${meta}</td></tr>
+            </table>
+          </td>
+        </tr>`;
+    })
+    .join('');
+  return `
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding-top:20px">
+      <tr>
+        <td style="font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding-bottom:6px">
+          📋 Tus solicitudes en curso (${items.length})
+        </td>
+      </tr>
+      ${rows}
+    </table>`;
+}
+
 /** Header/banner block: usa header_email_url si existe; si no, logo sobre color de marca. */
 function renderBanner(empresa: EmpresaBranding): string {
   const bgColor = empresa.colorPrimarioDark || empresa.colorPrimario || '#f8f8f8';
@@ -212,7 +299,8 @@ export function generateTaskSummaryHtml(
   firstName: string,
   groups: TaskSummaryGroups,
   todayCst: string,
-  empresa: EmpresaBranding
+  empresa: EmpresaBranding,
+  extras?: { porAutorizar?: CompraPorAutorizar[]; tusSolicitudes?: SolicitudPropia[] }
 ): string {
   const total =
     groups.vencidas.length +
@@ -223,6 +311,24 @@ export function generateTaskSummaryHtml(
 
   const accent = empresa.colorPrimario || DEFAULT_ACCENT;
   const accentHover = empresa.colorPrimarioDark || DEFAULT_ACCENT_DARK;
+
+  const porAutorizar = extras?.porAutorizar ?? [];
+  const tusSolicitudes = extras?.tusSolicitudes ?? [];
+  const comprasBlock = renderComprasPorAutorizar(porAutorizar, accent);
+  const solicitudesBlock = renderTusSolicitudes(tusSolicitudes);
+
+  const introParts: string[] = [];
+  if (total > 0)
+    introParts.push(
+      `<strong>${total}</strong> ${total === 1 ? 'tarea abierta' : 'tareas abiertas'}`
+    );
+  if (porAutorizar.length > 0)
+    introParts.push(
+      `<strong>${porAutorizar.length}</strong> ${porAutorizar.length === 1 ? 'compra por autorizar' : 'compras por autorizar'}`
+    );
+  const introSentence = introParts.length
+    ? `En <strong>${escapeHtml(empresa.nombre)}</strong> tienes ${introParts.join(' y ')}.`
+    : `Resumen de <strong>${escapeHtml(empresa.nombre)}</strong>.`;
 
   const sections = [
     renderSection('Vencidas', '🔴', groups.vencidas, todayCst, 'vencidas'),
@@ -248,10 +354,12 @@ export function generateTaskSummaryHtml(
       <td style="padding:28px 32px 24px">
         <table cellpadding="0" cellspacing="0" border="0" width="100%">
           <tr><td style="font-size:20px;font-weight:700;color:#1a1a1a;padding-bottom:4px">Buenos días, ${escapeHtml(firstName)} 👋</td></tr>
-          <tr><td style="font-size:15px;color:#555;line-height:1.5;padding-bottom:8px">Tienes <strong>${total}</strong> ${total === 1 ? 'tarea abierta' : 'tareas abiertas'} en <strong>${escapeHtml(empresa.nombre)}</strong>.</td></tr>
+          <tr><td style="font-size:15px;color:#555;line-height:1.5;padding-bottom:8px">${introSentence}</td></tr>
         </table>
 
+        ${comprasBlock}
         ${sections}
+        ${solicitudesBlock}
 
         <table cellpadding="0" cellspacing="0" border="0" width="100%" style="padding-top:28px">
           <tr><td align="center">

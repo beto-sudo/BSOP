@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el patrón candado + avisos es replicable a las otras empresas cuando su P2P exista)
 **Schemas afectados:** principalmente UI (`components/compras/*`, `components/gasto/te-toca-strip.tsx`, `app/api/cron/daily-task-summary`, `lib/task-summary-email`). Lectura de `erp` (cotizaciones/requisiciones/órdenes/partidas para el correo y los conteos) y `core` (gating de Dirección vía `usuarios_empresas`+`roles`; resolución de destinatarios del correo). **Sin cambios de modelo en Sprints 1-2.** Sprint 3 (opcional, con `blindaje-financiero`) agrega RPC de adjudicación/emisión con `audit_log`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 (reordenar el flujo en UI: candado de adjudicación a Dirección, OC emitida en un acto, quitar "autorizar requisición") en Vercel Preview para revisión de Beto
+**Próximo hito:** Sprint 2 (sección "Compras por autorizar" + "Tus solicitudes" en el correo diario) en revisión de Beto (preview enviado); luego Sprint 3 (blindaje server-side del candado, con `blindaje-financiero`)
 **Dueño:** Beto
 **Creada:** 2026-06-22
-**Última actualización:** 2026-06-22 (promovida; arranca Sprint 1)
+**Última actualización:** 2026-06-22 (S1 mergeado #986; S2 construido y en revisión)
 
 ## Problema
 
@@ -159,3 +159,21 @@ dinero, y que los pendientes lleguen solos a quien los resuelve.**
   `puedeEscribir`; falta `solicitante_id` en `ReqRow`) y el pulido de
   badge/KPI de requisición ("pendiente" → "abierta", quitar "Autorizadas" que
   ahora queda en 0). Próximo: Sprint 2 (avisos en el correo).
+- **2026-06-22 — Sprint 2 construido (avisos en el correo) — preview enviado a
+  Beto.** Dos secciones nuevas en el correo diario de tareas (cron
+  `daily-task-summary`, 07:00 CST), sin migración: (1) **"Compras por autorizar"**
+  para Dirección/admin = cotizaciones listas para adjudicar (≥1 proveedor
+  respondió), con solicitante · concepto · monto (mejor total respondido) ·
+  partida/proyecto · días desde la solicitud, ordenadas de más vieja a más nueva;
+  (2) **"Tus solicitudes en curso"** para el solicitante = sus requisiciones sin
+  OC + cotizaciones abiertas/comparadas. Dirección recibe el correo **aunque no
+  tenga tareas** (bucket creado por email). Identidad: Dirección = `core.roles`
+  ilike 'direcci%n' de DILESA + `usuarios_empresas` activos (espejo de
+  `loadDireccionEmpresaIds`), más admins globales (`core.usuarios.rol='admin'`);
+  nombre/email desde `core.usuarios`. Arquitectura: helpers puros en
+  `lib/compras/avisos.ts` (12 tests) + render en `lib/task-summary-email.ts` +
+  fetch/fusión-por-email en el cron. 6 checks verdes (typecheck, 1977 tests, lint
+  0-err, format; schema n/a). Preview-first (es correo a personal real): el PR
+  queda sin auto-merge; al mergear, las secciones salen en la corrida de la
+  mañana siguiente. `TASK_SUMMARY_TEST_TO` permite una prueba dirigida antes.
+  Próximo: Sprint 3 (blindaje server-side del candado).
