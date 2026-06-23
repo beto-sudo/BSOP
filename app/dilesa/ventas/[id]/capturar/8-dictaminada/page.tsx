@@ -483,6 +483,17 @@ function CapturarFase8Body() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
+      // ADR-048: solo Dirección modifica/cuadra la dictaminación, también con la
+      // fase ya cerrada.
+      const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+      if (!esDir) {
+        toast.add({
+          title: 'Solo Dirección modifica la dictaminación',
+          description: 'El cierre financiero (cuadratura, pagaré, datos) lo controla Dirección.',
+          type: 'error',
+        });
+        return;
+      }
       setSubmitting(true);
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
@@ -563,6 +574,7 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      me,
       router,
       sb,
       toast,
@@ -727,18 +739,24 @@ function CapturarFase8Body() {
                     avalDomicilio: venta.cd_aval_domicilio,
                   }}
                   onGuardadoChange={setCdGuardado}
+                  canWrite={esDireccion}
                 />
               </Section>
             ) : null}
 
             <div className="flex items-center justify-end gap-3">
+              {!esDireccion ? (
+                <span className="text-xs text-amber-700 dark:text-amber-300">
+                  Solo Dirección modifica la dictaminación.
+                </span>
+              ) : null}
               <Link
                 href={`/dilesa/ventas/${venta.id}`}
                 className="text-sm text-muted-foreground hover:text-[var(--text)]"
               >
                 Volver al detalle
               </Link>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || !esDireccion}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
@@ -919,6 +937,7 @@ function CapturarFase8Body() {
                   avalDomicilio: venta.cd_aval_domicilio,
                 }}
                 onGuardadoChange={setCdGuardado}
+                canWrite={esDireccion}
               />
             </Section>
           ) : null}

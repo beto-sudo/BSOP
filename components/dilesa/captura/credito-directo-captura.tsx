@@ -55,6 +55,7 @@ export function CreditoDirectoCaptura({
   saldo,
   inicial,
   onGuardadoChange,
+  canWrite = true,
 }: {
   ventaId: string;
   /** Pagaré necesario (faltante de gastos) que deriva el motor de cuadratura. */
@@ -62,6 +63,8 @@ export function CreditoDirectoCaptura({
   inicial: CreditoDirectoInicial;
   /** Reporta al contenedor si el crédito directo quedó guardado (gate del submit). */
   onGuardadoChange?: (guardado: boolean) => void;
+  /** Solo Dirección guarda/modifica el crédito directo (ADR-048). */
+  canWrite?: boolean;
 }) {
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
@@ -443,7 +446,12 @@ export function CreditoDirectoCaptura({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" onClick={guardarCreditoDirecto} disabled={savingCD}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={guardarCreditoDirecto}
+          disabled={savingCD || !canWrite}
+        >
           {savingCD ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
@@ -454,6 +462,11 @@ export function CreditoDirectoCaptura({
             </>
           )}
         </Button>
+        {!canWrite ? (
+          <span className="text-[11px] text-amber-700 dark:text-amber-300">
+            Solo Dirección guarda el crédito directo.
+          </span>
+        ) : null}
         {cdGuardado ? (
           <a
             href={`/api/dilesa/ventas/${ventaId}/pdf/pagare-credito-directo`}
