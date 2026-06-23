@@ -180,6 +180,10 @@ function OperacionBody() {
                     value: fmtMoney(calculo.productos_adicionales) ?? '—',
                   },
                   {
+                    label: 'Sobreprecio gastos escrituración',
+                    value: fmtMoney(calculo.sobreprecio_gastos_escrituracion) ?? '—',
+                  },
+                  {
                     label: 'Precio de venta total',
                     value: fmtMoney(calculo.precio_venta_total) ?? '—',
                   },
