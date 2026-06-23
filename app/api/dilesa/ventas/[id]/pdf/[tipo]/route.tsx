@@ -106,7 +106,7 @@ export async function GET(
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, sobreprecio_gastos_escrituracion, precio_asignacion, desglose_precio, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
+      'id, empresa_id, persona_id, unidad_id, vendedor_usuario_id, tipo_credito, vendedor, monto_credito_titular, monto_credito_cotitular, productos_adicionales, sobreprecio_gastos_escrituracion, precio_asignacion, valor_escrituracion, precio_documentos_firmados, desglose_precio, created_at, ine_numero, estado, valuador_id, notario_id, es_pep, ocupacion, forma_pago, uso_efectivo, conocimiento_dueno_beneficiario, fecha_firma_programada, fase_posicion, fecha_escritura'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -697,9 +697,17 @@ export async function GET(
     // créditos (que omite enganche, gastos notariales y pago directo).
     // Usamos `precio_asignacion` (snapshot persistido del cálculo) y
     // fallback a la suma de créditos solo si no está disponible.
-    const precio =
+    const precioBaseProm =
       Number(venta.precio_asignacion ?? 0) ||
       Number(venta.monto_credito_titular ?? 0) + Number(venta.monto_credito_cotitular ?? 0);
+    // Opción A (ADR-048 D5): la promesa re-firmada sale con el valor dictaminado
+    // cuando difiere del que tienen los documentos firmados vigentes.
+    const precio =
+      venta.valor_escrituracion != null &&
+      venta.precio_documentos_firmados != null &&
+      Math.abs(Number(venta.valor_escrituracion) - Number(venta.precio_documentos_firmados)) > 0.5
+        ? Number(venta.valor_escrituracion)
+        : precioBaseProm;
     const arras1pct = Math.round(precio * 0.01);
     const arras10pct = Math.round(precio * 0.1);
     const modeloSufijo = productoFull?.nombre ? (productoFull.nombre.split('-').pop() ?? '') : '';
@@ -847,6 +855,17 @@ export async function GET(
     .join('');
   const folio = `${iniciales}-${identificacionInventario}-${fechaCreado.toLocaleString('es-MX', { timeZone: 'America/Matamoros' })}`;
 
+  // Opción A (ADR-048 D5): si el precio dictaminado difiere del que tienen los
+  // documentos firmados vigentes, el PDF re-firmado sale con el valor dictaminado
+  // (sin tocar el precio congelado). Si no, usa el congelado del snapshot.
+  const precioCongelado = Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0);
+  const precioVigente =
+    venta.valor_escrituracion != null &&
+    venta.precio_documentos_firmados != null &&
+    Math.abs(Number(venta.valor_escrituracion) - Number(venta.precio_documentos_firmados)) > 0.5
+      ? Number(venta.valor_escrituracion)
+      : precioCongelado;
+
   const data: SolicitudData = {
     fechaTexto,
     asesorVentas: vendedorNombre.toUpperCase(),
@@ -860,7 +879,7 @@ export async function GET(
     sobreprecioGastos: Number(
       c?.sobreprecio_gastos_escrituracion ?? venta.sobreprecio_gastos_escrituracion ?? 0
     ),
-    precioVenta: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),
+    precioVenta: precioVigente,
     enganche1pct: Number(c?.enganche_1pct ?? 0),
     isai2pct: Number(c?.isai_2pct ?? 0),
     gastosNotariales6pct: Number(c?.gastos_notariales_6pct ?? 0),
@@ -871,12 +890,12 @@ export async function GET(
     pagoDirecto:
       typeof c?.pago_directo === 'number'
         ? Number(c.pago_directo) + Number(c.apoyo_infonavit ?? 0)
-        : Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0) -
+        : precioVigente -
           Number(venta.monto_credito_titular ?? 0) -
           Number(venta.monto_credito_cotitular ?? 0),
     montoCreditoTitular: Number(venta.monto_credito_titular ?? 0),
     montoCreditoCotitular: Number(venta.monto_credito_cotitular ?? 0),
-    totalPagosDisponibles: Number(c?.precio_venta_total ?? venta.precio_asignacion ?? 0),
+    totalPagosDisponibles: precioVigente,
     clienteNombre: `${clienteNombre} (${identificacionInventario})`,
     folio,
     fraccionamiento: '',
