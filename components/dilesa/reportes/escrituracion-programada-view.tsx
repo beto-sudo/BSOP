@@ -24,13 +24,13 @@ const DEFAULT_FILTERS = { desde: '', hasta: '', proyecto: '' };
 
 export function EscrituracionProgramadaView() {
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(DEFAULT_FILTERS);
-  const { ventas, proyectos, loading, error, recargar } = useVentasReporte();
+  const { ventas, loading, error, recargar } = useVentasReporte();
 
   const result = useMemo(
     () => construirEscrituracionProgramada(ventas, filters),
     [ventas, filters]
   );
-  const proys = useMemo(() => proyectosPresentes(proyectos), [proyectos]);
+  const proys = useMemo(() => proyectosPresentes(ventas), [ventas]);
 
   const kpis = useMemo<readonly ModuleKpi[]>(
     () => [
