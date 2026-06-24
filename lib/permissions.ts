@@ -142,8 +142,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // gate de cada módulo. Ver docs/planning/manual-usuario.md.
   '/dilesa/manual': 'dilesa.manual',
   // Atención a Clientes — bandeja de trabajo (iniciativa dilesa-atencion-clientes
-  // Sprint 2). Página única (cola por momento); sin sub-slugs.
+  // Sprint 2). Dos tabs ("Por hacer" / "Respuestas") sobre el mismo módulo, sin
+  // sub-slugs: ambos comparten el permiso `dilesa.atencion_clientes`.
   '/dilesa/atencion-clientes': 'dilesa.atencion_clientes',
+  '/dilesa/atencion-clientes/respuestas': 'dilesa.atencion_clientes',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',
