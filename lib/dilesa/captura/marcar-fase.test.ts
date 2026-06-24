@@ -168,8 +168,8 @@ describe('FASES_PIPELINE', () => {
     // Los nombres deben ser EXACTAMENTE los de la DB para que el INSERT
     // funcione. Si la migración cambia el seed, romper aquí intencionalmente.
     const nombres = FASES_PIPELINE.map((f) => f.nombre);
-    expect(nombres).toContain('Solicitar asignación');
-    expect(nombres).toContain('Formalizar promesa');
-    expect(nombres).toContain('Cerrar operación');
+    expect(nombres).toContain('Asignación Solicitada');
+    expect(nombres).toContain('Formalizada');
+    expect(nombres).toContain('Operación Terminada');
   });
 });

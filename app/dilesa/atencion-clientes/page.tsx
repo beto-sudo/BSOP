@@ -109,7 +109,7 @@ function UrgenciaChip({ venta }: { venta: VentaEntrega }) {
       ? 'Falta pago'
       : enEntrega
         ? 'Entregar'
-        : (venta.fase_actual ?? (venta.pago_detonado ? 'Detonar crédito' : 'Escriturar'));
+        : (venta.fase_actual ?? (venta.pago_detonado ? 'Detonada' : 'Escriturada'));
   return (
     <Badge tone={urgenciaTono(venta)}>
       <Icono />

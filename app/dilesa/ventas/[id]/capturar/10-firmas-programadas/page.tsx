@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 10 — Programar firmas.
+ * Captura Fase 10 — Firmas Programadas.
  *
  * Gerencia Ventas (o Dirección) programa la fecha + hora de firma ya acordada
  * con el notario (que viene de Fase 7) y genera la Póliza de Garantía.
@@ -347,8 +347,8 @@ function CapturarFase10Body() {
             title="Fase 10 ya está cerrada"
             body={
               fechaFirmaLabel
-                ? `Firma programada para el ${fechaFirmaLabel}. La siguiente fase es Escriturar.`
-                : 'Esta venta ya tiene la firma programada. La siguiente fase es Escriturar.'
+                ? `Firma programada para el ${fechaFirmaLabel}. La siguiente fase es Escriturada.`
+                : 'Esta venta ya tiene la firma programada. La siguiente fase es Escriturada.'
             }
           />
 

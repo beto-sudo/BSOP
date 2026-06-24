@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 8 — Dictaminar (cierre financiero, ADR-048).
+ * Captura Fase 8 — Dictaminada (cierre financiero, ADR-048).
  *
  * Gerencia/notario suben la Carta de Instrucción + el Anexo B (por el magic
  * link del notario o aquí), la IA pre-llena los números y **Dirección cuadra la
@@ -21,7 +21,7 @@
  * verificación cruzada (NSS, nombre, domicilio vs unidad, CLABE de DILESA).
  * Nada se escribe a la venta hasta "Guardar" — la precarga es editable.
  *
- * Enforcement: Fase 7 (Solicitar dictamen) debe estar cerrada.
+ * Enforcement: Fase 7 (Dictamen Solicitado) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase08_dictaminada` (Gerencia Ventas + Dirección).
  */
@@ -1036,7 +1036,7 @@ function CapturarFase8Body() {
       ) : !fase7Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 7 (Solicitar dictamen)"
+          title="Falta cerrar Fase 7 (Dictamen Solicitado)"
           body={
             <>
               Antes de capturar el dictamen, asegúrate de haber enviado la solicitud al notario.
@@ -1129,7 +1129,7 @@ function CapturarFase8Body() {
 
           <Section title="Confirmar datos del crédito">
             <p className="mb-3 text-xs text-[var(--text)]/50">
-              Acarreados de Inscribir crédito (Fase 6). Confirma o corrige si el banco cambió algo.
+              Acarreados de Inscrita (Fase 6). Confirma o corrige si el banco cambió algo.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Monto Crédito Titular">
