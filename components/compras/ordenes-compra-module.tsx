@@ -16,8 +16,19 @@
  * La recepción (devengar `ejercido`) vive en el tab Recepciones (Fase C).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Coins, Loader2, Pencil, Plus, RefreshCw, Search, Send, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Coins,
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import {
@@ -50,6 +61,13 @@ import {
   type OcRow,
 } from '@/lib/compras/ordenes';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
+import { downloadCsv, toCsv } from '@/lib/export/csv';
 
 const SIN = '__sin__';
 /** Valor del selector para ver/crear órdenes de gasto suelto (sin proyecto/partida). */
@@ -128,7 +146,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const autoSelectDone = useRef(false);
+  const [estadoFiltro, setEstadoFiltro] = useState<OcEstado | ''>('');
+  const [rango, setRango] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const [formOpen, setFormOpen] = useState(false);
   const [proveedorId, setProveedorId] = useState('');
@@ -312,16 +331,10 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     void fetchData().then((res) => {
       if (!activo) return;
       apply(res);
-      if (!autoSelectDone.current && !res.error) {
-        const first = (res.rows ?? [])
-          .filter((r) => r.proyectoId)
-          .sort((a, b) => a.proyectoNombre.localeCompare(b.proyectoNombre))[0];
-        // Sin OCs todavía: cae al primer proyecto con partidas.
-        const firstByPartida = [...(res.partidasByProyecto ?? new Map()).keys()][0];
-        const pid = first?.proyectoId ?? firstByPartida ?? '';
-        if (pid) setProyectoFiltro(pid);
-        autoSelectDone.current = true;
-      }
+      // Sin auto-select de proyecto (Sprint 1 `dilesa-compras-operacion`): el
+      // módulo arranca en "Todos los proyectos" para que el operador vea TODO el
+      // pendiente de entrada, no un solo fraccionamiento. El alta exige elegir
+      // proyecto explícitamente.
       setLoading(false);
     });
     return () => {
@@ -351,16 +364,19 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       } else if (proyectoFiltro && r.proyectoId !== proyectoFiltro) {
         return false;
       }
+      if (estadoFiltro && r.estado !== estadoFiltro) return false;
+      if (!isInDateRange(r.fecha, rango)) return false;
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
           r.proveedorNombre.toLowerCase().includes(q) ||
+          r.proyectoNombre.toLowerCase().includes(q) ||
           r.lineas.some((l) => l.partidaLabel.toLowerCase().includes(q));
         if (!hay) return false;
       }
       return true;
     });
-  }, [rows, q, proyectoFiltro]);
+  }, [rows, q, proyectoFiltro, estadoFiltro, rango]);
 
   // El drawer lee la fila viva: tras una acción (enviar / cerrar) el refetch
   // actualiza `rows` y el detalle abierto refleja el estado nuevo.
@@ -640,8 +656,29 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     [toast, cargar]
   );
 
+  const exportarCsv = useCallback(() => {
+    const headers = ['Folio', 'Proyecto', 'Proveedor', 'Estado', 'Líneas', 'Total', 'Fecha'];
+    const filas = filtrados.map((r) => [
+      r.codigo,
+      r.proyectoNombre || 'Gasto suelto',
+      r.proveedorNombre,
+      ESTADO_LABEL[r.estado],
+      r.lineas.length,
+      ocTotal(r),
+      r.fecha ?? '',
+    ]);
+    downloadCsv(`ordenes-compra-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+  }, [filtrados]);
+
   const columns: Column<OcRow>[] = [
     { key: 'codigo', label: 'Folio', type: 'text', sticky: true, width: 'min-w-[120px]' },
+    {
+      key: 'proyectoNombre',
+      label: 'Proyecto',
+      type: 'text',
+      width: 'min-w-[160px]',
+      render: (r) => r.proyectoNombre || 'Gasto suelto',
+    },
     { key: 'proveedorNombre', label: 'Proveedor', type: 'text', width: 'min-w-[200px]' },
     {
       key: 'estado',
@@ -764,15 +801,29 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           ))}
           <option value={LIBRE}>Gasto suelto (sin proyecto)</option>
         </select>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value as OcEstado | '')}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
+          aria-label="Estado"
+        >
+          <option value="">Todos los estados</option>
+          <option value="borrador">Borrador</option>
+          <option value="enviada">Enviada</option>
+          <option value="parcial">Parcial</option>
+          <option value="cerrada">Cerrada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar folio, proveedor o partida…"
+            placeholder="Buscar folio, proveedor, proyecto o partida…"
             className="w-72 pl-9"
           />
         </div>
+        <DateRangeFilter label="Fecha" value={rango} onChange={setRango} />
         <button
           type="button"
           onClick={() => void cargar()}
@@ -781,6 +832,14 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" /> Refrescar
         </button>
         <div className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={exportarCsv}
+            disabled={filtrados.length === 0}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)] disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Exportar
+          </button>
           <span className="text-sm text-[var(--text)]/60">
             {filtrados.length} de {rows.length} órdenes
           </span>

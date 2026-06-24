@@ -15,10 +15,11 @@
  * paralelo + Map lookups, un proyecto a la vez, selector solo-con-presupuesto.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Award,
   ClipboardList,
+  Download,
   FileDown,
   Loader2,
   Mail,
@@ -68,6 +69,13 @@ import {
   type CotProveedor,
 } from '@/lib/compras/cotizaciones';
 import type { EmpresaSlug } from '@/lib/storage';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
+import { downloadCsv, toCsv } from '@/lib/export/csv';
 
 const ESTADO_TONE: Record<CotizacionEstado, BadgeTone> = {
   abierta: 'info',
@@ -136,7 +144,8 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const autoSelectDone = useRef(false);
+  const [estadoFiltro, setEstadoFiltro] = useState<CotizacionEstado | ''>('');
+  const [rango, setRango] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // Alta de RFQ
   const [formOpen, setFormOpen] = useState(false);
@@ -352,11 +361,8 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
     void fetchData().then((res) => {
       if (!activo) return;
       apply(res);
-      if (!autoSelectDone.current && !res.error) {
-        const firstByPartida = [...(res.partidasByProyecto ?? new Map()).keys()][0];
-        if (firstByPartida) setProyectoFiltro(firstByPartida);
-        autoSelectDone.current = true;
-      }
+      // Sin auto-select de proyecto (Sprint 1 `dilesa-compras-operacion`): arranca
+      // en "Todos los proyectos"; el alta de RFQ exige elegir proyecto.
       setLoading(false);
     });
     return () => {
@@ -381,16 +387,19 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
   const filtrados = useMemo(() => {
     return rows.filter((r) => {
       if (proyectoFiltro && r.proyectoId !== proyectoFiltro) return false;
+      if (estadoFiltro && r.estado !== estadoFiltro) return false;
+      if (!isInDateRange(r.fechaLimite, rango)) return false;
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
           r.descripcion.toLowerCase().includes(q) ||
+          r.proyectoNombre.toLowerCase().includes(q) ||
           r.proveedores.some((p) => p.proveedorNombre.toLowerCase().includes(q));
         if (!hay) return false;
       }
       return true;
     });
-  }, [rows, q, proyectoFiltro]);
+  }, [rows, q, proyectoFiltro, estadoFiltro, rango]);
 
   const kpisData = useMemo(() => deriveCotizacionKpis(filtrados), [filtrados]);
   const kpis: ModuleKpi[] = [
@@ -529,8 +538,39 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
 
   const enCaptura = useMemo(() => rows.find((r) => r.id === capturaId) ?? null, [rows, capturaId]);
 
+  const exportarCsv = useCallback(() => {
+    const headers = [
+      'Folio',
+      'Tipo',
+      'Proyecto',
+      'Descripción',
+      'Estado',
+      'Líneas',
+      'Respuestas',
+      'Límite',
+    ];
+    const filas = filtrados.map((r) => [
+      r.codigo,
+      TIPO_LABEL[r.tipo],
+      r.proyectoNombre || '—',
+      r.descripcion,
+      ESTADO_LABEL[r.estado],
+      r.lineas.length,
+      `${r.proveedores.filter((p) => p.estado !== 'invitado').length}/${r.proveedores.length}`,
+      r.fechaLimite ?? '',
+    ]);
+    downloadCsv(`cotizaciones-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+  }, [filtrados]);
+
   const columns: Column<CotizacionRow>[] = [
     { key: 'codigo', label: 'Folio', type: 'text', sticky: true, width: 'min-w-[130px]' },
+    {
+      key: 'proyectoNombre',
+      label: 'Proyecto',
+      type: 'text',
+      width: 'min-w-[150px]',
+      render: (r) => r.proyectoNombre || '—',
+    },
     {
       key: 'tipo',
       label: 'Tipo',
@@ -631,15 +671,28 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value as CotizacionEstado | '')}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
+          aria-label="Estado"
+        >
+          <option value="">Todos los estados</option>
+          <option value="abierta">Abierta</option>
+          <option value="comparada">Comparada</option>
+          <option value="adjudicada">Adjudicada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar folio, descripción o proveedor…"
+            placeholder="Buscar folio, descripción, proyecto o proveedor…"
             className="w-72 pl-9"
           />
         </div>
+        <DateRangeFilter label="Límite" value={rango} onChange={setRango} />
         <button
           type="button"
           onClick={() => void cargar()}
@@ -648,6 +701,14 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" /> Refrescar
         </button>
         <div className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={exportarCsv}
+            disabled={filtrados.length === 0}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)] disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Exportar
+          </button>
           <span className="text-sm text-[var(--text)]/60">
             {filtrados.length} de {rows.length} cotizaciones
           </span>
