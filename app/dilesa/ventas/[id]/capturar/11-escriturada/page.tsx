@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 11 — Escriturada (Sprint 7i).
+ * Captura Fase 11 — Escriturar (Sprint 7i).
  *
  * Tras la firma en notaría, las escrituras llegan a Dirección (Beto, o quien
  * de Dirección esté) para firmar. Se registra:
@@ -14,7 +14,7 @@
  *
  * Sin documentos requeridos.
  *
- * Enforcement: Fase 10 (Firmas Programadas) debe estar cerrada.
+ * Enforcement: Fase 10 (Programar firmas) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase11_escriturada` (Gerencia Ventas + Dirección).
  */
 
@@ -181,7 +181,6 @@ function CapturarFase11Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Escriturada',
         faseposicion: 11,
         docs: [],
         camposVenta: {
@@ -285,7 +284,7 @@ function CapturarFase11Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={11} faseNombre="Escriturada" />
+        <CapturarFaseHeader faseposicion={11} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -297,7 +296,6 @@ function CapturarFase11Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={11}
-        faseNombre="Escriturada"
         descripcion="Registra la escrituración: fecha de escritura y el cheque enviado a la notaría (número y monto)."
       />
 
@@ -306,7 +304,7 @@ function CapturarFase11Body() {
           <Banner
             tone="success"
             title="Fase 11 ya está cerrada"
-            body="Esta venta ya está escriturada. La siguiente fase es Detonada. Si el número o la fecha de la escritura quedaron mal capturados (ej. folio interno en lugar del instrumento del notario), corrígelos aquí — la revisión PLD de la Fase 13 los cruza contra el aviso."
+            body="Esta venta ya está escriturada. La siguiente fase es Detonar crédito. Si el número o la fecha de la escritura quedaron mal capturados (ej. folio interno en lugar del instrumento del notario), corrígelos aquí — la revisión PLD de la Fase 13 los cruza contra el aviso."
           />
           <form onSubmit={onActualizarEscritura} className="space-y-6">
             <Section title="Corregir datos de la escritura">
@@ -349,7 +347,7 @@ function CapturarFase11Body() {
       ) : fase10Cerrada === false ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 10 (Firmas Programadas)"
+          title="Falta cerrar Fase 10 (Programar firmas)"
           body={
             <>
               Antes de registrar la escrituración, programa la firma (Fase 10). Vuelve al detalle y

@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Captura Fase 4 — Solicitud de Avalúo (Sprint 7d).
+ * Captura Fase 4 — Solicitar avalúo (Sprint 7d).
  *
- * Cierra la fase de Solicitud de Avalúo: Gerencia Ventas (o Dirección)
+ * Cierra la fase de Solicitar avalúo: Gerencia Ventas (o Dirección)
  * asigna una casa valuadora del catálogo (`erp.personas` con
  * `tipo='valuador'`) y dispara el email de solicitud al valuador.
  *
@@ -162,7 +162,6 @@ function CapturarFase4Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Solicitud de Avalúo',
         faseposicion: 4,
         docs: [],
         camposVenta: {
@@ -220,7 +219,7 @@ function CapturarFase4Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={4} faseNombre="Solicitud de Avalúo" />
+        <CapturarFaseHeader faseposicion={4} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -234,7 +233,6 @@ function CapturarFase4Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={4}
-        faseNombre="Solicitud de Avalúo"
         descripcion="Asigna una casa valuadora y dispara el email con los datos del inmueble y del cliente."
       />
 
@@ -242,12 +240,12 @@ function CapturarFase4Body() {
         <Banner
           tone="success"
           title="Fase 4 ya está cerrada"
-          body="Esta venta ya pasó por Solicitud de Avalúo. La siguiente fase es Avalúo Cerrado."
+          body="Esta venta ya pasó por Solicitar avalúo. La siguiente fase es Cerrar avalúo."
         />
       ) : !fase3Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 3 (Formalizada)"
+          title="Falta cerrar Fase 3 (Formalizar promesa)"
           body={
             <>
               Antes de solicitar el avalúo, asegúrate de que el contrato de promesa esté firmado y

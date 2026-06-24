@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 10 — Firmas Programadas.
+ * Captura Fase 10 — Programar firmas.
  *
  * Gerencia Ventas (o Dirección) programa la fecha + hora de firma ya acordada
  * con el notario (que viene de Fase 7) y genera la Póliza de Garantía.
@@ -9,7 +9,7 @@
  * ADR-048: el **crédito directo (pagaré) ya NO se captura aquí** — se define en
  * la dictaminación (fase 8), con el saldo REAL del Anexo B. Si la venta tiene
  * crédito directo, aquí solo se sube el **pagaré firmado** que se recaba en la
- * firma (rol `pagare`, el mismo que reconoce la fase Escriturada y
+ * firma (rol `pagare`, el mismo que reconoce la fase Escriturar y
  * `rolesOpcionales`).
  *
  * Tasas / cobertura / plan de pagos: viven en la fase 8.
@@ -263,7 +263,6 @@ function CapturarFase10Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Firmas Programadas',
         faseposicion: 10,
         docs: [], // el pagaré (si se subió) ya vive en el expediente
         // Si la fecha está bloqueada (póliza ya expedida y no eres Dirección)
@@ -312,7 +311,7 @@ function CapturarFase10Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={10} faseNombre="Firmas Programadas" />
+        <CapturarFaseHeader faseposicion={10} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -367,7 +366,6 @@ function CapturarFase10Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={10}
-        faseNombre="Firmas Programadas"
         descripcion="Programa la fecha y hora de firma acordada con el notario y genera la Póliza de Garantía."
       />
 
@@ -378,8 +376,8 @@ function CapturarFase10Body() {
             title="Fase 10 ya está cerrada"
             body={
               fechaFirmaLabel
-                ? `Firma programada para el ${fechaFirmaLabel}. La siguiente fase es Escriturada.`
-                : 'Esta venta ya tiene la firma programada. La siguiente fase es Escriturada.'
+                ? `Firma programada para el ${fechaFirmaLabel}. La siguiente fase es Escriturar.`
+                : 'Esta venta ya tiene la firma programada. La siguiente fase es Escriturar.'
             }
           />
 

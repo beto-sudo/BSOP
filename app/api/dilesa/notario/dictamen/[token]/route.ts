@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const posiciones = new Set<number>((fases ?? []).map((f) => f.posicion as number));
   if (!posiciones.has(7)) {
     return NextResponse.json(
-      { ok: false, error: 'La Fase 7 (Solicitud de Dictaminación) no está cerrada.' },
+      { ok: false, error: 'La Fase 7 (Solicitar dictamen) no está cerrada.' },
       { status: 409 }
     );
   }

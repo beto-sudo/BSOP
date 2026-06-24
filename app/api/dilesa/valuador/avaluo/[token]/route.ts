@@ -31,6 +31,7 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { verifyAvaluoToken } from '@/lib/dilesa/avaluo-token';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { nombreFase } from '@/lib/dilesa/fases';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const posiciones = new Set<number>((fases ?? []).map((f) => f.posicion as number));
   if (!posiciones.has(4)) {
     return NextResponse.json(
-      { ok: false, error: 'La Fase 4 (Solicitud de Avalúo) no está cerrada.' },
+      { ok: false, error: 'La Fase 4 (Solicitar avalúo) no está cerrada.' },
       { status: 409 }
     );
   }
@@ -201,7 +202,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     .update({
       monto_avaluo: monto,
       fecha_avaluo_cerrado: fecha,
-      fase_actual: 'Avalúo Cerrado',
+      fase_actual: nombreFase(5),
       fase_posicion: 5,
     })
     .eq('id', ventaId);
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     .insert({
       empresa_id: DILESA_EMPRESA_ID,
       venta_id: ventaId,
-      fase: 'Avalúo Cerrado',
+      fase: nombreFase(5),
       posicion: 5,
       fecha: new Date().toISOString().slice(0, 10),
       registrado_por: null,

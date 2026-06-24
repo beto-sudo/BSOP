@@ -5,7 +5,7 @@ import type { EstancadaRow } from './estancadas-data';
 function row(p: Partial<EstancadaRow>): EstancadaRow {
   return {
     ventaId: p.ventaId ?? 'x',
-    faseActual: p.faseActual ?? 'Avalúo Cerrado',
+    faseActual: p.faseActual ?? 'Cerrar avalúo',
     fasePosicion: p.fasePosicion ?? 5,
     fechaFaseActual: p.fechaFaseActual ?? '2026-06-01',
     diasEnFase: p.diasEnFase ?? 0,

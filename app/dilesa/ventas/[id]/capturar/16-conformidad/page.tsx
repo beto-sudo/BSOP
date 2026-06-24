@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 16 — Conformidad del Cliente (dilesa-ventas-expediente S5).
+ * Captura Fase 16 — Recabar conformidad (dilesa-ventas-expediente S5).
  *
  * La fase normalmente se cierra SOLA: al cerrar F15 se programa la encuesta
  * (entrega + 2 días), el cron la envía/recuerda, y la respuesta del cliente
@@ -240,7 +240,6 @@ function CapturarFase16Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Conformidad del Cliente',
         faseposicion: 16,
         docs: [],
         camposVenta: {},
@@ -292,7 +291,6 @@ function CapturarFase16Body() {
     }
     const result = await marcarFase(sb, {
       ventaId: venta.id,
-      faseNombre: 'Conformidad del Cliente',
       faseposicion: 16,
       docs: [],
       camposVenta: {},
@@ -325,7 +323,7 @@ function CapturarFase16Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={16} faseNombre="Conformidad del Cliente" />
+        <CapturarFaseHeader faseposicion={16} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -340,14 +338,13 @@ function CapturarFase16Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={16}
-        faseNombre="Conformidad del Cliente"
         descripcion="Encuesta posventa: se envía sola tras la entrega; aquí se monitorea el ciclo y se captura por teléfono si hace falta."
       />
 
       {!fase15Cerrada && !yaCerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 15 (Entregada)"
+          title="Falta cerrar Fase 15 (Entregar)"
           body="Al cerrar la entrega, la encuesta se programa automáticamente (entrega + 2 días)."
           extra={
             <Link
@@ -439,7 +436,7 @@ function CapturarFase16Body() {
             <Banner
               tone="success"
               title="Fase 16 ya está cerrada"
-              body="La conformidad del cliente quedó registrada. La siguiente fase es Operación Terminada."
+              body="La conformidad del cliente quedó registrada. La siguiente fase es Cerrar operación."
             />
           ) : !respondida ? (
             <>

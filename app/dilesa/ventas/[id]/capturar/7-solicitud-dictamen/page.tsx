@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 7 — Solicitud de Dictaminación (Sprint 7f).
+ * Captura Fase 7 — Solicitar dictamen (Sprint 7f).
  *
  * Cierra la fase de Solicitud de Dictamen: Gerencia Ventas (o Dirección)
  * asigna una notaría del catálogo de proveedores (`erp.proveedores` con
@@ -13,7 +13,7 @@
  *   - `fecha_solicitud_dictamen` → fecha del cierre (default hoy)
  *   - Sin doc requerido (el dictamen llega en Fase 8)
  *
- * Enforcement: Fase 6 (Inscrita) debe estar cerrada.
+ * Enforcement: Fase 6 (Inscribir crédito) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase07_solicitud_dictamen` (Gerencia Ventas +
  * Dirección por default — backfill de la migración).
@@ -146,7 +146,6 @@ function CapturarFase7Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Solicitud de Dictaminación',
         faseposicion: 7,
         docs: [],
         camposVenta: {
@@ -206,7 +205,7 @@ function CapturarFase7Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={7} faseNombre="Solicitud de Dictaminación" />
+        <CapturarFaseHeader faseposicion={7} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -220,7 +219,6 @@ function CapturarFase7Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={7}
-        faseNombre="Solicitud de Dictaminación"
         descripcion="Asigna una notaría y dispara el email con los datos del cliente, inmueble y crédito."
       />
 
@@ -228,12 +226,12 @@ function CapturarFase7Body() {
         <Banner
           tone="success"
           title="Fase 7 ya está cerrada"
-          body="Esta venta ya pasó por Solicitud de Dictaminación. La siguiente fase es Dictaminada."
+          body="Esta venta ya pasó por Solicitar dictamen. La siguiente fase es Dictaminar."
         />
       ) : !fase6Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 6 (Inscrita)"
+          title="Falta cerrar Fase 6 (Inscribir crédito)"
           body={
             <>
               Antes de solicitar dictamen, captura primero las Constancias de Crédito. Vuelve al

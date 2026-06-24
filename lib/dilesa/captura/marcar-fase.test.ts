@@ -82,7 +82,6 @@ function fakeFile(name = 'contrato.pdf', size = 1024): File {
 describe('marcarFase', () => {
   const baseInput = {
     ventaId: '550e8400-e29b-41d4-a716-446655440000',
-    faseNombre: 'Formalizada',
     faseposicion: 3,
     docs: [{ rol: 'contrato_promesa', archivo: fakeFile() }],
     camposVenta: { precio_asignacion: 1_021_000 },
@@ -169,8 +168,8 @@ describe('FASES_PIPELINE', () => {
     // Los nombres deben ser EXACTAMENTE los de la DB para que el INSERT
     // funcione. Si la migración cambia el seed, romper aquí intencionalmente.
     const nombres = FASES_PIPELINE.map((f) => f.nombre);
-    expect(nombres).toContain('Solicitud de Asignación');
-    expect(nombres).toContain('Formalizada');
-    expect(nombres).toContain('Operación Terminada');
+    expect(nombres).toContain('Solicitar asignación');
+    expect(nombres).toContain('Formalizar promesa');
+    expect(nombres).toContain('Cerrar operación');
   });
 });

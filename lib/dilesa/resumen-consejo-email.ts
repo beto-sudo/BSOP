@@ -918,11 +918,11 @@ export async function fetchResumenConsejoData(
       .is('deleted_at', null),
     dilesa
       .from('venta_fases')
-      .select('venta_id,fase,fecha')
+      .select('venta_id,posicion,fecha')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
       .gte('fecha', inicioMes)
-      .in('fase', ['Asignada', 'Escriturada']),
+      .in('posicion', [2, 11]),
     dilesa.from('v_contratista_obra').select('*').eq('empresa_id', empresaId),
     erp.from('v_cuenta_saldo_actual').select('*').eq('empresa_id', empresaId),
     dilesa
@@ -930,7 +930,7 @@ export async function fetchResumenConsejoData(
       .select('venta_id')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
-      .eq('fase', 'Asignada')
+      .eq('posicion', 2)
       .gte('fecha', inicio3m),
   ]);
 
@@ -1007,7 +1007,7 @@ export async function fetchResumenConsejoData(
     );
     const acc = new Map<string, AsignacionRow>();
     for (const f of fasesMesRes.data ?? []) {
-      const ff = f as { venta_id: string; fase: string };
+      const ff = f as { venta_id: string; posicion: number | null };
       const v = ventaInfo.get(ff.venta_id) as Record<string, unknown> | undefined;
       if (!v) continue;
       const proto = protoNombre.get(unidadProto.get(v.unidad_id as string) ?? '') ?? '—';
@@ -1018,10 +1018,10 @@ export async function fetchResumenConsejoData(
         escrituras_mes: 0,
         monto_escrituras: 0,
       };
-      if (ff.fase === 'Asignada') {
+      if (ff.posicion === 2) {
         row.asignaciones_mes += 1;
         row.monto_asignaciones += Number(v.precio_asignacion ?? 0);
-      } else if (ff.fase === 'Escriturada') {
+      } else if (ff.posicion === 11) {
         row.escrituras_mes += 1;
         row.monto_escrituras += Number(v.valor_escrituracion ?? 0);
       }

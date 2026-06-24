@@ -43,7 +43,7 @@ export function CopilotoCierre({
         <div className="flex items-center gap-2">
           <PartyPopper className="size-5 text-emerald-600 dark:text-emerald-400" />
           <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-            Operación Terminada{fecha17 ? ` · ${fecha17}` : ''}
+            Operación cerrada{fecha17 ? ` · ${fecha17}` : ''}
           </h3>
         </div>
         <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-100/80">
@@ -109,7 +109,7 @@ export function CopilotoCierre({
           href={`/dilesa/ventas/${ventaId}/capturar/17-operacion-terminada`}
           className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
         >
-          Marcar Operación Terminada
+          Cerrar operación
           <ChevronRight className="size-4" />
         </Link>
       ) : null}

@@ -11,9 +11,9 @@
  * Captura:
  *   - `fecha_validacion_patronal` → fecha del documento (default hoy)
  *   - Doc requerido: rol `validacion_patronal` (PDF de la validación).
- *     Coincide con `FASE_ROLES['Validación Patronal']` en el detalle.
+ *     Coincide con `FASE_ROLES[9]` en el detalle.
  *
- * Enforcement: Fase 8 (Dictaminada) debe estar cerrada.
+ * Enforcement: Fase 8 (Dictaminar) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase09_validacion_patronal` (Gerencia Ventas +
  * Dirección por default — backfill de la migración).
@@ -152,7 +152,6 @@ function CapturarFase9Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Validación Patronal',
         faseposicion: 9,
         docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {
@@ -196,7 +195,7 @@ function CapturarFase9Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={9} faseNombre="Validación Patronal" />
+        <CapturarFaseHeader faseposicion={9} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -208,7 +207,6 @@ function CapturarFase9Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={9}
-        faseNombre="Validación Patronal"
         descripcion="Sube el PDF de la Validación Patronal que el patrón le entrega al empleado."
       />
 
@@ -216,12 +214,12 @@ function CapturarFase9Body() {
         <Banner
           tone="success"
           title="Fase 9 ya está cerrada"
-          body="Esta venta ya pasó por Validación Patronal. La siguiente fase es Firmas Programadas."
+          body="Esta venta ya pasó por Validación Patronal. La siguiente fase es Programar firmas."
         />
       ) : !fase8Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 8 (Dictaminada)"
+          title="Falta cerrar Fase 8 (Dictaminar)"
           body={
             <>
               Antes de subir la Validación Patronal, la venta debe estar dictaminada. Vuelve al

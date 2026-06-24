@@ -9,9 +9,9 @@ import {
 
 const FASES: FaseCatalogo[] = [
   // A propósito desordenadas para verificar el sort por posición.
-  { posicion: 2, nombre: 'Asignada', rol: 'Gerencia General' },
-  { posicion: 1, nombre: 'Solicitud de Asignación', rol: 'Todos' },
-  { posicion: 3, nombre: 'Formalizada', rol: 'Gerencia General' },
+  { posicion: 2, nombre: 'Asignar unidad', rol: 'Gerencia General' },
+  { posicion: 1, nombre: 'Solicitar asignación', rol: 'Todos' },
+  { posicion: 3, nombre: 'Formalizar promesa', rol: 'Gerencia General' },
 ];
 
 describe('construirPipelinePorFase', () => {
@@ -26,37 +26,37 @@ describe('construirPipelinePorFase', () => {
 
   it('cuenta y suma monto solo de ventas activas, por fase', () => {
     const ventas: VentaPipeline[] = [
-      { estado: 'activa', fase_actual: 'Asignada', precio: 100 },
-      { estado: 'activa', fase_actual: 'Asignada', precio: 200 },
-      { estado: 'activa', fase_actual: 'Formalizada', precio: 50 },
-      { estado: 'desasignada', fase_actual: 'Asignada', precio: 999 }, // excluida
+      { estado: 'activa', fase_actual: 'Asignar unidad', precio: 100 },
+      { estado: 'activa', fase_actual: 'Asignar unidad', precio: 200 },
+      { estado: 'activa', fase_actual: 'Formalizar promesa', precio: 50 },
+      { estado: 'desasignada', fase_actual: 'Asignar unidad', precio: 999 }, // excluida
     ];
     const res = construirPipelinePorFase(FASES, ventas);
-    const asignada = res.filas.find((f) => f.fase === 'Asignada')!;
+    const asignada = res.filas.find((f) => f.fase === 'Asignar unidad')!;
     expect(asignada.ventas).toBe(2);
     expect(asignada.monto).toBe(300);
     expect(res.totalVentas).toBe(3);
     expect(res.totalMonto).toBe(350);
-    expect(res.faseCuello).toBe('Asignada');
+    expect(res.faseCuello).toBe('Asignar unidad');
   });
 
   it('trata precio null como 0 en el monto pero cuenta la venta', () => {
     const ventas: VentaPipeline[] = [
-      { estado: 'activa', fase_actual: 'Formalizada', precio: null },
+      { estado: 'activa', fase_actual: 'Formalizar promesa', precio: null },
     ];
     const res = construirPipelinePorFase(FASES, ventas);
-    const f = res.filas.find((x) => x.fase === 'Formalizada')!;
+    const f = res.filas.find((x) => x.fase === 'Formalizar promesa')!;
     expect(f.ventas).toBe(1);
     expect(f.monto).toBe(0);
   });
 
   it('calcula los shares (pctVentas/pctMonto) sobre los totales', () => {
     const ventas: VentaPipeline[] = [
-      { estado: 'activa', fase_actual: 'Asignada', precio: 75 },
-      { estado: 'activa', fase_actual: 'Formalizada', precio: 25 },
+      { estado: 'activa', fase_actual: 'Asignar unidad', precio: 75 },
+      { estado: 'activa', fase_actual: 'Formalizar promesa', precio: 25 },
     ];
     const res = construirPipelinePorFase(FASES, ventas);
-    const asignada = res.filas.find((f) => f.fase === 'Asignada')!;
+    const asignada = res.filas.find((f) => f.fase === 'Asignar unidad')!;
     expect(asignada.pctVentas).toBeCloseTo(0.5);
     expect(asignada.pctMonto).toBeCloseTo(0.75);
   });
@@ -74,7 +74,7 @@ describe('filtrarVentas', () => {
   const base: VentaReporte[] = [
     {
       estado: 'activa',
-      fase_actual: 'Asignada',
+      fase_actual: 'Asignar unidad',
       precio: 100,
       proyectoId: 'p1',
       vendedor: 'Ana',
@@ -82,7 +82,7 @@ describe('filtrarVentas', () => {
     },
     {
       estado: 'activa',
-      fase_actual: 'Formalizada',
+      fase_actual: 'Formalizar promesa',
       precio: 200,
       proyectoId: 'p2',
       vendedor: 'Beto',
@@ -90,7 +90,7 @@ describe('filtrarVentas', () => {
     },
     {
       estado: 'activa',
-      fase_actual: 'Asignada',
+      fase_actual: 'Asignar unidad',
       precio: 300,
       proyectoId: 'p1',
       vendedor: 'Beto',

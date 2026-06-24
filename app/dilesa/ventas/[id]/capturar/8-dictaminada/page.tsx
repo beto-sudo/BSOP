@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 8 — Dictaminada (cierre financiero, ADR-048).
+ * Captura Fase 8 — Dictaminar (cierre financiero, ADR-048).
  *
  * Gerencia/notario suben la Carta de Instrucción + el Anexo B (por el magic
  * link del notario o aquí), la IA pre-llena los números y **Dirección cuadra la
@@ -21,7 +21,7 @@
  * verificación cruzada (NSS, nombre, domicilio vs unidad, CLABE de DILESA).
  * Nada se escribe a la venta hasta "Guardar" — la precarga es editable.
  *
- * Enforcement: Fase 7 (Solicitud de Dictaminación) debe estar cerrada.
+ * Enforcement: Fase 7 (Solicitar dictamen) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase08_dictaminada` (Gerencia Ventas + Dirección).
  */
@@ -460,7 +460,6 @@ function CapturarFase8Body() {
         docs.push({ rol: 'condiciones_financieras', archivo: archivoCondiciones });
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Dictaminada',
         faseposicion: 8,
         docs,
         camposVenta: {
@@ -761,7 +760,7 @@ function CapturarFase8Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={8} faseNombre="Dictaminada" />
+        <CapturarFaseHeader faseposicion={8} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -840,7 +839,6 @@ function CapturarFase8Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={8}
-        faseNombre="Dictaminada"
         descripcion="Captura manual del dictamen (cuando el notario no usa el magic link del email)."
       />
 
@@ -997,7 +995,7 @@ function CapturarFase8Body() {
       ) : !fase7Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 7 (Solicitud de Dictaminación)"
+          title="Falta cerrar Fase 7 (Solicitar dictamen)"
           body={
             <>
               Antes de capturar el dictamen, asegúrate de haber enviado la solicitud al notario.
@@ -1090,7 +1088,7 @@ function CapturarFase8Body() {
 
           <Section title="Confirmar datos del crédito">
             <p className="mb-3 text-xs text-[var(--text)]/50">
-              Acarreados de Inscrita (Fase 6). Confirma o corrige si el banco cambió algo.
+              Acarreados de Inscribir crédito (Fase 6). Confirma o corrige si el banco cambió algo.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Monto Crédito Titular">

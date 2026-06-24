@@ -24,6 +24,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { FASES_VENTA, nombreFase, type FaseSlug } from '@/lib/dilesa/fases';
 
 export type DocCaptura = {
   /** Rol del adjunto (ej. 'contrato_promesa', 'aviso_pld', 'factura'). */
@@ -34,8 +35,7 @@ export type DocCaptura = {
 
 export type MarcarFaseInput = {
   ventaId: string;
-  /** Nombre canónico de la fase (debe coincidir con `dilesa.venta_fase_catalogo.nombre`). */
-  faseNombre: string;
+  /** Posición de la fase (1–17). El nombre se deriva de `lib/dilesa/fases.ts`. */
   faseposicion: number;
   /** Documentos a subir + crear como `erp.adjuntos`. */
   docs: DocCaptura[];
@@ -66,7 +66,7 @@ export async function marcarFase(
   sb: SupabaseClient,
   input: MarcarFaseInput
 ): Promise<MarcarFaseResult> {
-  const { ventaId, faseNombre, faseposicion, docs, camposVenta, notas, registradoPor } = input;
+  const { ventaId, faseposicion, docs, camposVenta, notas, registradoPor } = input;
   let adjuntosCreados = 0;
 
   // 1) Subir archivos a Storage + 2) insertar en erp.adjuntos
@@ -134,7 +134,7 @@ export async function marcarFase(
     .maybeSingle();
   const posActual = (ventaActual?.fase_posicion as number | null) ?? 0;
   if (faseposicion > posActual) {
-    camposParaUpdate.fase_actual = faseNombre;
+    camposParaUpdate.fase_actual = nombreFase(faseposicion);
     camposParaUpdate.fase_posicion = faseposicion;
   }
   if (Object.keys(camposParaUpdate).length > 0) {
@@ -159,7 +159,7 @@ export async function marcarFase(
     .insert({
       empresa_id: DILESA_EMPRESA_ID,
       venta_id: ventaId,
-      fase: faseNombre,
+      fase: nombreFase(faseposicion),
       posicion: faseposicion,
       fecha: new Date().toISOString().slice(0, 10),
       registrado_por: registradoPor,
@@ -179,28 +179,10 @@ export async function marcarFase(
 }
 
 /**
- * Catálogo central de fases — index 0 = Fase 1. Replica `FASES_ORDEN` de
- * `app/dilesa/ventas/[id]/page.tsx` pero como TS (no JSX) para que el
- * helper sea reusable en server actions futuros.
+ * Catálogo de fases para captura — alias de la fuente única `lib/dilesa/fases.ts`.
+ * Conserva la forma `{ posicion, nombre, slug }` que consumen el copiloto de
+ * cierre y el resumen de captura.
  */
-export const FASES_PIPELINE = [
-  { posicion: 1, nombre: 'Solicitud de Asignación', slug: '1-solicitud-asignacion' },
-  { posicion: 2, nombre: 'Asignada', slug: '2-asignada' },
-  { posicion: 3, nombre: 'Formalizada', slug: '3-formalizada' },
-  { posicion: 4, nombre: 'Solicitud de Avalúo', slug: '4-solicitud-avaluo' },
-  { posicion: 5, nombre: 'Avalúo Cerrado', slug: '5-avaluo-cerrado' },
-  { posicion: 6, nombre: 'Inscrita', slug: '6-inscrita' },
-  { posicion: 7, nombre: 'Solicitud de Dictaminación', slug: '7-solicitud-dictamen' },
-  { posicion: 8, nombre: 'Dictaminada', slug: '8-dictaminada' },
-  { posicion: 9, nombre: 'Validación Patronal', slug: '9-validacion-patronal' },
-  { posicion: 10, nombre: 'Firmas Programadas', slug: '10-firmas-programadas' },
-  { posicion: 11, nombre: 'Escriturada', slug: '11-escriturada' },
-  { posicion: 12, nombre: 'Detonada', slug: '12-detonada' },
-  { posicion: 13, nombre: 'Facturada', slug: '13-facturada' },
-  { posicion: 14, nombre: 'Preparada para Entrega', slug: '14-preparada-entrega' },
-  { posicion: 15, nombre: 'Entregada', slug: '15-entregada' },
-  { posicion: 16, nombre: 'Conformidad del Cliente', slug: '16-conformidad' },
-  { posicion: 17, nombre: 'Operación Terminada', slug: '17-operacion-terminada' },
-] as const;
+export const FASES_PIPELINE = FASES_VENTA;
 
-export type FaseSlug = (typeof FASES_PIPELINE)[number]['slug'];
+export type { FaseSlug };

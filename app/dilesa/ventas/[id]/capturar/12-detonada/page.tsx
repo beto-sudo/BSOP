@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Fase 12 — Detonada. GUÍA a Cobranza + cierre manual SOLO Dirección.
+ * Fase 12 — Detonar crédito. GUÍA a Cobranza + cierre manual SOLO Dirección.
  *
  * "Detonar" el crédito = la institución libera el recurso y DILESA recibe el
  * depósito. El camino ÚNICO normal (2026-06-11) es: Contabilidad registra el
@@ -16,7 +16,7 @@
  * cierre de emergencia exclusivo de Dirección/admin, con advertencia de que
  * NO registra el dinero en Cobranza.
  *
- * Enforcement: Fase 11 (Escriturada) debe estar cerrada.
+ * Enforcement: Fase 11 (Escriturar) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase12_detonada` (Contabilidad + Gerencia Ventas +
  * Dirección); el form de emergencia además exige Dirección
  * (`EffectiveUser.direccionEmpresaIds` o admin global).
@@ -188,7 +188,6 @@ function CapturarFase12Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Detonada',
         faseposicion: 12,
         docs: [], // el comprobante ya vive en el expediente (subida incremental)
         camposVenta: {
@@ -232,7 +231,7 @@ function CapturarFase12Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={12} faseNombre="Detonada" />
+        <CapturarFaseHeader faseposicion={12} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -244,7 +243,6 @@ function CapturarFase12Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={12}
-        faseNombre="Detonada"
         descripcion="Registra la detonación del crédito (el depósito recibido) y sube el comprobante."
       />
 
@@ -252,12 +250,12 @@ function CapturarFase12Body() {
         <Banner
           tone="success"
           title="Fase 12 ya está cerrada"
-          body="Esta venta ya está detonada. La siguiente fase es Facturada."
+          body="Esta venta ya está detonada. La siguiente fase es Facturar."
         />
       ) : fase11Cerrada === false ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 11 (Escriturada)"
+          title="Falta cerrar Fase 11 (Escriturar)"
           body={
             <>
               Antes de registrar la detonación, la venta debe estar escriturada. Vuelve al detalle y
