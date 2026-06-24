@@ -28,6 +28,8 @@ Flujo de fases (no cambia): `… 7 Solicitud Dictamen → 8 Dictaminada → 9 Va
 
 **D6 — La congelación del precio (regla 2026-06-15) cede en la dictaminación.** El precio se congela al asignar para que reglas globales (ZCU, +6%) no re-tarifen ventas viejas; la dictaminación es la **excepción legítima** — ahí llegan los datos reales y Dirección puede ajustar el precio, condicionado a la re-firma de D5. Una sesión futura NO debe tratar este ajuste como violación de la congelación.
 
+**D7 — El pagaré firmado también se recaba en la fase 8 (decisión Beto 2026-06-24).** D1/D4 movieron a la fase 8 la **definición** del pagaré (monto/plan/tasas), pero el **documento firmado** (adjunto rol `pagare`) había quedado como slot opcional en la fase 10 — un cabo suelto. Se **mueve el slot a la fase 8** y se vuelve **obligatorio para cerrar la dictaminación cuando la operación lleva crédito directo** (`coberturaGastos.pagareNecesario > 0`): no se cierra la fase 8 sin el pagaré firmado subido. El slot sale de la fase 10. El adjunto es por rol y vive en el expediente, así que sigue visible en la fase Escriturar; las ventas ya dictaminadas (fase ≥ 8) lo suben desde la vista "fase ya cerrada" de la 8. Razón: el cliente firma el pagaré en la dictaminación, cuando acepta el crédito directo — recabarlo ahí evita cerrar el cierre financiero sin el documento que lo respalda.
+
 ## Migración
 
 Las ventas en **fase 10 (pagaré) que aún no programan firmas** se **regresan a la fase 8** (`regresarAFase`, ya existe) para cuadrar ahí, **conservando los documentos ya subidos**. Vuelven a pasar por dictaminación con el flujo nuevo. Las que ya programaron firmas o escrituraron no se tocan.
