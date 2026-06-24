@@ -13,7 +13,16 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, ClipboardList, HardHat, KeyRound, Star } from 'lucide-react';
+import {
+  Banknote,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  HardHat,
+  KeyRound,
+  Lock,
+  Star,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +47,10 @@ type VentaEntrega = {
   cola: 'pre_entrega' | 'entrega';
   // F12 (Detonada) cerrada = pago recibido. Sin esto no se puede entregar.
   pago_detonado: boolean | null;
+  // Nombre de la fase actual (Escriturada / Detonada / Facturada / …).
+  fase_actual: string | null;
+  // Días desde que alcanzó su fase actual (para el chip de urgencia).
+  dias_en_fase: number | null;
 };
 type Encuesta = {
   encuesta_id: string;
@@ -56,6 +69,57 @@ type Kpi = {
   calif_vivienda_prom: number | null;
   calif_proceso_prom: number | null;
 };
+
+type UrgenciaTono = 'danger' | 'warning' | 'neutral';
+
+/**
+ * Urgencia de una venta en cola de pre-entrega/entrega. La detonación manda:
+ * Atención a Clientes solo puede accionar sobre las detonadas (las escrituradas
+ * esperan el pago, que es de Cobranza). Decisión de Beto (2026-06-23):
+ *   - entrega + detonada     → rojo (solo falta el acto físico de entrega).
+ *   - entrega sin pago        → neutral (bloqueada: "Falta pago").
+ *   - pre-entrega + detonada  → rojo si lleva >3 días, ámbar si es reciente.
+ *   - pre-entrega sin detonar → ámbar si lleva >21 días (estancada), si no neutral.
+ */
+function urgenciaTono(v: VentaEntrega): UrgenciaTono {
+  const d = v.dias_en_fase;
+  if (v.cola === 'entrega') return v.pago_detonado ? 'danger' : 'neutral';
+  if (v.pago_detonado) return d != null && d > 3 ? 'danger' : 'warning';
+  return d != null && d > 21 ? 'warning' : 'neutral';
+}
+
+const URGENCIA_RANK: Record<UrgenciaTono, number> = { danger: 0, warning: 1, neutral: 2 };
+
+/** Orden de cola: lo más urgente primero, y a igual urgencia, más días arriba. */
+function porUrgencia(a: VentaEntrega, b: VentaEntrega): number {
+  const ra = URGENCIA_RANK[urgenciaTono(a)];
+  const rb = URGENCIA_RANK[urgenciaTono(b)];
+  if (ra !== rb) return ra - rb;
+  return (b.dias_en_fase ?? -1) - (a.dias_en_fase ?? -1);
+}
+
+/** Chip de urgencia: fase actual + días en fase, coloreado por urgenciaTono. */
+function UrgenciaChip({ venta }: { venta: VentaEntrega }) {
+  const enEntrega = venta.cola === 'entrega';
+  const sinPago = !venta.pago_detonado;
+  const Icono =
+    enEntrega && sinPago ? Lock : enEntrega ? KeyRound : venta.pago_detonado ? Banknote : Clock;
+  const label =
+    enEntrega && sinPago
+      ? 'Falta pago'
+      : enEntrega
+        ? 'Entregar'
+        : (venta.fase_actual ?? (venta.pago_detonado ? 'Detonada' : 'Escriturada'));
+  return (
+    <Badge tone={urgenciaTono(venta)}>
+      <Icono />
+      {label}
+      {venta.dias_en_fase != null ? (
+        <span className="opacity-70">· {venta.dias_en_fase} d</span>
+      ) : null}
+    </Badge>
+  );
+}
 
 export default function AtencionClientesPage() {
   return (
@@ -101,8 +165,14 @@ function Body() {
     };
   }, []);
 
-  const preEntrega = useMemo(() => ventas.filter((v) => v.cola === 'pre_entrega'), [ventas]);
-  const entrega = useMemo(() => ventas.filter((v) => v.cola === 'entrega'), [ventas]);
+  const preEntrega = useMemo(
+    () => ventas.filter((v) => v.cola === 'pre_entrega').sort(porUrgencia),
+    [ventas]
+  );
+  const entrega = useMemo(
+    () => ventas.filter((v) => v.cola === 'entrega').sort(porUrgencia),
+    [ventas]
+  );
 
   const kpis: ModuleKpi[] = useMemo(() => {
     const respondidas = kpi?.encuestas_respondidas ?? 0;
@@ -193,6 +263,7 @@ function Body() {
             href={`/dilesa/ventas/${v.venta_id}/capturar/14-preparada-entrega`}
             titulo={v.cliente ?? '(cliente sin nombre)'}
             sub={[v.unidad, v.proyecto].filter(Boolean).join(' · ') || null}
+            right={<UrgenciaChip venta={v} />}
           />
         ))}
       </Cola>
@@ -209,7 +280,7 @@ function Body() {
             href={`/dilesa/ventas/${v.venta_id}/capturar/15-entregada`}
             titulo={v.cliente ?? '(cliente sin nombre)'}
             sub={[v.unidad, v.proyecto].filter(Boolean).join(' · ') || null}
-            right={!v.pago_detonado ? <Badge tone="danger">Falta pago</Badge> : null}
+            right={<UrgenciaChip venta={v} />}
           />
         ))}
       </Cola>

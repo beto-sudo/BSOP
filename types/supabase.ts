@@ -5836,6 +5836,7 @@ export type Database = {
         Row: {
           cliente: string | null
           cola: string | null
+          dias_en_fase: number | null
           empresa_id: string | null
           fase_actual: string | null
           fase_posicion: number | null
