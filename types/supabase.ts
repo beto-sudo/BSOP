@@ -2659,6 +2659,13 @@ export type Database = {
             foreignKeyName: "contratos_construccion_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "contratos_construccion_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3106,6 +3113,13 @@ export type Database = {
             foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "obra_presupuesto_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3406,6 +3420,13 @@ export type Database = {
             foreignKeyName: "productos_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3510,6 +3531,13 @@ export type Database = {
             foreignKeyName: "proyecto_activos_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_activos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3566,6 +3594,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_documentos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_documentos_proyecto_id_fkey"
@@ -3638,6 +3673,13 @@ export type Database = {
             foreignKeyName: "proyecto_hitos_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_hitos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3697,6 +3739,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_planos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_planos_proyecto_id_fkey"
@@ -3793,6 +3842,13 @@ export type Database = {
             foreignKeyName: "proyecto_presupuesto_partidas_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_presupuesto_partidas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3855,6 +3911,13 @@ export type Database = {
             foreignKeyName: "proyecto_prorrateo_proyecto_madre_id_fkey"
             columns: ["proyecto_madre_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyecto_prorrateo_proyecto_madre_id_fkey"
+            columns: ["proyecto_madre_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -3871,6 +3934,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_prorrateo_sub_proyecto_id_fkey"
+            columns: ["sub_proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_prorrateo_sub_proyecto_id_fkey"
@@ -3926,6 +3996,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_responsables_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_responsables_proyecto_id_fkey"
@@ -4107,6 +4184,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
@@ -4362,6 +4446,13 @@ export type Database = {
             foreignKeyName: "proyectos_proyecto_padre_id_fkey"
             columns: ["proyecto_padre_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "proyectos_proyecto_padre_id_fkey"
+            columns: ["proyecto_padre_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -4378,6 +4469,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_proyecto_predecesor_id_fkey"
+            columns: ["proyecto_predecesor_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyectos_proyecto_predecesor_id_fkey"
@@ -4709,6 +4807,13 @@ export type Database = {
             foreignKeyName: "ruv_frentes_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -4929,6 +5034,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "unidades_proyecto_id_fkey"
@@ -5646,6 +5758,55 @@ export type Database = {
           },
         ]
       }
+      v_ac_encuestas_respondidas: {
+        Row: {
+          calif_proceso: number | null
+          calif_vivienda: number | null
+          canal: string | null
+          cliente: string | null
+          comentario: string | null
+          empresa_id: string | null
+          encuesta_id: string | null
+          nps: number | null
+          nps_segmento: string | null
+          proyecto: string | null
+          proyecto_id: string | null
+          respondida_at: string | null
+          respondida_fecha: string | null
+          unidad: string | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_ac_kpis: {
         Row: {
           calif_proceso_prom: number | null
@@ -5819,6 +5980,13 @@ export type Database = {
             foreignKeyName: "productos_proyecto_id_fkey"
             columns: ["proyecto_id"]
             isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "productos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
             referencedRelation: "v_proyecto_avances"
             referencedColumns: ["proyecto_id"]
           },
@@ -5846,6 +6014,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
@@ -5918,6 +6093,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ruv_frentes_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "ruv_frentes_proyecto_id_fkey"
@@ -6024,6 +6206,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
           },
           {
             foreignKeyName: "unidades_proyecto_id_fkey"
