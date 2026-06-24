@@ -265,7 +265,7 @@ function NuevaSolicitudForm() {
         .schema('erp')
         .from('personas')
         .select(
-          'id, nombre, apellido_paterno, apellido_materno, curp, rfc, numero_credencial_ine, telefono, email, fecha_nacimiento, nss, domicilio_calle, domicilio_numero_exterior, domicilio_numero_interior, domicilio_colonia, domicilio_codigo_postal, domicilio_ciudad, domicilio_estado, tipo_persona, nacionalidad, estado_civil, ocupacion, es_pep, forma_pago_kyc, uso_efectivo_kyc, conocimiento_dueno_beneficiario'
+          'id, nombre, apellido_paterno, apellido_materno, curp, rfc, numero_credencial_ine, telefono, email, fecha_nacimiento, nss, domicilio, domicilio_calle, domicilio_numero_exterior, domicilio_numero_interior, domicilio_colonia, domicilio_codigo_postal, domicilio_ciudad, domicilio_estado, tipo_persona, nacionalidad, estado_civil, ocupacion, es_pep, forma_pago_kyc, uso_efectivo_kyc, conocimiento_dueno_beneficiario'
         )
         .eq('empresa_id', DILESA_EMPRESA_ID)
         .eq('tipo', 'cliente')
@@ -398,6 +398,10 @@ function NuevaSolicitudForm() {
       fecha_nacimiento: fechaNacimiento,
       nss,
       numero_credencial_ine: numeroCredencialIne,
+      // Blob de domicilio: lo arrastra la persona seleccionada (el form solo
+      // edita los campos estructurados). Permite que el gate considere el
+      // domicilio completo aunque solo exista el blob de Coda.
+      domicilio: personaSeleccionadaInfo?.domicilio ?? null,
       domicilio_calle: domCalle,
       domicilio_numero_exterior: domNumExt,
       domicilio_numero_interior: domNumInt,
@@ -440,6 +444,7 @@ function NuevaSolicitudForm() {
       formaPagoKyc,
       usoEfectivoKyc,
       conocimientoDuenoBeneficiario,
+      personaSeleccionadaInfo,
     ]
   );
 

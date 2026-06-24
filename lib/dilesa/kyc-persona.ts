@@ -13,6 +13,8 @@
  * la persona) y se testean aquí de forma pura.
  */
 
+import { domicilioTexto } from './kyc-efectivo';
+
 /** Subconjunto de columnas de `erp.personas` que toca la captura de venta. */
 export type PersonaKycSnapshot = {
   nombre: string | null;
@@ -25,6 +27,9 @@ export type PersonaKycSnapshot = {
   fecha_nacimiento: string | null;
   nss: string | null;
   numero_credencial_ine: string | null;
+  // Domicilio: blob histórico de Coda (`domicilio`) y/o campos estructurados.
+  // La completitud lo considera satisfecho si existe CUALQUIERA (ver abajo).
+  domicilio: string | null;
   domicilio_calle: string | null;
   domicilio_numero_exterior: string | null;
   domicilio_numero_interior: string | null;
@@ -43,14 +48,16 @@ export type PersonaKycSnapshot = {
 };
 
 /**
- * Campos obligatorios para arrancar una venta — espejo de `obligatoriosTexto`
- * del alta de cliente nuevo. Quedan FUERA a propósito:
- *   - `apellido_materno` y `domicilio_numero_interior`: legítimamente opcionales
- *     (hay personas con un solo apellido / domicilios sin número interior).
+ * Campos obligatorios (escalares) para arrancar una venta. El domicilio NO va
+ * aquí: se valida aparte porque se considera completo si existe el blob
+ * histórico de Coda (`domicilio`) O los campos estructurados — la mayoría de
+ * clientes migrados traen la dirección como blob y forzar re-capturar lo que
+ * ya tenemos sería ruido. Quedan FUERA a propósito:
+ *   - `apellido_materno` y `domicilio_numero_interior`: legítimamente opcionales.
  *   - `tipo_persona`, `nacionalidad`, `es_pep`, `conocimiento_dueno_beneficiario`:
  *     tienen default sensato (fisica / Mexicana / false / 'No'), nunca quedan
  *     "vacíos".
- * Si cambia la lista del alta, actualizar ambos lados.
+ * Si cambia la lista del alta de cliente nuevo, actualizar aquí también.
  */
 export const CAMPOS_KYC_OBLIGATORIOS: { col: keyof PersonaKycSnapshot; label: string }[] = [
   { col: 'nombre', label: 'Nombre' },
@@ -62,12 +69,6 @@ export const CAMPOS_KYC_OBLIGATORIOS: { col: keyof PersonaKycSnapshot; label: st
   { col: 'fecha_nacimiento', label: 'Fecha de nacimiento' },
   { col: 'nss', label: 'NSS' },
   { col: 'numero_credencial_ine', label: 'Número de credencial INE' },
-  { col: 'domicilio_calle', label: 'Calle' },
-  { col: 'domicilio_numero_exterior', label: 'Número exterior' },
-  { col: 'domicilio_colonia', label: 'Colonia' },
-  { col: 'domicilio_codigo_postal', label: 'Código postal' },
-  { col: 'domicilio_ciudad', label: 'Ciudad' },
-  { col: 'domicilio_estado', label: 'Estado' },
   { col: 'estado_civil', label: 'Estado civil' },
   { col: 'ocupacion', label: 'Ocupación' },
   { col: 'forma_pago_kyc', label: 'Forma de pago' },
@@ -81,10 +82,13 @@ function vacio(v: string | null | undefined): boolean {
 /** Etiquetas de los campos KYC obligatorios que la persona NO tiene. */
 export function camposKycFaltantes(p: PersonaKycSnapshot | null | undefined): string[] {
   if (!p) return [];
-  // Todas las columnas obligatorias son de texto (string | null).
-  return CAMPOS_KYC_OBLIGATORIOS.filter(({ col }) => vacio(p[col] as string | null)).map(
+  // Columnas escalares (todas de texto: string | null).
+  const faltantes = CAMPOS_KYC_OBLIGATORIOS.filter(({ col }) => vacio(p[col] as string | null)).map(
     ({ label }) => label
   );
+  // Domicilio: completo si hay blob de Coda O campos estructurados.
+  if (!domicilioTexto(p)) faltantes.push('Domicilio');
+  return faltantes;
 }
 
 /** `true` si la persona trae el expediente KYC obligatorio completo. */

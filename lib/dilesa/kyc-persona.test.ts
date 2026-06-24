@@ -19,6 +19,7 @@ function personaCompleta(over: Partial<PersonaKycSnapshot> = {}): PersonaKycSnap
     fecha_nacimiento: '1999-10-18',
     nss: '31149920329',
     numero_credencial_ine: '1659206621',
+    domicilio: null,
     domicilio_calle: 'HUITRON',
     domicilio_numero_exterior: 'S/N',
     domicilio_numero_interior: null,
@@ -72,6 +73,7 @@ describe('camposKycFaltantes', () => {
       fecha_nacimiento: null,
       nss: null,
       numero_credencial_ine: null,
+      domicilio: null,
       domicilio_calle: null,
       domicilio_numero_exterior: null,
       domicilio_numero_interior: null,
@@ -88,7 +90,8 @@ describe('camposKycFaltantes', () => {
       uso_efectivo_kyc: null,
       conocimiento_dueno_beneficiario: null,
     };
-    expect(camposKycFaltantes(vacia)).toHaveLength(19);
+    // 13 escalares obligatorios + 1 "Domicilio".
+    expect(camposKycFaltantes(vacia)).toHaveLength(14);
   });
 
   it('apellido_materno y número interior son opcionales (no bloquean)', () => {
@@ -97,6 +100,38 @@ describe('camposKycFaltantes', () => {
         personaCompleta({ apellido_materno: null, domicilio_numero_interior: null })
       )
     ).toEqual([]);
+  });
+
+  it('domicilio por blob de Coda cuenta como completo (sin estructurado)', () => {
+    expect(
+      camposKycFaltantes(
+        personaCompleta({
+          domicilio: 'HUITRON SIN NUMERO, EJIDO HUITRON, GOMEZ PALACIO, DURANGO, CP 35117',
+          domicilio_calle: null,
+          domicilio_numero_exterior: null,
+          domicilio_colonia: null,
+          domicilio_codigo_postal: null,
+          domicilio_ciudad: null,
+          domicilio_estado: null,
+        })
+      )
+    ).toEqual([]);
+  });
+
+  it('sin domicilio alguno (ni blob ni estructurado) → "Domicilio" faltante', () => {
+    expect(
+      camposKycFaltantes(
+        personaCompleta({
+          domicilio: null,
+          domicilio_calle: null,
+          domicilio_numero_exterior: null,
+          domicilio_colonia: null,
+          domicilio_codigo_postal: null,
+          domicilio_ciudad: null,
+          domicilio_estado: null,
+        })
+      )
+    ).toEqual(['Domicilio']);
   });
 
   it('campos con default (tipo_persona, nacionalidad, es_pep, conocimiento) no bloquean', () => {
