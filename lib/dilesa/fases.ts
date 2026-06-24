@@ -28,24 +28,69 @@ export type FaseVenta = {
   readonly slug: string;
 };
 
+// Cada fase tiene DOS formas: `nombre` (participio = el ESTADO, "lo que es", lo
+// que se persiste en DB) y `accion` (infinitivo = "lo que sigue / lo que se hace
+// para llegar a ella"). El estado se muestra en badges/lista/timeline; la acción
+// en el CTA "Siguiente fase", el título de la página de captura, y el chip
+// "Sigue: …" de cada venta (= la acción de la fase posición+1).
 export const FASES_VENTA = [
-  { posicion: 1, nombre: 'Asignación Solicitada', slug: '1-solicitud-asignacion' },
-  { posicion: 2, nombre: 'Asignada', slug: '2-asignada' },
-  { posicion: 3, nombre: 'Formalizada', slug: '3-formalizada' },
-  { posicion: 4, nombre: 'Avalúo Solicitado', slug: '4-solicitud-avaluo' },
-  { posicion: 5, nombre: 'Avalúo Cerrado', slug: '5-avaluo-cerrado' },
-  { posicion: 6, nombre: 'Inscrita', slug: '6-inscrita' },
-  { posicion: 7, nombre: 'Dictamen Solicitado', slug: '7-solicitud-dictamen' },
-  { posicion: 8, nombre: 'Dictaminada', slug: '8-dictaminada' },
-  { posicion: 9, nombre: 'Validación Patronal', slug: '9-validacion-patronal' },
-  { posicion: 10, nombre: 'Firmas Programadas', slug: '10-firmas-programadas' },
-  { posicion: 11, nombre: 'Escriturada', slug: '11-escriturada' },
-  { posicion: 12, nombre: 'Detonada', slug: '12-detonada' },
-  { posicion: 13, nombre: 'Facturada', slug: '13-facturada' },
-  { posicion: 14, nombre: 'Preparada para Entrega', slug: '14-preparada-entrega' },
-  { posicion: 15, nombre: 'Entregada', slug: '15-entregada' },
-  { posicion: 16, nombre: 'Conformidad del Cliente', slug: '16-conformidad' },
-  { posicion: 17, nombre: 'Operación Terminada', slug: '17-operacion-terminada' },
+  {
+    posicion: 1,
+    nombre: 'Asignación Solicitada',
+    accion: 'Solicitar asignación',
+    slug: '1-solicitud-asignacion',
+  },
+  { posicion: 2, nombre: 'Asignada', accion: 'Asignar unidad', slug: '2-asignada' },
+  { posicion: 3, nombre: 'Formalizada', accion: 'Formalizar promesa', slug: '3-formalizada' },
+  {
+    posicion: 4,
+    nombre: 'Avalúo Solicitado',
+    accion: 'Solicitar avalúo',
+    slug: '4-solicitud-avaluo',
+  },
+  { posicion: 5, nombre: 'Avalúo Cerrado', accion: 'Cerrar avalúo', slug: '5-avaluo-cerrado' },
+  { posicion: 6, nombre: 'Inscrita', accion: 'Inscribir crédito', slug: '6-inscrita' },
+  {
+    posicion: 7,
+    nombre: 'Dictamen Solicitado',
+    accion: 'Solicitar dictamen',
+    slug: '7-solicitud-dictamen',
+  },
+  { posicion: 8, nombre: 'Dictaminada', accion: 'Dictaminar', slug: '8-dictaminada' },
+  {
+    posicion: 9,
+    nombre: 'Validación Patronal',
+    accion: 'Recabar validación patronal',
+    slug: '9-validacion-patronal',
+  },
+  {
+    posicion: 10,
+    nombre: 'Firmas Programadas',
+    accion: 'Programar firmas',
+    slug: '10-firmas-programadas',
+  },
+  { posicion: 11, nombre: 'Escriturada', accion: 'Escriturar', slug: '11-escriturada' },
+  { posicion: 12, nombre: 'Detonada', accion: 'Detonar crédito', slug: '12-detonada' },
+  { posicion: 13, nombre: 'Facturada', accion: 'Facturar', slug: '13-facturada' },
+  {
+    posicion: 14,
+    nombre: 'Preparada para Entrega',
+    accion: 'Preparar entrega',
+    slug: '14-preparada-entrega',
+  },
+  { posicion: 15, nombre: 'Entregada', accion: 'Entregar', slug: '15-entregada' },
+  {
+    posicion: 16,
+    nombre: 'Conformidad del Cliente',
+    accion: 'Recabar conformidad',
+    slug: '16-conformidad',
+  },
+  {
+    posicion: 17,
+    nombre: 'Operación Terminada',
+    accion: 'Cerrar operación',
+    slug: '17-operacion-terminada',
+  },
 ] as const;
 
 export type FaseSlug = (typeof FASES_VENTA)[number]['slug'];
@@ -53,10 +98,31 @@ export type FaseSlug = (typeof FASES_VENTA)[number]['slug'];
 const NOMBRE_BY_POS: ReadonlyMap<number, string> = new Map(
   FASES_VENTA.map((f) => [f.posicion, f.nombre])
 );
+const ACCION_BY_POS: ReadonlyMap<number, string> = new Map(
+  FASES_VENTA.map((f) => [f.posicion, f.accion])
+);
 
-/** Nombre visible de una fase por su posición. Fallback defensivo si no existe. */
+/** Nombre/ESTADO visible de una fase (participio) por su posición. */
 export function nombreFase(posicion: number): string {
   return NOMBRE_BY_POS.get(posicion) ?? `Fase ${posicion}`;
+}
+
+/** ACCIÓN (infinitivo, "lo que se hace") de una fase por su posición. */
+export function accionFase(posicion: number): string {
+  return ACCION_BY_POS.get(posicion) ?? nombreFase(posicion);
+}
+
+/**
+ * "Lo que sigue" para una venta cuya última fase COMPLETADA es `fasePosicion`:
+ * la acción (infinitivo) de la fase siguiente. `null` si ya está en la 17
+ * (no hay siguiente) o si no hay posición.
+ */
+export function proximaFase(
+  fasePosicion: number | null | undefined
+): { posicion: number; accion: string } | null {
+  if (fasePosicion == null || fasePosicion >= 17) return null;
+  const siguiente = fasePosicion + 1;
+  return { posicion: siguiente, accion: accionFase(siguiente) };
 }
 
 /** Record posición → nombre, para lookups O(1) en server actions y rutas API. */
