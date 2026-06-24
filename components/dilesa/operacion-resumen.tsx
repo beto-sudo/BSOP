@@ -13,6 +13,7 @@
  */
 
 import type { Cuadratura } from '@/lib/dilesa/cuadratura';
+import { proximaFase } from '@/lib/dilesa/fases';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -55,6 +56,8 @@ export function OperacionResumen({
     fasePosicion != null && totalFases > 0
       ? Math.round((Math.min(fasePosicion, totalFases) / totalFases) * 100)
       : 0;
+  // "Lo que sigue" = la acción (infinitivo) de la fase posición+1.
+  const sig = proximaFase(fasePosicion);
 
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
@@ -97,6 +100,11 @@ export function OperacionResumen({
                   style={{ width: `${pct}%` }}
                 />
               </div>
+              {sig ? (
+                <p className="mt-1 text-[11px] text-[var(--text)]/55">
+                  Sigue: <span className="font-medium text-[var(--text)]/75">{sig.accion}</span>
+                </p>
+              ) : null}
             </div>
           ) : null}
         </Bloque>

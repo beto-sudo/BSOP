@@ -14,7 +14,7 @@
  */
 import { Badge } from '@/components/ui/badge';
 import { useVentaCapturaResumen } from '@/components/dilesa/venta-detalle/captura-shell';
-import { nombreFase } from '@/lib/dilesa/fases';
+import { accionFase } from '@/lib/dilesa/fases';
 
 function fmtFechaCorta(s: string | null): string | null {
   if (!s) return null;
@@ -37,7 +37,7 @@ export function CapturarFaseHeader({
     <header className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Fase {faseposicion} — {nombreFase(faseposicion)}
+          Fase {faseposicion} — {accionFase(faseposicion)}
         </h1>
         <Badge tone="neutral">Pipeline DILESA</Badge>
       </div>

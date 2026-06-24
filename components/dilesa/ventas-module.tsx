@@ -16,6 +16,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
+import { proximaFase } from '@/lib/dilesa/fases';
 import { VENTA_ESTADO_CONFIG, VENTA_ESTADOS } from '@/lib/status-tokens';
 import { Input } from '@/components/ui/input';
 import {
@@ -408,16 +409,20 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       label: 'Fase',
       type: 'custom',
       accessor: (v) => (v.estado === 'desasignada' ? -1 : (v.fase_posicion ?? 0)),
-      render: (v) =>
+      render: (v) => {
         // Si la venta está desasignada, no mostramos la fase — evita el
         // efecto contradictorio "Asignada + Desasignada" que Beto reportó.
-        v.estado === 'desasignada' ? (
-          <span className="text-[var(--text)]/30">—</span>
-        ) : v.fase_actual ? (
-          <Badge tone="neutral">{v.fase_actual}</Badge>
-        ) : (
-          <span>—</span>
-        ),
+        if (v.estado === 'desasignada') return <span className="text-[var(--text)]/30">—</span>;
+        if (!v.fase_actual) return <span>—</span>;
+        // Estado (participio) + "lo que sigue" (acción infinitivo de la fase+1).
+        const sig = proximaFase(v.fase_posicion);
+        return (
+          <div className="flex flex-col gap-0.5">
+            <Badge tone="neutral">{v.fase_actual}</Badge>
+            {sig ? <span className="text-[10px] text-[var(--text)]/50">→ {sig.accion}</span> : null}
+          </div>
+        );
+      },
     },
     { key: 'precio', label: 'Precio', type: 'currency' },
     {

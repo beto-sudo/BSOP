@@ -21,6 +21,7 @@ import { ArrowRight, Pencil } from 'lucide-react';
 import { usePermissions } from '@/components/providers';
 import { useVentaDetalle } from './provider';
 import { CAPTURA_MODULO_BY_POSICION } from './types';
+import { accionFase } from '@/lib/dilesa/fases';
 
 export function BotonSiguienteFase() {
   const { venta, pipelineRows } = useVentaDetalle();
@@ -40,13 +41,13 @@ export function BotonSiguienteFase() {
     <Link
       href={`/dilesa/ventas/${venta.id}/capturar/${siguiente.slugCaptura}`}
       className="inline-flex items-center gap-2 rounded-md bg-[var(--accent)] px-3 py-1.5 text-white transition-colors hover:bg-[var(--accent)]/90"
-      title={`Capturar la fase ${siguiente.pos} · ${siguiente.nombre}`}
+      title={`Capturar la fase ${siguiente.pos} · ${accionFase(siguiente.pos)}`}
     >
       <Pencil className="size-4 shrink-0" aria-hidden />
       <span className="flex flex-col text-left leading-tight">
         <span className="text-[10px] font-normal opacity-80">Siguiente fase</span>
         <span className="text-sm font-medium">
-          {siguiente.pos} · {siguiente.nombre}
+          {siguiente.pos} · {accionFase(siguiente.pos)}
         </span>
       </span>
       <ArrowRight className="size-4 shrink-0" aria-hidden />
