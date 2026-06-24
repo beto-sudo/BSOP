@@ -29,7 +29,7 @@ export type KpisDelDia = {
 
 /** Filas crudas que alimentan `armarKpis` (ya fetcheadas). */
 export type KpisRaw = {
-  fasesHoy: { venta_id: string; fase: string }[];
+  fasesHoy: { venta_id: string; posicion: number | null }[];
   ventaMontos: {
     id: string;
     precio_asignacion: number | null;
@@ -79,10 +79,12 @@ export function armarKpis(raw: KpisRaw): KpisDelDia {
   let escrituras_hoy_monto = 0;
   for (const f of raw.fasesHoy) {
     const v = montoPorVenta.get(f.venta_id);
-    if (f.fase === 'Asignada') {
+    if (f.posicion === 2) {
+      // Asignar unidad (fase 2) = venta nueva del día.
       ventas_hoy_n += 1;
       ventas_hoy_monto += Number(v?.precio_asignacion ?? 0);
-    } else if (f.fase === 'Escriturada') {
+    } else if (f.posicion === 11) {
+      // Escriturar (fase 11) = escritura del día.
       escrituras_hoy_n += 1;
       escrituras_hoy_monto += Number(v?.valor_escrituracion ?? 0);
     }
@@ -144,11 +146,11 @@ export async function computeKpisDelDia(
   const [fasesRes, pagosRes, cargosRes, saldosRes, obraRes] = await Promise.all([
     dilesa
       .from('venta_fases')
-      .select('venta_id,fase')
+      .select('venta_id,posicion')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
       .eq('fecha', fechaLocal)
-      .in('fase', ['Asignada', 'Escriturada']),
+      .in('posicion', [2, 11]),
     erp
       .from('cxc_pagos')
       .select('monto_total')
@@ -170,7 +172,7 @@ export async function computeKpisDelDia(
       .eq('estado', 'en_progreso'),
   ]);
 
-  const fasesHoy = (fasesRes.data ?? []) as { venta_id: string; fase: string }[];
+  const fasesHoy = (fasesRes.data ?? []) as { venta_id: string; posicion: number | null }[];
   const ventaIds = [...new Set(fasesHoy.map((f) => f.venta_id))];
   const ventaMontos = ventaIds.length
     ? ((

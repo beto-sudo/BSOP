@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 6 — Inscrita (Sprint 7e).
+ * Captura Fase 6 — Inscribir crédito (Sprint 7e).
  *
  * Cierra la fase de Inscripción del crédito: el banco entregó la(s)
  * Constancia(s) de Crédito con el monto APROBADO. Gerencia Ventas (o
@@ -229,7 +229,6 @@ function CapturarFase6Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Inscrita',
         faseposicion: 6,
         docs,
         camposVenta: {
@@ -290,7 +289,7 @@ function CapturarFase6Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={6} faseNombre="Inscrita" />
+        <CapturarFaseHeader faseposicion={6} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -302,7 +301,6 @@ function CapturarFase6Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={6}
-        faseNombre="Inscrita"
         descripcion="Banco entregó la(s) Constancia(s) de Crédito. Sube los PDFs y confirma los montos aprobados."
       />
 
@@ -310,12 +308,12 @@ function CapturarFase6Body() {
         <Banner
           tone="success"
           title="Fase 6 ya está cerrada"
-          body="Esta venta ya pasó por Inscrita. La siguiente fase es Solicitud de Dictaminación."
+          body="Esta venta ya pasó por Inscribir crédito. La siguiente fase es Solicitar dictamen."
         />
       ) : !fase5Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 5 (Avalúo Cerrado)"
+          title="Falta cerrar Fase 5 (Cerrar avalúo)"
           body={
             <>
               Antes de inscribir el crédito, captura primero el avalúo entregado por la casa

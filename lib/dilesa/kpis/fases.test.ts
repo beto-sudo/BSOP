@@ -31,7 +31,7 @@ describe('deriveFasesKpis (DILESA Fases — ADR-034)', () => {
       v({ estado: 'activa' }),
       v({ estado: 'activa' }),
       v({ estado: 'desasignada' }),
-      v({ estado: 'terminada', fase_actual: 'Operación Terminada', fase_posicion: 17 }),
+      v({ estado: 'terminada', fase_actual: 'Cerrar operación', fase_posicion: 17 }),
     ];
     expect(deriveFasesKpis(rows, { now: NOW })[0]?.value).toBe(2);
   });

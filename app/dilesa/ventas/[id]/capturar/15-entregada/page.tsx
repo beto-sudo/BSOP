@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * Captura Fase 15 — Entregada (dilesa-ventas-expediente S5).
+ * Captura Fase 15 — Entregar (dilesa-ventas-expediente S5).
  *
  * La entrega física de la vivienda al cliente: se imprime el Checklist para
  * Entrega de Vivienda (PDF prellenado), se recorre la casa con el cliente
  * palomeando SÍ/NO, firman el CLIENTE y Atención a Clientes, se escanea y se
  * sube el PDF firmado. Subirlo cierra la fase.
  *
- * Gate: Fase 14 (Preparada para Entrega) debe estar cerrada.
+ * Gate: Fase 14 (Preparar entrega) debe estar cerrada.
  *
  * Captura:
  *   - Doc requerido: rol `checklist_entrega` (checklist firmado por cliente).
- *     Coincide con `FASE_ROLES['Entregada']` en el detalle.
+ *     Coincide con `FASE_ROLES[15]` en el detalle.
  *   - Notas opcionales → `venta_fases.notas`.
  *
  * Acceso: `dilesa.ventas.fase15_entregada` (escritura: Vendedor + Dirección;
@@ -68,7 +68,7 @@ function CapturarFase15Body() {
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [fase14Cerrada, setFase14Cerrada] = useState<boolean | null>(null);
-  // F12 (Detonada) = el pago recibido. No se entrega sin pago.
+  // F12 (Detonar crédito) = el pago recibido. No se entrega sin pago.
   const [fase12Cerrada, setFase12Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
@@ -151,7 +151,6 @@ function CapturarFase15Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Entregada',
         faseposicion: 15,
         docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {},
@@ -192,7 +191,7 @@ function CapturarFase15Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={15} faseNombre="Entregada" />
+        <CapturarFaseHeader faseposicion={15} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -204,7 +203,6 @@ function CapturarFase15Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={15}
-        faseNombre="Entregada"
         descripcion="Entrega física al cliente: checklist impreso, recorrido, firmas y escaneado."
       />
 
@@ -212,12 +210,12 @@ function CapturarFase15Body() {
         <Banner
           tone="success"
           title="Fase 15 ya está cerrada"
-          body="Esta vivienda ya fue entregada al cliente. La siguiente fase es Comisión Pagada."
+          body="Esta vivienda ya fue entregada al cliente. La siguiente fase es Recabar conformidad."
         />
       ) : !fase14Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 14 (Preparada para Entrega)"
+          title="Falta cerrar Fase 14 (Preparar entrega)"
           body={
             <>
               Antes de entregar al cliente, Calidad y Entrega debe dejar la vivienda preparada
@@ -236,7 +234,7 @@ function CapturarFase15Body() {
       ) : !fase12Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta el pago (Fase 12 — Detonada)"
+          title="Falta el pago (Fase 12 — Detonar crédito)"
           body={
             <>
               No se puede entregar la vivienda sin haber recibido el pago. El pago lo registra

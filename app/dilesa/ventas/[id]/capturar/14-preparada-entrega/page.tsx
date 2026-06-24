@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 14 — Preparada para Entrega (dilesa-ventas-expediente S5).
+ * Captura Fase 14 — Preparar entrega (dilesa-ventas-expediente S5).
  *
  * El equipo de Calidad y Entrega revisa la vivienda con el Checklist
  * Pre-Entrega: lo imprime desde aquí (PDF prellenado con vivienda + cliente),
@@ -9,11 +9,11 @@
  * Subirlo cierra la fase.
  *
  * Gate especial (Beto, 2026-06-10): la preparación puede hacerse desde que se
- * registra la escritura (Fase 11) — NO espera Detonada (12) ni Facturada (13).
+ * registra la escritura (Fase 11) — NO espera Detonar crédito (12) ni Facturar (13).
  *
  * Captura:
  *   - Doc requerido: rol `checklist_pre_entrega` (checklist firmado).
- *     Coincide con `FASE_ROLES['Preparada para Entrega']` en el detalle.
+ *     Coincide con `FASE_ROLES[14]` en el detalle.
  *   - Notas opcionales → `venta_fases.notas`.
  *
  * Acceso: `dilesa.ventas.fase14_preparada_entrega` (escritura: Obra +
@@ -145,7 +145,6 @@ function CapturarFase14Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Preparada para Entrega',
         faseposicion: 14,
         docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {},
@@ -186,7 +185,7 @@ function CapturarFase14Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={14} faseNombre="Preparada para Entrega" />
+        <CapturarFaseHeader faseposicion={14} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -198,7 +197,6 @@ function CapturarFase14Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={14}
-        faseNombre="Preparada para Entrega"
         descripcion="Calidad y Entrega revisa la vivienda con el checklist impreso y sube el escaneado firmado."
       />
 
@@ -206,16 +204,16 @@ function CapturarFase14Body() {
         <Banner
           tone="success"
           title="Fase 14 ya está cerrada"
-          body="Esta vivienda ya quedó preparada para entrega. La siguiente fase es Entregada."
+          body="Esta vivienda ya quedó preparada para entrega. La siguiente fase es Entregar."
         />
       ) : !fase11Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 11 (Escriturada)"
+          title="Falta cerrar Fase 11 (Escriturar)"
           body={
             <>
               La preparación de entrega puede hacerse desde que se registra la escritura — sin
-              esperar Detonada ni Facturada. Vuelve al detalle y captura la Fase 11 primero.
+              esperar Detonar crédito ni Facturar. Vuelve al detalle y captura la Fase 11 primero.
             </>
           }
           extra={

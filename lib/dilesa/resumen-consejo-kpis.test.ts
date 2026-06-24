@@ -59,8 +59,8 @@ describe('armarKpis — agregación pura', () => {
     const kpis = armarKpis({
       ...RAW_VACIO,
       fasesHoy: [
-        { venta_id: 'v1', fase: 'Asignada' },
-        { venta_id: 'v2', fase: 'Escriturada' },
+        { venta_id: 'v1', posicion: 2 },
+        { venta_id: 'v2', posicion: 11 },
       ],
       ventaMontos: [
         { id: 'v1', precio_asignacion: 100, valor_escrituracion: null },
@@ -136,8 +136,8 @@ describe('computeKpisDelDia — wiring de queries', () => {
     const sb = makeSupabase({
       venta_fases: {
         data: [
-          { venta_id: 'v1', fase: 'Asignada' },
-          { venta_id: 'v2', fase: 'Escriturada' },
+          { venta_id: 'v1', posicion: 2 },
+          { venta_id: 'v2', posicion: 11 },
         ],
       },
       ventas: {

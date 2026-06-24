@@ -33,6 +33,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { nombreFase } from '@/lib/dilesa/fases';
 import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
 import { leerCfdiMetadata } from '@/lib/dilesa/captura/cfdi-validacion';
 import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const posiciones = ((fasesRows ?? []) as { posicion: number }[]).map((f) => f.posicion);
   if (!posiciones.includes(12)) {
     return NextResponse.json(
-      { ok: false, error: 'La Fase 12 (Detonada) no está cerrada.' },
+      { ok: false, error: 'La Fase 12 (Detonar crédito) no está cerrada.' },
       { status: 409 }
     );
   }
@@ -263,7 +264,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Caché de posición: solo avanza, nunca retrocede (mismo criterio que
   // marcarFase).
   if (FASE > (venta.fase_posicion ?? 0)) {
-    campos.fase_actual = 'Facturada';
+    campos.fase_actual = nombreFase(FASE);
     campos.fase_posicion = FASE;
   }
   if (Object.keys(campos).length > 0) {
@@ -286,7 +287,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     .insert({
       empresa_id: DILESA_EMPRESA_ID,
       venta_id: ventaId,
-      fase: 'Facturada',
+      fase: nombreFase(FASE),
       posicion: FASE,
       fecha: new Date().toISOString().slice(0, 10),
       registrado_por: user.id,

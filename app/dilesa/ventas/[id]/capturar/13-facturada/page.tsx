@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 13 — Facturada (captura colaborativa + XML CFDI: Sprints 1-2
+ * Captura Fase 13 — Facturar (captura colaborativa + XML CFDI: Sprints 1-2
  * de `dilesa-ventas-captura-colaborativa`).
  *
  * Sprint 1 — colaborativo: cada documento PERSISTE AL SUBIRSE
@@ -25,7 +25,7 @@
  *     venta. Errores bloquean la subida; warnings quedan visibles y
  *     persistidos en `erp.adjuntos.metadata`.
  *   - NADA se captura a mano en esta pantalla: `valor_escrituracion` viene
- *     de la Fase 8 (Dictaminada) y aquí solo se muestra; `valor_facturado`
+ *     de la Fase 8 (Dictaminar) y aquí solo se muestra; `valor_facturado`
  *     y `monto_nota_credito` se derivan del XML vigente. Corregir un monto
  *     = subir el XML correcto (queda versionado — esa es la auditoría).
  *     Las ventas históricas (sin XML) conservan sus montos migrados: el
@@ -42,7 +42,7 @@
  * aviso + cargar el acuse; la revisión con acuse completa el ciclo y solo
  * entonces se prende el cierre.
  *
- * Enforcement: Fase 12 (Detonada) debe estar cerrada.
+ * Enforcement: Fase 12 (Detonar crédito) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
  * Dirección).
  */
@@ -659,7 +659,7 @@ function CapturarFase13Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={13} faseNombre="Facturada" />
+        <CapturarFaseHeader faseposicion={13} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -674,7 +674,6 @@ function CapturarFase13Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={13}
-        faseNombre="Facturada"
         descripcion="Sube el XML de la factura (y nota de crédito / aviso PLD si aplican). Cada documento se valida y se guarda al subirse; los montos del CFDI se llenan solos."
       />
 
@@ -687,7 +686,7 @@ function CapturarFase13Body() {
       ) : bloqueadaPorFase12 ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 12 (Detonada)"
+          title="Falta cerrar Fase 12 (Detonar crédito)"
           body={
             <>
               Antes de facturar, la venta debe estar detonada (depósito recibido). Vuelve al detalle
@@ -878,8 +877,8 @@ function CapturarFase13Body() {
                 <MontoDerivado valor={venta.valor_escrituracion} />
                 <Hint>
                   {venta.valor_escrituracion == null
-                    ? 'Falta — se captura en la Fase 8 (Dictaminada).'
-                    : 'Capturado en la Fase 8 (Dictaminada).'}
+                    ? 'Falta — se captura en la Fase 8 (Dictaminar).'
+                    : 'Capturado en la Fase 8 (Dictaminar).'}
                 </Hint>
               </Field>
               <Field label="Valor real venta Dilesa (calculado)">

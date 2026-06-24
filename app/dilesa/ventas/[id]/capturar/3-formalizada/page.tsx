@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 3 — Formalizada (Sprint 7c piloto).
+ * Captura Fase 3 — Formalizar promesa (Sprint 7c piloto).
  *
  * Cierra la fase de Formalización: el cliente firmó el contrato de
  * promesa de compraventa que el vendedor descargó/imprimió de
@@ -199,7 +199,6 @@ function CapturarFase3Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Formalizada',
         faseposicion: 3,
         docs: [], // el documento ya vive en el expediente (subida incremental)
         camposVenta: {
@@ -225,7 +224,7 @@ function CapturarFase3Body() {
       }
       toast.add({
         title: 'Fase 3 cerrada',
-        description: 'Fase 4 (Solicitud de Avalúo) está disponible.',
+        description: 'Fase 4 (Solicitar avalúo) está disponible.',
         type: 'success',
       });
       router.push(`/dilesa/ventas/${venta.id}`);
@@ -247,7 +246,7 @@ function CapturarFase3Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={3} faseNombre="Formalizada" />
+        <CapturarFaseHeader faseposicion={3} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -259,7 +258,6 @@ function CapturarFase3Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={3}
-        faseNombre="Formalizada"
         descripcion="Cliente firmó el contrato de promesa de compraventa. Sube el PDF firmado y captura precio + fecha."
       />
 
@@ -267,12 +265,12 @@ function CapturarFase3Body() {
         <Banner
           tone="success"
           title="Fase 3 ya está cerrada"
-          body="Esta venta ya pasó por Formalizada. Si necesitas corregir algo, contacta al comité para reabrir la fase."
+          body="Esta venta ya pasó por Formalizar promesa. Si necesitas corregir algo, contacta al comité para reabrir la fase."
         />
       ) : !fase2Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 2 (Asignada)"
+          title="Falta cerrar Fase 2 (Asignar unidad)"
           body={
             <>
               Antes de capturar Formalizada, asegúrate de tener la asignación del comité. Vuelve al

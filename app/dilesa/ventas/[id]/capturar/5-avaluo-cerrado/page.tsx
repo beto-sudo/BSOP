@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Captura Fase 5 — Avalúo Cerrado (Sprint 7d).
+ * Captura Fase 5 — Cerrar avalúo (Sprint 7d).
  *
- * Cierra la fase de Avalúo Cerrado: Gerencia Ventas (o Dirección)
+ * Cierra la fase de Cerrar avalúo: Gerencia Ventas (o Dirección)
  * registra el monto dictaminado y sube el PDF del avalúo comercial
  * entregado por el valuador.
  *
@@ -11,7 +11,7 @@
  *   - `monto_avaluo` → monto dictaminado por la casa valuadora
  *   - `fecha_avaluo_cerrado` → fecha del cierre (default hoy)
  *   - Doc requerido: rol `avaluo_comercial` (PDF firmado por el
- *     valuador). Coincide con `FASE_ROLES['Avalúo Cerrado']` en el
+ *     valuador). Coincide con `FASE_ROLES[5]` en el
  *     detalle de venta.
  *
  * Captura colaborativa (Sprint 4b de `dilesa-ventas-captura-colaborativa`):
@@ -190,7 +190,6 @@ function CapturarFase5Body() {
 
       const result = await marcarFase(sb, {
         ventaId: venta.id,
-        faseNombre: 'Avalúo Cerrado',
         faseposicion: 5,
         docs: [], // el avalúo ya vive en el expediente (subida incremental)
         camposVenta: {
@@ -234,7 +233,7 @@ function CapturarFase5Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={5} faseNombre="Avalúo Cerrado" />
+        <CapturarFaseHeader faseposicion={5} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -246,7 +245,6 @@ function CapturarFase5Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={5}
-        faseNombre="Avalúo Cerrado"
         descripcion="Registra el monto dictaminado por la casa valuadora y sube el PDF del avalúo."
       />
 
@@ -254,12 +252,12 @@ function CapturarFase5Body() {
         <Banner
           tone="success"
           title="Fase 5 ya está cerrada"
-          body="Esta venta ya pasó por Avalúo Cerrado. La siguiente fase es Dictaminación."
+          body="Esta venta ya pasó por Cerrar avalúo. La siguiente fase es Dictaminación."
         />
       ) : !fase4Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 4 (Solicitud de Avalúo)"
+          title="Falta cerrar Fase 4 (Solicitar avalúo)"
           body={
             <>
               Antes de capturar el avalúo, asegúrate de haber enviado la solicitud al valuador.

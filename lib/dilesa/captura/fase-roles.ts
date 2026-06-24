@@ -7,27 +7,30 @@
  * Iniciativa dilesa-ventas-expediente (movido del detalle en S4).
  */
 
-export const FASE_ROLES: Record<string, string[]> = {
-  'Solicitud de Asignación': ['solicitud_asignacion'],
-  Asignada: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'],
-  Formalizada: ['contrato_promesa'],
-  'Solicitud de Avalúo': [],
-  'Avalúo Cerrado': ['avaluo_comercial'],
-  // Beto: las Constancias de Crédito (titular + co-titular) van en Inscrita
-  // (el banco las entrega al inscribir el crédito). La Carta de instrucción
-  // notarial queda en Dictaminada (sale después con el dictamen jurídico).
-  Inscrita: ['constancia_credito_titular', 'constancia_credito_cotitular'],
-  'Solicitud de Dictaminación': ['aprobacion_credito'],
-  Dictaminada: ['carta_instruccion_notarial', 'condiciones_financieras'],
-  'Validación Patronal': ['validacion_patronal'],
-  'Firmas Programadas': [],
-  Escriturada: ['pagare'],
-  Detonada: ['imagen_detonacion'],
-  Facturada: ['factura', 'nota_credito', 'aviso_pld'],
-  'Preparada para Entrega': ['checklist_pre_entrega'],
-  Entregada: ['checklist_entrega'],
-  'Conformidad del Cliente': [],
-  'Operación Terminada': [],
+// Llaveado por POSICIÓN (1–17), no por nombre: los renombres de fase (que viven
+// en `lib/dilesa/fases.ts`) no tocan este mapa. El comentario al lado de cada
+// entrada recuerda qué fase es.
+export const FASE_ROLES: Record<number, string[]> = {
+  1: ['solicitud_asignacion'], // Solicitar asignación
+  2: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'], // Asignar unidad
+  3: ['contrato_promesa'], // Formalizar promesa
+  4: [], // Solicitar avalúo
+  5: ['avaluo_comercial'], // Cerrar avalúo
+  // Beto: las Constancias de Crédito (titular + co-titular) van al inscribir el
+  // crédito (pos 6) — el banco las entrega ahí. La Carta de instrucción notarial
+  // queda en el dictamen (pos 8, sale después con el dictamen jurídico).
+  6: ['constancia_credito_titular', 'constancia_credito_cotitular'], // Inscribir crédito
+  7: ['aprobacion_credito'], // Solicitar dictamen
+  8: ['carta_instruccion_notarial', 'condiciones_financieras'], // Dictaminar
+  9: ['validacion_patronal'], // Validación Patronal
+  10: [], // Programar firmas
+  11: ['pagare'], // Escriturar
+  12: ['imagen_detonacion'], // Detonar crédito
+  13: ['factura', 'nota_credito', 'aviso_pld'], // Facturar
+  14: ['checklist_pre_entrega'], // Preparar entrega
+  15: ['checklist_entrega'], // Entregar
+  16: [], // Recabar conformidad
+  17: [], // Cerrar operación
 };
 
 export const ROL_LABEL: Record<string, string> = {

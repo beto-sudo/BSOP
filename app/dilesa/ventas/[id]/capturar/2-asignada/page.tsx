@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * Captura Fase 2 — Asignada.
+ * Captura Fase 2 — Asignar unidad.
  *
  * Cierra la fase de Asignación: el líder del hold subió todos los
  * documentos firmados del expediente, y Dirección (o el rol autorizador
  * configurado, ej. Nelcy) revisa que esté todo en regla y autoriza la
- * asignación. La venta pasa a `fase_actual='Asignada'` / `fase_posicion=2`.
+ * asignación. La venta pasa a `fase_actual='Asignar unidad'` / `fase_posicion=2`.
  *
  * Acceso: gate por `dilesa.ventas.autorizar` (RBAC nuevo, ver migración
  * 20260528191807). Solo Dirección + el rol de Nelcy lo tienen.
@@ -233,11 +233,10 @@ function CapturarFase2Body() {
         .map(([rol, archivo]) => ({ rol, archivo }));
       const res = await marcarFase(sb, {
         ventaId,
-        faseNombre: 'Asignada',
         faseposicion: 2,
         docs,
         camposVenta: {
-          fase_actual: 'Asignada',
+          fase_actual: 'Asignar unidad',
           fase_posicion: 2,
         },
         notas: null,
@@ -272,7 +271,7 @@ function CapturarFase2Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={2} faseNombre="Asignada" />
+        <CapturarFaseHeader faseposicion={2} />
         <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
           {error ?? 'Venta no encontrada.'}
         </p>
@@ -287,7 +286,6 @@ function CapturarFase2Body() {
           el autorizador necesita para revisar antes de asignar. */}
       <CapturarFaseHeader
         faseposicion={2}
-        faseNombre="Asignada"
         descripcion="Revisa el expediente completo y los datos de la operación, y autoriza la asignación de la unidad."
       />
 

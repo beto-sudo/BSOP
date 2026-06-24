@@ -48,8 +48,8 @@ describe('evaluarCierre', () => {
     const r = evaluarCierre({
       ...BASE,
       docsFaltantes: [
-        { fase: 'Facturada', rol: 'factura', label: 'Factura' },
-        { fase: 'Escriturada', rol: 'pagare', label: 'Pagaré' },
+        { fase: 'Facturar', rol: 'factura', label: 'Factura' },
+        { fase: 'Escriturar', rol: 'pagare', label: 'Pagaré' },
       ],
     });
     expect(r.items[1]!.ok).toBe(false);

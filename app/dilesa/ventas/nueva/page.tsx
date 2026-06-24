@@ -39,6 +39,7 @@ import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { congelarDesglose } from '@/lib/dilesa/desglose-precio';
+import { nombreFase } from '@/lib/dilesa/fases';
 import {
   camposKycFaltantes,
   buildPersonaKycPayload,
@@ -745,7 +746,7 @@ function NuevaSolicitudForm() {
           vendedor_usuario_id: user?.id ?? null,
           vendedor: vendedorSnapshot,
           estado: 'activa',
-          fase_actual: 'Solicitud de Asignación',
+          fase_actual: nombreFase(1),
           fase_posicion: 1,
           // Hold de inventario: 2 días hábiles MX desde ahora. La columna
           // `expira_at` la consume el cron de expiración + los banners UI.
@@ -790,14 +791,14 @@ function NuevaSolicitudForm() {
 
       const ventaId = vIns.id as string;
 
-      // 4) Primera fila de venta_fases (Solicitud de Asignación, fecha hoy)
+      // 4) Primera fila de venta_fases (Solicitar asignación, fecha hoy)
       const { error: fErr } = await sb
         .schema('dilesa')
         .from('venta_fases')
         .insert({
           empresa_id: DILESA_EMPRESA_ID,
           venta_id: ventaId,
-          fase: 'Solicitud de Asignación',
+          fase: nombreFase(1),
           posicion: 1,
           // fecha (date) = hoy; created_at (timestamptz) = now() vía default.
           // Para FIFO en Fase 2 se ordena por created_at, que conserva la hora.

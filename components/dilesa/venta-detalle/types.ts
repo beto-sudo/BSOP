@@ -9,6 +9,7 @@
  */
 import type { BadgeTone } from '@/components/ui/badge';
 import type { Json } from '@/types/supabase';
+import { FASES_VENTA } from '@/lib/dilesa/fases';
 
 export type Venta = {
   id: string;
@@ -240,26 +241,15 @@ export const GATE_PREVIA_OVERRIDE: Record<number, number> = {
   14: 11,
 };
 
-/** Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas. */
-export const FASES_ORDEN: Array<{ pos: number; nombre: string }> = [
-  { pos: 1, nombre: 'Solicitud de Asignación' },
-  { pos: 2, nombre: 'Asignada' },
-  { pos: 3, nombre: 'Formalizada' },
-  { pos: 4, nombre: 'Solicitud de Avalúo' },
-  { pos: 5, nombre: 'Avalúo Cerrado' },
-  { pos: 6, nombre: 'Inscrita' },
-  { pos: 7, nombre: 'Solicitud de Dictaminación' },
-  { pos: 8, nombre: 'Dictaminada' },
-  { pos: 9, nombre: 'Validación Patronal' },
-  { pos: 10, nombre: 'Firmas Programadas' },
-  { pos: 11, nombre: 'Escriturada' },
-  { pos: 12, nombre: 'Detonada' },
-  { pos: 13, nombre: 'Facturada' },
-  { pos: 14, nombre: 'Preparada para Entrega' },
-  { pos: 15, nombre: 'Entregada' },
-  { pos: 16, nombre: 'Conformidad del Cliente' },
-  { pos: 17, nombre: 'Operación Terminada' },
-];
+/**
+ * Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas.
+ * Derivada de la fuente única `lib/dilesa/fases.ts`: renombrar una fase se hace
+ * allí, no aquí.
+ */
+export const FASES_ORDEN: Array<{ pos: number; nombre: string }> = FASES_VENTA.map((f) => ({
+  pos: f.posicion,
+  nombre: f.nombre,
+}));
 
 /**
  * Las 17 fases agrupadas en 5 macro-etapas (Zona B del Expediente de

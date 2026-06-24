@@ -170,7 +170,7 @@ function CapturarFase17Body() {
       const cargados = new Set(((adjRes.data ?? []) as { rol: string }[]).map((a) => a.rol));
       const opcionales = rolesOpcionales(v);
       const docsFaltantes = FASES_PIPELINE.flatMap((f) =>
-        (FASE_ROLES[f.nombre] ?? [])
+        (FASE_ROLES[f.posicion] ?? [])
           .filter((rol) => !cargados.has(rol) && !opcionales.has(rol))
           .map((rol) => ({ fase: f.nombre, rol, label: ROL_LABEL[rol] ?? rol }))
       );
@@ -208,7 +208,6 @@ function CapturarFase17Body() {
 
     const result = await marcarFase(sb, {
       ventaId: venta.id,
-      faseNombre: 'Operación Terminada',
       faseposicion: 17,
       docs: [],
       camposVenta: {},
@@ -226,7 +225,7 @@ function CapturarFase17Body() {
       return;
     }
     toast.add({
-      title: 'Operación Terminada 🎉',
+      title: '¡Operación cerrada! 🎉',
       description: 'El expediente quedó sellado. Felicidades por otra entrega completa.',
       type: 'success',
     });
@@ -246,7 +245,7 @@ function CapturarFase17Body() {
   if (error || !venta) {
     return (
       <div className="container mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <CapturarFaseHeader faseposicion={17} faseNombre="Operación Terminada" />
+        <CapturarFaseHeader faseposicion={17} />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error ?? 'Venta no encontrada.'}
         </div>
@@ -258,7 +257,6 @@ function CapturarFase17Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={17}
-        faseNombre="Operación Terminada"
         descripcion="El sello final: el copiloto verifica el expediente y habilita el cierre."
       />
 
@@ -317,7 +315,7 @@ function CapturarFase17Body() {
                 </>
               ) : (
                 <>
-                  <PartyPopper className="mr-2 size-4" /> Marcar Operación Terminada
+                  <PartyPopper className="mr-2 size-4" /> Cerrar operación
                 </>
               )}
             </Button>

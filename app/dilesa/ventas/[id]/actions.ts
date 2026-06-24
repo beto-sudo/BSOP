@@ -23,26 +23,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { sendHoldEmail, type HoldEmailContext } from '@/lib/dilesa/hold-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
-
-const FASES_CANONICAS: Record<number, string> = {
-  1: 'Solicitud de Asignación',
-  2: 'Asignada',
-  3: 'Formalizada',
-  4: 'Solicitud de Avalúo',
-  5: 'Avalúo Cerrado',
-  6: 'Inscrita',
-  7: 'Solicitud de Dictaminación',
-  8: 'Dictaminada',
-  9: 'Validación Patronal',
-  10: 'Firmas Programadas',
-  11: 'Escriturada',
-  12: 'Detonada',
-  13: 'Facturada',
-  14: 'Preparada para Entrega',
-  15: 'Entregada',
-  16: 'Comisión Pagada',
-  17: 'Operación Terminada',
-};
+import { FASES_NOMBRE_BY_POS } from '@/lib/dilesa/fases';
 
 export type ActionResult =
   | {
@@ -274,7 +255,7 @@ async function regresarAFaseInner(
   if (motivoTrim.length < 5) {
     return { ok: false, error: 'El motivo es obligatorio (mínimo 5 caracteres).' };
   }
-  const faseNombre = FASES_CANONICAS[faseDestino];
+  const faseNombre = FASES_NOMBRE_BY_POS[faseDestino];
   if (!faseNombre) {
     return { ok: false, error: `Fase destino inválida: ${faseDestino}` };
   }

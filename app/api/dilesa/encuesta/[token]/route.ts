@@ -14,9 +14,10 @@ import { NextResponse } from 'next/server';
 import { verifyEncuestaToken } from '@/lib/dilesa/encuesta-token';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { nombreFase } from '@/lib/dilesa/fases';
 
-const FASE_NOMBRE = 'Conformidad del Cliente';
 const FASE_POSICION = 16;
+const FASE_NOMBRE = nombreFase(FASE_POSICION);
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

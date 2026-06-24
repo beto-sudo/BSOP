@@ -625,7 +625,7 @@ export function VentaDetalleProvider({
     const posicionesAlcanzadas = new Set(fases.map((f) => f.posicion));
     return FASES_ORDEN.map(({ pos, nombre }) => {
       const f = fasesByPos.get(pos);
-      const roles = FASE_ROLES[nombre] ?? [];
+      const roles = FASE_ROLES[pos] ?? [];
       const cargados = roles.flatMap((r) =>
         (adjuntosPorRolMap.get(r) ?? []).map((a) => ({ ...a, rol: r }))
       );
