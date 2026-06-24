@@ -11,26 +11,26 @@
 // en `lib/dilesa/fases.ts`) no tocan este mapa. El comentario al lado de cada
 // entrada recuerda qué fase es.
 export const FASE_ROLES: Record<number, string[]> = {
-  1: ['solicitud_asignacion'], // Solicitar asignación
-  2: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'], // Asignar unidad
-  3: ['contrato_promesa'], // Formalizar promesa
-  4: [], // Solicitar avalúo
-  5: ['avaluo_comercial'], // Cerrar avalúo
+  1: ['solicitud_asignacion'], // Asignación Solicitada
+  2: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'], // Asignada
+  3: ['contrato_promesa'], // Formalizada
+  4: [], // Avalúo Solicitado
+  5: ['avaluo_comercial'], // Avalúo Cerrado
   // Beto: las Constancias de Crédito (titular + co-titular) van al inscribir el
   // crédito (pos 6) — el banco las entrega ahí. La Carta de instrucción notarial
   // queda en el dictamen (pos 8, sale después con el dictamen jurídico).
-  6: ['constancia_credito_titular', 'constancia_credito_cotitular'], // Inscribir crédito
-  7: ['aprobacion_credito'], // Solicitar dictamen
-  8: ['carta_instruccion_notarial', 'condiciones_financieras'], // Dictaminar
+  6: ['constancia_credito_titular', 'constancia_credito_cotitular'], // Inscrita
+  7: ['aprobacion_credito'], // Dictamen Solicitado
+  8: ['carta_instruccion_notarial', 'condiciones_financieras'], // Dictaminada
   9: ['validacion_patronal'], // Validación Patronal
-  10: [], // Programar firmas
-  11: ['pagare'], // Escriturar
-  12: ['imagen_detonacion'], // Detonar crédito
-  13: ['factura', 'nota_credito', 'aviso_pld'], // Facturar
-  14: ['checklist_pre_entrega'], // Preparar entrega
-  15: ['checklist_entrega'], // Entregar
-  16: [], // Recabar conformidad
-  17: [], // Cerrar operación
+  10: [], // Firmas Programadas
+  11: ['pagare'], // Escriturada
+  12: ['imagen_detonacion'], // Detonada
+  13: ['factura', 'nota_credito', 'aviso_pld'], // Facturada
+  14: ['checklist_pre_entrega'], // Preparada para Entrega
+  15: ['checklist_entrega'], // Entregada
+  16: [], // Conformidad del Cliente
+  17: [], // Operación Terminada
 };
 
 export const ROL_LABEL: Record<string, string> = {

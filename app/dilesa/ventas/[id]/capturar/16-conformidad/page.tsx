@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 16 — Recabar conformidad (dilesa-ventas-expediente S5).
+ * Captura Fase 16 — Conformidad del Cliente (dilesa-ventas-expediente S5).
  *
  * La fase normalmente se cierra SOLA: al cerrar F15 se programa la encuesta
  * (entrega + 2 días), el cron la envía/recuerda, y la respuesta del cliente
@@ -344,7 +344,7 @@ function CapturarFase16Body() {
       {!fase15Cerrada && !yaCerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 15 (Entregar)"
+          title="Falta cerrar Fase 15 (Entregada)"
           body="Al cerrar la entrega, la encuesta se programa automáticamente (entrega + 2 días)."
           extra={
             <Link
@@ -436,7 +436,7 @@ function CapturarFase16Body() {
             <Banner
               tone="success"
               title="Fase 16 ya está cerrada"
-              body="La conformidad del cliente quedó registrada. La siguiente fase es Cerrar operación."
+              body="La conformidad del cliente quedó registrada. La siguiente fase es Operación Terminada."
             />
           ) : !respondida ? (
             <>

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 14 — Preparar entrega (dilesa-ventas-expediente S5).
+ * Captura Fase 14 — Preparada para Entrega (dilesa-ventas-expediente S5).
  *
  * El equipo de Calidad y Entrega revisa la vivienda con el Checklist
  * Pre-Entrega: lo imprime desde aquí (PDF prellenado con vivienda + cliente),
@@ -9,7 +9,7 @@
  * Subirlo cierra la fase.
  *
  * Gate especial (Beto, 2026-06-10): la preparación puede hacerse desde que se
- * registra la escritura (Fase 11) — NO espera Detonar crédito (12) ni Facturar (13).
+ * registra la escritura (Fase 11) — NO espera Detonada (12) ni Facturada (13).
  *
  * Captura:
  *   - Doc requerido: rol `checklist_pre_entrega` (checklist firmado).
@@ -204,16 +204,16 @@ function CapturarFase14Body() {
         <Banner
           tone="success"
           title="Fase 14 ya está cerrada"
-          body="Esta vivienda ya quedó preparada para entrega. La siguiente fase es Entregar."
+          body="Esta vivienda ya quedó preparada para entrega. La siguiente fase es Entregada."
         />
       ) : !fase11Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 11 (Escriturar)"
+          title="Falta cerrar Fase 11 (Escriturada)"
           body={
             <>
               La preparación de entrega puede hacerse desde que se registra la escritura — sin
-              esperar Detonar crédito ni Facturar. Vuelve al detalle y captura la Fase 11 primero.
+              esperar Detonada ni Facturada. Vuelve al detalle y captura la Fase 11 primero.
             </>
           }
           extra={

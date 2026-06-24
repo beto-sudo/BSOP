@@ -256,7 +256,7 @@ export function ChecklistEntregaPDF({ data }: { data: ChecklistEntregaData }) {
         <Text style={local.leyenda}>
           La vivienda queda preparada para entrega una vez verificados todos los puntos. El
           checklist firmado se digitaliza y se archiva en el expediente de la operación (Fase 14 —
-          Preparar entrega).
+          Preparada para Entrega).
         </Text>
 
         <FooterBand />

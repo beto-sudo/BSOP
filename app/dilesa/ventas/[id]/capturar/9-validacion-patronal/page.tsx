@@ -13,7 +13,7 @@
  *   - Doc requerido: rol `validacion_patronal` (PDF de la validación).
  *     Coincide con `FASE_ROLES[9]` en el detalle.
  *
- * Enforcement: Fase 8 (Dictaminar) debe estar cerrada.
+ * Enforcement: Fase 8 (Dictaminada) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase09_validacion_patronal` (Gerencia Ventas +
  * Dirección por default — backfill de la migración).
@@ -214,12 +214,12 @@ function CapturarFase9Body() {
         <Banner
           tone="success"
           title="Fase 9 ya está cerrada"
-          body="Esta venta ya pasó por Validación Patronal. La siguiente fase es Programar firmas."
+          body="Esta venta ya pasó por Validación Patronal. La siguiente fase es Firmas Programadas."
         />
       ) : !fase8Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 8 (Dictaminar)"
+          title="Falta cerrar Fase 8 (Dictaminada)"
           body={
             <>
               Antes de subir la Validación Patronal, la venta debe estar dictaminada. Vuelve al

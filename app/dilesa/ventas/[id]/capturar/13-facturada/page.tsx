@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 13 — Facturar (captura colaborativa + XML CFDI: Sprints 1-2
+ * Captura Fase 13 — Facturada (captura colaborativa + XML CFDI: Sprints 1-2
  * de `dilesa-ventas-captura-colaborativa`).
  *
  * Sprint 1 — colaborativo: cada documento PERSISTE AL SUBIRSE
@@ -25,7 +25,7 @@
  *     venta. Errores bloquean la subida; warnings quedan visibles y
  *     persistidos en `erp.adjuntos.metadata`.
  *   - NADA se captura a mano en esta pantalla: `valor_escrituracion` viene
- *     de la Fase 8 (Dictaminar) y aquí solo se muestra; `valor_facturado`
+ *     de la Fase 8 (Dictaminada) y aquí solo se muestra; `valor_facturado`
  *     y `monto_nota_credito` se derivan del XML vigente. Corregir un monto
  *     = subir el XML correcto (queda versionado — esa es la auditoría).
  *     Las ventas históricas (sin XML) conservan sus montos migrados: el
@@ -42,7 +42,7 @@
  * aviso + cargar el acuse; la revisión con acuse completa el ciclo y solo
  * entonces se prende el cierre.
  *
- * Enforcement: Fase 12 (Detonar crédito) debe estar cerrada.
+ * Enforcement: Fase 12 (Detonada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
  * Dirección).
  */
@@ -686,7 +686,7 @@ function CapturarFase13Body() {
       ) : bloqueadaPorFase12 ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 12 (Detonar crédito)"
+          title="Falta cerrar Fase 12 (Detonada)"
           body={
             <>
               Antes de facturar, la venta debe estar detonada (depósito recibido). Vuelve al detalle
@@ -877,8 +877,8 @@ function CapturarFase13Body() {
                 <MontoDerivado valor={venta.valor_escrituracion} />
                 <Hint>
                   {venta.valor_escrituracion == null
-                    ? 'Falta — se captura en la Fase 8 (Dictaminar).'
-                    : 'Capturado en la Fase 8 (Dictaminar).'}
+                    ? 'Falta — se captura en la Fase 8 (Dictaminada).'
+                    : 'Capturado en la Fase 8 (Dictaminada).'}
                 </Hint>
               </Field>
               <Field label="Valor real venta Dilesa (calculado)">

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 7 — Solicitar dictamen (Sprint 7f).
+ * Captura Fase 7 — Dictamen Solicitado (Sprint 7f).
  *
  * Cierra la fase de Solicitud de Dictamen: Gerencia Ventas (o Dirección)
  * asigna una notaría del catálogo de proveedores (`erp.proveedores` con
@@ -13,7 +13,7 @@
  *   - `fecha_solicitud_dictamen` → fecha del cierre (default hoy)
  *   - Sin doc requerido (el dictamen llega en Fase 8)
  *
- * Enforcement: Fase 6 (Inscribir crédito) debe estar cerrada.
+ * Enforcement: Fase 6 (Inscrita) debe estar cerrada.
  *
  * Acceso: `dilesa.ventas.fase07_solicitud_dictamen` (Gerencia Ventas +
  * Dirección por default — backfill de la migración).
@@ -226,12 +226,12 @@ function CapturarFase7Body() {
         <Banner
           tone="success"
           title="Fase 7 ya está cerrada"
-          body="Esta venta ya pasó por Solicitar dictamen. La siguiente fase es Dictaminar."
+          body="Esta venta ya pasó por Dictamen Solicitado. La siguiente fase es Dictaminada."
         />
       ) : !fase6Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 6 (Inscribir crédito)"
+          title="Falta cerrar Fase 6 (Inscrita)"
           body={
             <>
               Antes de solicitar dictamen, captura primero las Constancias de Crédito. Vuelve al

@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Captura Fase 4 — Solicitar avalúo (Sprint 7d).
+ * Captura Fase 4 — Avalúo Solicitado (Sprint 7d).
  *
- * Cierra la fase de Solicitar avalúo: Gerencia Ventas (o Dirección)
+ * Cierra la fase de Avalúo Solicitado: Gerencia Ventas (o Dirección)
  * asigna una casa valuadora del catálogo (`erp.personas` con
  * `tipo='valuador'`) y dispara el email de solicitud al valuador.
  *
@@ -240,12 +240,12 @@ function CapturarFase4Body() {
         <Banner
           tone="success"
           title="Fase 4 ya está cerrada"
-          body="Esta venta ya pasó por Solicitar avalúo. La siguiente fase es Cerrar avalúo."
+          body="Esta venta ya pasó por Avalúo Solicitado. La siguiente fase es Avalúo Cerrado."
         />
       ) : !fase3Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 3 (Formalizar promesa)"
+          title="Falta cerrar Fase 3 (Formalizada)"
           body={
             <>
               Antes de solicitar el avalúo, asegúrate de que el contrato de promesa esté firmado y

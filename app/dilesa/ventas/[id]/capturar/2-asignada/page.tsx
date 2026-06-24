@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * Captura Fase 2 — Asignar unidad.
+ * Captura Fase 2 — Asignada.
  *
  * Cierra la fase de Asignación: el líder del hold subió todos los
  * documentos firmados del expediente, y Dirección (o el rol autorizador
  * configurado, ej. Nelcy) revisa que esté todo en regla y autoriza la
- * asignación. La venta pasa a `fase_actual='Asignar unidad'` / `fase_posicion=2`.
+ * asignación. La venta pasa a `fase_actual='Asignada'` / `fase_posicion=2`.
  *
  * Acceso: gate por `dilesa.ventas.autorizar` (RBAC nuevo, ver migración
  * 20260528191807). Solo Dirección + el rol de Nelcy lo tienen.
@@ -236,7 +236,7 @@ function CapturarFase2Body() {
         faseposicion: 2,
         docs,
         camposVenta: {
-          fase_actual: 'Asignar unidad',
+          fase_actual: 'Asignada',
           fase_posicion: 2,
         },
         notas: null,

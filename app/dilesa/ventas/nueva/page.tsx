@@ -791,7 +791,7 @@ function NuevaSolicitudForm() {
 
       const ventaId = vIns.id as string;
 
-      // 4) Primera fila de venta_fases (Solicitar asignación, fecha hoy)
+      // 4) Primera fila de venta_fases (Asignación Solicitada, fecha hoy)
       const { error: fErr } = await sb
         .schema('dilesa')
         .from('venta_fases')

@@ -225,7 +225,7 @@ function CapturarFase17Body() {
       return;
     }
     toast.add({
-      title: '¡Operación cerrada! 🎉',
+      title: 'Operación Terminada 🎉',
       description: 'El expediente quedó sellado. Felicidades por otra entrega completa.',
       type: 'success',
     });
@@ -315,7 +315,7 @@ function CapturarFase17Body() {
                 </>
               ) : (
                 <>
-                  <PartyPopper className="mr-2 size-4" /> Cerrar operación
+                  <PartyPopper className="mr-2 size-4" /> Marcar Operación Terminada
                 </>
               )}
             </Button>

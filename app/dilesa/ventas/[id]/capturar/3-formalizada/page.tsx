@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 3 — Formalizar promesa (Sprint 7c piloto).
+ * Captura Fase 3 — Formalizada (Sprint 7c piloto).
  *
  * Cierra la fase de Formalización: el cliente firmó el contrato de
  * promesa de compraventa que el vendedor descargó/imprimió de
@@ -224,7 +224,7 @@ function CapturarFase3Body() {
       }
       toast.add({
         title: 'Fase 3 cerrada',
-        description: 'Fase 4 (Solicitar avalúo) está disponible.',
+        description: 'Fase 4 (Avalúo Solicitado) está disponible.',
         type: 'success',
       });
       router.push(`/dilesa/ventas/${venta.id}`);
@@ -265,12 +265,12 @@ function CapturarFase3Body() {
         <Banner
           tone="success"
           title="Fase 3 ya está cerrada"
-          body="Esta venta ya pasó por Formalizar promesa. Si necesitas corregir algo, contacta al comité para reabrir la fase."
+          body="Esta venta ya pasó por Formalizada. Si necesitas corregir algo, contacta al comité para reabrir la fase."
         />
       ) : !fase2Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 2 (Asignar unidad)"
+          title="Falta cerrar Fase 2 (Asignada)"
           body={
             <>
               Antes de capturar Formalizada, asegúrate de tener la asignación del comité. Vuelve al

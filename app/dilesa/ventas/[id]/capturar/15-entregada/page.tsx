@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * Captura Fase 15 — Entregar (dilesa-ventas-expediente S5).
+ * Captura Fase 15 — Entregada (dilesa-ventas-expediente S5).
  *
  * La entrega física de la vivienda al cliente: se imprime el Checklist para
  * Entrega de Vivienda (PDF prellenado), se recorre la casa con el cliente
  * palomeando SÍ/NO, firman el CLIENTE y Atención a Clientes, se escanea y se
  * sube el PDF firmado. Subirlo cierra la fase.
  *
- * Gate: Fase 14 (Preparar entrega) debe estar cerrada.
+ * Gate: Fase 14 (Preparada para Entrega) debe estar cerrada.
  *
  * Captura:
  *   - Doc requerido: rol `checklist_entrega` (checklist firmado por cliente).
@@ -68,7 +68,7 @@ function CapturarFase15Body() {
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [fase14Cerrada, setFase14Cerrada] = useState<boolean | null>(null);
-  // F12 (Detonar crédito) = el pago recibido. No se entrega sin pago.
+  // F12 (Detonada) = el pago recibido. No se entrega sin pago.
   const [fase12Cerrada, setFase12Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
@@ -210,12 +210,12 @@ function CapturarFase15Body() {
         <Banner
           tone="success"
           title="Fase 15 ya está cerrada"
-          body="Esta vivienda ya fue entregada al cliente. La siguiente fase es Recabar conformidad."
+          body="Esta vivienda ya fue entregada al cliente. La siguiente fase es Conformidad del Cliente."
         />
       ) : !fase14Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 14 (Preparar entrega)"
+          title="Falta cerrar Fase 14 (Preparada para Entrega)"
           body={
             <>
               Antes de entregar al cliente, Calidad y Entrega debe dejar la vivienda preparada
@@ -234,7 +234,7 @@ function CapturarFase15Body() {
       ) : !fase12Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta el pago (Fase 12 — Detonar crédito)"
+          title="Falta el pago (Fase 12 — Detonada)"
           body={
             <>
               No se puede entregar la vivienda sin haber recibido el pago. El pago lo registra
