@@ -39,6 +39,7 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { deriveFasesKpis } from '@/lib/dilesa/kpis/fases';
+import { proximaFase } from '@/lib/dilesa/fases';
 
 type Fase = {
   posicion: number;
@@ -320,6 +321,9 @@ function VentasFasesBody() {
 
 function FaseCard({ fase, cuenta }: { fase: Fase; cuenta: number }) {
   const href = `/dilesa/ventas?fase=${encodeURIComponent(fase.nombre)}`;
+  // "Lo que sigue por hacer" para las ventas en esta fase = la acción
+  // (infinitivo) de la fase SIGUIENTE (posición + 1). null en la 17 (el final).
+  const sig = proximaFase(fase.posicion);
   return (
     <Link
       href={href}
@@ -337,6 +341,11 @@ function FaseCard({ fase, cuenta }: { fase: Fase; cuenta: number }) {
       {fase.rol ? (
         <div className="mt-1 text-[11px] text-[var(--text)]/50">
           Resp.: <span className="text-[var(--text)]/70">{fase.rol}</span>
+        </div>
+      ) : null}
+      {sig ? (
+        <div className="mt-1 text-[11px] text-[var(--text)]/50">
+          Sigue: <span className="font-medium text-[var(--text)]/70">{sig.accion}</span>
         </div>
       ) : null}
       <div className="mt-3 flex items-baseline justify-between">
