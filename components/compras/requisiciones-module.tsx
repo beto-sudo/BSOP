@@ -519,15 +519,14 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       if (!esDireccion || !puedeGenerarOc(req) || accionId === req.id) return;
       setAccionId(req.id);
       const sb = createSupabaseBrowserClient();
-      const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
       // Partida opcional: gasto suelto genera OC sin partida (no compromete presupuesto).
       const validas = req.lineas.filter((l) => l.cantidad > 0);
+      // El folio (OC-{año}-{NNNN}) lo asigna el trigger erp.fn_oc_asignar_folio.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ocResp = await (sb.schema('erp') as any)
         .from('ordenes_compra')
         .insert({
           empresa_id: empresaId,
-          codigo: folio,
           requisicion_id: req.id,
           proveedor_id: null,
           // La OC hereda las líneas y su partida pero NO el proveedor (la
@@ -540,7 +539,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           autorizada_at: null,
           total: validas.reduce((acc, l) => acc + l.cantidad * l.precioEstimado, 0),
         })
-        .select('id')
+        .select('id, codigo')
         .single();
       if (ocResp.error || !ocResp.data) {
         setAccionId(null);
@@ -552,6 +551,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         return;
       }
       const ocId = ocResp.data.id as string;
+      const folio = (ocResp.data.codigo as string) ?? ocId;
       const detalle = validas.map((l) => ({
         empresa_id: empresaId,
         orden_compra_id: ocId,
