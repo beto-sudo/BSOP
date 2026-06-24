@@ -126,11 +126,28 @@ export function normalizarVentas(b: VentasRawBundle): VentaReporteRow[] {
   });
 }
 
-/** Proyectos presentes (para el selector de filtro), ordenados por nombre. */
+/**
+ * Proyectos presentes EN LAS VENTAS (para el selector de filtro), únicos por id
+ * y ordenados por nombre.
+ *
+ * Se deriva del propio dataset y NO del catálogo completo `dilesa.proyectos` a
+ * propósito: el catálogo trae nombres duplicados (cascarones de import sin
+ * inventario ni ventas, p.ej. dos «Lomas de las Delicias») que ensuciaban el
+ * filtro con opciones repetidas. Derivando de las ventas, solo aparece el
+ * proyecto que realmente tiene ventas — sin duplicados y sin proyectos vacíos.
+ * Es simétrico con `vendedoresPresentes`. El value sigue siendo el `id`, así que
+ * el filtrado por `proyectoId` en los motores no cambia.
+ */
 export function proyectosPresentes(
-  proyectos: ReadonlyArray<{ id: string; nombre: string }>
+  ventas: readonly VentaReporteRow[]
 ): Array<{ id: string; nombre: string }> {
-  return [...proyectos].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const porId = new Map<string, string>();
+  for (const v of ventas) {
+    if (v.proyectoId && v.proyectoNombre) porId.set(v.proyectoId, v.proyectoNombre);
+  }
+  return [...porId.entries()]
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
 /** Vendedores presentes en las ventas (para el selector), únicos y ordenados. */

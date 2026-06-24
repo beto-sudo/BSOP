@@ -23,10 +23,10 @@ const DEFAULT_FILTERS = { desde: '', hasta: '', proyecto: '', vendedor: '' };
 
 export function VentasPeriodoView() {
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(DEFAULT_FILTERS);
-  const { ventas, proyectos, loading, error, recargar } = useVentasReporte();
+  const { ventas, loading, error, recargar } = useVentasReporte();
 
   const result = useMemo(() => construirVentasPeriodo(ventas, filters), [ventas, filters]);
-  const proys = useMemo(() => proyectosPresentes(proyectos), [proyectos]);
+  const proys = useMemo(() => proyectosPresentes(ventas), [ventas]);
   const vendedores = useMemo(() => vendedoresPresentes(ventas), [ventas]);
 
   const mejorMes = useMemo(() => {

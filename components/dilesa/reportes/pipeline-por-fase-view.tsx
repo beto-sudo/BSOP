@@ -153,6 +153,22 @@ export function PipelinePorFaseView() {
       ),
     [ventas]
   );
+  // Proyectos presentes en las ventas (no el catálogo completo): evita listar
+  // proyectos sin ventas y los nombres duplicados del catálogo `dilesa.proyectos`
+  // (cascarones de import). El value sigue siendo el id → el filtro por
+  // `proyectoId` no cambia. Simétrico con `vendedoresPresentes`.
+  const proyectosPresentes = useMemo(() => {
+    const nombrePorId = new Map(proyectos.map((p) => [p.id, p.nombre]));
+    const porId = new Map<string, string>();
+    for (const v of ventas) {
+      if (!v.proyectoId) continue;
+      const nombre = nombrePorId.get(v.proyectoId);
+      if (nombre) porId.set(v.proyectoId, nombre);
+    }
+    return [...porId.entries()]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }, [ventas, proyectos]);
   const mesesPresentes = useMemo(
     () => [...new Set(ventas.map((v) => v.mes))].sort().reverse(),
     [ventas]
@@ -199,7 +215,7 @@ export function PipelinePorFaseView() {
         className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
       >
         <option value="">Todos los proyectos</option>
-        {proyectos.map((p) => (
+        {proyectosPresentes.map((p) => (
           <option key={p.id} value={p.id}>
             {p.nombre}
           </option>
