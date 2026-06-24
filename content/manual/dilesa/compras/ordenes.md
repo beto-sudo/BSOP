@@ -1,8 +1,8 @@
 ---
 titulo: 'Compras — Órdenes de compra'
 modulo: dilesa.compras.ordenes
-version: '1.1.0'
-actualizado: '2026-06-11'
+version: '1.2.0'
+actualizado: '2026-06-24'
 ---
 
 ## ¿Qué es y para qué sirve?
@@ -18,7 +18,7 @@ Son las **órdenes de compra (OC)** de DILESA. Cada línea de la orden se ancla 
 ## Cómo llegar
 
 **Sidebar → DILESA → Compras → Órdenes de compra.** Se trabaja **un proyecto a la
-vez** (lo eliges arriba).
+vez** (lo eliges arriba), o en **"Gasto suelto"** para órdenes sin proyecto.
 
 ## Lo que ves arriba (indicadores)
 
@@ -34,12 +34,15 @@ enviada, cerrar, cancelar).
 
 ## Cómo crear una orden (paso a paso)
 
-1. Elige el **proyecto** arriba.
-2. **Nueva orden** → eliges proveedor y agregas **líneas**: cada una con su
-   **partida** del presupuesto, descripción, cantidad, unidad y precio.
+1. Elige el **proyecto** arriba (o **"Gasto suelto"** para una orden sin
+   proyecto/partida).
+2. **Nueva orden** → eliges proveedor y agregas **líneas**: con proyecto, cada
+   una lleva su **partida** del presupuesto; en gasto suelto, solo descripción.
+   Captura cantidad, unidad y precio.
 3. **Crear orden (borrador)** — queda en Borrador (todavía no compromete nada).
 4. Haz clic en la orden y, en el detalle, **Marcar enviada** → ahí sí compromete
    el monto contra las partidas (la misma acción vive en el menú ⋯ del renglón).
+   **Necesita proveedor**: una orden sin proveedor no se puede marcar enviada.
 5. Cuando ya no falta nada por recibir, **Cerrar orden**. Si te equivocaste,
    **Cancelar** (con motivo) la anula y libera el presupuesto.
 
@@ -56,7 +59,7 @@ enviada, cerrar, cancelar).
 ## Preguntas frecuentes
 
 **El botón "Nueva orden" está deshabilitado.**
-Tienes que **elegir un proyecto** primero (arriba).
+Tienes que **elegir un proyecto** —o **"Gasto suelto"**— primero (arriba).
 
 **¿Por qué cada línea pide una partida?**
 Porque la orden se controla contra el presupuesto del proyecto: la partida es a

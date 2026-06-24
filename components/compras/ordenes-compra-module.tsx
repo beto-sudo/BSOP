@@ -52,6 +52,8 @@ import {
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 
 const SIN = '__sin__';
+/** Valor del selector para ver/crear órdenes de gasto suelto (sin proyecto/partida). */
+const LIBRE = '__libre__';
 
 const ESTADO_TONE: Record<OcEstado, BadgeTone> = {
   borrador: 'neutral',
@@ -344,7 +346,11 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const q = search.trim().toLowerCase();
   const filtrados = useMemo(() => {
     return rows.filter((r) => {
-      if (proyectoFiltro && r.proyectoId !== proyectoFiltro) return false;
+      if (proyectoFiltro === LIBRE) {
+        if (r.proyectoId !== null) return false;
+      } else if (proyectoFiltro && r.proyectoId !== proyectoFiltro) {
+        return false;
+      }
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
@@ -391,8 +397,12 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     },
   ];
 
-  const proyectoActivo = proyectoFiltro && proyectoFiltro !== SIN ? proyectoFiltro : '';
+  const modoLibre = proyectoFiltro === LIBRE;
+  const proyectoActivo =
+    proyectoFiltro && proyectoFiltro !== SIN && proyectoFiltro !== LIBRE ? proyectoFiltro : '';
   const partidaGrupos = proyectoActivo ? (partidasByProyecto.get(proyectoActivo) ?? []) : [];
+  // Alta disponible con un proyecto presupuestado elegido, o en gasto suelto.
+  const puedeAlta = modoLibre || proyectoActivo !== '';
 
   function abrirAlta() {
     setEditOc(null);
@@ -404,7 +414,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   /** Edición de una OC en borrador: form de alta pre-poblado (S4). */
   function abrirEdicionOc(oc: OcRow) {
     if (oc.estado !== 'borrador') return;
-    if (oc.proyectoId) setProyectoFiltro(oc.proyectoId);
+    // OC de gasto suelto (sin proyecto) → modo libre; con proyecto, fija ese
+    // proyecto para poblar sus partidas en el form.
+    setProyectoFiltro(oc.proyectoId ?? LIBRE);
     setEditOc(oc);
     setProveedorId(oc.proveedorId ?? '');
     setLineas(
@@ -427,14 +439,18 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     () => lineas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0),
     [lineas]
   );
-  const canSubmit =
-    proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
+  // Gasto suelto: la línea válida es texto (descripción + cantidad). Con proyecto: partida + cantidad.
+  const canSubmit = modoLibre
+    ? lineas.some((l) => l.descripcion.trim() !== '' && toNum(l.cantidad) > 0)
+    : proyectoActivo !== '' && lineas.some((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
-    const validas = lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
+    const validas = modoLibre
+      ? lineas.filter((l) => l.descripcion.trim() !== '' && toNum(l.cantidad) > 0)
+      : lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
     const total = validas.reduce((acc, l) => acc + toNum(l.cantidad) * toNum(l.precio), 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const erp = sb.schema('erp') as any;
@@ -506,7 +522,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     const detalle = validas.map((l) => ({
       empresa_id: empresaId,
       orden_compra_id: ocId,
-      partida_id: l.partidaId,
+      partida_id: modoLibre ? null : l.partidaId,
       producto_id: null,
       descripcion: l.descripcion.trim() || null,
       unidad: l.unidad.trim() || null,
@@ -542,6 +558,17 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     async (oc: OcRow, estado: OcEstado, okMsg: string) => {
       // Candado de dinero (D2): emitir (→ enviada) solo Dirección/admin.
       if (estado === 'enviada' && !esDireccion) return;
+      // Una OC emitida compromete presupuesto y es el documento que va al
+      // proveedor (PDF/email, Sprint 2-3 de `dilesa-compras-operacion`): no puede
+      // emitirse sin destinatario. Se valida aquí, en el punto de emisión.
+      if (estado === 'enviada' && !oc.proveedorId) {
+        toast.add({
+          title: 'Falta proveedor',
+          description: 'Asígnale un proveedor a la orden (edítala) antes de marcarla enviada.',
+          type: 'error',
+        });
+        return;
+      }
       const sb = createSupabaseBrowserClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: e } = await (sb.schema('erp') as any)
@@ -735,6 +762,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
               {p.nombre}
             </option>
           ))}
+          <option value={LIBRE}>Gasto suelto (sin proyecto)</option>
         </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
@@ -760,10 +788,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
             <button
               type="button"
               onClick={abrirAlta}
-              disabled={proyectoActivo === ''}
-              title={
-                proyectoActivo === '' ? 'Selecciona un proyecto para crear una orden' : undefined
-              }
+              disabled={!puedeAlta}
+              title={!puedeAlta ? 'Elige un proyecto con presupuesto o “Gasto suelto”' : undefined}
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" /> Nueva orden
@@ -777,7 +803,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
               {editOc ? `Editar orden · ${editOc.codigo}` : 'Nueva orden'} ·{' '}
-              {proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto'}
+              {modoLibre
+                ? 'Gasto suelto'
+                : (proyectosPresentes.find((p) => p.id === proyectoActivo)?.nombre ?? 'Proyecto')}
             </h2>
             <select
               value={proveedorId}
@@ -796,26 +824,28 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           <div className="space-y-2">
             {lineas.map((l, idx) => (
               <div key={l.key} className="flex flex-wrap items-center gap-2">
-                <select
-                  value={l.partidaId}
-                  onChange={(e) =>
-                    setLineas((prev) =>
-                      prev.map((x) => (x.key === l.key ? { ...x, partidaId: e.target.value } : x))
-                    )
-                  }
-                  className="h-9 min-w-[260px] flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)]"
-                >
-                  <option value="">Partida…</option>
-                  {partidaGrupos.map((g) => (
-                    <optgroup key={g.key} label={g.label}>
-                      {g.partidas.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                {!modoLibre ? (
+                  <select
+                    value={l.partidaId}
+                    onChange={(e) =>
+                      setLineas((prev) =>
+                        prev.map((x) => (x.key === l.key ? { ...x, partidaId: e.target.value } : x))
+                      )
+                    }
+                    className="h-9 min-w-[260px] flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)]"
+                  >
+                    <option value="">Partida…</option>
+                    {partidaGrupos.map((g) => (
+                      <optgroup key={g.key} label={g.label}>
+                        {g.partidas.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                ) : null}
                 <Input
                   value={l.descripcion}
                   onChange={(e) =>
@@ -823,8 +853,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                       prev.map((x) => (x.key === l.key ? { ...x, descripcion: e.target.value } : x))
                     )
                   }
-                  placeholder="Detalle (opcional)"
-                  className="w-44"
+                  placeholder={modoLibre ? '¿Qué se compra?' : 'Detalle (opcional)'}
+                  className={modoLibre ? 'min-w-[260px] flex-1' : 'w-44'}
                 />
                 <Input
                   value={l.cantidad}
