@@ -344,8 +344,9 @@ function FaseCard({ fase, cuenta }: { fase: Fase; cuenta: number }) {
         </div>
       ) : null}
       {sig ? (
-        <div className="mt-1 text-[11px] text-[var(--text)]/50">
-          Sigue: <span className="font-medium text-[var(--text)]/70">{sig.accion}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text)]/40">Sigue</span>
+          <Badge tone="accent">{sig.accion}</Badge>
         </div>
       ) : null}
       <div className="mt-3 flex items-baseline justify-between">
