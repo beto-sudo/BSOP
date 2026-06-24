@@ -123,7 +123,7 @@ describe('POST /api/dilesa/encuesta/[token]', () => {
     });
 
     const insFase = inserts.find((i) => i.tabla === 'venta_fases');
-    expect(insFase?.row).toMatchObject({ posicion: 16, fase: 'Recabar conformidad' });
+    expect(insFase?.row).toMatchObject({ posicion: 16, fase: 'Conformidad del Cliente' });
 
     const upVenta = updates.find((u) => u.tabla === 'ventas');
     expect(upVenta?.patch).toMatchObject({ fase_posicion: 16 });

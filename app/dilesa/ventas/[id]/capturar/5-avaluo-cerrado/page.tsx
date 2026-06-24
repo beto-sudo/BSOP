@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Captura Fase 5 — Cerrar avalúo (Sprint 7d).
+ * Captura Fase 5 — Avalúo Cerrado (Sprint 7d).
  *
- * Cierra la fase de Cerrar avalúo: Gerencia Ventas (o Dirección)
+ * Cierra la fase de Avalúo Cerrado: Gerencia Ventas (o Dirección)
  * registra el monto dictaminado y sube el PDF del avalúo comercial
  * entregado por el valuador.
  *
@@ -252,12 +252,12 @@ function CapturarFase5Body() {
         <Banner
           tone="success"
           title="Fase 5 ya está cerrada"
-          body="Esta venta ya pasó por Cerrar avalúo. La siguiente fase es Dictaminación."
+          body="Esta venta ya pasó por Avalúo Cerrado. La siguiente fase es Dictaminación."
         />
       ) : !fase4Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 4 (Solicitar avalúo)"
+          title="Falta cerrar Fase 4 (Avalúo Solicitado)"
           body={
             <>
               Antes de capturar el avalúo, asegúrate de haber enviado la solicitud al valuador.

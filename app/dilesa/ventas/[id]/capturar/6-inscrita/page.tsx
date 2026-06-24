@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 6 — Inscribir crédito (Sprint 7e).
+ * Captura Fase 6 — Inscrita (Sprint 7e).
  *
  * Cierra la fase de Inscripción del crédito: el banco entregó la(s)
  * Constancia(s) de Crédito con el monto APROBADO. Gerencia Ventas (o
@@ -308,12 +308,12 @@ function CapturarFase6Body() {
         <Banner
           tone="success"
           title="Fase 6 ya está cerrada"
-          body="Esta venta ya pasó por Inscribir crédito. La siguiente fase es Solicitar dictamen."
+          body="Esta venta ya pasó por Inscrita. La siguiente fase es Dictamen Solicitado."
         />
       ) : !fase5Cerrada ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 5 (Cerrar avalúo)"
+          title="Falta cerrar Fase 5 (Avalúo Cerrado)"
           body={
             <>
               Antes de inscribir el crédito, captura primero el avalúo entregado por la casa

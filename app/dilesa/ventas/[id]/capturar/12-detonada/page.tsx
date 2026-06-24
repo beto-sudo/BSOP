@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Fase 12 — Detonar crédito. GUÍA a Cobranza + cierre manual SOLO Dirección.
+ * Fase 12 — Detonada. GUÍA a Cobranza + cierre manual SOLO Dirección.
  *
  * "Detonar" el crédito = la institución libera el recurso y DILESA recibe el
  * depósito. El camino ÚNICO normal (2026-06-11) es: Contabilidad registra el
@@ -16,7 +16,7 @@
  * cierre de emergencia exclusivo de Dirección/admin, con advertencia de que
  * NO registra el dinero en Cobranza.
  *
- * Enforcement: Fase 11 (Escriturar) debe estar cerrada.
+ * Enforcement: Fase 11 (Escriturada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase12_detonada` (Contabilidad + Gerencia Ventas +
  * Dirección); el form de emergencia además exige Dirección
  * (`EffectiveUser.direccionEmpresaIds` o admin global).
@@ -250,12 +250,12 @@ function CapturarFase12Body() {
         <Banner
           tone="success"
           title="Fase 12 ya está cerrada"
-          body="Esta venta ya está detonada. La siguiente fase es Facturar."
+          body="Esta venta ya está detonada. La siguiente fase es Facturada."
         />
       ) : fase11Cerrada === false ? (
         <Banner
           tone="warning"
-          title="Falta cerrar Fase 11 (Escriturar)"
+          title="Falta cerrar Fase 11 (Escriturada)"
           body={
             <>
               Antes de registrar la detonación, la venta debe estar escriturada. Vuelve al detalle y

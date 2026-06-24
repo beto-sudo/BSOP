@@ -80,11 +80,11 @@ export function armarKpis(raw: KpisRaw): KpisDelDia {
   for (const f of raw.fasesHoy) {
     const v = montoPorVenta.get(f.venta_id);
     if (f.posicion === 2) {
-      // Asignar unidad (fase 2) = venta nueva del día.
+      // Asignada (fase 2) = venta nueva del día.
       ventas_hoy_n += 1;
       ventas_hoy_monto += Number(v?.precio_asignacion ?? 0);
     } else if (f.posicion === 11) {
-      // Escriturar (fase 11) = escritura del día.
+      // Escriturada (fase 11) = escritura del día.
       escrituras_hoy_n += 1;
       escrituras_hoy_monto += Number(v?.valor_escrituracion ?? 0);
     }

@@ -197,13 +197,13 @@ describe('renderResumenConsejoHtml — 4 secciones', () => {
     const html = renderResumenConsejoHtml(
       {
         ...EMPTY,
-        tuberiaViva: [{ fase: 'Formalizar promesa', clientes: 20, valor: 22000000 }],
+        tuberiaViva: [{ fase: 'Formalizada', clientes: 20, valor: 22000000 }],
         tuberiaHistorico: { clientes: 1093, valor: 1060000000 },
       },
       { fechaTitulo: 'x' }
     );
     expect(html).toContain('Pipeline de Ventas (vivo)');
-    expect(html).toContain('Formalizar promesa');
+    expect(html).toContain('Formalizada');
     expect(html).toContain('Histórico acumulado: 1,093 operaciones');
   });
 
@@ -228,41 +228,41 @@ describe('renderResumenConsejoHtml — 4 secciones', () => {
 
 describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
   const CAT = [
-    { nombre: 'Asignar unidad', posicion: 2 },
-    { nombre: 'Solicitar asignación', posicion: 1 },
-    { nombre: 'Cerrar operación', posicion: 17 },
+    { nombre: 'Asignada', posicion: 2 },
+    { nombre: 'Asignación Solicitada', posicion: 1 },
+    { nombre: 'Operación Terminada', posicion: 17 },
   ];
 
   it('agrupa activas por fase (solo con clientes) y manda terminadas al histórico', () => {
     const { viva, historico } = armarTuberiaSplit(CAT, [
       {
         estado: 'activa',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: 1000,
         precio_asignacion: 9999,
       },
       {
         estado: 'activa',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: 500,
         precio_asignacion: 9999,
       },
       {
         estado: 'terminada',
-        fase_actual: 'Cerrar operación',
+        fase_actual: 'Operación Terminada',
         valor_escrituracion: 2000,
         precio_asignacion: 9999,
       },
       {
         estado: 'terminada',
-        fase_actual: 'Cerrar operación',
+        fase_actual: 'Operación Terminada',
         valor_escrituracion: 1000,
         precio_asignacion: 9999,
       },
     ]);
     // Solo la fase con clientes vivos; las fases en 0 se filtran del funnel.
     // `valor_escrituracion` tiene precedencia sobre `precio_asignacion` (el 9999 se ignora).
-    expect(viva).toEqual([{ fase: 'Asignar unidad', clientes: 2, valor: 1500 }]);
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 1500 }]);
     expect(historico).toEqual({ clientes: 2, valor: 3000 });
   });
 
@@ -270,19 +270,19 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
     const { viva } = armarTuberiaSplit(CAT, [
       {
         estado: 'activa',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: null,
         precio_asignacion: 800,
       },
       {
         estado: 'activa',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: 1200,
         precio_asignacion: 1000,
       },
     ]);
     // 800 (fallback a precio_asignacion) + 1200 (valor_escrituracion gana) = 2000.
-    expect(viva).toEqual([{ fase: 'Asignar unidad', clientes: 2, valor: 2000 }]);
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 2000 }]);
   });
 
   it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
@@ -302,13 +302,13 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
     const { viva, historico } = armarTuberiaSplit(CAT, [
       {
         estado: 'desasignada',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: 999,
         precio_asignacion: 999,
       },
       {
         estado: 'expirada',
-        fase_actual: 'Asignar unidad',
+        fase_actual: 'Asignada',
         valor_escrituracion: 111,
         precio_asignacion: 111,
       },
