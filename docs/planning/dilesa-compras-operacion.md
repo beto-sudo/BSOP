@@ -3,11 +3,11 @@
 **Slug:** `dilesa-compras-operacion`
 **Empresas:** DILESA (golden; el patrón de documento PDF + envío + alertas del ciclo P2P es replicable a las otras empresas cuando su compras exista)
 **Schemas afectados:** Principalmente UI (`components/compras/*`) + nuevos PDFs (`lib/dilesa/pdf/`) y rutas API (`app/api/dilesa/...`). `erp`: folio secuencial de OC (RPC con secuencia/contador atómico sobre `ordenes_compra`; los campos `condiciones_pago`/`fecha_entrega`/`direccion_entrega` ya existen sin captura), **tabla nueva de evento de recepción** (hoy la recepción solo setea `ordenes_compra_detalle.cantidad_recibida` de forma absoluta, sin quién/cuándo/cuánto). `core`: nueva `notification_definitions` slug `dilesa_orden_compra` (kill-switch). `lib/compras/avisos.ts` + cron `daily-task-summary` para la alerta de OC sin recibir. Reusa `<DateRangeFilter>`, Resend, el molde react-pdf con branding DILESA. **Línea roja: NO toca `erp.v_partida_control` ni el modelo de precio c/IVA-incluido** (los números de control que ve el Consejo).
-**Estado:** planned
-**Próximo hito:** Arrancar **Sprint 0** (validar proveedor antes de emitir OC + opción "Gasto suelto" en Órdenes + alinear el manual) — quick wins que desbloquean el email de OC y el quitar el auto-select.
+**Estado:** in_progress
+**Próximo hito:** **Sprint 0 en revisión de Beto** ([#1017](https://github.com/beto-sudo/BSOP/pull/1017), sin auto-merge — UI). Sigue **Sprint 1** (panorama y filtros: quitar el auto-select de un solo proyecto + filtro por estado/fecha + columna y búsqueda por proyecto + export).
 **Dueño:** Beto
 **Creada:** 2026-06-24
-**Última actualización:** 2026-06-24 (promoción; alcance Opción B "Operación completa" aprobado por Beto tras análisis + doble crítica adversarial)
+**Última actualización:** 2026-06-24 (Sprint 0 en PR #1017: proveedor obligatorio al emitir OC + gasto suelto en Órdenes + requisición→OC nace borrador + manual alineado)
 
 > Detonante: Beto pidió revisar a fondo el módulo de Compras de DILESA "como si fuera un usuario", detectando mejoras para **simplificar y tener todos los elementos**: documentación que hoy no existe (impresión de orden de compra), envío por email de algunos elementos, filtros predeterminados mal planteados y filtros faltantes. El análisis se rebotó con dos agentes críticos (operativo + técnico) hasta acordar el corte indispensable.
 
@@ -33,6 +33,7 @@ Recorrido de los 5 tabs como usuario + dos agentes críticos en paralelo (lente 
 - **2026-06-24 — El folio secuencial va ANTES del PDF.** El PDF y el email deben llevar un folio legible. Romper el formato viejo no afecta downstream (verificado: `avisos.ts` usa `codigo` solo para mostrar/ordenar; el hilo del gasto referencia por `id`). Se genera con RPC/secuencia atómica (no en cliente) por concurrencia multi-sesión; toca los **3 productores de OC** + contrato/req/RFQ → PR aislado.
 - **2026-06-24 — Comprobante de recepción y alerta de "sin recibir" dependen de modelar el evento de recepción primero.** Hoy `oc_recibir_linea_partida` setea `cantidad_recibida` de forma absoluta, sin tabla de eventos. Sin el evento, "hace N días" no tiene fecha contra qué medir y el PDF sería de un dato que no se guarda.
 - **2026-06-24 — Sale del alcance lo ya hecho / redundante.** El manual del flujo P2P ya está escrito (`flujo-del-gasto.md`); el filtro por proveedor ya es buscable por texto (queda como nice-to-have, no sprint).
+- **2026-06-24 (Sprint 0) — El manual ya documentaba "la OC nace en borrador"; el código había driftado.** Al implementar se vio que `requisiciones.md` y el propio JSDoc de `generarOC` ya decían que la OC de requisición nace en borrador, pero el código la creaba `enviada`. La acción de "alinear el manual" se invirtió: se alineó el **código al manual** (requisición→OC nace `borrador`), lo que de paso resuelve la inconsistencia de estado inicial (antes E6) y rutea esa OC por la emisión validada de Órdenes. El candado no se reabre: "Generar OC" sigue siendo de Dirección. Otro drift corregido en el manual: el paso "Marcar autorizada" ya no existe (lo quitó `dilesa-compras-flujo`).
 
 ## Outcome esperado
 
@@ -100,3 +101,4 @@ Ordenado por dependencia técnica (prerequisitos primero; lo que toca dinero/sch
 ## Bitácora
 
 - **2026-06-24 — Promoción.** Análisis del módulo (recorrido de los 5 tabs como usuario) + doble crítica adversarial (operativa + técnica) → corte indispensable y plan de 5 sprints. Beto aprobó alcance Opción B. Iniciativa creada en estado `planned`. Próximo: arrancar Sprint 0.
+- **2026-06-24 — Sprint 0** ([#1017](https://github.com/beto-sudo/BSOP/pull/1017), sin auto-merge — UI visible). Proveedor obligatorio al emitir la OC (gate en "Marcar enviada"); requisición→OC nace `borrador` (alinea código↔manual, resuelve E6); "Gasto suelto" en Órdenes (paridad con Requisiciones, vuelve visibles las OC sin proyecto); manual de Órdenes/Requisiciones alineado. Sin migración, sin tocar el modelo de dinero. 6 checks verdes. Pendiente: Beto revisa el Preview y mergea.
