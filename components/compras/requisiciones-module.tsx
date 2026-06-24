@@ -524,10 +524,14 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           codigo: folio,
           requisicion_id: req.id,
           proveedor_id: null,
-          // Dirección emite en un acto (D2/D3): la OC directa nace `enviada` y
-          // compromete el presupuesto de inmediato (sin paso de re-autorización).
-          estado: 'enviada',
-          autorizada_at: new Date().toISOString(),
+          // La OC hereda las líneas y su partida pero NO el proveedor (la
+          // requisición no lo captura), así que nace en `borrador` — igual que
+          // una orden creada directamente en Órdenes, y como el manual ya lo
+          // documenta. Dirección le asigna proveedor y la emite (→ enviada) en el
+          // tab Órdenes, donde se valida el proveedor antes de comprometer
+          // (`dilesa-compras-operacion` S0; evita OC comprometida sin destinatario).
+          estado: 'borrador',
+          autorizada_at: null,
           total: validas.reduce((acc, l) => acc + l.cantidad * l.precioEstimado, 0),
         })
         .select('id')
@@ -575,8 +579,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         .eq('id', req.id);
       setAccionId(null);
       toast.add({
-        title: 'Orden de compra emitida',
-        description: `${folio} · desde ${req.codigo}`,
+        title: 'Orden de compra creada (borrador)',
+        description: `${folio} · asígnale proveedor y emítela en Órdenes`,
         type: 'success',
       });
       void cargar();
