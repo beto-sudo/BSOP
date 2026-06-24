@@ -123,22 +123,23 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
   }> => {
     const sb = createSupabaseBrowserClient();
 
-    // 4 queries paralelas: estimaciones + estimacion_tareas (count) +
+    // 3 queries paralelas: estimaciones (con conteo embebido de tareas) +
     // personas (contratistas, cross-schema) + datos satellite (abrev).
-    const [eRes, etRes, personasRes, datosRes] = await Promise.all([
+    //
+    // El conteo de tareas va embebido (`estimacion_tareas(count)`) en vez de
+    // bajar las ~130k filas de estimacion_tareas para contarlas en JS: el
+    // servidor agrega vía el FK estimacion_id y solo devuelve un número por
+    // estimación (paga RLS una vez gracias al fix set-membership de la política
+    // estimacion_tareas_rls_select — ver migración 20260624180340).
+    const [eRes, personasRes, datosRes] = await Promise.all([
       sb
         .schema('dilesa')
         .from('estimaciones')
         .select(
-          'id, codigo, fecha_cierre, fecha_pago_programado, contratista_id, monto_bruto, monto_neto, estado, pagada_at'
+          'id, codigo, fecha_cierre, fecha_pago_programado, contratista_id, monto_bruto, monto_neto, estado, pagada_at, estimacion_tareas(count)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
-      sb
-        .schema('dilesa')
-        .from('estimacion_tareas')
-        .select('estimacion_id')
-        .eq('empresa_id', empresaId),
       sb
         .schema('erp')
         .from('personas')
@@ -153,7 +154,7 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
         .is('deleted_at', null),
     ]);
 
-    const firstErr = eRes.error ?? etRes.error ?? personasRes.error ?? datosRes.error;
+    const firstErr = eRes.error ?? personasRes.error ?? datosRes.error;
     if (firstErr) {
       return {
         error: getSupabaseErrorMessage(firstErr, 'No se pudieron cargar las estimaciones.'),
@@ -170,12 +171,6 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
       abrevMap.set(d.persona_id as string, (d.abreviacion as string | null) ?? null);
     }
 
-    const tareasByEstim = new Map<string, number>();
-    for (const t of etRes.data ?? []) {
-      const eid = t.estimacion_id as string;
-      tareasByEstim.set(eid, (tareasByEstim.get(eid) ?? 0) + 1);
-    }
-
     const rows: EstimacionRow[] = (eRes.data ?? []).map((e) => {
       const cid = e.contratista_id as string;
       return {
@@ -190,7 +185,7 @@ export function EstimacionesModule({ empresaId }: { empresaId: string }) {
         pagada_at: (e.pagada_at as string | null) ?? null,
         contratistaNombre: personaMap.get(cid) ?? '(sin contratista)',
         contratistaAbreviacion: abrevMap.get(cid) ?? null,
-        tareasCount: tareasByEstim.get(e.id as string) ?? 0,
+        tareasCount: Number((e.estimacion_tareas as { count: number }[] | null)?.[0]?.count ?? 0),
       };
     });
 
