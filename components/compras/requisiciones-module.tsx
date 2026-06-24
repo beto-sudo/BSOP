@@ -18,10 +18,11 @@
  * `autorizada_at` + la OC ligada. Un proyecto a la vez (como Costeo/Órdenes).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ClipboardList,
+  Download,
   FileSearch,
   Loader2,
   Plus,
@@ -64,6 +65,13 @@ import {
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
+import {
+  DateRangeFilter,
+  EMPTY_DATE_RANGE,
+  isInDateRange,
+  type DateRange,
+} from '@/components/filters/date-range-filter';
+import { downloadCsv, toCsv } from '@/lib/export/csv';
 
 const SIN = '__sin__';
 /** Valor del selector para capturar una requisición libre (gasto suelto sin proyecto). */
@@ -134,7 +142,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
-  const autoSelectDone = useRef(false);
+  const [estadoFiltro, setEstadoFiltro] = useState<ReqEstado | ''>('');
+  const [rango, setRango] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const [formOpen, setFormOpen] = useState(false);
   const [justificacion, setJustificacion] = useState('');
@@ -301,15 +310,9 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     void fetchData().then((res) => {
       if (!activo) return;
       apply(res);
-      if (!autoSelectDone.current && !res.error) {
-        const first = (res.rows ?? [])
-          .filter((r) => r.proyectoId)
-          .sort((a, b) => a.proyectoNombre.localeCompare(b.proyectoNombre))[0];
-        const firstByPartida = [...(res.partidasByProyecto ?? new Map()).keys()][0];
-        const pid = first?.proyectoId ?? firstByPartida ?? '';
-        if (pid) setProyectoFiltro(pid);
-        autoSelectDone.current = true;
-      }
+      // Sin auto-select de proyecto (Sprint 1 `dilesa-compras-operacion`): arranca
+      // en "Todos los proyectos" para ver TODO el pendiente; el alta exige elegir
+      // proyecto (o "Gasto suelto") explícitamente.
       setLoading(false);
     });
     return () => {
@@ -339,16 +342,19 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       } else if (proyectoFiltro && r.proyectoId !== proyectoFiltro) {
         return false;
       }
+      if (estadoFiltro && deriveReqEstado(r) !== estadoFiltro) return false;
+      if (!isInDateRange(r.fecha, rango)) return false;
       if (q) {
         const hay =
           r.codigo.toLowerCase().includes(q) ||
           r.solicitanteNombre.toLowerCase().includes(q) ||
+          r.proyectoNombre.toLowerCase().includes(q) ||
           r.lineas.some((l) => l.partidaLabel.toLowerCase().includes(q));
         if (!hay) return false;
       }
       return true;
     });
-  }, [rows, q, proyectoFiltro]);
+  }, [rows, q, proyectoFiltro, estadoFiltro, rango]);
 
   const kpisData = useMemo(() => deriveReqKpis(filtrados), [filtrados]);
   const kpis: ModuleKpi[] = [
@@ -657,8 +663,39 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
     [empresaId, accionId, toast, router]
   );
 
+  const exportarCsv = useCallback(() => {
+    const headers = [
+      'Folio',
+      'Proyecto',
+      'Solicitante',
+      'Estado',
+      'Orden',
+      'Líneas',
+      'Estimado',
+      'Fecha',
+    ];
+    const filas = filtrados.map((r) => [
+      r.codigo,
+      r.proyectoNombre || 'Gasto suelto',
+      r.solicitanteNombre,
+      ESTADO_LABEL[deriveReqEstado(r)],
+      r.ocCodigo ?? '',
+      r.lineas.length,
+      reqTotal(r),
+      r.fecha ?? '',
+    ]);
+    downloadCsv(`requisiciones-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+  }, [filtrados]);
+
   const columns: Column<ReqRow>[] = [
     { key: 'codigo', label: 'Folio', type: 'text', sticky: true, width: 'min-w-[120px]' },
+    {
+      key: 'proyectoNombre',
+      label: 'Proyecto',
+      type: 'text',
+      width: 'min-w-[150px]',
+      render: (r) => r.proyectoNombre || 'Gasto suelto',
+    },
     { key: 'solicitanteNombre', label: 'Solicitante', type: 'text', width: 'min-w-[160px]' },
     {
       key: 'estado',
@@ -781,15 +818,27 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           ))}
           <option value={LIBRE}>Gasto suelto (sin proyecto)</option>
         </select>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value as ReqEstado | '')}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]"
+          aria-label="Estado"
+        >
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="autorizada">Autorizada</option>
+          <option value="con_oc">Con orden</option>
+        </select>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text)]/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar folio, solicitante o partida…"
+            placeholder="Buscar folio, solicitante, proyecto o partida…"
             className="w-72 pl-9"
           />
         </div>
+        <DateRangeFilter label="Fecha" value={rango} onChange={setRango} />
         <button
           type="button"
           onClick={() => void cargar()}
@@ -798,6 +847,14 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
           <RefreshCw className="h-3.5 w-3.5" /> Refrescar
         </button>
         <div className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={exportarCsv}
+            disabled={filtrados.length === 0}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)] disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Exportar
+          </button>
           <span className="text-sm text-[var(--text)]/60">
             {filtrados.length} de {rows.length} requisiciones
           </span>
