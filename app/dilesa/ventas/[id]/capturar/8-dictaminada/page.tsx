@@ -48,6 +48,18 @@ import {
   CreditoDirectoCaptura,
   type PlanPagoJson,
 } from '@/components/dilesa/captura/credito-directo-captura';
+import {
+  DocsFaseSection,
+  useDocsFaseColaborativos,
+  type SlotColaborativo,
+} from '@/components/dilesa/captura/docs-fase-colaborativos';
+
+// Pagaré firmado (decisión Beto 2026-06-24): el documento se recaba en la
+// dictaminación (no en la firma). Mismo adjunto (rol `pagare`) que reconoce la
+// fase Escriturar; obligatorio para cerrar la fase cuando hay crédito directo.
+const SLOTS_PAGARE: SlotColaborativo[] = [
+  { rol: 'pagare', label: 'Pagaré firmado por el cliente', requerido: true },
+];
 
 type VentaCtx = {
   id: string;
@@ -133,6 +145,8 @@ function CapturarFase8Body() {
   // pagaré (ADR-048: el cierre financiero se cuadra aquí, con los datos reales).
   const resumen = useVentaCapturaResumen();
   const { data: me } = useEffectiveUser();
+  // Pagaré firmado: estado del adjunto colaborativo (rol `pagare`) — gate del cierre.
+  const docsPagare = useDocsFaseColaborativos(ventaId, SLOTS_PAGARE);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   // El crédito directo (pagaré) reporta su estado "guardado" para el gate del
@@ -409,6 +423,16 @@ function CapturarFase8Body() {
         });
         return;
       }
+      // El pagaré firmado se recaba en la dictaminación (decisión Beto 2026-06-24):
+      // obligatorio para cerrar la fase cuando la operación lleva crédito directo.
+      if (cob && cob.pagareNecesario > 0.0049 && docsPagare.faltantes.length > 0) {
+        toast.add({
+          title: 'Falta el pagaré firmado',
+          description: 'Sube el pagaré firmado por el cliente antes de cerrar la dictaminación.',
+          type: 'error',
+        });
+        return;
+      }
       // Re-firma pendiente (ADR-048 D5): si el precio dictaminado difiere del de los
       // documentos firmados, no se avanza hasta re-firmar Solicitud + Promesa.
       const valorN = Number(valorEscrituracion) || 0;
@@ -503,6 +527,7 @@ function CapturarFase8Body() {
       valorEscrituracion,
       adjuntosNotariales,
       cdGuardado,
+      docsPagare,
       me,
       resumen,
       router,
@@ -737,6 +762,20 @@ function CapturarFase8Body() {
   const saldoCD = cobGastos ? cobGastos.pagareNecesario : 0;
   const aplicaCD = saldoCD > 0.0049;
 
+  // Pagaré firmado (decisión Beto 2026-06-24): se recaba en la dictaminación, no
+  // en la firma. Obligatorio para cerrar la fase cuando hay crédito directo (el
+  // gate vive en onSubmit). Reusado en ambos forms (cierre y "ya cerrada") para
+  // que las ventas ya dictaminadas también puedan subirlo.
+  const pagareFirmadoSection = aplicaCD ? (
+    <Section title="Pagaré firmado">
+      <p className="mb-3 text-xs text-[var(--text)]/60">
+        Imprime el pagaré del crédito directo (sección de arriba), recábalo firmado por el cliente y
+        súbelo aquí. Es obligatorio para cerrar la dictaminación.
+      </p>
+      <DocsFaseSection state={docsPagare} titulo="Pagaré firmado" />
+    </Section>
+  ) : null;
+
   // Re-firma de documentos (ADR-048 D5): el precio dictaminado capturado difiere
   // del que tienen los documentos firmados vigentes → hay que re-firmar Solicitud
   // + Promesa antes de avanzar. El snapshot se actualiza al confirmar la re-firma.
@@ -964,6 +1003,8 @@ function CapturarFase8Body() {
               </Section>
             ) : null}
 
+            {pagareFirmadoSection}
+
             {refirmaSection}
 
             <div className="flex items-center justify-end gap-3">
@@ -1167,6 +1208,8 @@ function CapturarFase8Body() {
               />
             </Section>
           ) : null}
+
+          {pagareFirmadoSection}
 
           {refirmaSection}
 

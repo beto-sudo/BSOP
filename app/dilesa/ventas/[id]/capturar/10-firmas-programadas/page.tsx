@@ -6,11 +6,10 @@
  * Gerencia Ventas (o Dirección) programa la fecha + hora de firma ya acordada
  * con el notario (que viene de Fase 7) y genera la Póliza de Garantía.
  *
- * ADR-048: el **crédito directo (pagaré) ya NO se captura aquí** — se define en
- * la dictaminación (fase 8), con el saldo REAL del Anexo B. Si la venta tiene
- * crédito directo, aquí solo se sube el **pagaré firmado** que se recaba en la
- * firma (rol `pagare`, el mismo que reconoce la fase Escriturada y
- * `rolesOpcionales`).
+ * ADR-048: el **crédito directo (pagaré) ya NO se captura aquí** — se define y se
+ * recaba firmado en la dictaminación (fase 8), con el saldo REAL del Anexo B
+ * (decisión Beto 2026-06-24). Esta fase solo programa la fecha/hora de firma y
+ * genera la Póliza de Garantía.
  *
  * Tasas / cobertura / plan de pagos: viven en la fase 8.
  *
@@ -32,20 +31,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
-import {
-  DocsFaseSection,
-  useDocsFaseColaborativos,
-  type SlotColaborativo,
-} from '@/components/dilesa/captura/docs-fase-colaborativos';
 import { getNotaria } from '@/lib/dilesa/notarios';
-
-const SLOTS_FASE: SlotColaborativo[] = [
-  {
-    rol: 'pagare',
-    label: 'Pagaré firmado (súbelo cuando lo tengas)',
-    requerido: false,
-  },
-];
 
 type VentaCtx = {
   id: string;
@@ -54,8 +40,6 @@ type VentaCtx = {
   fecha_firma_programada: string | null;
   hora_firma_programada: string | null;
   poliza_garantia_expedida_at: string | null;
-  // Definido en la fase 8 (ADR-048). Aquí solo decide si se pide el pagaré firmado.
-  monto_credito_directo: number | null;
 };
 
 const MESES_LARGO = [
@@ -95,7 +79,6 @@ function CapturarFase10Body() {
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const { data: me } = useEffectiveUser();
   const ventaId = params.id;
-  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
@@ -128,7 +111,7 @@ function CapturarFase10Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, notario_id, fecha_firma_programada, hora_firma_programada, poliza_garantia_expedida_at, monto_credito_directo'
+          'id, empresa_id, notario_id, fecha_firma_programada, hora_firma_programada, poliza_garantia_expedida_at'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -187,7 +170,6 @@ function CapturarFase10Body() {
   const firmaCongelada = polizaExpedida || yaCerrada;
   const fechaBloqueada = firmaCongelada && !esDireccion;
   const tieneFechaPersistida = !!venta?.fecha_firma_programada;
-  const tieneCreditoDirecto = venta?.monto_credito_directo != null;
 
   // Persiste fecha/hora de firma sin cerrar la fase. Enciende la póliza con esa
   // fecha. Si el trigger la rechaza (congelada + rol no Dirección), avisa.
@@ -351,17 +333,6 @@ function CapturarFase10Body() {
     </span>
   ) : null;
 
-  // Sección del pagaré firmado (solo si la fase 8 definió un crédito directo).
-  const pagareSection = tieneCreditoDirecto ? (
-    <Section title="Pagaré firmado">
-      <p className="mb-3 text-xs text-[var(--text)]/60">
-        El crédito directo se definió en la dictaminación (fase 8). Imprime el pagaré desde ahí,
-        recábalo firmado en la firma y súbelo aquí.
-      </p>
-      <DocsFaseSection state={docsFase} titulo="Pagaré firmado" />
-    </Section>
-  ) : null;
-
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
@@ -388,8 +359,6 @@ function CapturarFase10Body() {
             </p>
             {polizaButton}
           </Section>
-
-          {pagareSection}
 
           {esDireccion ? (
             <Section title="Reprogramar firma (Dirección)">
@@ -499,8 +468,6 @@ function CapturarFase10Body() {
             ) : null}
             {polizaButton}
           </Section>
-
-          {pagareSection}
 
           <div className="flex items-center justify-end gap-3">
             <Link
