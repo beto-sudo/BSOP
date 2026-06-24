@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { evaluarCierre, type CopilotoInput } from './copiloto-cierre';
-import { rolesOpcionales } from './captura/fase-roles';
+import { requiereSeguroCalidad, rolesOpcionales } from './captura/fase-roles';
 
 const fasesCompletas = Array.from({ length: 17 }, (_, idx) => ({
   pos: idx + 1,
@@ -86,9 +86,12 @@ describe('rolesOpcionales (docs condicionales)', () => {
     expect(opc.has('pagare')).toBe(true);
     expect(opc.has('nota_credito')).toBe(true);
     expect(opc.has('condiciones_financieras')).toBe(false); // Infonavit SÍ lo exige
+    // Infonavit SÍ exige el seguro de calidad (no opcional).
+    expect(opc.has('orden_pago_seguro_calidad')).toBe(false);
+    expect(opc.has('solicitud_pago_seguro_calidad')).toBe(false);
   });
 
-  it('crédito bancario: exime el Anexo B', () => {
+  it('crédito bancario: exime el Anexo B y el seguro de calidad', () => {
     const opc = rolesOpcionales({
       monto_credito_cotitular: 100000,
       monto_credito_directo: 50000,
@@ -99,5 +102,50 @@ describe('rolesOpcionales (docs condicionales)', () => {
     expect(opc.has('constancia_credito_cotitular')).toBe(false);
     expect(opc.has('pagare')).toBe(false);
     expect(opc.has('nota_credito')).toBe(false);
+    // No-Infonavit → seguro de calidad opcional.
+    expect(opc.has('orden_pago_seguro_calidad')).toBe(true);
+    expect(opc.has('solicitud_pago_seguro_calidad')).toBe(true);
+  });
+
+  it('Cofinavit exige el seguro de calidad (cofinanciamiento Infonavit)', () => {
+    const opc = rolesOpcionales({
+      monto_credito_cotitular: null,
+      monto_credito_directo: null,
+      monto_nota_credito: 0,
+      tipo_credito: 'Cofinavit',
+    });
+    expect(opc.has('orden_pago_seguro_calidad')).toBe(false);
+    expect(opc.has('solicitud_pago_seguro_calidad')).toBe(false);
+  });
+
+  it('Contado exime el seguro de calidad', () => {
+    const opc = rolesOpcionales({
+      monto_credito_cotitular: null,
+      monto_credito_directo: null,
+      monto_nota_credito: 0,
+      tipo_credito: 'Contado',
+    });
+    expect(opc.has('orden_pago_seguro_calidad')).toBe(true);
+    expect(opc.has('solicitud_pago_seguro_calidad')).toBe(true);
+  });
+});
+
+describe('requiereSeguroCalidad', () => {
+  it('exige en todos los créditos Infonavit (incluye Cofinavit)', () => {
+    for (const t of [
+      'Infonavit Tradicional',
+      'Infonavit Unamos',
+      'Infonavit Conyugal',
+      'Infonavit/Fovissste',
+      'Cofinavit',
+    ]) {
+      expect(requiereSeguroCalidad(t)).toBe(true);
+    }
+  });
+
+  it('no exige en Fovissste, bancario, contado, IMSS ni cuando falta el dato', () => {
+    for (const t of ['Fovissste Tradicional', 'Hipotecario', 'Contado', 'IMSS', '', null]) {
+      expect(requiereSeguroCalidad(t)).toBe(false);
+    }
   });
 });
