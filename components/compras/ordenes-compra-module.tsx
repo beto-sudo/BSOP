@@ -511,17 +511,17 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         return;
       }
     } else {
-      folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+      // El folio (OC-{año}-{NNNN}) lo asigna el trigger erp.fn_oc_asignar_folio;
+      // el cliente ya no lo genera, se lee de vuelta para el toast.
       const ocResp = await erp
         .from('ordenes_compra')
         .insert({
           empresa_id: empresaId,
-          codigo: folio,
           proveedor_id: proveedorId || null,
           estado: 'borrador',
           total,
         })
-        .select('id')
+        .select('id, codigo')
         .single();
       if (ocResp.error || !ocResp.data) {
         toast.add({
@@ -533,6 +533,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         return;
       }
       ocId = ocResp.data.id as string;
+      folio = (ocResp.data.codigo as string) ?? ocId;
     }
 
     const detalle = validas.map((l) => ({

@@ -1225,13 +1225,12 @@ function CapturaPrecios({
     const total = totalProveedor(cotizacion, cotProveedorId);
     try {
       if (adjudicaA(cotizacion.tipo) === 'oc') {
-        const folio = `OC-${Date.now().toString(36).toUpperCase()}`;
+        // El folio (OC-{año}-{NNNN}) lo asigna el trigger erp.fn_oc_asignar_folio.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ocResp = await (sb.schema('erp') as any)
           .from('ordenes_compra')
           .insert({
             empresa_id: empresaId,
-            codigo: folio,
             cotizacion_id: cotizacion.id,
             proveedor_id: prov.proveedorId,
             // Adjudicar = autorizar = emitir en un acto (D2): la OC nace
