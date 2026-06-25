@@ -1,7 +1,5 @@
 'use client';
 
- 
-
 /**
  * Detalle completo de una construcción DILESA — 4 secciones:
  *   1. Datos generales — prototipo, contratista, supervisor, fechas
