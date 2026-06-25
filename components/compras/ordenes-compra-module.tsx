@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Coins,
   Download,
+  FileDown,
   Loader2,
   Pencil,
   Plus,
@@ -151,6 +152,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [proveedorId, setProveedorId] = useState('');
+  const [condicionesPago, setCondicionesPago] = useState('');
+  const [fechaEntrega, setFechaEntrega] = useState('');
+  const [direccionEntrega, setDireccionEntrega] = useState('');
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
   /** OC en edición (solo borrador, quick win S4 — antes: cancelar y recrear). */
@@ -177,7 +181,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       (sb.schema('erp') as any)
         .from('ordenes_compra')
         .select(
-          'id, codigo, proveedor_id, estado, fecha_entrega, created_at, ordenes_compra_detalle(id, partida_id, descripcion, unidad, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real)'
+          'id, codigo, proveedor_id, estado, fecha_entrega, condiciones_pago, direccion_entrega, created_at, ordenes_compra_detalle(id, partida_id, descripcion, unidad, cantidad, cantidad_recibida, cantidad_cancelada, precio_unitario, precio_real)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -260,6 +264,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       proveedor_id: string | null;
       estado: string;
       fecha_entrega: string | null;
+      condiciones_pago: string | null;
+      direccion_entrega: string | null;
       created_at: string;
       ordenes_compra_detalle: Array<{
         id: string;
@@ -300,6 +306,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         proveedorNombre: o.proveedor_id ? (proveedorLabel.get(o.proveedor_id) ?? '—') : '—',
         estado: (o.estado as OcEstado) ?? 'borrador',
         fecha: o.fecha_entrega ?? o.created_at?.slice(0, 10) ?? null,
+        condicionesPago: o.condiciones_pago,
+        fechaEntrega: o.fecha_entrega,
+        direccionEntrega: o.direccion_entrega,
         lineas,
       };
     });
@@ -423,6 +432,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   function abrirAlta() {
     setEditOc(null);
     setProveedorId('');
+    setCondicionesPago('');
+    setFechaEntrega('');
+    setDireccionEntrega('');
     setLineas([emptyLinea()]);
     setFormOpen(true);
   }
@@ -435,6 +447,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     setProyectoFiltro(oc.proyectoId ?? LIBRE);
     setEditOc(oc);
     setProveedorId(oc.proveedorId ?? '');
+    setCondicionesPago(oc.condicionesPago ?? '');
+    setFechaEntrega(oc.fechaEntrega ?? '');
+    setDireccionEntrega(oc.direccionEntrega ?? '');
     setLineas(
       oc.lineas.length > 0
         ? oc.lineas.map((l) => ({
@@ -483,6 +498,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         .from('ordenes_compra')
         .update({
           proveedor_id: proveedorId || null,
+          condiciones_pago: condicionesPago.trim() || null,
+          fecha_entrega: fechaEntrega || null,
+          direccion_entrega: direccionEntrega.trim() || null,
           total,
           updated_at: new Date().toISOString(),
         })
@@ -518,6 +536,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         .insert({
           empresa_id: empresaId,
           proveedor_id: proveedorId || null,
+          condiciones_pago: condicionesPago.trim() || null,
+          fecha_entrega: fechaEntrega || null,
+          direccion_entrega: direccionEntrega.trim() || null,
           estado: 'borrador',
           total,
         })
@@ -881,6 +902,30 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
             </select>
           </div>
 
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Input
+              value={condicionesPago}
+              onChange={(e) => setCondicionesPago(e.target.value)}
+              placeholder="Condiciones de pago"
+              className="w-48"
+            />
+            <label className="flex items-center gap-1.5 text-sm text-[var(--text)]/60">
+              Entrega
+              <Input
+                value={fechaEntrega}
+                onChange={(e) => setFechaEntrega(e.target.value)}
+                type="date"
+                className="w-40"
+              />
+            </label>
+            <Input
+              value={direccionEntrega}
+              onChange={(e) => setDireccionEntrega(e.target.value)}
+              placeholder="Dirección de entrega"
+              className="min-w-[200px] flex-1"
+            />
+          </div>
+
           <div className="space-y-2">
             {lineas.map((l, idx) => (
               <div key={l.key} className="flex flex-wrap items-center gap-2">
@@ -1093,33 +1138,45 @@ function OcDetalleDrawer({
       }
       meta={oc ? <Badge tone={ESTADO_TONE[oc.estado]}>{ESTADO_LABEL[oc.estado]}</Badge> : null}
       footer={
-        conAcciones ? (
+        oc ? (
           <div className="flex flex-wrap items-center gap-2">
-            {oc.estado === 'borrador' ? (
+            <a
+              href={`/api/dilesa/ordenes-compra/${oc.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--card)]"
+            >
+              <FileDown className="size-4" /> Imprimir OC
+            </a>
+            {conAcciones ? (
               <>
-                <Button variant="outline" onClick={() => onEditar(oc)}>
-                  <Pencil className="size-4" /> Editar borrador
-                </Button>
-                {esDireccion ? (
-                  <Button onClick={() => onMarcarEnviada(oc)}>
-                    <Send className="size-4" /> Marcar enviada
+                {oc.estado === 'borrador' ? (
+                  <>
+                    <Button variant="outline" onClick={() => onEditar(oc)}>
+                      <Pencil className="size-4" /> Editar borrador
+                    </Button>
+                    {esDireccion ? (
+                      <Button onClick={() => onMarcarEnviada(oc)}>
+                        <Send className="size-4" /> Marcar enviada
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null}
+                {oc.estado === 'enviada' || oc.estado === 'parcial' ? (
+                  <Button variant="outline" onClick={() => onCerrarOrden(oc)}>
+                    <X className="size-4" /> Cerrar orden
+                  </Button>
+                ) : null}
+                {oc.estado === 'borrador' || oc.estado === 'enviada' ? (
+                  <Button
+                    variant="ghost"
+                    className="ml-auto text-[var(--text)]/60 hover:text-red-600"
+                    onClick={() => onCancelar(oc)}
+                  >
+                    <Trash2 className="size-4" /> Cancelar OC
                   </Button>
                 ) : null}
               </>
-            ) : null}
-            {oc.estado === 'enviada' || oc.estado === 'parcial' ? (
-              <Button variant="outline" onClick={() => onCerrarOrden(oc)}>
-                <X className="size-4" /> Cerrar orden
-              </Button>
-            ) : null}
-            {oc.estado === 'borrador' || oc.estado === 'enviada' ? (
-              <Button
-                variant="ghost"
-                className="ml-auto text-[var(--text)]/60 hover:text-red-600"
-                onClick={() => onCancelar(oc)}
-              >
-                <Trash2 className="size-4" /> Cancelar OC
-              </Button>
             ) : null}
           </div>
         ) : null
