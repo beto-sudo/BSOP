@@ -446,19 +446,19 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
     const validas = lineas.filter((l) => l.partidaId !== '' && toNum(l.cantidad) > 0);
-    const folio = `RFQ-${Date.now().toString(36).toUpperCase()}`;
+    // El folio (RFQ-{año}-{NNNN}) lo asigna el trigger erp.fn_cotizacion_asignar_folio
+    // (BEFORE INSERT) — no se manda desde el cliente. Se lee de vuelta para el aviso.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cotResp = await (sb.schema('erp') as any)
       .from('cotizaciones')
       .insert({
         empresa_id: empresaId,
-        codigo: folio,
         tipo,
         estado: 'abierta',
         descripcion: descripcion.trim() || null,
         fecha_limite: fechaLimite || null,
       })
-      .select('id')
+      .select('id, codigo')
       .single();
     if (cotResp.error || !cotResp.data) {
       toast.add({
@@ -470,6 +470,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
       return;
     }
     const cotId = cotResp.data.id as string;
+    const cotCodigo = (cotResp.data.codigo as string | null) ?? 'RFQ';
     const detalle = validas.map((l) => ({
       empresa_id: empresaId,
       cotizacion_id: cotId,
@@ -500,7 +501,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
       setSubmitting(false);
       return;
     }
-    toast.add({ title: 'Cotización creada', description: folio, type: 'success' });
+    toast.add({ title: 'Cotización creada', description: cotCodigo, type: 'success' });
     setSubmitting(false);
     setFormOpen(false);
     void cargar();

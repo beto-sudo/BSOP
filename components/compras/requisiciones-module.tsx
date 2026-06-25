@@ -647,19 +647,19 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         router.push(`/dilesa/compras/cotizaciones?focus=${existente.id}`);
         return;
       }
-      const folio = `RFQ-${Date.now().toString(36).toUpperCase()}`;
+      // El folio (RFQ-{año}-{NNNN}) lo asigna el trigger erp.fn_cotizacion_asignar_folio
+      // (BEFORE INSERT) — no se manda desde el cliente. Se lee de vuelta para el aviso.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cotResp = await (sb.schema('erp') as any)
         .from('cotizaciones')
         .insert({
           empresa_id: empresaId,
-          codigo: folio,
           tipo: 'compra',
           requisicion_id: req.id,
           descripcion: `Cotización de ${req.codigo}`,
           estado: 'abierta',
         })
-        .select('id')
+        .select('id, codigo')
         .single();
       if (cotResp.error || !cotResp.data) {
         toast.add({
@@ -671,6 +671,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         return;
       }
       const cotId = cotResp.data.id as string;
+      const cotCodigo = (cotResp.data.codigo as string | null) ?? 'RFQ';
       // `precio_estimado` se hereda → la captura de la RFQ lo muestra como
       // columna de referencia interna (con su total); NO pre-llena ni se envía
       // al proveedor (cotiza a ciegas). Mejora pedida por Nahum: tener el
@@ -697,7 +698,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       }
       toast.add({
         title: 'RFQ creada',
-        description: `${folio} · desde ${req.codigo}`,
+        description: `${cotCodigo} · desde ${req.codigo}`,
         type: 'success',
       });
       router.push(`/dilesa/compras/cotizaciones?focus=${cotId}`);
