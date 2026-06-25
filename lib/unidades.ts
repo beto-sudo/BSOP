@@ -19,6 +19,8 @@ export const UNIDADES: UnidadOption[] = [
   { value: 'gramo', label: 'Gramo (g)' },
   { value: 'litro', label: 'Litro (L)' },
   { value: 'mililitro', label: 'Mililitro (ml)' },
+  { value: 'onza', label: 'Onza fluida (oz)' },
+  { value: 'copa', label: 'Copa (1.5 oz)' },
   { value: 'caja', label: 'Caja' },
   { value: 'paquete', label: 'Paquete' },
   { value: 'bolsa', label: 'Bolsa' },
@@ -43,4 +45,80 @@ export function unidadOptions(current?: string | null): UnidadOption[] {
   const c = current?.trim();
   if (!c || UNIDADES.some((u) => u.value === c)) return UNIDADES;
   return [...UNIDADES, { value: c, label: c }];
+}
+
+// ─── Conversión de unidades (descuento de inventario por receta) ───────────────
+//
+// Espejo en TS de `erp.fn_factor_universal` / `erp.fn_factor_receta_a_stock`
+// (migración 20260625150117). Se usa SOLO para el preview en la UI; la verdad
+// del descuento vive en el trigger SQL. Mantener ambos en sync.
+
+type DimUnidad = 'V' | 'M'; // Volumen | Masa
+
+const PESO_POR_UNIDAD: Record<string, { dim: DimUnidad; peso: number }> = {
+  mililitro: { dim: 'V', peso: 1 },
+  litro: { dim: 'V', peso: 1000 },
+  onza: { dim: 'V', peso: 29.5735 }, // onza fluida US
+  copa: { dim: 'V', peso: 44.36025 }, // 1.5 onzas (medida de servicio del bar)
+  galon: { dim: 'V', peso: 3785.412 },
+  gramo: { dim: 'M', peso: 1 },
+  kilo: { dim: 'M', peso: 1000 },
+};
+
+/** Factor para pasar `de → a` dentro de la misma dimensión (litro↔ml, kilo↔g). null si no aplica. */
+export function factorUniversal(de: string, a: string): number | null {
+  const d = PESO_POR_UNIDAD[de?.trim().toLowerCase()];
+  const x = PESO_POR_UNIDAD[a?.trim().toLowerCase()];
+  if (!d || !x || d.dim !== x.dim) return null;
+  return d.peso / x.peso;
+}
+
+export type InsumoConversion = {
+  /** Unidad de compra/stock del insumo (ej. `pieza`, `botella`, `kilo`). */
+  unidad: string | null;
+  /** Unidad fina en que se expresa `contenido` (ej. `mililitro`, `gramo`). */
+  unidadBase: string | null;
+  /** Cuántas `unidadBase` trae 1 `unidad` de compra (ej. 980 ml por botella). */
+  contenido: number | null;
+};
+
+/**
+ * Factor F tal que `cantidad_en_unidad_stock = cantidad_receta * F`.
+ * `null` = no convertible (el trigger no descuenta ese insumo).
+ */
+export function factorRecetaAStock(unidadReceta: string, insumo: InsumoConversion): number | null {
+  const uReceta = unidadReceta?.trim().toLowerCase();
+  const uStock = insumo.unidad?.trim().toLowerCase() ?? '';
+  const uBase = insumo.unidadBase?.trim().toLowerCase() ?? null;
+  const contenido = insumo.contenido;
+
+  if (!uReceta) return null;
+  if (uReceta === uStock) return 1;
+
+  const fac = factorUniversal(uReceta, uStock);
+  if (fac !== null) return fac;
+
+  if (contenido != null && contenido > 0 && uBase) {
+    const facBase = uReceta === uBase ? 1 : factorUniversal(uReceta, uBase);
+    if (facBase !== null) return facBase / contenido;
+  }
+
+  return null;
+}
+
+/**
+ * Rendimiento de servicio de una presentación líquida: cuántas onzas y copas
+ * (1 copa = 1.5 oz) salen de `contenido` expresado en `unidadBase`.
+ * `null` si la unidad no es de volumen (ej. gramos) — el rendimiento no aplica.
+ */
+export function rendimientoServir(
+  contenido: number | null,
+  unidadBase: string | null
+): { onzas: number; copas: number } | null {
+  if (contenido == null || !Number.isFinite(contenido) || contenido <= 0 || !unidadBase)
+    return null;
+  const aOnza = factorUniversal(unidadBase, 'onza');
+  const aCopa = factorUniversal(unidadBase, 'copa');
+  if (aOnza === null || aCopa === null) return null;
+  return { onzas: contenido * aOnza, copas: contenido * aCopa };
 }

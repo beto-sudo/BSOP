@@ -50,9 +50,9 @@ export function CuadraturaPanel({
   const cob = c.coberturaGastos;
   // Saldo del precio que el enganche pagado aún no cubre. Si el cliente no lo
   // completa antes de escriturar, lo absorbe el bono de DILESA (entra al descuento).
-  const saldoPrecioPorCubrir = cob
-    ? Math.round(((c.saldoPrecioEscrituracion ?? 0) - cob.engancheAlPrecio) * 100) / 100
-    : 0;
+  // Fuente única en el motor (`cuadratura.ts`) — no recalcular aquí (lo mismo que
+  // muestra el mini-resumen de la cabecera).
+  const saldoPrecioPorCubrir = c.saldoPrecioPorCubrir ?? 0;
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (

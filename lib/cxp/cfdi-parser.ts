@@ -14,24 +14,54 @@
 
 import { XMLParser } from 'fast-xml-parser';
 
+/** Una línea del comprobante (nodo `Conceptos/Concepto`). */
+export type CfdiConcepto = {
+  /** Clave del producto/servicio del catálogo SAT (c_ClaveProdServ). */
+  claveProdServ: string | null;
+  /** Número de identificación interno del emisor (SKU). */
+  noIdentificacion: string | null;
+  cantidad: number;
+  /** Unidad legible (texto libre del emisor, ej. "Pieza"). */
+  unidad: string | null;
+  /** Clave de unidad del catálogo SAT (c_ClaveUnidad, ej. "H87"). */
+  claveUnidad: string | null;
+  descripcion: string;
+  valorUnitario: number;
+  importe: number;
+  /** Descuento de la línea. 0 si no aplica. */
+  descuento: number;
+};
+
 export type CfdiParsed = {
   /** Versión del CFDI ('4.0' | '3.3' | ...). */
   version: string;
   /** Folio fiscal (UUID del TimbreFiscalDigital). null si no está timbrado. */
   uuid: string | null;
+  /** Fecha+hora de timbrado del TFD (ISO sin offset = hora local del SAT). null sin timbrar. */
+  fechaTimbrado: string | null;
   serie: string | null;
   folio: string | null;
   /** Fecha de emisión en ISO `YYYY-MM-DD` (la parte de fecha del atributo Fecha). */
   fecha: string;
   emisorRfc: string;
   emisorNombre: string | null;
+  /** Régimen fiscal del emisor (clave SAT c_RegimenFiscal, ej. '601'). */
+  regimenFiscalEmisor: string | null;
   receptorRfc: string;
   receptorNombre: string | null;
   /** Clave de uso CFDI del receptor (G01, G03, ...). */
   usoCfdi: string | null;
+  /** Código postal del lugar de expedición (atributo LugarExpedicion). */
+  lugarExpedicion: string | null;
   subtotal: number;
+  /** Descuento total a nivel comprobante. 0 si no aplica. */
+  descuento: number;
   total: number;
   moneda: string;
+  /** Tipo de cambio cuando `moneda` ≠ MXN. null en MXN o si no viene. */
+  tipoCambio: number | null;
+  /** Líneas del comprobante (nodo Conceptos/Concepto). Vacío si no trae. */
+  conceptos: CfdiConcepto[];
   /** Clave SAT de forma de pago (01 efectivo, 03 transferencia, ...). */
   formaPago: string | null;
   /** Método de pago: 'PUE' (una exhibición) | 'PPD' (parcialidades/diferido). */
@@ -124,6 +154,7 @@ export function parseCfdiXml(xml: string): CfdiParsed {
 
   // UUID del timbre. Complemento puede ser objeto o arreglo; el TFD también.
   let uuid: string | null = null;
+  let fechaTimbrado: string | null = null;
   const complementos = asArray(comp.Complemento as unknown);
   for (const c of complementos) {
     const tfd = (c as Record<string, unknown>)?.TimbreFiscalDigital;
@@ -131,6 +162,7 @@ export function parseCfdiXml(xml: string): CfdiParsed {
     const u = str(first?.['@_UUID']);
     if (u) {
       uuid = u.toUpperCase();
+      fechaTimbrado = str(first?.['@_FechaTimbrado']);
       break;
     }
   }
@@ -171,6 +203,29 @@ export function parseCfdiXml(xml: string): CfdiParsed {
   const fechaRaw = str(comp['@_Fecha']) ?? '';
   const fecha = fechaRaw.split('T')[0]; // "2026-01-15T10:30:00" → "2026-01-15"
 
+  // Conceptos (líneas). El nodo puede traer 1 (objeto) o N (arreglo) Concepto.
+  const conceptos: CfdiConcepto[] = asArray(
+    (comp.Conceptos as Record<string, unknown> | undefined)?.Concepto as unknown
+  ).map((c) => {
+    const cc = c as Record<string, unknown>;
+    return {
+      claveProdServ: str(cc['@_ClaveProdServ']),
+      noIdentificacion: str(cc['@_NoIdentificacion']),
+      cantidad: num(cc['@_Cantidad']),
+      unidad: str(cc['@_Unidad']),
+      claveUnidad: str(cc['@_ClaveUnidad']),
+      descripcion: str(cc['@_Descripcion']) ?? '',
+      valorUnitario: num(cc['@_ValorUnitario']),
+      importe: num(cc['@_Importe']),
+      descuento: num(cc['@_Descuento']),
+    };
+  });
+
+  // Tipo de cambio: solo relevante cuando la moneda no es MXN. num() devuelve 0
+  // si falta o es 'XXX'/'1'; lo normalizamos a null para no pintar "TC 0".
+  const tcRaw = comp['@_TipoCambio'];
+  const tipoCambio = tcRaw == null || tcRaw === '' ? null : num(tcRaw) || null;
+
   // CFDI relacionados (la NC referencia a su factura con TipoRelacion 01).
   // En 4.0 puede haber varios nodos CfdiRelacionados, cada uno con 1..N hijos.
   const relacionados = asArray(comp.CfdiRelacionados as unknown).map((nodo) => {
@@ -184,17 +239,23 @@ export function parseCfdiXml(xml: string): CfdiParsed {
   return {
     version: str(comp['@_Version']) ?? str(comp['@_version']) ?? '',
     uuid,
+    fechaTimbrado,
     serie: str(comp['@_Serie']),
     folio: str(comp['@_Folio']),
     fecha,
     emisorRfc: emisorRfc.toUpperCase(),
     emisorNombre: str(emisor?.['@_Nombre']),
+    regimenFiscalEmisor: str(emisor?.['@_RegimenFiscal']),
     receptorRfc: receptorRfc.toUpperCase(),
     receptorNombre: str(receptor?.['@_Nombre']),
     usoCfdi: str(receptor?.['@_UsoCFDI']),
+    lugarExpedicion: str(comp['@_LugarExpedicion']),
     subtotal: num(comp['@_SubTotal']),
+    descuento: num(comp['@_Descuento']),
     total: num(totalRaw),
     moneda: str(comp['@_Moneda']) ?? 'MXN',
+    tipoCambio,
+    conceptos,
     formaPago: str(comp['@_FormaPago']),
     metodoPago: str(comp['@_MetodoPago']),
     tipoComprobante: str(comp['@_TipoDeComprobante']) ?? '',

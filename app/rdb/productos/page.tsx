@@ -15,7 +15,12 @@ import { Combobox } from '@/components/ui/combobox';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { RefreshCw, Search, Settings2, Save, X, BarChart3 } from 'lucide-react';
 import { upsertReceta, updateCategoria } from './actions';
-import { UNIDAD_DEFAULT, unidadOptions } from '@/lib/unidades';
+import {
+  UNIDAD_DEFAULT,
+  unidadOptions,
+  factorRecetaAStock,
+  rendimientoServir,
+} from '@/lib/unidades';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -54,12 +59,18 @@ type RecetaRow = {
   insumo_nombre: string;
   cantidad: number;
   unidad: string;
+  // Datos del insumo para el preview de conversión (cuánto descuenta del stock).
+  insumo_unidad: string | null;
+  insumo_contenido: number | null;
+  insumo_unidad_base: string | null;
 };
 
 type InsumoDisponible = {
   id: string;
   nombre: string;
   unidad: string;
+  contenido: number | null;
+  unidad_base: string | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -241,6 +252,10 @@ export default function ProductosPage() {
   const [formUnidad, setFormUnidad] = useState(UNIDAD_DEFAULT);
   const [formCategoriaId, setFormCategoriaId] = useState<string>('');
   const [formInventariable, setFormInventariable] = useState(false);
+  // Contenido de la presentación: cuántas `unidad_base` rinde 1 `unidad` de compra
+  // (ej. 980 ml por botella). Habilita el descuento fraccionado por receta.
+  const [formUnidadBase, setFormUnidadBase] = useState<string>('');
+  const [formContenido, setFormContenido] = useState<string>('');
 
   // Receta state
   const [recetaRows, setRecetaRows] = useState<RecetaRow[]>([]);
@@ -341,29 +356,45 @@ export default function ProductosPage() {
       supabase
         .schema('erp')
         .from('producto_receta')
-        .select('id, insumo_id, cantidad, unidad, insumo:productos!insumo_id(nombre)')
+        .select(
+          'id, insumo_id, cantidad, unidad, insumo:productos!insumo_id(nombre, unidad, contenido, unidad_base)'
+        )
         .eq('producto_venta_id', selectedProducto.id),
       supabase
         .schema('erp')
         .from('productos')
-        .select('id, nombre, unidad')
+        .select('id, nombre, unidad, contenido, unidad_base')
         .eq('empresa_id', RDB_EMPRESA_ID)
         .eq('inventariable', true)
         .eq('activo', true)
         .is('deleted_at', null)
         .order('nombre'),
-    ]).then(([rec, ins]) => {
+      supabase
+        .schema('erp')
+        .from('productos')
+        .select('contenido, unidad_base')
+        .eq('id', selectedProducto.id)
+        .maybeSingle(),
+    ]).then(([rec, ins, self]) => {
       if (cancelled) return;
       if (rec.data) {
         setRecetaRows(
           rec.data.map((r) => {
-            const insumo = r.insumo as { nombre?: string } | null;
+            const insumo = r.insumo as {
+              nombre?: string;
+              unidad?: string | null;
+              contenido?: number | null;
+              unidad_base?: string | null;
+            } | null;
             return {
               id: r.id,
               insumo_id: r.insumo_id,
               insumo_nombre: insumo?.nombre ?? '—',
               cantidad: Number(r.cantidad),
               unidad: r.unidad,
+              insumo_unidad: insumo?.unidad ?? null,
+              insumo_contenido: insumo?.contenido == null ? null : Number(insumo.contenido),
+              insumo_unidad_base: insumo?.unidad_base ?? null,
             };
           })
         );
@@ -372,8 +403,18 @@ export default function ProductosPage() {
       }
       if (ins.data) {
         setInsumosDisponibles(
-          ins.data.map((i) => ({ id: i.id, nombre: i.nombre, unidad: i.unidad || UNIDAD_DEFAULT }))
+          ins.data.map((i) => ({
+            id: i.id,
+            nombre: i.nombre,
+            unidad: i.unidad || UNIDAD_DEFAULT,
+            contenido: i.contenido == null ? null : Number(i.contenido),
+            unidad_base: (i.unidad_base as string | null) ?? null,
+          }))
         );
+      }
+      if (self.data) {
+        setFormContenido(self.data.contenido == null ? '' : String(self.data.contenido));
+        setFormUnidadBase((self.data.unidad_base as string | null) ?? '');
       }
       setRecetaLoading(false);
     });
@@ -388,11 +429,32 @@ export default function ProductosPage() {
     setFormUnidad(p.unidad || UNIDAD_DEFAULT);
     setFormCategoriaId(p.categoria_id ?? '');
     setFormInventariable(p.inventariable ?? true);
+    // Se llenan con el valor real en el effect del drawer; reset para no
+    // arrastrar el contenido del producto abierto anteriormente.
+    setFormUnidadBase('');
+    setFormContenido('');
     setDrawerOpen(true);
   };
 
   const handleSave = async () => {
     if (!selectedProducto) return;
+
+    // Contenido + unidad de consumo van juntos (o ninguno). El contenido, si se
+    // captura, debe ser un número > 0.
+    const contenidoTrim = formContenido.trim();
+    const unidadBaseTrim = formUnidadBase.trim();
+    const contenidoNum = contenidoTrim === '' ? null : Number(contenidoTrim);
+    if (contenidoNum !== null && (!Number.isFinite(contenidoNum) || contenidoNum <= 0)) {
+      alert('El contenido debe ser un número mayor a 0.');
+      return;
+    }
+    if (contenidoNum !== null && unidadBaseTrim === '') {
+      alert('Indica la unidad de consumo (ej. mililitro) que corresponde al contenido.');
+      return;
+    }
+    // Sin contenido, la unidad de consumo no aplica (se guarda en null).
+    const unidadBaseFinal = contenidoNum === null ? null : unidadBaseTrim || null;
+
     setSaving(true);
     try {
       const supabase = createSupabaseBrowserClient();
@@ -403,6 +465,8 @@ export default function ProductosPage() {
           tipo: formTipo.trim() || 'producto',
           unidad: formUnidad || UNIDAD_DEFAULT,
           inventariable: formInventariable,
+          unidad_base: unidadBaseFinal,
+          contenido: contenidoNum,
           updated_at: new Date().toISOString(),
         })
         .eq('empresa_id', RDB_EMPRESA_ID)
@@ -775,6 +839,55 @@ export default function ProductosPage() {
                     />
                   </div>
 
+                  {/* Contenido de la presentación (insumos fraccionables) */}
+                  {formInventariable && (
+                    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                      <label className="text-sm font-medium leading-none">
+                        Contenido por {formUnidad || 'unidad'}
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        Si en las recetas este producto se consume fraccionado (ej. mililitros de
+                        una botella), indica cuánto rinde 1 {formUnidad || 'unidad'}. Déjalo vacío
+                        si se consume entero.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          min="0"
+                          value={formContenido}
+                          onChange={(e) => setFormContenido(e.target.value)}
+                          placeholder="980"
+                          className="w-28 text-right"
+                          aria-label="Contenido por unidad de compra"
+                        />
+                        <Combobox
+                          value={formUnidadBase}
+                          onChange={(v) => setFormUnidadBase(v)}
+                          options={unidadOptions(formUnidadBase)}
+                          placeholder="Unidad de consumo…"
+                          className="flex-1"
+                        />
+                      </div>
+                      {formContenido.trim() !== '' && formUnidadBase.trim() !== '' && (
+                        <p className="text-xs text-emerald-700">
+                          1 {formUnidad || 'unidad'} = {formContenido} {formUnidadBase}. Las recetas
+                          en {formUnidadBase} descontarán la fracción correcta.
+                        </p>
+                      )}
+                      {(() => {
+                        const r = rendimientoServir(Number(formContenido), formUnidadBase);
+                        if (!r) return null;
+                        return (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Rinde: {formatNumber(r.onzas, { decimals: 0 })} oz ·{' '}
+                            {formatNumber(r.copas, { decimals: 0 })} copas
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {/* Categoría */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium leading-none">Categoría</label>
@@ -808,50 +921,73 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      {recetaRows.map((row, idx) => (
-                        <div key={row.id ?? `new-${idx}`} className="flex items-center gap-2">
-                          <div className="flex-1 truncate text-sm">{row.insumo_nombre}</div>
-                          <Input
-                            type="number"
-                            step="0.0001"
-                            min="0"
-                            value={row.cantidad}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value);
-                              setRecetaRows((rows) =>
-                                rows.map((r, i) =>
-                                  i === idx ? { ...r, cantidad: Number.isFinite(v) ? v : 0 } : r
-                                )
-                              );
-                            }}
-                            className="w-24 text-right"
-                            aria-label={`Cantidad de ${row.insumo_nombre}`}
-                          />
-                          <Combobox
-                            value={row.unidad}
-                            onChange={(v) =>
-                              setRecetaRows((rows) =>
-                                rows.map((r, i) => (i === idx ? { ...r, unidad: v } : r))
-                              )
-                            }
-                            options={unidadOptions(row.unidad)}
-                            className="w-32"
-                            size="sm"
-                            aria-label={`Unidad de ${row.insumo_nombre}`}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() =>
-                              setRecetaRows((rows) => rows.filter((_, i) => i !== idx))
-                            }
-                            aria-label={`Quitar ${row.insumo_nombre}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      {recetaRows.map((row, idx) => {
+                        const factor = factorRecetaAStock(row.unidad, {
+                          unidad: row.insumo_unidad,
+                          unidadBase: row.insumo_unidad_base,
+                          contenido: row.insumo_contenido,
+                        });
+                        const stockUnidad = row.insumo_unidad ?? 'unidad';
+                        return (
+                          <div key={row.id ?? `new-${idx}`} className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 truncate text-sm">{row.insumo_nombre}</div>
+                              <Input
+                                type="number"
+                                step="0.0001"
+                                min="0"
+                                value={row.cantidad}
+                                onChange={(e) => {
+                                  const v = parseFloat(e.target.value);
+                                  setRecetaRows((rows) =>
+                                    rows.map((r, i) =>
+                                      i === idx ? { ...r, cantidad: Number.isFinite(v) ? v : 0 } : r
+                                    )
+                                  );
+                                }}
+                                className="w-24 text-right"
+                                aria-label={`Cantidad de ${row.insumo_nombre}`}
+                              />
+                              <Combobox
+                                value={row.unidad}
+                                onChange={(v) =>
+                                  setRecetaRows((rows) =>
+                                    rows.map((r, i) => (i === idx ? { ...r, unidad: v } : r))
+                                  )
+                                }
+                                options={unidadOptions(row.unidad)}
+                                className="w-32"
+                                size="sm"
+                                aria-label={`Unidad de ${row.insumo_nombre}`}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() =>
+                                  setRecetaRows((rows) => rows.filter((_, i) => i !== idx))
+                                }
+                                aria-label={`Quitar ${row.insumo_nombre}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="pl-1 text-xs">
+                              {factor === null ? (
+                                <span className="text-amber-600">
+                                  ⚠ Sin conversión a «{stockUnidad}». Configura el contenido de «
+                                  {row.insumo_nombre}» para que descuente bien.
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  Descuenta {formatNumber(row.cantidad * factor, { decimals: 4 })}{' '}
+                                  {stockUnidad} por venta
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
 
                       <div className="flex items-center gap-2 border-t pt-2">
                         <Combobox
@@ -869,6 +1005,9 @@ export default function ProductosPage() {
                                 insumo_nombre: ins.nombre,
                                 cantidad: 1,
                                 unidad: ins.unidad,
+                                insumo_unidad: ins.unidad,
+                                insumo_contenido: ins.contenido,
+                                insumo_unidad_base: ins.unidad_base,
                               },
                             ]);
                             setInsumoToAdd('');

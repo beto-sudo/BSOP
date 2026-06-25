@@ -15,7 +15,9 @@ export const FASE_ROLES: Record<number, string[]> = {
   2: ['solicitud_asignacion', 'expediente_digital', 'ficu', 'aviso_privacidad'], // Asignada
   3: ['contrato_promesa'], // Formalizada
   4: [], // Avalúo Solicitado
-  5: ['avaluo_comercial'], // Avalúo Cerrado
+  // Avalúo Cerrado. Los 2 docs del seguro de calidad (RUV) solo se EXIGEN en
+  // créditos Infonavit/Cofinavit — `rolesOpcionales` los exime en el resto.
+  5: ['avaluo_comercial', 'orden_pago_seguro_calidad', 'solicitud_pago_seguro_calidad'],
   // Beto: las Constancias de Crédito (titular + co-titular) van al inscribir el
   // crédito (pos 6) — el banco las entrega ahí. La Carta de instrucción notarial
   // queda en el dictamen (pos 8, sale después con el dictamen jurídico).
@@ -40,6 +42,8 @@ export const ROL_LABEL: Record<string, string> = {
   constancia_credito_cotitular: 'Constancia de crédito (co-titular)',
   aviso_pld: 'Aviso PLD',
   avaluo_comercial: 'Avalúo comercial',
+  orden_pago_seguro_calidad: 'Orden de pago del seguro de calidad',
+  solicitud_pago_seguro_calidad: 'Solicitud de pago del seguro de calidad',
   contrato_promesa: 'Contrato promesa de compraventa',
   solicitud_asignacion: 'Solicitud de asignación',
   recibos_caja: 'Recibos de caja',
@@ -64,12 +68,25 @@ export type VentaFlagsDocs = {
 };
 
 /**
+ * El seguro de calidad (RUV) solo es obligatorio en créditos Infonavit —
+ * incluye Cofinavit, que es cofinanciamiento Infonavit + banco (Beto,
+ * 2026-06-24). En Fovissste, bancario y contado no aplica. Criterio aparte de
+ * `condiciones_financieras` (Anexo B), que sí excluye a Cofinavit.
+ */
+export function requiereSeguroCalidad(tipoCredito: string | null): boolean {
+  const t = (tipoCredito ?? '').toLowerCase();
+  return t.includes('infonavit') || t.includes('cofinavit');
+}
+
+/**
  * Roles que NO se exigen para el cierre porque la venta no los amerita:
  * - constancia co-titular: solo si hay crédito de co-titular.
  * - pagaré: solo si hay crédito directo (CD).
  * - nota de crédito: solo si el monto de nota de crédito es > 0.
  * - condiciones financieras (Anexo B): formato INFONAVIT — en otros créditos
  *   el notario no lo manda.
+ * - orden/solicitud del seguro de calidad: solo en créditos Infonavit/Cofinavit
+ *   (ver `requiereSeguroCalidad`).
  */
 export function rolesOpcionales(v: VentaFlagsDocs): Set<string> {
   const opc = new Set<string>();
@@ -84,6 +101,10 @@ export function rolesOpcionales(v: VentaFlagsDocs): Set<string> {
   }
   if (!(v.tipo_credito ?? '').toLowerCase().includes('infonavit')) {
     opc.add('condiciones_financieras');
+  }
+  if (!requiereSeguroCalidad(v.tipo_credito)) {
+    opc.add('orden_pago_seguro_calidad');
+    opc.add('solicitud_pago_seguro_calidad');
   }
   return opc;
 }

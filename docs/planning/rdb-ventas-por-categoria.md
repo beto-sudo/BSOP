@@ -274,3 +274,24 @@ Barrido de Reminders (`Claude 🧭`): sin pendientes de la iniciativa —
 las sub-tareas vivieron en TodoWrite y murieron con cada sesión.
 Iniciativa movida a `## Done` en `INITIATIVES.md`. Estado
 `in_progress → done`.
+
+### 2026-06-25 · Reajuste de categorías del catálogo (follow-up, iniciativa ya cerrada)
+
+Beto pidió un desglose más fino del negocio deportivo. Migración
+`20260625151717_rdb_recategorizar_servicios_canchas.sql` (solo datos en
+`erp.categorias_producto` / `erp.productos`, RDB):
+
+- **Rename**: "Uso de cancha" → **"Renta cancha Coach"** (sus 9 productos
+  "Uso cancha coach…" intactos).
+- **"Servicios" dividida y eliminada** — sus 14 productos repartidos en 5
+  categorías nuevas: **Renta cancha Pádel** (Renta Cancha Padel + Renta de
+  Pala Adidas), **Renta cancha Tenis** (2), **Renta cancha Pickleball** (4),
+  **Clínica Especializada** (1436058), **Propina** (5 códigos de propina).
+- Orden 93-98 (las 4 "Renta cancha \*" contiguas); colores nuevos.
+
+Aplicada a prod vía MCP + ledger reconciliado (`migration repair`:
+`20260625151717` applied, huérfano `20260625152048` reverted). Sin cambios
+de schema ni de código (las categorías son data-driven; la vista
+`rdb.v_waitry_productos_categoria` resuelve producto→categoría en vivo, por
+lo que el tab "Por categoría" refleja el nuevo desglose retroactivamente).
+La iniciativa permanece `done`; esto es un ajuste de datos sobre su salida.

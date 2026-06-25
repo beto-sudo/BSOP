@@ -429,6 +429,7 @@ describe('calcularCuadratura', () => {
       // Saldo del precio (lo que header/panel muestran, NO el saldoCliente): el
       // crédito cubre el precio al 100%. El saldo de gastos = pagaré (9,387).
       expect(c.saldoPrecioEscrituracion).toBe(0);
+      expect(c.saldoPrecioPorCubrir).toBe(0); // crédito cubre el precio → nada por cubrir
     });
 
     it('desglosa el presupuesto notarial completo y cuadra en 0 — MAYRA', () => {
@@ -517,6 +518,7 @@ describe('calcularCuadratura', () => {
       expect(cob.pagareNecesario).toBe(0);
       expect(cob.saldoCobertura).toBe(0); // cuadra
       expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
+      expect(c.saldoPrecioPorCubrir).toBe(792); // 157,735 − 156,943 enganche (lo que ve el cliente)
       // Descuento real = 13,361.42 < 15,000 → todo bono (promoción), sin sobreprecio.
       // El "$17,953 de sobreprecio fantasma" del reporte original venía solo de los
       // gastos inflados (62,161); con los gastos correctos del Anexo B (42,569.42) se va.
@@ -524,6 +526,31 @@ describe('calcularCuadratura', () => {
       const split = partirDescuento(c.descuentoReal, cob.promocion);
       expect(split.promocion).toBe(13361.42);
       expect(split.sobreprecio).toBe(0);
+    });
+
+    // Regresión (caso Ruben M3-L17-LDLE, reportado 2026-06-25): la cabecera mostraba
+    // `saldoPrecioEscrituracion` crudo (158,551) mientras el panel ya restaba el
+    // enganche y mostraba 1. `saldoPrecioPorCubrir` unifica ambos: crédito 761,449 +
+    // enganche 158,550 cubren el precio salvo 1 peso de redondeo (lo absorbe el bono).
+    // (Los gastos no afectan este derivado: depende solo de precio − crédito − enganche.)
+    it('Ruben (M3-L17): saldoPrecioPorCubrir resta el enganche pagado del saldo del precio', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 920000,
+        montoCreditoTitular: 761449,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 42569.42,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        sobreprecioGastos: 0,
+        promocionGastos: 14209,
+        depositos: [{ monto: 158550, directoCliente: true, tieneRecibo: false }],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      expect(c.saldoPrecioEscrituracion).toBe(158551); // crudo (lo que mostraba la cabecera)
+      expect(c.coberturaGastos?.engancheAlPrecio).toBe(158550); // enganche aplicado al precio
+      expect(c.saldoPrecioPorCubrir).toBe(1); // ← lo que el panel ya mostraba ("Saldo por cubrir")
     });
 
     // Infonavit con enganche MAYOR que el saldo del precio: el excedente sí fondea
@@ -697,6 +724,7 @@ describe('calcularCuadratura', () => {
       const c = mayra({ promocionGastos: null, precioBase: null, incrementoCredito: null });
       expect(c.formacionPrecio).toBe(null);
       expect(c.saldoPrecioEscrituracion).toBe(null); // legacy usa saldoCliente, no este
+      expect(c.saldoPrecioPorCubrir).toBe(null); // sin desglose, no aplica
       // Con la fórmula vieja: depósitos 35,000 − cheque calc + CD.
       expect(c.valorRealVentaDilesa).not.toBe(954419);
     });

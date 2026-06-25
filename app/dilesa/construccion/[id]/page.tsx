@@ -1,10 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Mismo data-sync pattern que el resto de páginas de detalle (cf.
- * app/dilesa/ventas/[id]/page.tsx).
- */
-
 /**
  * Detalle completo de una construcción DILESA — 4 secciones:
  *   1. Datos generales — prototipo, contratista, supervisor, fechas
@@ -33,8 +28,10 @@ import {
   ChevronRight,
   Circle,
   ClipboardCheck,
+  FileDown,
   HardHat,
   Lock,
+  Send,
 } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -192,6 +189,10 @@ function DetailInner() {
   const [programarOpen, setProgramarOpen] = useState(false);
   const [fechaProgInput, setFechaProgInput] = useState('');
   const [programando, setProgramando] = useState(false);
+  // Envío de la relación de pendientes al contratista (correo).
+  const [enviarOpen, setEnviarOpen] = useState(false);
+  const [enviarEmailInput, setEnviarEmailInput] = useState('');
+  const [enviando, setEnviando] = useState(false);
 
   const [obra, setObra] = useState<Construccion | null>(null);
   const [unidad, setUnidad] = useState<UnidadInfo | null>(null);
@@ -199,6 +200,7 @@ function DetailInner() {
   const [prototipoNombre, setPrototipoNombre] = useState<string | null>(null);
   const [contratistaNombre, setContratistaNombre] = useState<string | null>(null);
   const [contratistaAbrev, setContratistaAbrev] = useState<string | null>(null);
+  const [contratistaEmail, setContratistaEmail] = useState<string | null>(null);
   const [supervisorNombre, setSupervisorNombre] = useState<string | null>(null);
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [tareasCat, setTareasCat] = useState<Map<string, Tarea>>(new Map());
@@ -264,7 +266,7 @@ function DetailInner() {
         sb
           .schema('erp')
           .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno')
+          .select('nombre, apellido_paterno, apellido_materno, email')
           .eq('id', obraRow.contratista_id)
           .maybeSingle(),
         sb
@@ -300,6 +302,7 @@ function DetailInner() {
         : null;
       setContratistaNombre(cName);
       setContratistaAbrev((datosRes.data?.abreviacion as string | null) ?? null);
+      setContratistaEmail((contRes.data?.email as string | null) ?? null);
       if (supRes.data) {
         setSupervisorNombre(
           [supRes.data.nombre, supRes.data.apellido_paterno, supRes.data.apellido_materno]
@@ -648,6 +651,56 @@ function DetailInner() {
     setRecepcionOpen(true);
   }
 
+  /** Abre el PDF de tareas pendientes en una pestaña nueva (imprimir/guardar). */
+  function abrirPendientesPdf() {
+    window.open(`/api/dilesa/construccion/${id}/pendientes/pdf`, '_blank', 'noopener,noreferrer');
+  }
+
+  /** Envía la relación de pendientes por correo al contratista (POST). */
+  async function enviarPendientes() {
+    const to = enviarEmailInput.trim();
+    if (!to || !to.includes('@')) {
+      toast.add({ title: 'Indica un correo válido', type: 'error' });
+      return;
+    }
+    setEnviando(true);
+    try {
+      const res = await fetch(`/api/dilesa/construccion/${id}/pendientes/pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to }),
+      });
+      const json = (await res.json()) as { error?: string; skipped?: boolean; sentTo?: string };
+      if (!res.ok) {
+        toast.add({
+          title: 'No se pudo enviar',
+          description: json.error ?? 'Error al enviar el correo.',
+          type: 'error',
+        });
+        return;
+      }
+      if (json.skipped) {
+        toast.add({
+          title: 'Envío desactivado',
+          description: 'El correo de pendientes está apagado en Configuración → Notificaciones.',
+          type: 'info',
+        });
+        setEnviarOpen(false);
+        return;
+      }
+      toast.add({ title: `Enviado a ${json.sentTo ?? to}`, type: 'success' });
+      setEnviarOpen(false);
+    } catch {
+      toast.add({
+        title: 'No se pudo enviar',
+        description: 'Error de red al enviar el correo. Intenta de nuevo.',
+        type: 'error',
+      });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   const etapasConTareas = useMemo(() => {
     const terminadasByPlantilla = new Map<string, Terminada>();
     for (const t of terminadas) terminadasByPlantilla.set(t.plantilla_tarea_id, t);
@@ -824,6 +877,12 @@ function DetailInner() {
       : unidad.identificador
     : obra.codigo;
 
+  // Botón de pendientes: solo en obras vivas (no terminadas/canceladas) con
+  // tareas de ejecución por hacer — es justo lo que el contratista pide.
+  const ESTADOS_OBRA_TERMINAL = ['terminada', 'dtu', 'seguro_calidad', 'extraida', 'cancelada'];
+  const puedeImprimirPendientes =
+    !ESTADOS_OBRA_TERMINAL.includes(obra.estado) && previas.pendientes > 0;
+
   // Fechas/días de progreso viven en la sección "Cronograma" (más abajo).
   // Aquí solo datos identificadores + hitos post-cierre (DTU/SC/RUV).
   const fichaGeneral: { label: string; value: string }[] = (
@@ -882,6 +941,24 @@ function DetailInner() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {puedeImprimirPendientes ? (
+            <>
+              <Button size="sm" variant="outline" onClick={abrirPendientesPdf}>
+                <FileDown className="h-4 w-4" /> Pendientes
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEnviarEmailInput(contratistaEmail ?? '');
+                  setEnviarOpen(true);
+                }}
+                title="Enviar la relación de pendientes al contratista por correo"
+              >
+                <Send className="h-4 w-4" /> Enviar
+              </Button>
+            </>
+          ) : null}
           {puedeRecibirObra ? (
             recepcionEstado === 'recibida' ? (
               <Button size="sm" variant="outline" onClick={() => setRecepcionOpen(true)}>
@@ -1089,6 +1166,50 @@ function DetailInner() {
               </button>
               <Button onClick={() => void programarRecepcion()} disabled={programando}>
                 {programando ? 'Programando…' : 'Programar recepción'}
+              </Button>
+            </div>
+          </div>
+        </DetailDrawerContent>
+      </DetailDrawer>
+
+      <DetailDrawer
+        open={enviarOpen}
+        onOpenChange={setEnviarOpen}
+        size="sm"
+        title="Enviar pendientes al contratista"
+        description={identificadorCompleto}
+      >
+        <DetailDrawerContent>
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--text)]/70">
+              Se enviará por correo la relación de tareas pendientes de ejecución (con el valor de
+              mano de obra de cada una) como PDF adjunto. Revisa el destinatario antes de enviar.
+            </p>
+            <label className="block text-xs font-medium text-[var(--text)]">
+              Correo del contratista
+              <Input
+                type="email"
+                value={enviarEmailInput}
+                onChange={(e) => setEnviarEmailInput(e.target.value)}
+                placeholder="contratista@correo.com"
+                className="mt-1 rounded-xl border-[var(--border)] bg-[var(--panel)] text-[var(--text)]"
+              />
+            </label>
+            {!contratistaEmail ? (
+              <p className="text-xs text-[var(--text)]/50">
+                Este contratista no tiene correo registrado; captúralo aquí para este envío.
+              </p>
+            ) : null}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEnviarOpen(false)}
+                className="text-sm text-muted-foreground hover:text-[var(--text)]"
+              >
+                Cancelar
+              </button>
+              <Button onClick={() => void enviarPendientes()} disabled={enviando}>
+                {enviando ? 'Enviando…' : 'Enviar al contratista'}
               </Button>
             </div>
           </div>
