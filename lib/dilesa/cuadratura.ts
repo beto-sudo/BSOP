@@ -301,6 +301,18 @@ export type Cuadratura = {
    */
   saldoPrecioPorCubrir: number | null;
   /**
+   * true si la operación necesita que Dirección **resuelva explícitamente** el
+   * saldo residual de PRECIO antes de cerrar la dictaminación (fase 8): hay
+   * desglose y `saldoPrecioPorCubrir` supera la tolerancia de redondeo
+   * (`TOLERANCIA_SALDO`). El residual se resuelve cobrándolo (pagaré) o
+   * absorbiéndolo (nota de crédito); el monto absorbido ya cae en la NC derivada,
+   * así que esto es el GOBIERNO de la decisión, no aritmética nueva (ADR-048,
+   * iniciativa `dilesa-saldos-residuales`). `false` en legacy/cerradas (sin
+   * desglose) y cuando el residual es ruido de redondeo (≤ tolerancia, p.ej. el
+   * peso de Ruben M3-L17).
+   */
+  requiereResolucionSaldoResidual: boolean;
+  /**
    * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
    * (escrituración) + factura de enganche = total facturado; − NC = neto (=
    * escritura). `null` en legacy/cerradas.
@@ -543,6 +555,13 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoPrecioPorCubrir = tieneDesglose
     ? round2((saldoPrecioEscrituracion ?? 0) - engancheAlPrecio)
     : null;
+  // Señal de gobierno (iniciativa `dilesa-saldos-residuales`): el residual de
+  // precio supera el ruido de redondeo y exige resolución explícita de Dirección
+  // (cobrar/absorber) antes de cerrar la fase 8. El piso es `TOLERANCIA_SALDO`
+  // para no trabar por centavos (Ruben M3-L17 = $1 ⇒ false; Juan Antonio = $792
+  // ⇒ true). Solo aplica al modelo desglosado.
+  const requiereResolucionSaldoResidual =
+    tieneDesglose && (saldoPrecioPorCubrir ?? 0) > TOLERANCIA_SALDO;
 
   // Cobertura model-aware de TODA la operación — fuente ÚNICA para el copiloto de
   // cierre y otros gates. NO el `saldoCliente`/`cubierta` legacy, que en ventas
@@ -672,6 +691,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     formacionPrecio,
     saldoPrecioEscrituracion,
     saldoPrecioPorCubrir,
+    requiereResolucionSaldoResidual,
     desgloseFacturacion,
     posibleDobleConteo,
   };

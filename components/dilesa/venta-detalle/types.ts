@@ -56,6 +56,9 @@ export type Venta = {
   descuento_gastos_escrituracion: number | null;
   descuento_nota_credito: number | null;
   descuento_maximo_autorizado: number | null;
+  // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales).
+  saldo_residual_resolucion: 'cobrar' | 'absorber' | null;
+  saldo_residual_monto: number | null;
   promocion_id: string | null;
   coda_row_id: string | null;
   monto_detonado: number | null;
