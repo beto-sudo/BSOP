@@ -203,8 +203,11 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         .not('requisicion_id', 'is', null)
         .neq('estado', 'cancelada')
         .is('deleted_at', null),
-      // Best-effort: nombre del solicitante (cross-schema erp→core, sin embed).
-      sb.schema('core').from('usuarios').select('id, first_name, email'),
+      // Nombre del solicitante vía el directorio: `core.usuarios` tiene RLS
+      // self-only (solo ves tu propia fila por email) → leerlo directo deja en
+      // BLANCO al solicitante de las requisiciones de OTROS usuarios. La vista
+      // expone id+nombre de todos (migración 20260625140306_core_usuarios_directorio).
+      sb.schema('core').from('v_usuarios_directorio').select('id, nombre'),
     ]);
 
     const firstErr =
@@ -233,10 +236,10 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       }
     }
 
-    type UsuarioRaw = { id: string; first_name: string | null; email: string | null };
+    type UsuarioRaw = { id: string; nombre: string | null };
     const userName = new Map<string, string>();
     for (const u of (usuariosRes.data ?? []) as unknown as UsuarioRaw[]) {
-      userName.set(u.id, u.first_name?.trim() || u.email?.split('@')[0] || '—');
+      userName.set(u.id, u.nombre?.trim() || '—');
     }
 
     type ReqRaw = {

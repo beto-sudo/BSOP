@@ -44,6 +44,13 @@ export type Database = {
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_config_actualizado_por_fkey"
+            columns: ["actualizado_por"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ai_invocaciones: {
@@ -146,6 +153,13 @@ export type Database = {
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_log_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bancos: {
@@ -218,6 +232,13 @@ export type Database = {
             columns: ["asignado_por"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_documentos_asignado_por_fkey"
+            columns: ["asignado_por"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
             referencedColumns: ["id"]
           },
           {
@@ -700,6 +721,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gobierno_actas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gobierno_actas_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
@@ -770,6 +798,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gobierno_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
             referencedColumns: ["id"]
           },
         ]
@@ -992,6 +1027,13 @@ export type Database = {
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notification_definitions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_log: {
@@ -1054,6 +1096,13 @@ export type Database = {
             columns: ["triggered_by_user_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_triggered_by_user_id_fkey"
+            columns: ["triggered_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
             referencedColumns: ["id"]
           },
         ]
@@ -1242,6 +1291,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rol_plantillas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rol_plantillas_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
@@ -1307,6 +1363,13 @@ export type Database = {
             columns: ["oculto_por"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sidebar_oculto_oculto_por_fkey"
+            columns: ["oculto_por"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
             referencedColumns: ["id"]
           },
         ]
@@ -1421,7 +1484,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_usuarios_directorio: {
+        Row: {
+          activo: boolean | null
+          id: string | null
+          nombre: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          id?: string | null
+          nombre?: never
+        }
+        Update: {
+          activo?: boolean | null
+          id?: string | null
+          nombre?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       fn_current_empresa_ids: { Args: never; Returns: string[] }
