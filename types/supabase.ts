@@ -6392,6 +6392,15 @@ export type Database = {
         Args: { p_pago_id: string }
         Returns: undefined
       }
+      fn_corregir_avaluo_venta: {
+        Args: {
+          p_fecha_avaluo_cerrado?: string
+          p_monto_avaluo: number
+          p_motivo?: string
+          p_venta_id: string
+        }
+        Returns: Json
+      }
       fn_es_vendedor_restringido: { Args: never; Returns: boolean }
       fn_estimaciones_backfill_incremental: {
         Args: never

@@ -52,6 +52,7 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   monto_avaluo: number | null;
+  fecha_avaluo_cerrado: string | null;
   valuador_id: string | null;
   tipo_credito: string | null;
 };
@@ -132,7 +133,9 @@ function CapturarFase5Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, persona_id, unidad_id, monto_avaluo, valuador_id, tipo_credito')
+        .select(
+          'id, persona_id, unidad_id, monto_avaluo, fecha_avaluo_cerrado, valuador_id, tipo_credito'
+        )
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -150,6 +153,8 @@ function CapturarFase5Body() {
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
       if (v.monto_avaluo != null) setMontoAvaluo(String(v.monto_avaluo));
+      // En corrección (fase ya cerrada) mostramos la fecha real del cierre, no hoy.
+      if (v.fecha_avaluo_cerrado) setFechaAvaluo(v.fecha_avaluo_cerrado.slice(0, 10));
 
       const [fRes, valRes] = await Promise.all([
         sb
@@ -195,20 +200,52 @@ function CapturarFase5Body() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
-      if (docsFase.faltantes.length > 0) {
-        const faltan = docsFase.faltantes.map((rol) => docsFase.labelDe(rol)).join(', ');
-        toast.add({
-          title: docsFase.faltantes.length === 1 ? 'Falta un documento' : 'Faltan documentos',
-          description: `Sube en el expediente: ${faltan}. Quedan guardados al subirlos.`,
-          type: 'error',
-        });
-        return;
-      }
+
       const monto = Number(montoAvaluo);
       if (!Number.isFinite(monto) || monto <= 0) {
         toast.add({
           title: 'Monto del avalúo inválido',
           description: 'Captura el monto dictaminado por el valuador (mayor a cero).',
+          type: 'error',
+        });
+        return;
+      }
+
+      // ── Modo corrección: la fase ya está cerrada. Solo se ajusta el dato
+      //    financiero (monto/fecha) vía RPC auditada; el PDF corregido ya se
+      //    versionó al subirse. NO se re-marca la fase — el pipeline no cambia.
+      if (yaCerrada) {
+        setSubmitting(true);
+        const { error: rpcErr } = await sb.schema('dilesa').rpc('fn_corregir_avaluo_venta', {
+          p_venta_id: venta.id,
+          p_monto_avaluo: monto,
+          p_fecha_avaluo_cerrado: fechaAvaluo,
+          p_motivo: 'Corrección de avalúo (Fase 5 ya cerrada)',
+        });
+        setSubmitting(false);
+        if (rpcErr) {
+          toast.add({
+            title: 'No se pudo corregir el avalúo',
+            description: getSupabaseErrorMessage(rpcErr, 'Error desconocido.'),
+            type: 'error',
+          });
+          return;
+        }
+        toast.add({
+          title: 'Avalúo corregido',
+          description: 'Monto y fecha actualizados. El pipeline no se modificó.',
+          type: 'success',
+        });
+        router.push(`/dilesa/ventas/${venta.id}`);
+        return;
+      }
+
+      // ── Modo cierre (primera vez): valida el expediente + marcarFase.
+      if (docsFase.faltantes.length > 0) {
+        const faltan = docsFase.faltantes.map((rol) => docsFase.labelDe(rol)).join(', ');
+        toast.add({
+          title: docsFase.faltantes.length === 1 ? 'Falta un documento' : 'Faltan documentos',
+          description: `Sube en el expediente: ${faltan}. Quedan guardados al subirlos.`,
           type: 'error',
         });
         return;
@@ -246,7 +283,7 @@ function CapturarFase5Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [docsFase, fechaAvaluo, montoAvaluo, router, sb, toast, venta]
+    [docsFase, fechaAvaluo, montoAvaluo, router, sb, toast, venta, yaCerrada]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -278,13 +315,7 @@ function CapturarFase5Body() {
         descripcion="Registra el monto dictaminado por la casa valuadora y sube el PDF del avalúo."
       />
 
-      {yaCerrada ? (
-        <Banner
-          tone="success"
-          title="Fase 5 ya está cerrada"
-          body="Esta venta ya pasó por Avalúo Cerrado. La siguiente fase es Dictaminación."
-        />
-      ) : !fase4Cerrada ? (
+      {!yaCerrada && !fase4Cerrada ? (
         <Banner
           tone="warning"
           title="Falta cerrar Fase 4 (Avalúo Solicitado)"
@@ -305,6 +336,14 @@ function CapturarFase5Body() {
         />
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
+          {yaCerrada ? (
+            <Banner
+              tone="info"
+              title="Fase 5 cerrada — modo corrección"
+              body="Si el avalúo cambió, sube el archivo corregido (se guarda al instante y conserva el anterior) y/o ajusta el monto y la fecha. Esto solo corrige el expediente: no mueve el pipeline ni regresa la venta."
+            />
+          ) : null}
+
           {valuadorNombre ? (
             <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-4 py-2 text-xs text-[var(--text)]/70">
               <span className="font-medium text-[var(--text)]/80">Casa valuadora:</span>{' '}
@@ -352,7 +391,8 @@ function CapturarFase5Body() {
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 size-4" /> Guardar fase
+                  <Save className="mr-2 size-4" />{' '}
+                  {yaCerrada ? 'Guardar corrección' : 'Guardar fase'}
                 </>
               )}
             </Button>
@@ -395,7 +435,7 @@ function Banner({
   body,
   extra,
 }: {
-  tone: 'success' | 'warning';
+  tone: 'success' | 'warning' | 'info';
   title: string;
   body: React.ReactNode;
   extra?: React.ReactNode;
@@ -403,7 +443,9 @@ function Banner({
   const styles =
     tone === 'success'
       ? 'border-emerald-400/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
-      : 'border-amber-400/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+      : tone === 'info'
+        ? 'border-sky-400/40 bg-sky-50 text-sky-900 dark:bg-sky-950/30 dark:text-sky-100'
+        : 'border-amber-400/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
   return (
     <div className={`rounded-lg border p-4 ${styles}`}>
       <p className="text-sm font-medium">{title}</p>
