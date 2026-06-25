@@ -430,6 +430,7 @@ describe('calcularCuadratura', () => {
       // crédito cubre el precio al 100%. El saldo de gastos = pagaré (9,387).
       expect(c.saldoPrecioEscrituracion).toBe(0);
       expect(c.saldoPrecioPorCubrir).toBe(0); // crédito cubre el precio → nada por cubrir
+      expect(c.requiereResolucionSaldoResidual).toBe(false); // sin residual → nada que resolver
     });
 
     it('desglosa el presupuesto notarial completo y cuadra en 0 — MAYRA', () => {
@@ -519,6 +520,7 @@ describe('calcularCuadratura', () => {
       expect(cob.saldoCobertura).toBe(0); // cuadra
       expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
       expect(c.saldoPrecioPorCubrir).toBe(792); // 157,735 − 156,943 enganche (lo que ve el cliente)
+      expect(c.requiereResolucionSaldoResidual).toBe(true); // 792 > tolerancia → Dirección lo resuelve
       // Descuento real = 13,361.42 < 15,000 → todo bono (promoción), sin sobreprecio.
       // El "$17,953 de sobreprecio fantasma" del reporte original venía solo de los
       // gastos inflados (62,161); con los gastos correctos del Anexo B (42,569.42) se va.
@@ -551,6 +553,7 @@ describe('calcularCuadratura', () => {
       expect(c.saldoPrecioEscrituracion).toBe(158551); // crudo (lo que mostraba la cabecera)
       expect(c.coberturaGastos?.engancheAlPrecio).toBe(158550); // enganche aplicado al precio
       expect(c.saldoPrecioPorCubrir).toBe(1); // ← lo que el panel ya mostraba ("Saldo por cubrir")
+      expect(c.requiereResolucionSaldoResidual).toBe(false); // 1 ≤ tolerancia → ruido, no exige resolución
     });
 
     // Infonavit con enganche MAYOR que el saldo del precio: el excedente sí fondea

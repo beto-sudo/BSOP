@@ -86,6 +86,11 @@ type VentaCtx = {
   cd_fecha_suscripcion: string | null;
   cd_aval_nombre: string | null;
   cd_aval_domicilio: string | null;
+  // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales).
+  saldo_residual_resolucion: 'cobrar' | 'absorber' | null;
+  saldo_residual_monto: number | null;
+  saldo_residual_autorizado_por: string | null;
+  saldo_residual_at: string | null;
 };
 
 type Verificaciones = {
@@ -126,6 +131,14 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
 });
 const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
+// Con centavos — para el saldo residual (puede traer .42, p.ej. $792.42).
+const moneyFmt2 = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+  maximumFractionDigits: 2,
+});
+const money2 = (n: number | null | undefined): string =>
+  n == null ? '—' : moneyFmt2.format(Number(n));
 
 export default function CapturarFase8Page() {
   return (
@@ -152,6 +165,8 @@ function CapturarFase8Body() {
   // El crédito directo (pagaré) reporta su estado "guardado" para el gate del
   // cierre de la fase cuando hay saldo.
   const [cdGuardado, setCdGuardado] = useState(false);
+  // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales).
+  const [resolviendoSaldo, setResolviendoSaldo] = useState(false);
   // Re-firma de documentos (ADR-048 D5): los 2 PDF firmados que sube el gerente
   // cuando el precio dictaminado cambió respecto al de los documentos firmados.
   const [archivoSolicitudRef, setArchivoSolicitudRef] = useState<File | null>(null);
@@ -321,7 +336,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio'
+          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio, saldo_residual_resolucion, saldo_residual_monto, saldo_residual_autorizado_por, saldo_residual_at'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -429,6 +444,19 @@ function CapturarFase8Body() {
         toast.add({
           title: 'Falta el pagaré firmado',
           description: 'Sube el pagaré firmado por el cliente antes de cerrar la dictaminación.',
+          type: 'error',
+        });
+        return;
+      }
+      // Saldo residual de precio "siempre explícito" (iniciativa dilesa-saldos-residuales):
+      // si el precio queda con un residual real, Dirección lo resuelve (cobrar/absorber)
+      // antes de cerrar. La NC sigue derivada; esto registra la decisión.
+      const cuadResumen = resumen.status === 'ready' ? resumen.props.cuadratura : null;
+      if (cuadResumen?.requiereResolucionSaldoResidual && venta.saldo_residual_resolucion == null) {
+        toast.add({
+          title: 'Falta resolver el saldo del cliente',
+          description:
+            'Hay un saldo de precio por resolver. Cóbralo (pagaré) o absórbelo (nota de crédito) antes de cerrar la dictaminación.',
           type: 'error',
         });
         return;
@@ -762,6 +790,75 @@ function CapturarFase8Body() {
   const saldoCD = cobGastos ? cobGastos.pagareNecesario : 0;
   const aplicaCD = saldoCD > 0.0049;
 
+  // Saldo residual de precio (iniciativa dilesa-saldos-residuales): cuando el
+  // precio queda con un residual real (> tolerancia), Dirección decide explícito
+  // cobrarlo (pagaré) o absorberlo (nota de crédito). El gate del cierre lo exige.
+  // El monto absorbido ya cae en la NC derivada; esto registra decisión + rastro.
+  const requiereResolucionSaldo = cuadratura?.requiereResolucionSaldoResidual ?? false;
+  const saldoResidualMonto = cuadratura?.saldoPrecioPorCubrir ?? 0;
+  const resolucionSaldo = venta?.saldo_residual_resolucion ?? null;
+  const resolverSaldo = useCallback(
+    async (tipo: 'cobrar' | 'absorber') => {
+      if (!venta) return;
+      const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+      if (!esDir) {
+        toast.add({
+          title: 'Solo Dirección resuelve el saldo',
+          description: 'El cierre financiero lo controla Dirección.',
+          type: 'error',
+        });
+        return;
+      }
+      const monto =
+        resumen.status === 'ready' ? (resumen.props.cuadratura.saldoPrecioPorCubrir ?? 0) : 0;
+      const montoR = Math.round(monto * 100) / 100;
+      setResolviendoSaldo(true);
+      const { data: userRes } = await sb.auth.getUser();
+      const userId = userRes?.user?.id ?? null;
+      const at = new Date().toISOString();
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          saldo_residual_resolucion: tipo,
+          saldo_residual_monto: montoR,
+          saldo_residual_autorizado_por: userId,
+          saldo_residual_at: at,
+        })
+        .eq('id', venta.id);
+      setResolviendoSaldo(false);
+      if (upErr) {
+        toast.add({
+          title: 'No se pudo guardar la resolución',
+          description: getSupabaseErrorMessage(upErr, 'Error desconocido.'),
+          type: 'error',
+        });
+        return;
+      }
+      setVenta((v) =>
+        v
+          ? {
+              ...v,
+              saldo_residual_resolucion: tipo,
+              saldo_residual_monto: montoR,
+              saldo_residual_autorizado_por: userId,
+              saldo_residual_at: at,
+            }
+          : v
+      );
+      toast.add({
+        title:
+          tipo === 'absorber' ? 'Saldo absorbido (nota de crédito)' : 'Saldo marcado por cobrar',
+        description:
+          tipo === 'absorber'
+            ? `DILESA absorbe ${money2(montoR)}. Ya puedes cerrar la dictaminación.`
+            : `${money2(montoR)} quedan por cobrar al cliente (pagaré). Ya puedes cerrar la dictaminación.`,
+        type: 'success',
+      });
+    },
+    [venta, me, resumen, sb, toast]
+  );
+
   // Pagaré firmado (decisión Beto 2026-06-24): se recaba en la dictaminación, no
   // en la firma. Obligatorio para cerrar la fase cuando hay crédito directo (el
   // gate vive en onSubmit). Reusado en ambos forms (cierre y "ya cerrada") para
@@ -773,6 +870,57 @@ function CapturarFase8Body() {
         súbelo aquí. Es obligatorio para cerrar la dictaminación.
       </p>
       <DocsFaseSection state={docsPagare} titulo="Pagaré firmado" />
+    </Section>
+  ) : null;
+
+  // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales):
+  // Dirección decide cobrarlo (pagaré) o absorberlo (nota de crédito). Reusada en
+  // ambos forms (cierre y "ya cerrada") para que las ya dictaminadas también lo
+  // resuelvan. El gate del cierre la exige; la NC sigue derivada.
+  const saldoResidualSection = requiereResolucionSaldo ? (
+    <Section title="Resolver saldo del cliente">
+      <p className="mb-3 text-xs text-[var(--text)]/60">
+        Queda un saldo de <strong>{money2(saldoResidualMonto)}</strong> en el precio que el crédito
+        y el enganche no cubren. Dirección lo resuelve para cerrar la dictaminación:{' '}
+        <strong>absorberlo</strong> (nota de crédito de DILESA — ya entra al descuento; la NC se
+        emite al facturar) o <strong>cobrarlo</strong> (el cliente lo paga con pagaré).
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant={resolucionSaldo === 'absorber' ? 'default' : 'outline'}
+          onClick={() => resolverSaldo('absorber')}
+          disabled={resolviendoSaldo || !esDireccion}
+        >
+          {resolviendoSaldo ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Absorber con nota de crédito
+        </Button>
+        <Button
+          type="button"
+          variant={resolucionSaldo === 'cobrar' ? 'default' : 'outline'}
+          onClick={() => resolverSaldo('cobrar')}
+          disabled={resolviendoSaldo || !esDireccion}
+        >
+          {resolviendoSaldo ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Cobrar con pagaré
+        </Button>
+      </div>
+      {resolucionSaldo ? (
+        <p className="mt-3 text-[11px] text-emerald-700 dark:text-emerald-300">
+          {resolucionSaldo === 'absorber'
+            ? `Absorbido por DILESA (nota de crédito) por ${money2(venta?.saldo_residual_monto)}.`
+            : `Por cobrar al cliente (pagaré) por ${money2(venta?.saldo_residual_monto)}. Captura el pago como abono/enganche o formaliza el pagaré.`}
+        </p>
+      ) : (
+        <p className="mt-3 text-[11px] text-amber-700 dark:text-amber-300">
+          Elige una opción para poder cerrar la dictaminación.
+        </p>
+      )}
+      {!esDireccion ? (
+        <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+          Solo Dirección resuelve el saldo.
+        </p>
+      ) : null}
     </Section>
   ) : null;
 
@@ -979,6 +1127,10 @@ function CapturarFase8Body() {
                   valorEscrituracion={Number(valorEscrituracion) || venta.valor_escrituracion}
                   chequeCapturado={false}
                   hayFacturaCfdi={false}
+                  saldoResidual={{
+                    resolucion: venta.saldo_residual_resolucion,
+                    monto: venta.saldo_residual_monto,
+                  }}
                 />
               </Section>
             ) : null}
@@ -1002,6 +1154,8 @@ function CapturarFase8Body() {
                 />
               </Section>
             ) : null}
+
+            {saldoResidualSection}
 
             {pagareFirmadoSection}
 
@@ -1185,6 +1339,10 @@ function CapturarFase8Body() {
                 valorEscrituracion={Number(valorEscrituracion) || venta.valor_escrituracion}
                 chequeCapturado={false}
                 hayFacturaCfdi={false}
+                saldoResidual={{
+                  resolucion: venta.saldo_residual_resolucion,
+                  monto: venta.saldo_residual_monto,
+                }}
               />
             </Section>
           ) : null}
@@ -1208,6 +1366,8 @@ function CapturarFase8Body() {
               />
             </Section>
           ) : null}
+
+          {saldoResidualSection}
 
           {pagareFirmadoSection}
 

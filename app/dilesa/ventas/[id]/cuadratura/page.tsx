@@ -63,6 +63,10 @@ function CuadraturaBody() {
         valorEscrituracion={venta.valor_escrituracion}
         chequeCapturado={venta.monto_cheque_notaria != null}
         hayFacturaCfdi={hayFacturaCfdi}
+        saldoResidual={{
+          resolucion: venta.saldo_residual_resolucion,
+          monto: venta.saldo_residual_monto,
+        }}
       />
     </div>
   );
