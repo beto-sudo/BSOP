@@ -36,7 +36,7 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { RowActions } from '@/components/shared/row-actions';
+import { RowQuickActions } from '@/components/shared/row-quick-actions';
 import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -736,50 +736,44 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
             type: 'custom' as const,
             sortable: false,
             align: 'right' as const,
-            width: 'w-12',
+            width: 'min-w-[104px]',
             render: (r: ReqRow) => {
               const estado = deriveReqEstado(r);
               return (
-                <RowActions
-                  ariaLabel={`Acciones para ${r.codigo}`}
-                  onDelete={
-                    estado !== 'con_oc'
-                      ? {
-                          onConfirm: async (motivo) => {
-                            await cancelar(r, motivo ?? '');
-                          },
-                          label: 'Cancelar requisición',
-                          confirmTitle: `¿Cancelar ${r.codigo}?`,
-                          confirmDescription: 'La requisición quedará cancelada (borrado suave).',
-                          confirmLabel: 'Cancelar requisición',
-                          requireMotivo: true,
-                        }
-                      : undefined
-                  }
-                >
-                  {puedeGenerarOc(r) ? (
-                    <>
-                      {esDireccion ? (
-                        <button
-                          type="button"
-                          onClick={() => void generarOC(r)}
-                          disabled={accionId === r.id}
-                          className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
-                        >
-                          <ShoppingCart className="h-3.5 w-3.5" /> Generar orden de compra
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void pedirCotizaciones(r)}
-                        disabled={accionId === r.id}
-                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)] disabled:opacity-50"
-                      >
-                        <FileSearch className="h-3.5 w-3.5" /> Pedir cotizaciones (RFQ)
-                      </button>
-                    </>
-                  ) : null}
-                </RowActions>
+                <RowQuickActions
+                  quick={[
+                    {
+                      icon: <ShoppingCart className="h-4 w-4" />,
+                      label: 'Generar orden de compra',
+                      onClick: () => void generarOC(r),
+                      disabled: accionId === r.id,
+                      hidden: !esDireccion || !puedeGenerarOc(r),
+                    },
+                    {
+                      icon: <FileSearch className="h-4 w-4" />,
+                      label: 'Pedir cotizaciones (RFQ)',
+                      onClick: () => void pedirCotizaciones(r),
+                      disabled: accionId === r.id,
+                      hidden: !puedeGenerarOc(r),
+                    },
+                  ]}
+                  menu={{
+                    ariaLabel: `Más acciones para ${r.codigo}`,
+                    onDelete:
+                      estado !== 'con_oc'
+                        ? {
+                            onConfirm: async (motivo) => {
+                              await cancelar(r, motivo ?? '');
+                            },
+                            label: 'Cancelar requisición',
+                            confirmTitle: `¿Cancelar ${r.codigo}?`,
+                            confirmDescription: 'La requisición quedará cancelada (borrado suave).',
+                            confirmLabel: 'Cancelar requisición',
+                            requireMotivo: true,
+                          }
+                        : undefined,
+                  }}
+                />
               );
             },
           },
