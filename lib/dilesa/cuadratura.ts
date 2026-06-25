@@ -290,6 +290,17 @@ export type Cuadratura = {
    */
   saldoPrecioEscrituracion: number | null;
   /**
+   * Saldo del precio que el enganche pagado del cliente AÚN no cubre:
+   * `saldoPrecioEscrituracion` − `coberturaGastos.engancheAlPrecio`. Es el "Saldo
+   * por cubrir" que ve el cliente (≈ 0 cuando crédito + enganche alcanzan el
+   * precio; un residual de centavos lo absorbe el bono de DILESA al escriturar).
+   * Fuente ÚNICA del panel y del mini-resumen — antes el panel lo calculaba inline
+   * y el mini-resumen mostraba `saldoPrecioEscrituracion` crudo (sin restar el
+   * enganche), divergiendo en Infonavit (crédito < precio: cabecera 158,551 vs
+   * panel 1). `null` en legacy/cerradas.
+   */
+  saldoPrecioPorCubrir: number | null;
+  /**
    * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
    * (escrituración) + factura de enganche = total facturado; − NC = neto (=
    * escritura). `null` en legacy/cerradas.
@@ -523,6 +534,15 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const saldoPrecioEscrituracion = tieneDesglose
     ? round2(valorEscrituracion - creditoInstitucion)
     : null;
+  // Saldo del precio que el enganche pagado aún no cubre (= "Saldo por cubrir"
+  // del panel y la cifra "Precio" del mini-resumen): el crédito cubre el precio
+  // primero, el enganche aplica al resto, y lo que quede es el pendiente real del
+  // cliente. Fuente ÚNICA — antes el panel lo calculaba inline y el mini-resumen
+  // mostraba el saldo crudo (sin restar el enganche), por eso divergían en
+  // Infonavit (crédito < precio). `engancheAlPrecio` ya está topado al saldo.
+  const saldoPrecioPorCubrir = tieneDesglose
+    ? round2((saldoPrecioEscrituracion ?? 0) - engancheAlPrecio)
+    : null;
 
   // Cobertura model-aware de TODA la operación — fuente ÚNICA para el copiloto de
   // cierre y otros gates. NO el `saldoCliente`/`cubierta` legacy, que en ventas
@@ -651,6 +671,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     coberturaGastos,
     formacionPrecio,
     saldoPrecioEscrituracion,
+    saldoPrecioPorCubrir,
     desgloseFacturacion,
     posibleDobleConteo,
   };

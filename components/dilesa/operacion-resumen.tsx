@@ -119,20 +119,24 @@ export function OperacionResumen({
           <Cifra label="Depósitos directos" value={money(cuadratura.depositosDirectoCliente)} />
           {cuadratura.tieneDesglose ? (
             // Modelo desglosado (ADR-045): dos coberturas separadas — el precio lo
-            // cubre el crédito; los gastos notariales los cubre el presupuesto
-            // (subsidio + DILESA + enganche + sobreprecio + pagaré). Ambos leen de
-            // la misma `cuadratura`; el pagaré real va en su columna de arriba. NO
-            // se muestra el saldoCliente crudo (mezclaba precio + descuento → −74,651).
+            // cubre el crédito (+ enganche); los gastos notariales los cubre el
+            // presupuesto (subsidio + DILESA + enganche + sobreprecio + pagaré).
+            // Ambos leen de la misma `cuadratura`; el pagaré real va en su columna
+            // de arriba. "Precio" = `saldoPrecioPorCubrir` (saldo del precio −
+            // enganche pagado), el MISMO "Saldo por cubrir" del panel — no el
+            // `saldoPrecioEscrituracion` crudo (ignoraba el enganche → en Infonavit
+            // mostraba 158,551 cuando el panel ya mostraba 1) ni el `saldoCliente`
+            // crudo (mezclaba precio + descuento → −74,651).
             <div className="ml-auto flex items-stretch gap-x-6">
               <Cifra
                 label="Precio"
                 value={
-                  (cuadratura.saldoPrecioEscrituracion ?? 0) <= 0
-                    ? 'Cubierto ✓'
-                    : money(cuadratura.saldoPrecioEscrituracion)
+                  (cuadratura.saldoPrecioPorCubrir ?? 0) > 0.5
+                    ? money(cuadratura.saldoPrecioPorCubrir)
+                    : 'Cubierto ✓'
                 }
                 strong
-                tone={(cuadratura.saldoPrecioEscrituracion ?? 0) <= 0 ? 'ok' : 'warn'}
+                tone={(cuadratura.saldoPrecioPorCubrir ?? 0) > 0.5 ? 'warn' : 'ok'}
               />
               <Cifra
                 label="Gastos notariales"
