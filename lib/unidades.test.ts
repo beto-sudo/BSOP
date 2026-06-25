@@ -62,6 +62,15 @@ describe('factorUniversal', () => {
     expect(factorUniversal(' Gramo ', 'KILO')).toBe(0.001);
   });
 
+  it('convierte onza fluida ↔ mililitro', () => {
+    expect(factorUniversal('onza', 'mililitro')).toBeCloseTo(29.5735, 4);
+    expect(factorUniversal('mililitro', 'onza')).toBeCloseTo(1 / 29.5735, 10);
+  });
+
+  it('null entre onza (volumen) y gramo (masa)', () => {
+    expect(factorUniversal('onza', 'gramo')).toBeNull();
+  });
+
   it('null entre dimensiones distintas (masa vs volumen)', () => {
     expect(factorUniversal('gramo', 'litro')).toBeNull();
   });
@@ -96,6 +105,14 @@ describe('factorRecetaAStock', () => {
   it('presentación: agua 2 L (2000 ml), receta en ml → 1/2000', () => {
     const agua = { unidad: 'pieza', unidadBase: 'mililitro', contenido: 2000 };
     expect(factorRecetaAStock('mililitro', agua)).toBeCloseTo(0.0005, 10);
+  });
+
+  it('receta en onza contra botella con contenido en ml (1 oz = 29.5735 ml)', () => {
+    const tequila = { unidad: 'pieza', unidadBase: 'mililitro', contenido: 980 };
+    const f = factorRecetaAStock('onza', tequila);
+    expect(f).toBeCloseTo(29.5735 / 980, 10);
+    // un trago de 1.5 oz descuenta ~0.045 botella
+    expect(1.5 * (f as number)).toBeCloseTo(0.045265, 5);
   });
 
   it('receta en unidad distinta a unidad_base pero misma dimensión (litro vs ml base)', () => {
