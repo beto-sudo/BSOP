@@ -49,6 +49,13 @@ export type OcRow = {
   estado: OcEstado;
   fecha: string | null;
   lineas: OcLinea[];
+  /**
+   * Datos para el documento al proveedor (PDF, `dilesa-compras-operacion` S2b).
+   * Opcionales: solo el módulo de Órdenes los carga/edita; Recepciones no.
+   */
+  condicionesPago?: string | null;
+  fechaEntrega?: string | null;
+  direccionEntrega?: string | null;
 };
 
 /** Total de una línea: cantidad × precio (montos c/IVA). */
