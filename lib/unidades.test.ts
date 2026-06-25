@@ -5,6 +5,7 @@ import {
   unidadOptions,
   factorUniversal,
   factorRecetaAStock,
+  rendimientoServir,
 } from './unidades';
 
 describe('UNIDADES', () => {
@@ -79,6 +80,34 @@ describe('factorUniversal', () => {
     expect(factorUniversal('mililitro', 'pieza')).toBeNull();
     expect(factorUniversal('pieza', 'gramo')).toBeNull();
     expect(factorUniversal('botella', 'litro')).toBeNull();
+  });
+
+  it('copa = 1.5 onzas', () => {
+    expect(factorUniversal('copa', 'onza')).toBeCloseTo(1.5, 6);
+    expect(factorUniversal('onza', 'copa')).toBeCloseTo(1 / 1.5, 6);
+  });
+});
+
+describe('rendimientoServir', () => {
+  it('botella de 980 ml rinde ~33 oz y ~22 copas', () => {
+    const r = rendimientoServir(980, 'mililitro');
+    expect(r?.onzas).toBeCloseTo(33.14, 1);
+    expect(r?.copas).toBeCloseTo(22.09, 1);
+  });
+
+  it('botella de 700 ml rinde ~24 oz y ~16 copas (redondeado)', () => {
+    const r = rendimientoServir(700, 'mililitro');
+    expect(Math.round(r!.onzas)).toBe(24);
+    expect(Math.round(r!.copas)).toBe(16);
+  });
+
+  it('null para unidad de masa (no aplica oz/copas)', () => {
+    expect(rendimientoServir(25000, 'gramo')).toBeNull();
+  });
+
+  it('null sin contenido', () => {
+    expect(rendimientoServir(null, 'mililitro')).toBeNull();
+    expect(rendimientoServir(0, 'mililitro')).toBeNull();
   });
 });
 
