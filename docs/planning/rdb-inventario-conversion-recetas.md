@@ -7,7 +7,7 @@
 **Dueño:** Beto
 **Creada:** 2026-06-25
 **Última actualización:** 2026-06-25
-**Próximo hito:** Sprint 1 — migración schema (contenido + unidad_base) + función de conversión, lista para que Beto la aplique a prod
+**Próximo hito:** Sprint 3 — UI de captura de `contenido`/`unidad_base` en "Configurar Producto" (Sprint 1+2 ya en prod, PR #1026)
 
 > Promovida el 2026-06-25. Beto detectó que el descuento de inventario por
 > receta no podía saber cuántos mililitros tiene una botella si el "980ml"
@@ -101,22 +101,22 @@ lleva de `unidad_receta` a `unidad` de stock. Si no es convertible → factor NU
       (materializado), no de la vista — la corrección histórica debe tocar
       movimientos **y** el stock materializado.
 
-### Sprint 1 — Schema + función de conversión
+### Sprint 1 — Schema + función de conversión ✅ 2026-06-25 (PR #1026)
 
-- [ ] Migración: `erp.productos.contenido` + `erp.productos.unidad_base`.
-- [ ] `erp.fn_factor_receta_a_stock(p_insumo_id uuid, p_unidad_receta text)
-RETURNS numeric` — factores universales + contenido/unidad_base, NULL si
-      no convertible.
-- [ ] Regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
-- [ ] Migración como archivo; Beto la aplica a prod tras revisar riesgos.
+- [x] Migración: `erp.productos.contenido` + `erp.productos.unidad_base`.
+- [x] `erp.fn_factor_universal` (litro↔ml, kilo↔g) +
+      `erp.fn_factor_receta_a_stock(p_insumo_id uuid, p_unidad_receta text)
+RETURNS numeric` — universales + contenido/unidad_base, NULL si no convertible.
+- [x] Regenerar `SCHEMA_REF.md` + `types/supabase.ts`.
+- [x] Aplicada a prod por MCP + ledger reconciliado (`migration repair`).
 
-### Sprint 2 — Motor: trigger convierte (detiene el sangrado)
+### Sprint 2 — Motor: trigger convierte (detiene el sangrado) ✅ 2026-06-25 (PR #1026)
 
-- [ ] Reescribir `fn_trg_waitry_to_movimientos` usando
+- [x] Reescrito `fn_trg_waitry_to_movimientos` desde la versión viva usando
       `fn_factor_receta_a_stock`. Insumo sin factor ⇒ no inserta salida.
-- [ ] Conservar fallback legacy (`parent_id` + `factor_consumo`) para productos
-      sin receta — ese camino ya estaba en la unidad correcta (botellas).
-- [ ] Aplicar S1+S2 detiene el sangrado aunque falte capturar contenidos.
+- [x] Conservado el fallback legacy (`parent_id` + `factor_consumo`) para
+      productos sin receta — ese camino ya estaba en la unidad correcta.
+- [x] Verificado en prod: Bacardi sin contenido ⇒ factor NULL ⇒ no descuenta.
 
 ### Sprint 3 — Captura en UI
 
@@ -200,3 +200,16 @@ Origen: pregunta de Beto sobre cómo el sistema conoce los 980 ml de una botella
 si sólo están en el nombre. Investigación encontró el trigger descontando sin
 convertir y 31 insumos afectados con daño activo. Iniciativa promovida a
 `in_progress`. Branch `claude/rdb-inventario-conversion-recetas`.
+
+### 2026-06-25 · Sprint 1+2 — Motor aplicado a prod (PR #1026)
+
+Migración `20260625150117`: columnas `contenido`/`unidad_base`, funciones
+`fn_factor_universal` + `fn_factor_receta_a_stock`, y trigger reescrito (partido
+de la versión viva, sólo cambió el loop de receta). Aplicada a prod por MCP;
+ledger reconciliado con `migration repair` (archivo `…150117` applied, huérfano
+`…152701` reverted). `SCHEMA_REF.md` + `types/supabase.ts` regenerados. 6 checks
+de CI en verde. **Sangrado detenido**: insumos sin `contenido` capturado dejan de
+descontar (factor NULL) en vez de restar unidades fantasma. Pendiente vivo: el
+stock histórico de los 31 insumos sigue distorsionado hasta el Sprint 4
+(corrección de movimientos) y el descuento correcto no arranca hasta capturar
+contenidos (Sprint 3, UI).
