@@ -166,9 +166,27 @@ destajo.
 
 ## Bitácora
 
+- **2026-06-25 — S1+S2+S3 construidos en un PR — [#1043](https://github.com/beto-sudo/BSOP/pull/1043), SIN auto-merge (gated por aplicar migraciones a prod).**
+  Dos migraciones como archivo (`20260625212801` S1 + `20260625213616` S2):
+  `erp.facturas.estimacion_id` + índice único activo; guard
+  `dilesa.fn_estimaciones_guard`; RPCs `estimacion_destajo_autorizar` /
+  `estimacion_destajo_cancelar` / `cxp_factura_desde_estimacion_destajo`
+  (factura en espera por el neto al aprobar) / `cxp_factura_recibir_cfdi`
+  (sube XML → por_pagar) + trigger de sync `fn_cxp_factura_sync_estimacion`
+  (facturada/pagada/reversa derivados); backfill de `aprobada` vivas. UI:
+  rewire de Aprobar/Cancelar a RPC, fuera "Marcar factura recibida"/"Marcar
+  pagada", "Ver en CxP →"; bandeja "Facturas en espera" + diálogo "Subir XML"
+  en `components/cxp/cxp-facturas-module.tsx`; `upload-xml` acepta `factura_id`
+  destino. **Verificación local**: typecheck + test:coverage (2069) + lint +
+  format:check verdes; el schema nuevo se puentea con casts (`as any` rpc),
+  `SCHEMA_REF`/types **sin tocar** (se regeneran al aplicar). **CI**: "Lint /
+  Typecheck / Unit tests" verde + Vercel Preview desplegado. Conflicto de
+  `INITIATIVES.md` (auto-generada) resuelto con `--theirs` + regen.
+  **Pendiente de Beto (gate de salida):** `supabase db push` de ambas
+  migraciones → regenerar `SCHEMA_REF.md` + `types/supabase.ts` → mergear.
+  Backfill de KPIs/manual del módulo de estimaciones quedó como pulido menor
+  (los estados se preservan; los KPIs siguen contando por estado).
 - **2026-06-25 — Promovida (`in_progress`) + arranque autónomo.** Nace de la
   decisión D3 de `dilesa-contratos-estimaciones`. Beto autorizó arrancar en
   autónomo dejando las migraciones (finanzas) como archivo para aplicarlas él
   al verificar. Diseño cerrado con 3 decisiones de Beto (D1/D2/D3 arriba).
-  </content>
-  </invoke>
