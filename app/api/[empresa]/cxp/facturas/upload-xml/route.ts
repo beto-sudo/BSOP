@@ -131,6 +131,123 @@ export async function POST(req: NextRequest, { params }: Params) {
   const empresaRfc = String(emp.rfc ?? '')
     .toUpperCase()
     .trim();
+
+  // ── Camino RECEPCIÓN (destajo → CxP): un XML destinado a una factura EN
+  // ESPERA específica (estado_cxp='borrador' con estimacion_id). En vez de
+  // crear una factura nueva, asocia el CFDI a la existente y la promueve a
+  // por_pagar (RPC cxp_factura_recibir_cfdi). Iniciativa dilesa-estimaciones-cxp.
+  const facturaIdParam = form.get('factura_id');
+  if (typeof facturaIdParam === 'string' && facturaIdParam.trim()) {
+    const facturaId = facturaIdParam.trim();
+    if (files.length !== 1) {
+      return NextResponse.json(
+        { ok: false, error: 'Sube exactamente un XML para esta factura.' },
+        { status: 400 }
+      );
+    }
+    const { data: fac } = await admin
+      .schema('erp')
+      .from('facturas')
+      .select('id, empresa_id, estado_cxp, total, cancelada_at')
+      .eq('id', facturaId)
+      .maybeSingle();
+    if (!fac || fac.empresa_id !== emp.id) {
+      return NextResponse.json({ ok: false, error: 'Factura no encontrada.' }, { status: 404 });
+    }
+
+    let cfdi;
+    try {
+      cfdi = parseCfdiXml(await files[0].text());
+    } catch (e) {
+      const msg =
+        e instanceof CfdiParseError ? e.message : `Error inesperado: ${(e as Error).message}`;
+      return NextResponse.json({ ok: false, error: msg }, { status: 422 });
+    }
+    if (empresaRfc && cfdi.receptorRfc !== empresaRfc) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `El CFDI es para el RFC ${cfdi.receptorRfc}, no para ${empresaSlug} (${empresaRfc}).`,
+        },
+        { status: 422 }
+      );
+    }
+
+    // RPC aún no en types — mismo patrón de cast que el resto de CxP.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: rpcErr } = await (admin.schema('erp') as any).rpc('cxp_factura_recibir_cfdi', {
+      p_factura_id: facturaId,
+      p_uuid_sat: cfdi.uuid ?? undefined,
+      p_total: cfdi.total,
+      p_subtotal: cfdi.subtotal,
+      p_iva: cfdi.ivaTrasladado,
+      p_fecha_emision: cfdi.fecha || undefined,
+      p_emisor_rfc: cfdi.emisorRfc,
+      p_emisor_nombre: cfdi.emisorNombre ?? undefined,
+      p_receptor_rfc: cfdi.receptorRfc,
+      p_forma_pago_sat: cfdi.formaPago ?? undefined,
+      p_metodo_pago_sat:
+        cfdi.metodoPago === 'PUE' || cfdi.metodoPago === 'PPD' ? cfdi.metodoPago : undefined,
+      p_uso_cfdi: cfdi.usoCfdi ?? undefined,
+      p_tasa_iva: cfdi.tasaIva ?? undefined,
+      p_retencion_iva: cfdi.retencionIva,
+      p_retencion_isr: cfdi.retencionIsr,
+    });
+    if (rpcErr) {
+      return NextResponse.json(
+        { ok: false, error: (rpcErr as { message: string }).message },
+        { status: 422 }
+      );
+    }
+
+    // Guardar el XML + registrar adjunto + xml_url (best-effort).
+    const path = buildAdjuntoPath({
+      empresa: empresaSlug as EmpresaSlug,
+      entidad: 'facturas',
+      entidadId: facturaId,
+      filename: files[0].name,
+    });
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    const { error: upErr } = await admin.storage
+      .from('adjuntos')
+      .upload(path, bytes, { contentType: 'application/xml', upsert: false });
+    if (!upErr) {
+      await admin.schema('erp').from('adjuntos').insert({
+        empresa_id: emp.id,
+        entidad_tipo: 'cxp_factura',
+        entidad_id: facturaId,
+        rol: 'xml_cfdi',
+        nombre: files[0].name,
+        url: path,
+        tipo_mime: 'application/xml',
+      });
+      await admin.schema('erp').from('facturas').update({ xml_url: path }).eq('id', facturaId);
+    }
+
+    // Warning (no bloqueante): el total del CFDI difiere del neto autorizado.
+    const esperado = Number(fac.total ?? 0);
+    const dif = Math.abs(cfdi.total - esperado);
+    const warning =
+      esperado > 0 && dif > Math.max(1, esperado * 0.005)
+        ? `El total del CFDI (${cfdi.total.toLocaleString('es-MX')}) difiere del neto autorizado (${esperado.toLocaleString('es-MX')}). Se tomó el monto del CFDI; revísalo si no esperabas la diferencia.`
+        : null;
+
+    await admin
+      .schema('core')
+      .from('audit_log')
+      .insert({
+        empresa_id: emp.id,
+        usuario_id: user.id,
+        accion: 'cxp_factura_recibir_cfdi_upload',
+        tabla: 'erp.facturas',
+        registro_id: facturaId,
+        datos_nuevos: { uuid_sat: cfdi.uuid, total: cfdi.total, warning },
+        user_agent: req.headers.get('user-agent'),
+      });
+
+    return NextResponse.json({ ok: true, facturaId, uuid: cfdi.uuid, warning }, { status: 200 });
+  }
+
   const results: FacturaResult[] = [];
 
   // Rastro server-side de rechazos (se insertan en batch al final, junto con
