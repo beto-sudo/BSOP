@@ -10920,6 +10920,7 @@ export type Database = {
             | Database["erp"]["Enums"]["clasificacion_producto"]
             | null
           codigo: string | null
+          contenido: number | null
           created_at: string
           deleted_at: string | null
           descripcion: string | null
@@ -10931,6 +10932,7 @@ export type Database = {
           parent_id: string | null
           tipo: string
           unidad: string
+          unidad_base: string | null
           updated_at: string | null
         }
         Insert: {
@@ -10940,6 +10942,7 @@ export type Database = {
             | Database["erp"]["Enums"]["clasificacion_producto"]
             | null
           codigo?: string | null
+          contenido?: number | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
@@ -10951,6 +10954,7 @@ export type Database = {
           parent_id?: string | null
           tipo?: string
           unidad?: string
+          unidad_base?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -10960,6 +10964,7 @@ export type Database = {
             | Database["erp"]["Enums"]["clasificacion_producto"]
             | null
           codigo?: string | null
+          contenido?: number | null
           created_at?: string
           deleted_at?: string | null
           descripcion?: string | null
@@ -10971,6 +10976,7 @@ export type Database = {
           parent_id?: string | null
           tipo?: string
           unidad?: string
+          unidad_base?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -12380,6 +12386,14 @@ export type Database = {
         Returns: undefined
       }
       fn_es_direccion: { Args: { p_empresa_id: string }; Returns: boolean }
+      fn_factor_receta_a_stock: {
+        Args: { p_insumo_id: string; p_unidad_receta: string }
+        Returns: number
+      }
+      fn_factor_universal: {
+        Args: { p_a: string; p_de: string }
+        Returns: number
+      }
       fn_firmar_levantamiento: {
         Args: {
           p_comentario?: string
