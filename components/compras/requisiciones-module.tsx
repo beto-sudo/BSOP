@@ -492,7 +492,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       const sb = createSupabaseBrowserClient();
       const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('erp') as any)
+      const erp = sb.schema('erp') as any;
+      const { error: e } = await erp
         .from('requisiciones')
         .update({ deleted_at: ahora, cancelada_at: ahora, motivo_cancelacion: motivo })
         .eq('id', req.id);
@@ -504,6 +505,20 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         });
         return false;
       }
+      // Cascade (pulido 5b): cancela las cotizaciones aún en curso de esta
+      // requisición (abierta/comparada) — no tiene sentido cotizar para una
+      // requisición cancelada. Las adjudicadas no se tocan: su OC las gobierna y
+      // el gate 'con_oc' ya impide cancelar la requisición en ese caso.
+      await erp
+        .from('cotizaciones')
+        .update({
+          estado: 'cancelada',
+          cancelada_at: ahora,
+          motivo_cancelacion: `Requisición ${req.codigo} cancelada`,
+          updated_at: ahora,
+        })
+        .eq('requisicion_id', req.id)
+        .in('estado', ['abierta', 'comparada']);
       toast.add({ title: 'Requisición cancelada', description: req.codigo, type: 'success' });
       void cargar();
       return true;
