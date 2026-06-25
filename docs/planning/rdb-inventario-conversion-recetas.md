@@ -7,7 +7,7 @@
 **Dueño:** Beto
 **Creada:** 2026-06-25
 **Última actualización:** 2026-06-25
-**Próximo hito:** Sprint 3 — UI de captura de `contenido`/`unidad_base` en "Configurar Producto" (Sprint 1+2 ya en prod, PR #1026)
+**Próximo hito:** Sprint 4 — capturar `contenido`/`unidad_base` de los 31 insumos (lista validada por Beto) + corrección del stock histórico (UI de captura ya lista, PR Sprint 3)
 
 > Promovida el 2026-06-25. Beto detectó que el descuento de inventario por
 > receta no podía saber cuántos mililitros tiene una botella si el "980ml"
@@ -118,13 +118,16 @@ RETURNS numeric` — universales + contenido/unidad_base, NULL si no convertible
       productos sin receta — ese camino ya estaba en la unidad correcta.
 - [x] Verificado en prod: Bacardi sin contenido ⇒ factor NULL ⇒ no descuenta.
 
-### Sprint 3 — Captura en UI
+### Sprint 3 — Captura en UI ✅ 2026-06-25 (PR Sprint 3)
 
-- [ ] "Configurar Producto" (`app/rdb/productos/page.tsx`): cuando inventariable,
-      campos "Unidad de consumo" (`unidad_base`) + "Contenido por <unidad>".
-- [ ] Persistir en el server action de producto.
-- [ ] Helper de conversión en `lib/unidades.ts` (factores universales) +
-      preview del descuento en el editor de receta ("20 ml = 0.020 botellas").
+- [x] "Configurar Producto" (`app/rdb/productos/page.tsx`): cuando inventariable,
+      campos "Contenido por <unidad>" + "Unidad de consumo" (`unidad_base`).
+- [x] Persistir `contenido`/`unidad_base` en `handleSave` (con validación:
+      número > 0, unidad de consumo requerida si hay contenido).
+- [x] Helper de conversión en `lib/unidades.ts` (`factorUniversal` +
+      `factorRecetaAStock`, espejo de la SQL) + 17 unit tests.
+- [x] Preview por fila de receta: "Descuenta 0.0204 pieza por venta" o aviso
+      ámbar "⚠ sin conversión, configura el contenido" cuando falta el dato.
 
 ### Sprint 4 — Backfill datos + corrección histórica
 
@@ -213,3 +216,15 @@ descontar (factor NULL) en vez de restar unidades fantasma. Pendiente vivo: el
 stock histórico de los 31 insumos sigue distorsionado hasta el Sprint 4
 (corrección de movimientos) y el descuento correcto no arranca hasta capturar
 contenidos (Sprint 3, UI).
+
+### 2026-06-25 · Sprint 3 — UI de captura (PR Sprint 3)
+
+Branch `claude/rdb-inventario-captura-contenido` (desde `origin/main` con el
+motor ya mergeado). En "Configurar Producto": bloque "Contenido por <unidad>" +
+"Unidad de consumo" (visible cuando inventariable), persistido en `handleSave`
+con validación. Helper `factorUniversal` + `factorRecetaAStock` en
+`lib/unidades.ts` (espejo de la SQL, 17 unit tests). Preview por renglón de
+receta mostrando cuánto descuenta cada insumo, con aviso ámbar cuando falta el
+contenido. 6 checks de CI en verde. PR **sin auto-merge** (UI visible): Beto
+revisa el Vercel Preview y mergea. Sigue el Sprint 4 (lista de 31 + corrección
+histórica), que necesita su validación.
