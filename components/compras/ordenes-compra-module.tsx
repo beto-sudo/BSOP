@@ -22,6 +22,7 @@ import {
   Download,
   FileDown,
   Loader2,
+  Mail,
   Pencil,
   Plus,
   RefreshCw,
@@ -43,6 +44,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { RowActions } from '@/components/shared/row-actions';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
@@ -163,6 +172,9 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const [detalle, setDetalle] = useState<OcRow | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cancelarOcRow, setCancelarOcRow] = useState<OcRow | null>(null);
+  /** OC pendiente de confirmar envío por email al proveedor (acción externa). */
+  const [enviarOcRow, setEnviarOcRow] = useState<OcRow | null>(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   // Drill-down (?focus=<oc_id>) desde el hilo del gasto de otros módulos.
   useFocusDrilldown(
@@ -678,6 +690,48 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
     [toast, cargar]
   );
 
+  // Envía la OC en PDF por email al proveedor (acción externa, reintentable; no
+  // cambia el estado — eso lo gobierna "Marcar enviada"). El padre lo dispara
+  // desde el dialog de confirmación.
+  const enviarOcEmail = useCallback(
+    async (oc: OcRow) => {
+      setEnviandoEmail(true);
+      try {
+        const res = await fetch(`/api/dilesa/ordenes-compra/${oc.id}/pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const json = (await res.json()) as { sentTo?: string; error?: string; skipped?: boolean };
+        if (!res.ok) {
+          toast.add({
+            title: 'No se envió',
+            description: json.error ?? 'Error al enviar la orden.',
+            type: 'error',
+          });
+        } else if (json.skipped) {
+          toast.add({
+            title: 'Envío desactivado',
+            description: 'El catálogo de notificaciones tiene apagado este correo.',
+            type: 'info',
+          });
+        } else {
+          toast.add({
+            title: 'Orden enviada al proveedor',
+            description: json.sentTo ? `A ${json.sentTo}` : oc.codigo,
+            type: 'success',
+          });
+        }
+      } catch {
+        toast.add({ title: 'Error', description: 'No se pudo enviar la orden.', type: 'error' });
+      } finally {
+        setEnviandoEmail(false);
+        setEnviarOcRow(null);
+      }
+    },
+    [toast]
+  );
+
   const exportarCsv = useCallback(() => {
     const headers = ['Folio', 'Proyecto', 'Proveedor', 'Estado', 'Líneas', 'Total', 'Fecha'];
     const filas = filtrados.map((r) => [
@@ -753,6 +807,23 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                     : undefined
                 }
               >
+                <a
+                  href={`/api/dilesa/ordenes-compra/${r.id}/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                >
+                  <FileDown className="h-3.5 w-3.5" /> Imprimir OC
+                </a>
+                {r.proveedorId ? (
+                  <button
+                    type="button"
+                    onClick={() => setEnviarOcRow(r)}
+                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Enviar al proveedor
+                  </button>
+                ) : null}
                 {r.estado === 'borrador' ? (
                   <>
                     <button
@@ -1074,6 +1145,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         onMarcarEnviada={(r) => void cambiarEstado(r, 'enviada', 'Orden enviada')}
         onCerrarOrden={(r) => void cerrar(r)}
         onCancelar={(r) => setCancelarOcRow(r)}
+        onEnviarEmail={(r) => setEnviarOcRow(r)}
       />
 
       {cancelarOcRow ? (
@@ -1088,6 +1160,37 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
             if (ok) setDrawerOpen(false);
           }}
         />
+      ) : null}
+
+      {enviarOcRow ? (
+        <Dialog open onOpenChange={(v) => !v && !enviandoEmail && setEnviarOcRow(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>¿Enviar {enviarOcRow.codigo} al proveedor?</DialogTitle>
+              <DialogDescription>
+                Se enviará la orden de compra en PDF por email a{' '}
+                <strong>{enviarOcRow.proveedorNombre}</strong>. No cambia el estado de la orden.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEnviarOcRow(null)}
+                disabled={enviandoEmail}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={() => void enviarOcEmail(enviarOcRow)} disabled={enviandoEmail}>
+                {enviandoEmail ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Mail className="size-4" />
+                )}
+                Enviar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </div>
   );
@@ -1112,6 +1215,7 @@ function OcDetalleDrawer({
   onMarcarEnviada,
   onCerrarOrden,
   onCancelar,
+  onEnviarEmail,
 }: {
   oc: OcRow | null;
   open: boolean;
@@ -1122,6 +1226,7 @@ function OcDetalleDrawer({
   onMarcarEnviada: (oc: OcRow) => void;
   onCerrarOrden: (oc: OcRow) => void;
   onCancelar: (oc: OcRow) => void;
+  onEnviarEmail: (oc: OcRow) => void;
 }) {
   const conAcciones =
     !!oc &&
@@ -1148,6 +1253,11 @@ function OcDetalleDrawer({
             >
               <FileDown className="size-4" /> Imprimir OC
             </a>
+            {oc.proveedorId ? (
+              <Button variant="outline" onClick={() => onEnviarEmail(oc)}>
+                <Mail className="size-4" /> Enviar al proveedor
+              </Button>
+            ) : null}
             {conAcciones ? (
               <>
                 {oc.estado === 'borrador' ? (
