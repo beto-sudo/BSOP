@@ -3,11 +3,11 @@
 **Slug:** `dilesa-saldos-residuales`
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa.ventas` — **campos nuevos de resolución del saldo residual** (tipo `cobrar`|`absorber`, monto, autorizado_por, fecha). Motor `lib/dilesa/cuadratura.ts` (exponer el residual de **precio** como saldo accionable — hoy solo el de **gastos** lo es vía `coberturaGastos.pagareNecesario`) + gate de resolución en `app/dilesa/ventas/[id]/capturar/8-dictaminada/page.tsx` (reusa `<CreditoDirectoCaptura>` para el camino pagaré) + `components/dilesa/cuadratura-panel.tsx` (muestra la resolución en vez de la nota suave) + reconciliación de la NC en `app/api/dilesa/ventas/[ventaId]/cerrar-fase13`. La nota de crédito se mantiene **derivada** (Facturado − Valor Real). Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md). Sin backfill de cerradas.
-**Estado:** proposed
-**Próximo hito:** Beto da luz verde a ejecutar → Sprint 1 (motor: saldo residual de precio accionable + gate de resolución «siempre explícito» en fase 8). Opcional antes: dimensionar en prod cuántas activas traen residual hoy.
+**Estado:** in_progress
+**Próximo hito:** Beto revisa S1 en Preview (control Absorber/Cobrar + gate en fase 8) y da OK para aplicar la migración a prod (4 columnas aditivas, sin las cuales el código rompe en prod) → luego Sprint 2 (reconciliación de la NC en F13 + addendum a ADR-048).
 **Dueño:** Beto
 **Creada:** 2026-06-25
-**Última actualización:** 2026-06-25 (promovida — alcance v1 cerrado con las 3 decisiones de forma; pendiente luz verde de Beto para ejecutar)
+**Última actualización:** 2026-06-25 (Sprint 1 — motor + gate + UI + migración; PR abierto sin auto-merge, en revisión de Beto)
 
 > Detonante operativo: la venta **JUAN ANTONIO HERNANDEZ MUÑOZ** (M3-L9-LDLE, Infonavit Tradicional) — el precio (920,000) lo cubren crédito (762,265) + enganche (156,943), dejando **$792 de saldo de precio** que DILESA absorbe otorgando una nota de crédito. Beto: en la dictaminación debe haber un campo para **cuadrar** ese residual — si no lo va a pagar el cliente (pagaré), se mete como nota de crédito para que Ale cuadre y avance la fase, y ese monto se considere en la NC que se otorga al facturar.
 
@@ -38,16 +38,17 @@ En la fase 8, cuando quede saldo residual de precio, Dirección lo **resuelve ex
 
 ## Alcance
 
-**Sprint 1 — Motor + gate (núcleo).**
+**Sprint 1 — Motor + schema + gate + UI (núcleo) ✅ entregado (PR sin auto-merge).**
 
-- Motor (`lib/dilesa/cuadratura.ts`): exponer el residual de precio como **saldo accionable** que el gate y el panel leen (paralelo a `pagareNecesario` para gastos). Tests.
-- Fase 8 (`8-dictaminada/page.tsx`): control de Dirección _"Resolver saldo de $X"_ con dos vías (Cobrar / Absorber); el camino Cobrar extiende `<CreditoDirectoCaptura>` para que se dispare también con el saldo de precio. Gate "siempre explícito": residual > tolerancia ⇒ no deja "Cuadrar y cerrar fase" hasta resolverlo.
-- Panel (`cuadratura-panel.tsx`): mostrar la resolución (_"Absorbido · NC autorizada por Dirección"_ / _"Por cobrar · pagaré"_) en vez de la nota suave.
+- Motor (`lib/dilesa/cuadratura.ts`): expone `requiereResolucionSaldoResidual` (= hay desglose y `saldoPrecioPorCubrir` > `TOLERANCIA_SALDO`); señal pura, sin tocar cálculos. Tests.
+- Schema (migración `20260625204005`): 4 columnas nullable en `dilesa.ventas` (`saldo_residual_resolucion` `cobrar`|`absorber`, `_monto`, `_autorizado_por`, `_at`). **La aplica Beto** (toca prod — `db push` con OK explícito).
+- Fase 8 (`8-dictaminada/page.tsx`): control de Dirección _"Resolver saldo del cliente"_ con dos vías (Absorber con NC / Cobrar con pagaré); persiste la decisión. Gate "siempre explícito": residual > tolerancia ⇒ no deja cerrar hasta resolverlo. En ambos forms (cierre y "ya cerrada").
+- Panel (`cuadratura-panel.tsx`): muestra la resolución (_"Absorbido por DILESA (NC)"_ / _"Por cobrar (pagaré)"_) en vez de la nota suave; cableado en la pestaña Cuadratura del expediente.
 
-**Sprint 2 — Persistencia + reconciliación en F13.**
+**Sprint 2 — Reconciliación en F13 + pagaré formal del residual de precio.**
 
-- Schema: campos de resolución en `dilesa.ventas` (`saldo_residual_tipo` `cobrar`|`absorber`, `saldo_residual_monto`, `saldo_residual_autorizado_por`, `saldo_residual_fecha`), auditable. **Migración que aplica Beto** (toca finanzas/prod — no va en modo autónomo).
-- F13 (`cerrar-fase13`): el check de NC existente reconcilia contra la absorción autorizada en fase 8 (que el CFDI de NC ≥ lo absorbido + lo derivado).
+- F13 (`cerrar-fase13`): el check de NC reconcilia contra la absorción autorizada en fase 8 (que el CFDI de NC ≥ lo absorbido + lo derivado).
+- **Pagaré formal para el residual de _precio_** (camino "Cobrar"): reusar `<CreditoDirectoCaptura>` con la asignación correcta gastos↔precio en el motor (separada de S1 para no rushear sobre la cuadratura que ya cuadra).
 - Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md) documentando la resolución del residual de precio.
 
 **Fuera de alcance (v1):** backfill de ventas cerradas (el residual histórico ya cae en el descuento real, no se reabre); la vía CxC simple para el cobro (se usa pagaré formal).
@@ -69,6 +70,7 @@ En la fase 8, cuando quede saldo residual de precio, Dirección lo **resuelve ex
 ## Bitácora
 
 - **2026-06-25** — Promovida. Detonante: caso JUAN ANTONIO HERNANDEZ (M3-L9-LDLE, $792 de saldo de precio absorbido por bono). Diagnóstico: el cierre de fase 8 (ADR-048) solo gatea el residual de **gastos** (`pagareNecesario`), no el de **precio** (`saldoPrecioPorCubrir`), que hoy solo se muestra como nota suave. Cerradas las 3 decisiones de forma con Beto (NC derivada + reconciliación · siempre explícito · pagaré formal). Pendiente: luz verde de Beto para ejecutar; opcional dimensionar en prod cuántas activas traen residual.
+- **2026-06-25 (Sprint 1 — motor + gate + UI)** — **[PR #1040](https://github.com/beto-sudo/BSOP/pull/1040):** Implementado el núcleo: (1) **motor** ([`cuadratura.ts`](../../lib/dilesa/cuadratura.ts)) expone `requiereResolucionSaldoResidual` (= hay desglose y `saldoPrecioPorCubrir` > `TOLERANCIA_SALDO`); señal pura, sin tocar ningún cálculo existente. (2) **Migración aditiva** `20260625204005` — 4 columnas nullable en `dilesa.ventas` (`saldo_residual_resolucion` cobrar|absorber, `_monto`, `_autorizado_por`, `_at`). (3) **Fase 8** ([`8-dictaminada/page.tsx`](../../app/dilesa/ventas/[id]/capturar/8-dictaminada/page.tsx)) gana el control de Dirección «Resolver saldo del cliente» (**Absorber con NC** / **Cobrar con pagaré**, persiste decisión + monto + autorizado*por + at) + **gate «siempre explícito»**: no cierra la dictaminación con residual sin resolver; en ambos forms (cierre y "ya cerrada"). (4) **Panel** ([`cuadratura-panel.tsx`](../../components/dilesa/cuadratura-panel.tsx)) muestra la resolución (\_Absorbido por DILESA (NC)* / _Por cobrar (pagaré)_) en vez de la nota suave; cableado en la pestaña Cuadratura del expediente. La **NC sigue derivada** (sin cambios de aritmética). 6/6 checks de CI verdes locales (2069 tests; +3 asserts del flag: Juan Antonio 792 → true, Ruben 1 → false, MAYRA 0 → false). **La migración NO está aplicada a prod** (el código rompe en prod sin las columnas → PR **sin auto-merge**, pendiente OK de Beto para `db push` + revisión del Preview). **Decisión de alcance de S1:** "Cobrar" registra la decisión (rastro + gate); el **pagaré formal** con monto/plan/tasas para un residual de **precio** queda para S2, porque reusar `<CreditoDirectoCaptura>` tal cual conflictúa con la asignación gastos↔precio del motor — no se rushea sobre la cuadratura que ya cuadra. Sigue: aplicar migración + Sprint 2 (reconciliación de la NC en F13 + addendum a ADR-048).
 
 ## Decisiones registradas
 

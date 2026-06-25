@@ -37,6 +37,14 @@ export type CuadraturaPanelProps = {
    * derivada de él; aquí solo define la etiqueta «CFDI/requerida» vs «sugerido».
    */
   hayFacturaCfdi: boolean;
+  /**
+   * Resolución del saldo residual de precio (iniciativa `dilesa-saldos-residuales`):
+   * cuando hay residual, Dirección decide en la dictaminación cobrarlo (pagaré) o
+   * absorberlo (nota de crédito). `null`/sin resolución ⇒ el panel muestra la nota
+   * pendiente. NO cambia ningún número (la NC sigue derivada); solo la etiqueta del
+   * "Saldo por cubrir".
+   */
+  saldoResidual?: { resolucion: 'cobrar' | 'absorber' | null; monto: number | null } | null;
 };
 
 export function CuadraturaPanel({
@@ -44,6 +52,7 @@ export function CuadraturaPanel({
   valorEscrituracion,
   chequeCapturado,
   hayFacturaCfdi,
+  saldoResidual,
 }: CuadraturaPanelProps) {
   // Cobertura del presupuesto notarial COMPLETO: el motor (`coberturaGastos`) ya
   // trae todos los componentes y el saldo — fuente única, el panel no recalcula.
@@ -53,6 +62,26 @@ export function CuadraturaPanel({
   // Fuente única en el motor (`cuadratura.ts`) — no recalcular aquí (lo mismo que
   // muestra el mini-resumen de la cabecera).
   const saldoPrecioPorCubrir = c.saldoPrecioPorCubrir ?? 0;
+  // Resolución del residual (iniciativa dilesa-saldos-residuales): si Dirección ya
+  // lo cobró (pagaré) o absorbió (NC) en la dictaminación, la etiqueta lo refleja
+  // en vez de la nota suave "lo absorbe el bono". No cambia ningún monto.
+  const resolucion = saldoResidual?.resolucion ?? null;
+  const saldoCubierto = saldoPrecioPorCubrir <= 0.5;
+  const saldoLabel = saldoCubierto
+    ? '(=) Precio cubierto ✓'
+    : resolucion === 'absorber'
+      ? '(=) Absorbido por DILESA (nota de crédito)'
+      : resolucion === 'cobrar'
+        ? '(=) Por cobrar (pagaré)'
+        : '(=) Saldo por cubrir';
+  const saldoTone: 'ok' | 'warn' = saldoCubierto || resolucion === 'absorber' ? 'ok' : 'warn';
+  const saldoNota = saldoCubierto
+    ? 'El precio queda cubierto entre el crédito y el enganche; los gastos de escrituración se desglosan abajo.'
+    : resolucion === 'absorber'
+      ? 'DILESA absorbe este saldo con una nota de crédito (autorizada por Dirección). Ya entra al descuento de la operación; la NC se emite al facturar.'
+      : resolucion === 'cobrar'
+        ? 'El cliente cubre este saldo con un pagaré (autorizado por Dirección).'
+        : 'Saldo pendiente del cliente. En la dictaminación, Dirección lo resuelve: cobrarlo (pagaré) o absorberlo (nota de crédito). Los gastos de escrituración se desglosan abajo.';
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (
@@ -141,18 +170,12 @@ export function CuadraturaPanel({
               />
               <div className="my-1 border-t border-[var(--border)]" />
               <Fila
-                label={
-                  saldoPrecioPorCubrir > 0.5 ? '(=) Saldo por cubrir' : '(=) Precio cubierto ✓'
-                }
+                label={saldoLabel}
                 value={money(saldoPrecioPorCubrir)}
                 strong
-                tone={saldoPrecioPorCubrir > 0.5 ? 'warn' : 'ok'}
+                tone={saldoTone}
               />
-              <p className="mt-1 text-[11px] text-[var(--text)]/45">
-                {saldoPrecioPorCubrir > 0.5
-                  ? 'Saldo pendiente del cliente. Si no lo completa antes de escriturar, lo absorbe el bono de DILESA (entra al descuento de la operación). Los gastos de escrituración se desglosan abajo.'
-                  : 'El precio queda cubierto entre el crédito y el enganche; los gastos de escrituración se desglosan abajo.'}
-              </p>
+              <p className="mt-1 text-[11px] text-[var(--text)]/45">{saldoNota}</p>
             </>
           ) : (
             <>
