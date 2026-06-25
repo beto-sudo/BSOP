@@ -7,7 +7,7 @@
 **Dueño:** Beto
 **Creada:** 2026-06-25
 **Última actualización:** 2026-06-25
-**Próximo hito:** Sprint 4 — capturar `contenido`/`unidad_base` de los 31 insumos (lista validada por Beto) + corrección del stock histórico (UI de captura ya lista, PR Sprint 3)
+**Próximo hito:** Sprint 4 — Grupo 3 (12 insumos, espera desglose de Pablo) + corrección del stock histórico con OK de Beto (Grupos 1 y 2, 19 insumos, ya cargados a prod)
 
 > Promovida el 2026-06-25. Beto detectó que el descuento de inventario por
 > receta no podía saber cuántos mililitros tiene una botella si el "980ml"
@@ -228,3 +228,24 @@ receta mostrando cuánto descuenta cada insumo, con aviso ámbar cuando falta el
 contenido. 6 checks de CI en verde. PR **sin auto-merge** (UI visible): Beto
 revisa el Vercel Preview y mergea. Sigue el Sprint 4 (lista de 31 + corrección
 histórica), que necesita su validación.
+
+### 2026-06-25 · Sprint 4 (parte 1) — Backfill Grupos 1 y 2 cargado a prod
+
+Con OK de Beto, `UPDATE erp.productos` directo a prod (data-fix, no migración —
+los productos solo existen en RDB). Verificado que los 19 ya convierten
+(`fn_factor_receta_a_stock` ≠ NULL):
+
+- **Grupo 1 — contenido del nombre (4):** Bacardi Botella 980ml (980 ml), Agua
+  Peñafiel 2 l (2000 ml), Coca 2.5 l (2500 ml), Bolsa de hielo 25 kilos
+  (25000 g). `unidad_base` + `contenido` poblados; `unidad` de compra sin cambio.
+- **Grupo 2 — granel `pieza` → `kilo` (15):** Bistec, Carne molida, Carne para
+  dehebrar, Carne pastor, Cebolla, Cilantro, Jitomate, Lechuga, Papas, Papas a
+  la francesa, Queso oaxaca, Queso panela, Queso tipo americano, Quso chedar,
+  Sal. Conversión universal g→kg (factor 0.001), sin `contenido`. El stock de
+  estos se cuenta ahora en kilos.
+
+**Pendientes del Sprint 4:** Grupo 3 (12 insumos: embotellados sin contenido en
+el nombre + cremas/mayonesa + las 2 inconsistentes Salsa serrano / Patuchela)
+espera el desglose que Pablo pasará a Beto. Esos 12 siguen con factor NULL (no
+descuentan, sin sangrar). **Corrección del stock histórico** (movimientos mal
+descontados desde 2026-06-17) pendiente de OK explícito de Beto.
