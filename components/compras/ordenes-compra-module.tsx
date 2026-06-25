@@ -43,7 +43,7 @@ import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { RowActions } from '@/components/shared/row-actions';
+import { RowQuickActions } from '@/components/shared/row-quick-actions';
 import {
   Dialog,
   DialogContent,
@@ -787,73 +787,74 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
             type: 'custom' as const,
             sortable: false,
             align: 'right' as const,
-            width: 'w-12',
+            width: 'min-w-[104px]',
             render: (r: OcRow) => (
-              <RowActions
-                ariaLabel={`Acciones para ${r.codigo}`}
-                onDelete={
-                  r.estado === 'borrador' || r.estado === 'enviada'
-                    ? {
-                        onConfirm: async (motivo) => {
-                          await cancelar(r, motivo ?? '');
-                        },
-                        label: 'Cancelar OC',
-                        confirmTitle: `¿Cancelar ${r.codigo}?`,
-                        confirmDescription:
-                          'La orden quedará cancelada y dejará de comprometer presupuesto.',
-                        confirmLabel: 'Cancelar OC',
-                        requireMotivo: true,
-                      }
-                    : undefined
-                }
-              >
-                <a
-                  href={`/api/dilesa/ordenes-compra/${r.id}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                >
-                  <FileDown className="h-3.5 w-3.5" /> Imprimir OC
-                </a>
-                {r.proveedorId ? (
-                  <button
-                    type="button"
-                    onClick={() => setEnviarOcRow(r)}
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                  >
-                    <Mail className="h-3.5 w-3.5" /> Enviar al proveedor
-                  </button>
-                ) : null}
-                {r.estado === 'borrador' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => abrirEdicionOc(r)}
-                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Editar borrador
-                    </button>
-                    {esDireccion ? (
-                      <button
-                        type="button"
-                        onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
-                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                      >
-                        <Send className="h-3.5 w-3.5" /> Marcar enviada
-                      </button>
-                    ) : null}
-                  </>
-                ) : null}
-                {r.estado === 'enviada' || r.estado === 'parcial' ? (
-                  <button
-                    type="button"
-                    onClick={() => void cerrar(r)}
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
-                  >
-                    <X className="h-3.5 w-3.5" /> Cerrar orden
-                  </button>
-                ) : null}
-              </RowActions>
+              <RowQuickActions
+                quick={[
+                  {
+                    icon: <FileDown className="h-4 w-4" />,
+                    label: 'Imprimir OC',
+                    href: `/api/dilesa/ordenes-compra/${r.id}/pdf`,
+                  },
+                  {
+                    icon: <Mail className="h-4 w-4" />,
+                    label: 'Enviar al proveedor',
+                    onClick: () => setEnviarOcRow(r),
+                    hidden: !r.proveedorId,
+                  },
+                ]}
+                menu={{
+                  ariaLabel: `Más acciones para ${r.codigo}`,
+                  onDelete:
+                    r.estado === 'borrador' || r.estado === 'enviada'
+                      ? {
+                          onConfirm: async (motivo) => {
+                            await cancelar(r, motivo ?? '');
+                          },
+                          label: 'Cancelar OC',
+                          confirmTitle: `¿Cancelar ${r.codigo}?`,
+                          confirmDescription:
+                            'La orden quedará cancelada y dejará de comprometer presupuesto.',
+                          confirmLabel: 'Cancelar OC',
+                          requireMotivo: true,
+                        }
+                      : undefined,
+                  children:
+                    r.estado === 'borrador' || r.estado === 'enviada' || r.estado === 'parcial' ? (
+                      <>
+                        {r.estado === 'borrador' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicionOc(r)}
+                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                            >
+                              <Pencil className="h-3.5 w-3.5" /> Editar borrador
+                            </button>
+                            {esDireccion ? (
+                              <button
+                                type="button"
+                                onClick={() => void cambiarEstado(r, 'enviada', 'Orden enviada')}
+                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                              >
+                                <Send className="h-3.5 w-3.5" /> Marcar enviada
+                              </button>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {r.estado === 'enviada' || r.estado === 'parcial' ? (
+                          <button
+                            type="button"
+                            onClick={() => void cerrar(r)}
+                            className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
+                          >
+                            <X className="h-3.5 w-3.5" /> Cerrar orden
+                          </button>
+                        ) : null}
+                      </>
+                    ) : undefined,
+                }}
+              />
             ),
           },
         ]

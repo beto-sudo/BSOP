@@ -1,7 +1,7 @@
 # ADR-049 — Exposición de acciones: visibles en la fila, posición en el drawer, y guard (AE1-AE5)
 
-- **Status**: Proposed
-- **Date**: 2026-06-25
+- **Status**: Accepted
+- **Date**: 2026-06-25 (aprobado por Beto; default de visibilidad = iconos con tooltip)
 - **Authors**: Beto, Claude Code
 - **Companion to**: [ADR-044](./044_detalle_con_set_completo_de_acciones.md) (el detalle expone el set completo), [ADR-018](./018_drawer_anatomy.md)/[ADR-026](./026_drawer_anatomy_polish.md) (anatomía del drawer), [ADR-010](./010_data_table.md) (DataTable)
 - **Iniciativa**: `ux-consolidacion`

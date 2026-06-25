@@ -4,10 +4,10 @@
 **Empresas:** todas (cross-empresa por diseño)
 **Schemas afectados:** principalmente UI (Next.js); lectura — sin cambios de schema salvo vistas para paginación/perf (`v_ventas_lista` y similares)
 **Estado:** in_progress
-**Próximo hito:** Beto revisa el Vercel Preview del switcher de empresa (Sprint Sidebar foco) y mergea; decidir si se suma el peek por hover en desktop. Luego elegir el siguiente sprint (Cmd+K es el quick-win de mayor apalancamiento).
+**Próximo hito:** **Sprint «Exposición de acciones» (ADR-049) arrancado**: primitivo `<RowQuickActions>` + adopción en Compras (Imprimir/Enviar/Generar visibles, ya no en el ⋯) en revisión de Beto. Sigue: emparejar drawers (workflow→footer, utilidades→header) + guard, luego rollout + migrar los ~15 módulos de nombres a `v_usuarios_directorio`. (En paralelo, pendiente de Beto: switcher de empresa del Sprint Sidebar foco.)
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-06-21 (arranca el Sprint «Sidebar con foco contextual» — switcher de empresa que reemplaza los toggles manuales de visibilidad)
+**Última actualización:** 2026-06-25 (arranca el Sprint «Exposición de acciones» — ADR-049: acciones primarias visibles en la fila + posición pareja en drawers + guard)
 
 ## Problema
 
@@ -60,5 +60,6 @@ Y un puñado de **fixes de performance de alto ROI** que tocan la misma superfic
 
 ## Bitácora
 
+- **2026-06-25** — Arranca el Sprint «Exposición de acciones» (ADR-049). Primitivo `<RowQuickActions>` (`components/shared/row-quick-actions.tsx`): 1-3 acciones primarias visibles como iconos con tooltip + el ⋯ con el resto. Adoptado en Compras — Órdenes (Imprimir/Enviar visibles) y Requisiciones (Generar OC/Pedir RFQ visibles) — resuelve la queja de Beto ("los 3 puntitos quedan muy escondidos"). ADR-049 aceptado (default: iconos con tooltip). Detonante: feedback de Beto sobre Compras + barrido con 2 agentes. Sin schema. PR sin auto-merge. Sigue: emparejar drawers (header/footer) + guard, luego rollout + migrar nombres a `v_usuarios_directorio`.
 - **2026-06-21** — Arranca el Sprint «Sidebar con foco contextual». Switcher de empresa (`components/app-shell/empresa-switcher.tsx`) + `NavIcon` extraído a `nav-icon.tsx` + helpers puros `isEmpresaNavItem`/`getActiveEmpresaHref` (con tests) + sidebar refactorizado a foco (Inicio + empresa activa + Configuración) + panel «Modo presentación» (`modo-presentacion-panel.tsx`, reemplaza `visibilidad-sidebar-panel.tsx`). Sin schema. PR a Preview sin auto-merge para revisión visual de Beto.
 - **2026-06-12** — Promovida desde la revisión general 2026-06-12 (dimensiones ui-ux + performance). El reporte identificó `cxp-facturas-module` como best-in-class a canonizar y juntas/cobranza/fases de captura como mayor drift.
