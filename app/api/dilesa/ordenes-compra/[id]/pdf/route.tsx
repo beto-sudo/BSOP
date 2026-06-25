@@ -12,6 +12,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { OrdenCompraPDF, type OrdenCompraPdfData } from '@/lib/dilesa/pdf/orden-compra';
 import { formatCurrency } from '@/lib/format';
+import { getDefinitionBySlug, renderSubject, writeNotificationLog } from '@/lib/notifications';
 
 const MESES_ES = [
   'Enero',
@@ -48,7 +49,7 @@ type Sb = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 async function buildPdfData(
   sb: Sb,
   ocId: string
-): Promise<{ data?: OrdenCompraPdfData; error?: string }> {
+): Promise<{ data?: OrdenCompraPdfData; proveedorEmail?: string | null; error?: string }> {
   const { data: oc, error } = await sb
     .schema('erp')
     .from('ordenes_compra')
@@ -81,6 +82,7 @@ async function buildPdfData(
   let proveedorNombre = '(proveedor por definir)';
   let proveedorRfc: string | null = null;
   let proveedorDomicilio: string | null = null;
+  let proveedorEmail: string | null = null;
   if (oc.proveedor_id) {
     const { data: prov } = await sb
       .schema('erp')
@@ -94,7 +96,7 @@ async function buildPdfData(
         sb
           .schema('erp')
           .from('personas')
-          .select('nombre, apellido_paterno, apellido_materno, rfc')
+          .select('nombre, apellido_paterno, apellido_materno, rfc, email')
           .eq('id', personaId)
           .maybeSingle(),
         sb
@@ -114,6 +116,7 @@ async function buildPdfData(
           .trim() ||
         '(sin nombre)';
       proveedorRfc = (per?.rfc as string | null) ?? null;
+      proveedorEmail = (per?.email as string | null) ?? null;
       const dom = [
         [fisc?.domicilio_calle, fisc?.domicilio_num_ext].filter(Boolean).join(' '),
         fisc?.domicilio_colonia,
@@ -184,7 +187,7 @@ async function buildPdfData(
     lineas,
     totalTexto: formatCurrency(total),
   };
-  return { data };
+  return { data, proveedorEmail };
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -203,6 +206,135 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       'Cache-Control': 'no-store',
     },
   });
+}
+
+/**
+ * POST /api/dilesa/ordenes-compra/[id]/pdf
+ *   body { to?: string } → envía la OC en PDF por email al proveedor (Resend).
+ *   Si no se pasa `to`, usa el email del proveedor (erp.personas.email).
+ *
+ * Acción reintentable e independiente del estado: enviar el documento no cambia
+ * el estado de la OC (eso lo gobierna "Marcar enviada"). Fail-open en el catálogo
+ * de notificaciones (slug `dilesa_orden_compra`): sin definición usa defaults.
+ */
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = (await req.json().catch(() => ({}))) as { to?: string };
+  const sb = await createSupabaseServerClient();
+  const result = await buildPdfData(sb, id);
+  if (result.error || !result.data) {
+    return NextResponse.json({ error: result.error ?? 'Error' }, { status: 404 });
+  }
+  const data = result.data;
+
+  const to = body.to?.trim() || result.proveedorEmail;
+  if (!to) {
+    return NextResponse.json(
+      {
+        error:
+          'El proveedor no tiene email registrado. Captúralo en el proveedor o reenvía con un correo.',
+      },
+      { status: 400 }
+    );
+  }
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return NextResponse.json({ error: 'RESEND_API_KEY no configurada' }, { status: 500 });
+  }
+
+  // Catálogo de notificaciones (fail-open: sin definición usa defaults).
+  const def = await getDefinitionBySlug(sb, 'dilesa_orden_compra');
+  let fromAddress = 'DILESA Compras <noreply@bsop.io>';
+  let replyTo: string | null = 'compras@dilesa.mx';
+  const toList = [to];
+  if (def) {
+    if (!def.activo) {
+      await writeNotificationLog(sb, {
+        definitionId: def.id,
+        status: 'skipped',
+        recipients: { to: toList },
+        subject: `dilesa_orden_compra ${data.folio} — kill switch`,
+        context: { ordenCompraId: id },
+      });
+      return NextResponse.json({ ok: true, skipped: true, reason: 'kill_switch' });
+    }
+    fromAddress = def.from_name ? `${def.from_name} <${def.from_email}>` : def.from_email;
+    replyTo = def.reply_to;
+  }
+
+  const buf = await renderToBuffer(<OrdenCompraPDF data={data} />);
+  const base64 = buf.toString('base64');
+  const subject = renderSubject(def?.subject_template ?? 'Orden de compra {folio} — DILESA', {
+    folio: data.folio,
+  });
+
+  const html = `
+<div style="font-family: -apple-system, sans-serif; color: #222; max-width: 600px;">
+  <h2 style="color: #7d8043;">Orden de compra ${data.folio}</h2>
+  <p>Estimado proveedor (${data.proveedorNombre}),</p>
+  <p>
+    Adjuntamos la orden de compra <strong>${data.folio}</strong> para el proyecto
+    <strong>${data.proyecto}</strong>, con los conceptos, cantidades y precios acordados.
+  </p>
+  <p>
+    Favor de referir el folio en su factura y remisión. Total (IVA incluido):
+    <strong>${data.totalTexto}</strong>.
+  </p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+  <p style="color: #888; font-size: 11px;">
+    DILESA · Desarrollo Inmobiliario Los Encinos<br/>
+    dilesa.mx · (878) 791-1818
+  </p>
+</div>`.trim();
+
+  const resendBody: Record<string, unknown> = {
+    from: fromAddress,
+    to: toList,
+    subject,
+    html,
+    attachments: [{ filename: `orden-compra-${data.folio}.pdf`, content: base64 }],
+  };
+  if (replyTo) resendBody.reply_to = replyTo;
+
+  const emailRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(resendBody),
+  });
+  const resJson = (await emailRes.json()) as { id?: string; message?: string };
+
+  if (!emailRes.ok) {
+    console.error('[ordenes-compra/pdf POST] Resend rechazó el envío', {
+      ordenCompraId: id,
+      to,
+      status: emailRes.status,
+      resendError: resJson,
+    });
+    await writeNotificationLog(sb, {
+      definitionId: def?.id ?? null,
+      status: 'failed',
+      recipients: { to: toList },
+      subject,
+      errorMessage: `Resend ${emailRes.status}: ${JSON.stringify(resJson).slice(0, 800)}`,
+      context: { ordenCompraId: id, folio: data.folio },
+    });
+    return NextResponse.json(
+      { error: resJson.message ?? 'Error al enviar email', detail: resJson },
+      { status: 500 }
+    );
+  }
+
+  await writeNotificationLog(sb, {
+    definitionId: def?.id ?? null,
+    status: 'sent',
+    recipients: { to: toList },
+    subject,
+    resendId: resJson.id ?? null,
+    context: { ordenCompraId: id, folio: data.folio },
+  });
+
+  return NextResponse.json({ ok: true, emailId: resJson.id, sentTo: to });
 }
 
 export const runtime = 'nodejs';
