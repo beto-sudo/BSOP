@@ -1891,6 +1891,10 @@ _(sin columnas)_
 - **fecha_desasignacion** `date`
 - **sobreprecio_gastos_escrituracion** `numeric` NOT NULL DEFAULT `0`
 - **precio_documentos_firmados** `numeric`
+- **saldo_residual_resolucion** `text`
+- **saldo_residual_monto** `numeric`
+- **saldo_residual_autorizado_por** `uuid`
+- **saldo_residual_at** `timestamp with time zone`
 
 ---
 
