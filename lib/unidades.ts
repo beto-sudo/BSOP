@@ -19,6 +19,7 @@ export const UNIDADES: UnidadOption[] = [
   { value: 'gramo', label: 'Gramo (g)' },
   { value: 'litro', label: 'Litro (L)' },
   { value: 'mililitro', label: 'Mililitro (ml)' },
+  { value: 'onza', label: 'Onza fluida (oz)' },
   { value: 'caja', label: 'Caja' },
   { value: 'paquete', label: 'Paquete' },
   { value: 'bolsa', label: 'Bolsa' },
@@ -56,6 +57,7 @@ type DimUnidad = 'V' | 'M'; // Volumen | Masa
 const PESO_POR_UNIDAD: Record<string, { dim: DimUnidad; peso: number }> = {
   mililitro: { dim: 'V', peso: 1 },
   litro: { dim: 'V', peso: 1000 },
+  onza: { dim: 'V', peso: 29.5735 }, // onza fluida US
   galon: { dim: 'V', peso: 3785.412 },
   gramo: { dim: 'M', peso: 1 },
   kilo: { dim: 'M', peso: 1000 },
