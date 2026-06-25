@@ -10,9 +10,12 @@
  * Captura:
  *   - `monto_avaluo` → monto dictaminado por la casa valuadora
  *   - `fecha_avaluo_cerrado` → fecha del cierre (default hoy)
- *   - Doc requerido: rol `avaluo_comercial` (PDF firmado por el
- *     valuador). Coincide con `FASE_ROLES[5]` en el
- *     detalle de venta.
+ *   - Docs requeridos (rol en `erp.adjuntos`, coinciden con `FASE_ROLES[5]`):
+ *       · `avaluo_comercial` — PDF firmado por el valuador (siempre).
+ *       · `orden_pago_seguro_calidad` — PDF de la orden de pago del seguro de
+ *         calidad (RUV). Solo Infonavit/Cofinavit (`requiereSeguroCalidad`).
+ *       · `solicitud_pago_seguro_calidad` — imagen de la solicitud de pago del
+ *         seguro (trae la referencia de la vivienda). Solo Infonavit/Cofinavit.
  *
  * Captura colaborativa (Sprint 4b de `dilesa-ventas-captura-colaborativa`):
  * el documento persiste AL SUBIRSE con quién/cuándo; el cierre valida contra
@@ -42,10 +45,7 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
-
-const SLOTS_F5: SlotColaborativo[] = [
-  { rol: 'avaluo_comercial', label: 'Avalúo Comercial firmado por el valuador', requerido: true },
-];
+import { requiereSeguroCalidad } from '@/lib/dilesa/captura/fase-roles';
 
 type VentaCtx = {
   id: string;
@@ -53,6 +53,7 @@ type VentaCtx = {
   unidad_id: string | null;
   monto_avaluo: number | null;
   valuador_id: string | null;
+  tipo_credito: string | null;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -83,7 +84,35 @@ function CapturarFase5Body() {
   const [fase4Cerrada, setFase4Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_F5);
+  // Slots por tipo de crédito: el avalúo va siempre; los 2 del seguro de
+  // calidad (RUV) solo se exigen en Infonavit/Cofinavit. La longitud del array
+  // cambia con `tipo_credito`, así que el hook recalcula `faltantes` al cargar
+  // la venta (su `slotsKey` se llavea por los roles presentes).
+  const slotsF5 = useMemo<SlotColaborativo[]>(() => {
+    const slots: SlotColaborativo[] = [
+      {
+        rol: 'avaluo_comercial',
+        label: 'Avalúo Comercial firmado por el valuador',
+        requerido: true,
+      },
+    ];
+    if (requiereSeguroCalidad(venta?.tipo_credito ?? null)) {
+      slots.push(
+        {
+          rol: 'orden_pago_seguro_calidad',
+          label: 'Orden de pago del seguro de calidad (PDF)',
+          requerido: true,
+        },
+        {
+          rol: 'solicitud_pago_seguro_calidad',
+          label: 'Solicitud de pago del seguro de calidad (referencia de la vivienda)',
+          requerido: true,
+        }
+      );
+    }
+    return slots;
+  }, [venta?.tipo_credito]);
+  const docsFase = useDocsFaseColaborativos(ventaId, slotsF5);
   const [montoAvaluo, setMontoAvaluo] = useState<string>('');
   const [fechaAvaluo, setFechaAvaluo] = useState<string>(new Date().toISOString().slice(0, 10));
 
@@ -103,7 +132,7 @@ function CapturarFase5Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, persona_id, unidad_id, monto_avaluo, valuador_id')
+        .select('id, persona_id, unidad_id, monto_avaluo, valuador_id, tipo_credito')
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -167,9 +196,10 @@ function CapturarFase5Body() {
       e.preventDefault();
       if (!venta) return;
       if (docsFase.faltantes.length > 0) {
+        const faltan = docsFase.faltantes.map((rol) => docsFase.labelDe(rol)).join(', ');
         toast.add({
-          title: 'Falta el documento del avalúo',
-          description: 'Sube el PDF del avalúo comercial — queda guardado al subirlo.',
+          title: docsFase.faltantes.length === 1 ? 'Falta un documento' : 'Faltan documentos',
+          description: `Sube en el expediente: ${faltan}. Quedan guardados al subirlos.`,
           type: 'error',
         });
         return;
@@ -216,7 +246,7 @@ function CapturarFase5Body() {
       });
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [docsFase.faltantes, fechaAvaluo, montoAvaluo, router, sb, toast, venta]
+    [docsFase, fechaAvaluo, montoAvaluo, router, sb, toast, venta]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -282,7 +312,7 @@ function CapturarFase5Body() {
             </div>
           ) : null}
 
-          <DocsFaseSection state={docsFase} titulo="Documento del avalúo" />
+          <DocsFaseSection state={docsFase} titulo="Documentos" />
 
           <Section title="Datos del avalúo">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
