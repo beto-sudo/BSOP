@@ -92,6 +92,72 @@ describe('parseCfdiXml — CFDI 4.0 con IVA 16%', () => {
     expect(r.fecha).toBe('2026-01-15');
     expect(r.version).toBe('4.0');
   });
+  it('extrae serie/folio, régimen del emisor y fecha+hora de timbrado', () => {
+    expect(r.serie).toBe('A');
+    expect(r.folio).toBe('1234');
+    expect(r.regimenFiscalEmisor).toBe('601');
+    expect(r.fechaTimbrado).toBe('2026-01-15T10:31:00');
+  });
+  it('extrae los conceptos (líneas) del comprobante', () => {
+    expect(r.conceptos).toHaveLength(1);
+    expect(r.conceptos[0]).toMatchObject({
+      claveProdServ: '01010101',
+      descripcion: 'Servicio',
+      cantidad: 1,
+      valorUnitario: 1000,
+      importe: 1000,
+    });
+    // Atributos opcionales ausentes → null / 0, no undefined.
+    expect(r.conceptos[0].unidad).toBeNull();
+    expect(r.conceptos[0].noIdentificacion).toBeNull();
+    expect(r.conceptos[0].descuento).toBe(0);
+  });
+  it('moneda MXN → sin tipo de cambio y sin descuento global', () => {
+    expect(r.moneda).toBe('MXN');
+    expect(r.tipoCambio).toBeNull();
+    expect(r.descuento).toBe(0);
+  });
+});
+
+// Importación en USD, varias líneas con unidad/SKU/descuento + descuento global.
+const CFDI_40_USD_MULTILINEA = `<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+  Version="4.0" Serie="IMP" Folio="700" Fecha="2026-04-10T08:00:00" LugarExpedicion="26000"
+  SubTotal="3000.00" Descuento="100.00" Total="3364.00" Moneda="USD" TipoCambio="17.20"
+  FormaPago="03" MetodoPago="PPD" TipoDeComprobante="I">
+  <cfdi:Emisor Rfc="EXT990101AB1" Nombre="Global Supplier Inc" RegimenFiscal="601"/>
+  <cfdi:Receptor Rfc="DIE030904866" Nombre="DESARROLLO INMOBILIARIO" UsoCFDI="G01"/>
+  <cfdi:Conceptos>
+    <cfdi:Concepto ClaveProdServ="31161500" NoIdentificacion="SKU-1" Cantidad="2" ClaveUnidad="H87" Unidad="Pieza" Descripcion="Rodamiento" ValorUnitario="1000.00" Importe="2000.00" Descuento="100.00"/>
+    <cfdi:Concepto ClaveProdServ="31162800" Cantidad="10" ClaveUnidad="H87" Unidad="Pieza" Descripcion="Tornillo" ValorUnitario="100.00" Importe="1000.00"/>
+  </cfdi:Conceptos>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital UUID="abcdef00-1111-2222-3333-444455556666" FechaTimbrado="2026-04-10T08:05:00"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>`;
+
+describe('parseCfdiXml — USD multilínea con descuentos', () => {
+  const r = parseCfdiXml(CFDI_40_USD_MULTILINEA);
+  it('moneda extranjera conserva el tipo de cambio y el descuento global', () => {
+    expect(r.moneda).toBe('USD');
+    expect(r.tipoCambio).toBe(17.2);
+    expect(r.descuento).toBe(100);
+    expect(r.lugarExpedicion).toBe('26000');
+  });
+  it('extrae cada línea con unidad, clave de unidad, SKU y descuento de línea', () => {
+    expect(r.conceptos).toHaveLength(2);
+    expect(r.conceptos[0]).toMatchObject({
+      noIdentificacion: 'SKU-1',
+      cantidad: 2,
+      unidad: 'Pieza',
+      claveUnidad: 'H87',
+      descripcion: 'Rodamiento',
+      importe: 2000,
+      descuento: 100,
+    });
+    expect(r.conceptos[1].descripcion).toBe('Tornillo');
+    expect(r.conceptos[1].descuento).toBe(0);
+  });
 });
 
 describe('parseCfdiXml — retenciones de servicios profesionales', () => {
@@ -115,6 +181,10 @@ describe('parseCfdiXml — frontera 8% sin timbrar', () => {
   it('receptorNombre null cuando no viene', () => {
     expect(r.receptorNombre).toBeNull();
     expect(r.emisorRfc).toBe('BBB020202BB2');
+  });
+  it('sin timbre → fechaTimbrado null; sin nodo Conceptos → lista vacía', () => {
+    expect(r.fechaTimbrado).toBeNull();
+    expect(r.conceptos).toEqual([]);
   });
 });
 
