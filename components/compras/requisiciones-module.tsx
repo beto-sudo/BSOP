@@ -608,6 +608,30 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       if (accionId) return;
       setAccionId(req.id);
       const sb = createSupabaseBrowserClient();
+      // Candado (pulido del flujo): UNA cotización por requisición. Si ya existe
+      // una activa (cualquier estado salvo cancelada), abrir ESA en vez de crear
+      // otra — evita las RFQs duplicadas que ensuciaban el hilo del gasto. Para
+      // comparar más proveedores, se agregan a la misma RFQ.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existente } = await (sb.schema('erp') as any)
+        .from('cotizaciones')
+        .select('id, codigo')
+        .eq('requisicion_id', req.id)
+        .neq('estado', 'cancelada')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (existente?.id) {
+        setAccionId(null);
+        toast.add({
+          title: 'Esta requisición ya tiene cotización',
+          description: `Abriendo ${existente.codigo ?? 'la cotización'} — agrega proveedores ahí en vez de crear otra.`,
+          type: 'info',
+        });
+        router.push(`/dilesa/compras/cotizaciones?focus=${existente.id}`);
+        return;
+      }
       const folio = `RFQ-${Date.now().toString(36).toUpperCase()}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cotResp = await (sb.schema('erp') as any)
