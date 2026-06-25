@@ -15,7 +15,12 @@ import { Combobox } from '@/components/ui/combobox';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { RefreshCw, Search, Settings2, Save, X, BarChart3 } from 'lucide-react';
 import { upsertReceta, updateCategoria } from './actions';
-import { UNIDAD_DEFAULT, unidadOptions, factorRecetaAStock } from '@/lib/unidades';
+import {
+  UNIDAD_DEFAULT,
+  unidadOptions,
+  factorRecetaAStock,
+  rendimientoServir,
+} from '@/lib/unidades';
 
 const RDB_EMPRESA_ID = 'e52ac307-9373-4115-b65e-1178f0c4e1aa';
 
@@ -870,6 +875,16 @@ export default function ProductosPage() {
                           en {formUnidadBase} descontarán la fracción correcta.
                         </p>
                       )}
+                      {(() => {
+                        const r = rendimientoServir(Number(formContenido), formUnidadBase);
+                        if (!r) return null;
+                        return (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Rinde: {formatNumber(r.onzas, { decimals: 0 })} oz ·{' '}
+                            {formatNumber(r.copas, { decimals: 0 })} copas
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
 

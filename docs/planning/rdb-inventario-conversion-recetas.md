@@ -7,7 +7,7 @@
 **Dueño:** Beto
 **Creada:** 2026-06-25
 **Última actualización:** 2026-06-25
-**Próximo hito:** Sprint 4 — Grupo 3 (12 insumos, espera desglose de Pablo) + corrección del stock histórico con OK de Beto (Grupos 1 y 2, 19 insumos, ya cargados a prod)
+**Próximo hito:** corrección del stock histórico (con OK de Beto); del Grupo 3 restan las salsas/cremas de cocina (Pablo cubrió las botellas del bar; onza/copa + rendimiento ya en prod)
 
 > Promovida el 2026-06-25. Beto detectó que el descuento de inventario por
 > receta no podía saber cuántos mililitros tiene una botella si el "980ml"
@@ -249,3 +249,18 @@ el nombre + cremas/mayonesa + las 2 inconsistentes Salsa serrano / Patuchela)
 espera el desglose que Pablo pasará a Beto. Esos 12 siguen con factor NULL (no
 descuentan, sin sangrar). **Corrección del stock histórico** (movimientos mal
 descontados desde 2026-06-17) pendiente de OK explícito de Beto.
+
+### 2026-06-25 · Sprint 4 (parte 2) — Botellas del bar (desglose de Pablo) + onza/copa + rendimiento
+
+Pablo pasó el contenido de las botellas del bar. Configuradas 16 botellas con
+`contenido` en ml (dato exacto; oz y copas se derivan) — el rendimiento del
+sistema coincide 1:1 con la tabla de Pablo. Creadas 2 que faltaban en el
+catálogo: "Bacardi Botella 750ml" (750 ml) y "Tradicional Reposado Botella
+950 ml" (950 ml), heredando categoría de su hermana. 28 de los tragos que las
+consumen ya tienen receta → descuentan al vender; 5 sin receta aún.
+
+Unidades nuevas: `onza` fluida (29.5735 ml, PR #1029) y `copa` (1.5 oz =
+44.36025 ml) en el catálogo + `erp.fn_factor_universal` (espejo TS/SQL). UI:
+"Rinde: X oz · Y copas" en la ficha de cada botella con contenido líquido
+(`rendimientoServir`). Duplicados de catálogo detectados (Etiqueta Negra ×2,
+Capitán Morgan ×2): ambos configurados, pendiente fusionarlos.
