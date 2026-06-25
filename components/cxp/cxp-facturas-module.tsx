@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ban, FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
+import { Ban, Check, Copy, FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
 
 import {
   ModuleFilters,
@@ -118,6 +118,34 @@ type PagoAplicado = {
 
 type Adjunto = { id: string; nombre: string; url: string; rol: string };
 
+/** Línea del CFDI parseada on-read por /api/<empresa>/cxp/facturas/<id>/cfdi. */
+type CfdiConcepto = {
+  claveProdServ: string | null;
+  noIdentificacion: string | null;
+  cantidad: number;
+  unidad: string | null;
+  claveUnidad: string | null;
+  descripcion: string;
+  valorUnitario: number;
+  importe: number;
+  descuento: number;
+};
+
+/** Delta del CFDI sobre lo que ya trae la fila de `erp.facturas`. */
+type FacturaCfdi = {
+  serie: string | null;
+  folio: string | null;
+  fechaTimbrado: string | null;
+  regimenFiscalEmisor: string | null;
+  lugarExpedicion: string | null;
+  tipoComprobante: string;
+  moneda: string;
+  tipoCambio: number | null;
+  descuento: number;
+  conceptos: CfdiConcepto[];
+  relacionados: { tipoRelacion: string | null; uuids: string[] }[];
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDate(value: string | null | undefined): string {
@@ -127,6 +155,51 @@ function formatDate(value: string | null | undefined): string {
   const d = new Date(`${value}T12:00:00`);
   if (isNaN(d.getTime())) return '—';
   return new Intl.DateTimeFormat('es-MX', { timeZone: TZ, dateStyle: 'medium' }).format(d);
+}
+
+/**
+ * Fecha + hora de timbrado. El atributo viene sin offset (hora local del SAT),
+ * así que troceamos el ISO en lugar de `new Date()` para no introducir corrimientos.
+ */
+function formatFechaHora(iso: string | null): string {
+  if (!iso) return '—';
+  const [d, t] = iso.split('T');
+  const fecha = formatDate(d);
+  const hhmm = t ? t.slice(0, 5) : '';
+  return hhmm ? `${fecha}, ${hhmm}` : fecha;
+}
+
+const TIPO_COMPROBANTE_LABEL: Record<string, string> = {
+  I: 'Ingreso',
+  E: 'Egreso (nota de crédito)',
+  P: 'Pago',
+  N: 'Nómina',
+  T: 'Traslado',
+};
+
+const TIPO_RELACION_LABEL: Record<string, string> = {
+  '01': 'Nota de crédito',
+  '02': 'Nota de débito',
+  '03': 'Devolución',
+  '04': 'Sustitución',
+  '05': 'Traslados previos',
+  '06': 'Factura por traslados',
+  '07': 'Aplicación de anticipo',
+};
+
+function tipoRelacionLabel(t: string | null): string {
+  if (!t) return 'Relacionado';
+  return TIPO_RELACION_LABEL[t] ? `${TIPO_RELACION_LABEL[t]} (${t})` : `Relación ${t}`;
+}
+
+/** Línea secundaria de un concepto: cantidad × valor unitario · claves SAT. */
+function formatConceptoMeta(c: CfdiConcepto): string {
+  const cant = c.unidad ? `${c.cantidad} ${c.unidad}` : String(c.cantidad);
+  const parts = [`${cant} × ${formatCurrency(c.valorUnitario)}`];
+  if (c.descuento > 0) parts.push(`desc. ${formatCurrency(c.descuento)}`);
+  if (c.claveProdServ) parts.push(c.claveProdServ);
+  if (c.noIdentificacion) parts.push(c.noIdentificacion);
+  return parts.join(' · ');
 }
 
 /** Etiqueta visible del proveedor: prefiere el nombre del emisor del CFDI. */
@@ -646,6 +719,8 @@ function FacturaDrawer({
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
+  const [cfdi, setCfdi] = useState<FacturaCfdi | null>(null);
+  const [cfdiLoading, setCfdiLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editPartida, setEditPartida] = useState(false);
   const [selProy, setSelProy] = useState('');
@@ -716,6 +791,33 @@ function FacturaDrawer({
       activo = false;
     };
   }, [open, factura]);
+
+  // Desglose del CFDI (conceptos + metadata fiscal) parseado on-read desde el
+  // XML en storage. Es opcional: si la factura no tiene XML o no parsea, el
+  // drawer simplemente no muestra el desglose (sin error ruidoso).
+  useEffect(() => {
+    if (!open || !factura) return;
+    let activo = true;
+    setCfdi(null);
+    setCfdiLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/${empresa}/cxp/facturas/${factura.id}/cfdi`);
+        if (!activo) return;
+        if (res.ok) {
+          const body = (await res.json()) as { cfdi: FacturaCfdi };
+          if (activo) setCfdi(body.cfdi);
+        }
+      } catch {
+        /* desglose opcional — silencioso */
+      } finally {
+        if (activo) setCfdiLoading(false);
+      }
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, factura, empresa]);
 
   // El xml_url de la factura puede ser un path de storage (Sprint 2) o estar
   // ausente; los adjuntos `cxp_factura` cubren ambos. Construir el link al
@@ -818,7 +920,19 @@ function FacturaDrawer({
                 Montos
               </div>
               <dl className="space-y-1">
+                {cfdi && cfdi.moneda !== 'MXN' && (
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Moneda</span>
+                    <span className="tabular-nums">
+                      {cfdi.moneda}
+                      {cfdi.tipoCambio ? ` · TC ${cfdi.tipoCambio}` : ''}
+                    </span>
+                  </div>
+                )}
                 <MoneyRow label="Subtotal" value={factura.subtotal} />
+                {cfdi && cfdi.descuento > 0 && (
+                  <MoneyRow label="Descuento" value={-cfdi.descuento} muted />
+                )}
                 <MoneyRow
                   label={`IVA${factura.tasa_iva != null ? ` (${factura.tasa_iva}%)` : ''}`}
                   value={factura.iva}
@@ -843,6 +957,37 @@ function FacturaDrawer({
                   </span>
                 </div>
               </dl>
+            </section>
+
+            {/* Conceptos (líneas del CFDI, parseadas on-read del XML) */}
+            <Separator />
+            <section className="space-y-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Conceptos
+              </div>
+              {cfdiLoading ? (
+                <p className="text-muted-foreground">Cargando…</p>
+              ) : !cfdi || cfdi.conceptos.length === 0 ? (
+                <p className="text-muted-foreground">
+                  {cfdi ? 'El CFDI no desglosa conceptos.' : 'Desglose no disponible (sin XML).'}
+                </p>
+              ) : (
+                <ul className="max-h-72 divide-y overflow-y-auto rounded-lg border">
+                  {cfdi.conceptos.map((c, i) => (
+                    <li key={`${c.claveProdServ ?? ''}-${i}`} className="px-3 py-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">{c.descripcion || '(sin descripción)'}</span>
+                        <span className="shrink-0 font-medium tabular-nums">
+                          {formatCurrency(c.importe)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {formatConceptoMeta(c)}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             {/* OC enlazada */}
@@ -1017,6 +1162,49 @@ function FacturaDrawer({
               )}
             </section>
 
+            {/* Comprobante: datos fiscales del CFDI (UUID copiable + metadata on-read) */}
+            <Separator />
+            <section className="space-y-2 text-sm">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comprobante
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div className="col-span-2">
+                  <CopyableField label="Folio fiscal (UUID)" value={factura.uuid_sat} />
+                </div>
+                {cfdi && (
+                  <>
+                    <Field
+                      label="Serie · Folio"
+                      value={[cfdi.serie, cfdi.folio].filter(Boolean).join(' · ') || '—'}
+                    />
+                    <Field label="Régimen emisor" value={cfdi.regimenFiscalEmisor ?? '—'} />
+                    <Field label="Timbrado" value={formatFechaHora(cfdi.fechaTimbrado)} />
+                    {cfdi.lugarExpedicion && (
+                      <Field label="Lugar exp. (CP)" value={cfdi.lugarExpedicion} mono />
+                    )}
+                    {cfdi.tipoComprobante && cfdi.tipoComprobante !== 'I' && (
+                      <Field
+                        label="Tipo"
+                        value={TIPO_COMPROBANTE_LABEL[cfdi.tipoComprobante] ?? cfdi.tipoComprobante}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+              {cfdi && cfdi.relacionados.length > 0 && (
+                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+                  <div className="font-medium text-foreground">CFDI relacionados</div>
+                  {cfdi.relacionados.map((rel, i) => (
+                    <div key={i} className="mt-1 text-muted-foreground">
+                      {tipoRelacionLabel(rel.tipoRelacion)}:{' '}
+                      <span className="break-all font-mono">{rel.uuids.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
             {/* Adjuntos */}
             {(xmlHref || pdfHref) && (
               <>
@@ -1093,6 +1281,46 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={mono ? 'font-mono text-sm' : 'text-sm'}>{value}</div>
+    </div>
+  );
+}
+
+/** Campo de solo lectura con botón para copiar el valor (UUID/folio fiscal). */
+function CopyableField({ label, value }: { label: string; value: string | null }) {
+  const feedback = useActionFeedback();
+  const [copied, setCopied] = useState(false);
+
+  if (!value) return <Field label={label} value="—" />;
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      feedback.success(`${label} copiado`);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      feedback.error('No se pudo copiar.');
+    }
+  };
+
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1.5">
+        <span className="break-all font-mono text-sm">{value}</span>
+        <button
+          type="button"
+          onClick={() => void copiar()}
+          aria-label={`Copiar ${label}`}
+          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-emerald-500" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
