@@ -644,7 +644,14 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       const sb = createSupabaseBrowserClient();
       const ahora = new Date().toISOString();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('erp') as any)
+      const erp = sb.schema('erp') as any;
+      // Lee la cotización ligada ANTES de cancelar (para reabrirla — pulido 5b).
+      const { data: ocRow } = await erp
+        .from('ordenes_compra')
+        .select('cotizacion_id')
+        .eq('id', oc.id)
+        .maybeSingle();
+      const { error: e } = await erp
         .from('ordenes_compra')
         .update({
           estado: 'cancelada',
@@ -661,7 +668,27 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
         });
         return false;
       }
-      toast.add({ title: 'Orden cancelada', description: oc.codigo, type: 'success' });
+      // Adjudicación reversible (pulido 5b): si la OC nació de una RFQ, reabre la
+      // cotización (vuelve a comparable) para re-adjudicar o cerrar — evita dejarla
+      // 'adjudicada' apuntando a una OC cancelada (huérfana, caso REQ-MQSAD18S).
+      const cotizacionId = ocRow?.cotizacion_id as string | null | undefined;
+      if (cotizacionId) {
+        await erp
+          .from('cotizaciones')
+          .update({ estado: 'comparada', adjudicado_proveedor_id: null, updated_at: ahora })
+          .eq('id', cotizacionId)
+          .eq('estado', 'adjudicada');
+        await erp
+          .from('cotizacion_proveedores')
+          .update({ estado: 'respondida' })
+          .eq('cotizacion_id', cotizacionId)
+          .in('estado', ['elegida', 'descartada']);
+      }
+      toast.add({
+        title: 'Orden cancelada',
+        description: cotizacionId ? `${oc.codigo} · su cotización se reabrió` : oc.codigo,
+        type: 'success',
+      });
       void cargar();
       return true;
     },
