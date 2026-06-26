@@ -40,6 +40,7 @@ import {
 } from '@/components/detail-page/detail-drawer';
 import { HiloGastoStepper } from '@/components/gasto/hilo-gasto-stepper';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -172,6 +173,8 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
   const [detalle, setDetalle] = useState<OcRow | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cancelarOcRow, setCancelarOcRow] = useState<OcRow | null>(null);
+  /** OC pendiente de confirmar cierre (evita cerrar/cancelar sin querer). */
+  const [cerrarOcRow, setCerrarOcRow] = useState<OcRow | null>(null);
   /** OC pendiente de confirmar envío por email al proveedor (acción externa). */
   const [enviarOcRow, setEnviarOcRow] = useState<OcRow | null>(null);
   const [enviandoEmail, setEnviandoEmail] = useState(false);
@@ -872,7 +875,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
                         {r.estado === 'enviada' || r.estado === 'parcial' ? (
                           <button
                             type="button"
-                            onClick={() => void cerrar(r)}
+                            onClick={() => setCerrarOcRow(r)}
                             className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--card)]"
                           >
                             <X className="h-3.5 w-3.5" /> Cerrar orden
@@ -1171,7 +1174,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           abrirEdicionOc(r);
         }}
         onMarcarEnviada={(r) => void cambiarEstado(r, 'enviada', 'Orden enviada')}
-        onCerrarOrden={(r) => void cerrar(r)}
+        onCerrarOrden={(r) => setCerrarOcRow(r)}
         onCancelar={(r) => setCancelarOcRow(r)}
         onEnviarEmail={(r) => setEnviarOcRow(r)}
       />
@@ -1189,6 +1192,43 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
           }}
         />
       ) : null}
+
+      {cerrarOcRow
+        ? (() => {
+            // Cerrar una OC sin nada recibido la marca como Cancelada. Lo tratamos
+            // como cancelación: pedimos motivo y usamos cancelar() (reabre su
+            // cotización), evitando dejarla huérfana. Con algo recibido es un
+            // cierre normal (congela el total en lo recibido).
+            const nadaRecibido = cerrarOcRow.lineas.every((l) => l.cantidadRecibida === 0);
+            return (
+              <ConfirmDialog
+                open
+                onOpenChange={(v) => {
+                  if (!v) setCerrarOcRow(null);
+                }}
+                confirmVariant={nadaRecibido ? 'destructive' : 'default'}
+                requireMotivo={nadaRecibido}
+                motivoPlaceholder="Motivo (ej. proveedor declinó, error de captura…)"
+                title={`¿Cerrar ${cerrarOcRow.codigo}?`}
+                description={
+                  nadaRecibido
+                    ? 'Esta orden no tiene nada recibido: cerrarla la deja como Cancelada y reabre su cotización para re-adjudicar. Indica el motivo.'
+                    : 'Se cancela lo pendiente por recibir y la orden queda Cerrada; el total a pagar se congela en lo ya recibido.'
+                }
+                confirmLabel={nadaRecibido ? 'Cerrar y cancelar' : 'Cerrar orden'}
+                onConfirm={async (motivo) => {
+                  if (nadaRecibido) {
+                    const ok = await cancelar(cerrarOcRow, motivo ?? '');
+                    if (ok) setDrawerOpen(false);
+                  } else {
+                    await cerrar(cerrarOcRow);
+                    setDrawerOpen(false);
+                  }
+                }}
+              />
+            );
+          })()
+        : null}
 
       {enviarOcRow ? (
         <Dialog open onOpenChange={(v) => !v && !enviandoEmail && setEnviarOcRow(null)}>
