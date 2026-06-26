@@ -356,11 +356,7 @@ export function CuadraturaPanel({
           label="Valor real venta Dilesa"
           value={money(c.valorRealVentaDilesa)}
           strong
-          formula={
-            c.tieneDesglose
-              ? 'detonación + enganche − cheque + pagaré'
-              : 'depósitos − cheque + pagaré'
-          }
+          formula="detonación + enganche − cheque + pagaré"
         />
         <Fila
           label={`Valor facturado ${hayFacturaCfdi ? '(CFDI)' : '(sugerido)'}`}

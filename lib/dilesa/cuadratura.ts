@@ -38,7 +38,9 @@
  *   Cheque Notaría (cálculo)  = min(Gastos Escrituración − Apoyo Infonavit,
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
- *   Valor Real Venta Dilesa   = Depósitos Recibidos − Cheque Notaría + Pagaré.
+ *   Valor Real Venta Dilesa   = Crédito (detonación) + Enganche del cliente
+ *                               − Cheque Notaría + Pagaré (ambos modelos, ADR-050;
+ *                               usa el crédito de la VENTA, no la suma de cxc_pagos).
  *   Valor Facturado           = SUMA de los CFDIs timbrados: la factura de la
  *                               escrituración (el CFDI real `valorFacturadoReal`
  *                               si existe, si no el Valor Escrituración) + Σ
@@ -619,17 +621,24 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
 
   // Valor Real Venta DILESA = lo que DILESA realiza NETO: crédito (detonación) +
   // enganche del cliente − cheque a notaría (los gastos que pasan al notario NO
-  // son ingreso de DILESA) + pagaré. Es la fórmula operativa que validan Michelle
-  // (Notas de crédito) y Ale (participación), alineada el 2026-06-18 — antes el
-  // desglose usaba el precio interno BRUTO y no restaba el cheque, por lo que la
-  // NC no cuadraba. Con desglose se usa el crédito de la columna (los depósitos
-  // solos dan negativo en FOVISSSTE); sin desglose, la fórmula vieja por depósitos.
-  // Detonación = disbursement real del crédito (Fase 12); antes de detonar se usa
-  // el crédito institución como estimado (mismo criterio que el archivo de Michelle).
+  // son ingreso de DILESA) + pagaré. Fórmula operativa que validan Michelle (Notas
+  // de crédito) y Ale (participación), alineada el 2026-06-18.
+  //
+  // UNIFICADO en AMBOS modelos el 2026-06-26 (ADR-050). Antes el legacy sumaba
+  // `depositosRecibidos` (TODOS los abonos de cxc_pagos): daba un valor real BASURA
+  // en las ~76 ventas migradas de Coda cuyo CRÉDITO nunca se registró en cxc_pagos
+  // (solo el enganche) → valor real ≈ enganche (M14-L4: 22,429 en vez de 2.26M; la
+  // comisión salía 224 en vez de 22,652). Usar el crédito de la VENTA (detonación o,
+  // antes de detonar, el crédito institución) + el enganche del cliente (depósitos
+  // fuente='cliente') es robusto a ese hueco y NO dobla el crédito cuando SÍ está en
+  // cxc_pagos: idéntico resultado que el cálculo viejo para Jorge Luis y el ejemplo
+  // de Coda (ahí el crédito = un abono institución = `montoCreditoTitular`).
+  // Detonación = disbursement real del crédito (Fase 12); antes de detonar se usa el
+  // crédito institución como estimado (mismo criterio que el archivo de Michelle).
   const detonacion = i.montoDetonado != null ? n(i.montoDetonado) : creditoInstitucion;
-  const valorRealVentaDilesa = tieneDesglose
-    ? round2(detonacion + depositosDirectoCliente - chequeNotariaUsado + montoCreditoDirecto)
-    : round2(depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto);
+  const valorRealVentaDilesa = round2(
+    detonacion + depositosDirectoCliente - chequeNotariaUsado + montoCreditoDirecto
+  );
   // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
   // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
   // del cliente con recibo se factura aparte). La factura de escrituración toma
