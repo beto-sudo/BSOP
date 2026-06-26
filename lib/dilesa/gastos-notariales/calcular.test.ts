@@ -8,6 +8,10 @@ import type { GastosNotarialesConfig, TabuladorFila } from './tipos';
  * `20260626171235_dilesa_gastos_notariales_config.sql`. Si cambia el seed,
  * actualizar aquí (y viceversa) — este test es el guard contra que el cálculo
  * se desvíe del presupuesto del notario.
+ *
+ * `valorBeneficio` = columna que aplica a DILESA por default (en compraventa el
+ * beneficio 50% sin propiedad; en apertura la columna 'DILESA' de la hoja).
+ * `valorParticular` = cuota plena (columna PARTICULAR).
  */
 const compraventa: TabuladorFila[] = [
   {
@@ -124,131 +128,133 @@ const compraventa: TabuladorFila[] = [
   },
 ];
 
+// Apertura: valorBeneficio = columna 'DILESA' de la hoja (la que aplica a
+// DILESA); valorParticular = PARTICULAR (referencia, no se usa en el cálculo).
 const apertura: TabuladorFila[] = [
   {
     orden: 1,
     limiteInferior: 0.01,
     limiteSuperior: 57750,
-    valorBeneficio: 678.15,
+    valorBeneficio: 1356,
     valorParticular: 1336.3,
   },
   {
     orden: 2,
     limiteInferior: 57750.01,
     limiteSuperior: 173250,
-    valorBeneficio: 1346.3,
+    valorBeneficio: 2693,
     valorParticular: 2672.6,
   },
   {
     orden: 3,
     limiteInferior: 173250.01,
     limiteSuperior: 288750,
-    valorBeneficio: 2014.45,
+    valorBeneficio: 4029,
     valorParticular: 4008.9,
   },
   {
     orden: 4,
     limiteInferior: 288750.01,
     limiteSuperior: 404250,
-    valorBeneficio: 2682.6,
+    valorBeneficio: 5365,
     valorParticular: 5345.2,
   },
   {
     orden: 5,
     limiteInferior: 404250.01,
     limiteSuperior: 519750,
-    valorBeneficio: 3350.75,
+    valorBeneficio: 6702,
     valorParticular: 6681.5,
   },
   {
     orden: 6,
     limiteInferior: 519750.01,
     limiteSuperior: 635250,
-    valorBeneficio: 4018.9,
+    valorBeneficio: 8038,
     valorParticular: 8017.8,
   },
   {
     orden: 7,
     limiteInferior: 635250.01,
     limiteSuperior: 750750,
-    valorBeneficio: 4687.05,
+    valorBeneficio: 9374,
     valorParticular: 9354.1,
   },
   {
     orden: 8,
     limiteInferior: 750750.01,
     limiteSuperior: 866250,
-    valorBeneficio: 5355.2,
+    valorBeneficio: 10710,
     valorParticular: 10690.4,
   },
   {
     orden: 9,
     limiteInferior: 866250.01,
     limiteSuperior: 981750,
-    valorBeneficio: 6023.35,
+    valorBeneficio: 12047,
     valorParticular: 12026.7,
   },
   {
     orden: 10,
     limiteInferior: 981750.01,
     limiteSuperior: 1097250,
-    valorBeneficio: 6691.5,
+    valorBeneficio: 13383,
     valorParticular: 13363,
   },
   {
     orden: 11,
     limiteInferior: 1097250.01,
     limiteSuperior: 1212750,
-    valorBeneficio: 7359.65,
+    valorBeneficio: 14719,
     valorParticular: 14699.3,
   },
   {
     orden: 12,
     limiteInferior: 1212750.01,
     limiteSuperior: 1328250,
-    valorBeneficio: 8027.8,
+    valorBeneficio: 16056,
     valorParticular: 16035.6,
   },
   {
     orden: 13,
     limiteInferior: 1328250.01,
     limiteSuperior: 1443750,
-    valorBeneficio: 8695.95,
+    valorBeneficio: 17392,
     valorParticular: 17371.9,
   },
   {
     orden: 14,
     limiteInferior: 1443750.01,
     limiteSuperior: 1559250,
-    valorBeneficio: 9364.1,
+    valorBeneficio: 18728,
     valorParticular: 18708.2,
   },
   {
     orden: 15,
     limiteInferior: 1559250.01,
     limiteSuperior: 1674750,
-    valorBeneficio: 10032.25,
+    valorBeneficio: 20065,
     valorParticular: 20044.5,
   },
   {
     orden: 16,
     limiteInferior: 1674750.01,
     limiteSuperior: 1732500,
-    valorBeneficio: 10700.4,
+    valorBeneficio: 21401,
     valorParticular: 21380.8,
   },
   {
     orden: 17,
     limiteInferior: 1732500.01,
     limiteSuperior: 1848000,
-    valorBeneficio: 11368.55,
+    valorBeneficio: 22737,
     valorParticular: 22717.1,
   },
   {
     orden: 18,
     limiteInferior: 1848000.01,
     limiteSuperior: 2310000,
-    valorBeneficio: 12036.7,
+    valorBeneficio: 24073,
     valorParticular: 24053.4,
   },
 ];
@@ -372,7 +378,7 @@ describe('calcularGastosNotariales — variantes', () => {
     expect(linea(d, 'isai')?.monto).toBe(30000); // 3% × 1,000,000
   });
 
-  it('crédito sobre el umbral entra al tabulador de apertura', () => {
+  it('crédito sobre el umbral entra al tabulador de apertura (columna DILESA)', () => {
     const d = calcularGastosNotariales(
       {
         valorEscrituracion: 930000,
@@ -382,8 +388,20 @@ describe('calcularGastosNotariales — variantes', () => {
       },
       CONFIG_MEMO_2026
     );
-    // 900k > 820k → escalón 866,250–981,750, columna beneficio.
-    expect(linea(d, 'apertura_credito_i')?.monto).toBe(6023.35);
+    // 900k > 820k → escalón 866,250–981,750, columna DILESA.
+    expect(linea(d, 'apertura_credito_i')?.monto).toBe(12047);
+  });
+
+  it('la apertura no depende de la propiedad (siempre columna DILESA)', () => {
+    const base = {
+      valorEscrituracion: 930000,
+      montoCreditoTitular: 900000,
+      montoCreditoCotitular: 0,
+    };
+    const sinProp = calcularGastosNotariales({ ...base, tienePropiedad: false }, CONFIG_MEMO_2026);
+    const conProp = calcularGastosNotariales({ ...base, tienePropiedad: true }, CONFIG_MEMO_2026);
+    expect(linea(sinProp, 'apertura_credito_i')?.monto).toBe(12047);
+    expect(linea(conProp, 'apertura_credito_i')?.monto).toBe(12047); // igual: propiedad no afecta apertura
   });
 });
 

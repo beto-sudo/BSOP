@@ -47,18 +47,17 @@ function valorTabulador(fila: TabuladorFila | null, tienePropiedad: boolean): nu
 
 /**
  * Apertura de crédito de un derechohabiente: cuota fija hasta el umbral; arriba
- * entra el tabulador por monto de crédito.
+ * entra el tabulador por monto de crédito. Siempre usa la columna 'DILESA'
+ * (`valorBeneficio`) — la apertura NO depende de la propiedad previa (eso solo
+ * aplica a la compraventa).
  */
-function calcularApertura(
-  montoCredito: number,
-  config: GastosNotarialesConfig,
-  tienePropiedad: boolean
-): number {
+function calcularApertura(montoCredito: number, config: GastosNotarialesConfig): number {
   if (montoCredito <= 0) return 0;
   if (montoCredito <= config.registroPublico.aperturaUmbralCuotaFija) {
     return config.registroPublico.aperturaCuotaFija;
   }
-  return valorTabulador(buscarEscalon(config.tabuladorApertura, montoCredito), tienePropiedad);
+  const fila = buscarEscalon(config.tabuladorApertura, montoCredito);
+  return fila ? fila.valorBeneficio : config.registroPublico.aperturaCuotaFija;
 }
 
 /**
@@ -78,11 +77,9 @@ export function calcularGastosNotariales(
     buscarEscalon(config.tabuladorCompraventa, input.valorEscrituracion),
     tienePropiedad
   );
-  const aperturaI = calcularApertura(input.montoCreditoTitular, config, tienePropiedad);
+  const aperturaI = calcularApertura(input.montoCreditoTitular, config);
   const aperturaII =
-    input.montoCreditoCotitular > 0
-      ? calcularApertura(input.montoCreditoCotitular, config, tienePropiedad)
-      : 0;
+    input.montoCreditoCotitular > 0 ? calcularApertura(input.montoCreditoCotitular, config) : 0;
   const cnpr = round2(config.otros.cnprPorDerechohabiente * numDerechohabientes);
 
   const bloque = (

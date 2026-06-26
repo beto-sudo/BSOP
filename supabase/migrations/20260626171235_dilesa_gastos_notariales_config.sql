@@ -77,11 +77,12 @@ CREATE TABLE IF NOT EXISTS dilesa.gastos_notariales_tabulador (
   orden integer NOT NULL,
   limite_inferior numeric(14, 2) NOT NULL,
   limite_superior numeric(14, 2), -- NULL = sin tope (último escalón)
-  -- valor_beneficio: ningún derechohabiente con propiedad (beneficio 50%).
-  -- valor_particular: algún derechohabiente con propiedad (cuota plena).
-  -- En 'apertura' el caso >umbral es ambiguo en la hoja del notario (PARTICULAR /
-  -- CONSTRU / DILESA); se seedea beneficio=CONSTRU, particular=PARTICULAR y queda
-  -- editable — pendiente confirmar con Memo (ver planning doc).
+  -- valor_beneficio: columna que aplica a DILESA por default. En compraventa = el
+  --   beneficio 50% (sin propiedad previa); en apertura = la columna 'DILESA' de
+  --   la hoja del notario (confirmado por Beto 2026-06-26).
+  -- valor_particular: cuota plena (columna PARTICULAR). En compraventa aplica
+  --   cuando algún derechohabiente ya tiene propiedad; en apertura es solo
+  --   referencia — la apertura NO depende de la propiedad (solo la compraventa).
   valor_beneficio numeric(12, 2) NOT NULL,
   valor_particular numeric(12, 2) NOT NULL,
   UNIQUE (config_id, tipo, orden)
@@ -168,33 +169,35 @@ CROSS JOIN (VALUES
 WHERE c.anio = 2026
 ON CONFLICT (config_id, tipo, orden) DO NOTHING;
 
--- Tabulador de apertura de crédito (por monto de crédito): beneficio=CONSTRU
--- (50%) / particular=PARTICULAR (cuota plena). Solo aplica cuando el crédito
--- supera apertura_umbral_cuota_fija; abajo se cobra apertura_cuota_fija.
+-- Tabulador de apertura de crédito (por monto de crédito): beneficio = columna
+-- 'DILESA' de la hoja del notario (la que aplica a DILESA) / particular =
+-- PARTICULAR (referencia, no se usa: la apertura no depende de la propiedad).
+-- Solo aplica cuando el crédito supera apertura_umbral_cuota_fija; abajo se
+-- cobra apertura_cuota_fija.
 INSERT INTO dilesa.gastos_notariales_tabulador
   (config_id, empresa_id, tipo, orden, limite_inferior, limite_superior, valor_beneficio, valor_particular)
 SELECT c.id, c.empresa_id, 'apertura', v.orden, v.inf, v.sup, v.benef, v.part
 FROM dilesa.gastos_notariales_config c
 JOIN core.empresas e ON e.id = c.empresa_id AND e.slug = 'dilesa'
 CROSS JOIN (VALUES
-  (1, 0.01::numeric, 57750::numeric, 678.15::numeric, 1336.30::numeric),
-  (2, 57750.01, 173250, 1346.30, 2672.60),
-  (3, 173250.01, 288750, 2014.45, 4008.90),
-  (4, 288750.01, 404250, 2682.60, 5345.20),
-  (5, 404250.01, 519750, 3350.75, 6681.50),
-  (6, 519750.01, 635250, 4018.90, 8017.80),
-  (7, 635250.01, 750750, 4687.05, 9354.10),
-  (8, 750750.01, 866250, 5355.20, 10690.40),
-  (9, 866250.01, 981750, 6023.35, 12026.70),
-  (10, 981750.01, 1097250, 6691.50, 13363.00),
-  (11, 1097250.01, 1212750, 7359.65, 14699.30),
-  (12, 1212750.01, 1328250, 8027.80, 16035.60),
-  (13, 1328250.01, 1443750, 8695.95, 17371.90),
-  (14, 1443750.01, 1559250, 9364.10, 18708.20),
-  (15, 1559250.01, 1674750, 10032.25, 20044.50),
-  (16, 1674750.01, 1732500, 10700.40, 21380.80),
-  (17, 1732500.01, 1848000, 11368.55, 22717.10),
-  (18, 1848000.01, 2310000, 12036.70, 24053.40)
+  (1, 0.01::numeric, 57750::numeric, 1356::numeric, 1336.30::numeric),
+  (2, 57750.01, 173250, 2693, 2672.60),
+  (3, 173250.01, 288750, 4029, 4008.90),
+  (4, 288750.01, 404250, 5365, 5345.20),
+  (5, 404250.01, 519750, 6702, 6681.50),
+  (6, 519750.01, 635250, 8038, 8017.80),
+  (7, 635250.01, 750750, 9374, 9354.10),
+  (8, 750750.01, 866250, 10710, 10690.40),
+  (9, 866250.01, 981750, 12047, 12026.70),
+  (10, 981750.01, 1097250, 13383, 13363.00),
+  (11, 1097250.01, 1212750, 14719, 14699.30),
+  (12, 1212750.01, 1328250, 16056, 16035.60),
+  (13, 1328250.01, 1443750, 17392, 17371.90),
+  (14, 1443750.01, 1559250, 18728, 18708.20),
+  (15, 1559250.01, 1674750, 20065, 20044.50),
+  (16, 1674750.01, 1732500, 21401, 21380.80),
+  (17, 1732500.01, 1848000, 22737, 22717.10),
+  (18, 1848000.01, 2310000, 24073, 24053.40)
 ) AS v(orden, inf, sup, benef, part)
 WHERE c.anio = 2026
 ON CONFLICT (config_id, tipo, orden) DO NOTHING;
