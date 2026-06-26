@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — fases 3 (descuento) y 5 (avalúo) con RPC auditada.
+**Próximo hito:** Fase 8 (Dictaminada) — la última con campos; tratamiento especial por ser financiera (cuadratura + re-firma): Gerencia autoguarda los datos del dictamen, Dirección cierra (ADR-051 D5). Pendiente de hacer con calidad + revisión en preview.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (Sprint 1 cerrado: fases 9/4/7/11 + smoke E2E de carga de las 17 pantallas de captura)
+**Última actualización:** 2026-06-26 (Sprints 1-3a en prod: 8 fases con campos [9/4/7/11/3/5/6/12] + smoke E2E. Falta solo la fase 8; la 15/16 quedan fuera por diseño)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -85,6 +85,29 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   el autoguardado; el form no se monta (gate `write`) y el harness es read-only contra prod, así
   que NO ejercita la persistencia. Para chequear el autoguardado real (interceptando el PATCH) haría
   falta darle `write` al bot — pendiente, decisión de Beto. **Sprint 1 cerrado** (9/4/7/11).
+- **2026-06-26 (Sprint 2 — RPC auditada, [PR #1079](https://github.com/beto-sudo/BSOP/pull/1079))** —
+  fase **3** (Formalizada): el **descuento** autoguarda por la misma RPC auditada del cierre
+  (`fn_actualizar_descuentos_venta`, registra cada cambio en `audit_log`); la fecha del contrato
+  no autoguarda (va a `venta_fases.notas`). Fase **5** (Avalúo Cerrado): **monto + fecha del avalúo**
+  autoguardan (UPDATE directo pre-cierre); en corrección post-cierre se mantiene la RPC
+  `fn_corregir_avaluo_venta`.
+- **2026-06-26 (Sprint 3a — financieras, [PR #1080](https://github.com/beto-sudo/BSOP/pull/1080))** —
+  fase **6** (Inscrita): montos + referencias de crédito autoguardan (la fecha de inscripción va a
+  notas). Fase **12** (Detonada): fecha + monto autoguardan **solo para Dirección** (el form de
+  captura manual es solo de Dirección). **Patrón general consolidado:** un estado "guardado" por
+  fase (firma persistida = lo cargado), `habilitado` que hereda el gate de cada pantalla, los campos
+  que van a `venta_fases.notas` al avanzar (fechas de contrato/inscripción) no autoguardan.
+- **2026-06-26 (cierre parcial — qué queda)** — **Fuera del autoguardado por diseño:** fase **15**
+  (notas) y fase **16** (encuesta) — captura **atómica de una sola persona sin separación de roles**
+  (no hay pérdida cross-rol), y escriben a `venta_fases`/`venta_encuestas` con lógica de estado; un
+  autoguardado parcial de encuesta no tiene buena semántica. **Pendiente: fase 8 (Dictaminada)** — la
+  única con campos sin autoguardar. Se dejó deliberadamente para una sesión enfocada por ser la más
+  delicada: sus campos alimentan la **cuadratura** y la captura de `valor_escrituracion` dispara la
+  **re-firma**; tiene 2 forms (cierre + "ya cerrada") con gates distintos (ADR-048). **Diseño listo:**
+  un hook que autoguarda los 7 campos del dictamen (montos/refs/gastos/valor/fecha) vía UPDATE
+  directo, `habilitado: !!venta && (!yaCerrada || esDireccion)` — Gerencia autoguarda en la captura
+  (D5), pero una fase YA cerrada solo la modifica Dirección (ADR-048). Hacer + revisar en preview
+  (financiero, sin auto-merge).
 
 ## Decisiones registradas
 
@@ -96,6 +119,11 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
 - **2026-06-26 (fase 8: Gerencia autoguarda, Dirección cierra)** — decisión de Beto: los datos del
   dictamen autoguardan al teclearlos Gerencia; la cuadratura/pagaré/avance siguen solo-Dirección
   (ADR-048 intacto, ADR-051 D5).
+- **2026-06-26 (qué NO autoguarda)** — (a) campos que viven en `venta_fases.notas` al avanzar
+  (fecha de contrato F3, fecha de inscripción F6) — sin columna en `dilesa.ventas`; (b) fases de
+  captura **atómica de una sola persona** sin separación de roles (F15 notas, F16 encuesta) — no hay
+  pérdida cross-rol y la F16 escribe a `venta_encuestas` con estado, donde un guardado parcial es
+  ambiguo. El autoguardado se reserva para campos con destino directo y/o riesgo de pérdida cross-rol.
 
 ## Done
 
