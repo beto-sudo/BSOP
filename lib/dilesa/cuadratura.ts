@@ -54,8 +54,8 @@
  *                               factura real usa el facturado real; la Fase 13
  *                               valida aparte que el CFDI de NC coincida.
  *   Descuento Real            = Valor Escrituración − Valor Real Venta Dilesa.
- *   Comisión Vendedor         = Escrituración × (1.5% Loma Verde / 1.0% resto).
- *   Comisión Gerencia         = Escrituración × 0.5%.
+ *   Comisión Vendedor         = (Valor Real − sobreprecio) × (1.5% LV / 1.0% resto).
+ *   Comisión Gerencia         = (Valor Real − sobreprecio) × 0.5%.
  *
  * GAPS de captura (aún no en BSOP; el motor los acepta opcionales y asume 0):
  * apoyoInfonavit (por tipo de crédito), los 4 buckets de descuento, y el
@@ -211,6 +211,9 @@ export type Cuadratura = {
   /** NC estimada: `valorFacturadoSugerido` − valor real venta DILESA. */
   montoNotaCreditoSugerido: number;
   descuentoReal: number;
+  /** Precio de asignación (lista). Eco del input — referencia del resumen de precio
+   *  del panel legacy (bono al cliente = precio de asignación − valor real). */
+  precioAsignacion: number;
   comisionVendedor: number;
   comisionGerencia: number;
   /**
@@ -670,15 +673,17 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       }
     : null;
 
-  // Con desglose, las comisiones se calculan sobre el Valor Real Venta DILESA
-  // menos el SOBREPRECIO para gastos (lo absorbe el crédito, NO comisiona) — base
-  // operativa de Michelle/Ale (col "Venta Dilesa comisiones" = valor real −
-  // sobreprecio), alineada el 2026-06-18. Los productos reales del paquete
-  // (closets/upgrades) SÍ comisionan, por eso NO se restan de la base. Sin
-  // desglose, sobre el valor de escrituración (fallback).
-  const baseComision = tieneDesglose
-    ? round2(valorRealVentaDilesa - sobreprecioGastos)
-    : valorEscrituracion;
+  // Base de comisión = Valor Real Venta DILESA − sobreprecio para gastos (lo
+  // absorbe el crédito y NO comisiona), en AMBOS modelos — base operativa de
+  // Michelle/Ale (col "Venta Dilesa comisiones" = valor real − sobreprecio). Los
+  // productos reales del paquete (closets/upgrades) SÍ comisionan, por eso NO se
+  // restan. Hasta el 2026-06-26 el modelo legacy comisionaba sobre el valor de
+  // ESCRITURACIÓN, lo que sobre-pagaba en ventas con descuento (p.ej. escritura
+  // inflada para aforo); se unificó a la base de valor real (iniciativa
+  // `dilesa-comision-valor-real`, ADR-050). OJO: esto es solo la BASE — la comisión
+  // PAGADA lleva encima un esquema de objetivos y cuotas trimestrales que se modela
+  // aparte (pendiente).
+  const baseComision = round2(valorRealVentaDilesa - sobreprecioGastos);
   const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
   const comisionGerencia = round2(baseComision * 0.005);
 
@@ -704,6 +709,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     montoNotaCredito,
     montoNotaCreditoSugerido,
     descuentoReal,
+    precioAsignacion: round2(n(i.precioAsignacion)),
     comisionVendedor,
     comisionGerencia,
     tieneDesglose,

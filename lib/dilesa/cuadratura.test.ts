@@ -36,8 +36,34 @@ describe('calcularCuadratura', () => {
     expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378 + 0
     expect(c.montoNotaCredito).toBe(276049.55); // 1,160,049.55 − 884,000
     expect(c.descuentoReal).toBe(15000); // 899,000 − 884,000
-    expect(c.comisionGerencia).toBe(4495); // 899,000 × 0.5%
-    expect(c.comisionVendedor).toBe(8990); // 899,000 × 1.0% (no Loma Verde)
+    expect(c.comisionGerencia).toBe(4420); // 884,000 (valor real) × 0.5% — ADR-050
+    expect(c.comisionVendedor).toBe(8840); // 884,000 (valor real) × 1.0% (no Loma Verde) — ADR-050
+  });
+
+  // ADR-050 (iniciativa dilesa-comision-valor-real): la base de comisión es el
+  // Valor Real Venta DILESA en AMBOS modelos. Antes el legacy comisionaba sobre el
+  // valor de ESCRITURACIÓN, que sobre-pagaba en ventas con descuento (la escritura
+  // es mayor que lo que DILESA realiza). Aquí valor real (884,000) < escrituración
+  // (899,000) por el descuento de 15,000 → la comisión baja en consecuencia.
+  it('legacy comisiona sobre el valor real, no la escrituración (ADR-050)', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 899000,
+      montoCreditoTitular: 636328.45,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: 13378,
+      gastosEscrituracion: null,
+      depositos: [
+        { monto: 261049.55, directoCliente: true, tieneRecibo: true },
+        { monto: 636328.45, directoCliente: false, tieneRecibo: false },
+      ],
+      proyectoNombre: 'Lomas del Sol',
+    });
+    expect(c.tieneDesglose).toBe(false); // legacy
+    expect(c.valorRealVentaDilesa).toBe(884000);
+    // Base = valor real (884,000), NO la escrituración (899,000).
+    expect(c.comisionVendedor).toBe(8840);
+    expect(c.comisionGerencia).toBe(4420);
   });
 
   // Modelo confirmado por Beto 2026-06-15: el enganche se factura con su propio
