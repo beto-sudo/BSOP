@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `erp` (`facturas.estimacion_id` nuevo + índice único activo; nuevas RPCs `cxp_factura_desde_estimacion_destajo`, `cxp_factura_recibir_cfdi`; trigger de sync factura→estimación), `dilesa` (`estimaciones`: guard de gobierno + RPC `estimacion_destajo_autorizar`), UI en `app/dilesa/construccion/estimaciones/**`, `components/cxp/**` y `app/api/[empresa]/cxp/facturas/upload-xml`
 **Estado:** in_progress
-**Próximo hito:** Beto aplica la migración del Sprint 1 a prod (toca finanzas) → regenerar SCHEMA_REF/types → mergear; luego Sprint 2 (recepción de XML en CxP) y Sprint 3 (invertir la UI de construcción)
+**Próximo hito:** v1 **en prod** (migraciones aplicadas + #1043 mergeado 2026-06-26). Falta: smoke test con un XML real (aprobar destajo → subir XML en CxP → programar/pagar → ver `pagada` derivado) + pulido opcional (KPIs/manual del módulo de estimaciones; decidir backfill de `facturada` históricas si las hubiera).
 **Dueño:** Beto
 **Creada:** 2026-06-25
-**Última actualización:** 2026-06-25
+**Última actualización:** 2026-06-26
 
 > **Origen:** decisión **D3** de `dilesa-contratos-estimaciones` (cerrada 2026-06-10),
 > que dejó explícitamente registrada esta integración como "iniciativa futura al
@@ -166,6 +166,20 @@ destajo.
 
 ## Bitácora
 
+- **2026-06-26 — CUTOVER: migraciones aplicadas a prod + #1043 mergeado (OK de Beto en chat).**
+  S1 (`20260625212801`) + S2 (`20260625213616`) aplicadas vía `psql`
+  (`ON_ERROR_STOP=1`) y registradas en el ledger con `migration repair --status
+applied` (1:1, sin huérfanos — no se usó `db push` porque el ledger traía
+  drift de otras sesiones: `dilesa_notif_tareas_pendientes` #1022 local-only y
+  un huérfano `fix_detonacion_acumula_abonos_coacreditados`; ambos ajenos, se
+  dejaron intactos). **Verificación post-aplicación:** 6/6 objetos S1 + 3/3 S2;
+  **backfill = 4 facturas en espera creadas = 4 estimaciones aprobadas vivas**
+  (W26-MAYA, W26-SALA, W25, W24). SCHEMA_REF + types regenerados desde prod
+  (solo `estimacion_id` + 4 RPCs, sin absorber schema ajeno). CI verde,
+  incluido **Supabase Preview** (el `failed to bundle function` previo era flake
+  transitorio del runner de branching — no toqué edge functions; #1040/#1039
+  bundlearon ✅; pasó en el re-run). Merge squash (#1043 → main `17525a3`).
+  **Pendiente operativo (no bloqueante):** smoke test con un XML real.
 - **2026-06-25 — S1+S2+S3 construidos en un PR — [#1043](https://github.com/beto-sudo/BSOP/pull/1043), SIN auto-merge (gated por aplicar migraciones a prod).**
   Dos migraciones como archivo (`20260625212801` S1 + `20260625213616` S2):
   `erp.facturas.estimacion_id` + índice único activo; guard
