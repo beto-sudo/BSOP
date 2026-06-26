@@ -121,10 +121,17 @@ export async function marcarFase(
   //    cerradas. Bug detectado tras agregar Fases 3/4/5 que no los
   //    seteaban.
   //
-  //    Defensa: solo avanza, nunca retrocede. Si por alguna razón se
-  //    está re-capturando una fase anterior, no pisamos un estado más
-  //    avanzado. Para retroceder se usa la server action
-  //    `regresarAFase` (que limpia pipeline + sincroniza).
+  //    Defensa (2026-06-25, Beto): avance ESTRICTO de 1 en 1 — el caché de
+  //    posición solo sube a la fase inmediata siguiente, jamás brinca. Antes
+  //    era `faseposicion > posActual`, que dejaba que una captura adelantada
+  //    (la preparación de entrega abría desde Escriturada) aterrizara la venta
+  //    en la fase 14 saltándose Detonada (12) y Facturada (13). Ahora el
+  //    pipeline obliga a recorrer todos los pasos en orden. Las pages ya gatean
+  //    por la previa inmediata; esto es la defensa de fondo en el ÚNICO helper
+  //    cliente que escribe `fase_posicion`. Re-capturar una fase anterior no
+  //    pisa un estado más avanzado. Para retroceder se usa la server action
+  //    `regresarAFase` (que limpia pipeline + sincroniza). La fase 14 ya no
+  //    pasa por aquí: la cierra el trigger `dilesa.fn_auto_preparada_entrega`.
   const camposParaUpdate: Record<string, unknown> = { ...camposVenta };
   const { data: ventaActual } = await sb
     .schema('dilesa')
@@ -133,7 +140,7 @@ export async function marcarFase(
     .eq('id', ventaId)
     .maybeSingle();
   const posActual = (ventaActual?.fase_posicion as number | null) ?? 0;
-  if (faseposicion > posActual) {
+  if (faseposicion === posActual + 1) {
     camposParaUpdate.fase_actual = nombreFase(faseposicion);
     camposParaUpdate.fase_posicion = faseposicion;
   }

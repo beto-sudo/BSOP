@@ -1,37 +1,34 @@
 'use client';
 
 /**
- * Captura Fase 14 — Preparada para Entrega (dilesa-ventas-expediente S5).
+ * Captura Fase 14 — Preparada para Entrega (dilesa-ventas).
  *
- * El equipo de Calidad y Entrega revisa la vivienda con el Checklist
- * Pre-Entrega: lo imprime desde aquí (PDF prellenado con vivienda + cliente),
- * recorre la casa palomeando en papel, firma, escanea y sube el PDF firmado.
- * Subirlo cierra la fase.
+ * Calidad / Atención a Clientes imprime el Checklist Pre-Entrega (PDF
+ * prellenado con vivienda + cliente), recorre la casa palomeando en papel,
+ * firma, escanea y sube el PDF firmado. SUBIR el checklist es la única acción
+ * de esta pantalla: queda en el expediente al instante.
  *
- * Gate especial (Beto, 2026-06-10): la preparación puede hacerse desde que se
- * registra la escritura (Fase 11) — NO espera Detonada (12) ni Facturada (13).
+ * El AVANCE de fase es automático y secuencial (2026-06-25, Beto): subir el
+ * checklist NO mueve la fase. La vivienda pasa a "Preparada para Entrega" (14)
+ * sola, vía el trigger `dilesa.fn_auto_preparada_entrega`, cuando coinciden:
+ *   (a) la operación está Facturada (fase 13 cerrada), y
+ *   (b) el checklist está cargado.
+ * Así el checklist puede ADELANTARSE desde la Escritura (fase 11) sin saltarse
+ * Detonada (12) ni Facturada (13) — habilitar la acción ≠ estar en la fase.
  *
- * Captura:
- *   - Doc requerido: rol `checklist_pre_entrega` (checklist firmado).
- *     Coincide con `FASE_ROLES[14]` en el detalle.
- *   - Notas opcionales → `venta_fases.notas`.
- *
- * Acceso: `dilesa.ventas.fase14_preparada_entrega` (escritura: Obra +
- * Dirección; lectura: Gerencia Ventas — pre-sembrado en core.modulos).
+ * Acceso: `dilesa.ventas.fase14_preparada_entrega` (Atención a Clientes / Obra /
+ * Dirección — escritura).
  */
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Printer, Save } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
-import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import {
   DocsFaseSection,
   useDocsFaseColaborativos,
@@ -58,21 +55,25 @@ export default function CapturarFase14Page() {
 
 function CapturarFase14Body() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
-  const [fase11Cerrada, setFase11Cerrada] = useState<boolean | null>(null);
-  const [yaCerrada, setYaCerrada] = useState<boolean>(false);
-
-  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
-  const [notas, setNotas] = useState<string>('');
-
+  const [posiciones, setPosiciones] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
+
+  const cargarPosiciones = useCallback(async () => {
+    const { data: fRows } = await sb
+      .schema('dilesa')
+      .from('venta_fases')
+      .select('posicion')
+      .eq('venta_id', ventaId)
+      .is('deleted_at', null);
+    setPosiciones((fRows ?? []).map((f) => f.posicion as number));
+  }, [sb, ventaId]);
 
   // ── Cargar contexto ──────────────────────────────────────────────
   useEffect(() => {
@@ -101,75 +102,27 @@ function CapturarFase14Body() {
         setLoading(false);
         return;
       }
-      const v = vRow as unknown as VentaCtx;
-      setVenta(v);
-
-      const { data: fRows } = await sb
-        .schema('dilesa')
-        .from('venta_fases')
-        .select('posicion')
-        .eq('venta_id', v.id)
-        .is('deleted_at', null);
+      setVenta(vRow as unknown as VentaCtx);
+      await cargarPosiciones();
       if (!activo) return;
-
-      const posiciones = (fRows ?? []).map((f) => f.posicion as number);
-      setFase11Cerrada(posiciones.includes(11));
-      setYaCerrada(posiciones.includes(14));
-
       setLoading(false);
     })();
 
     return () => {
       activo = false;
     };
-  }, [ventaId, sb]);
+  }, [ventaId, sb, cargarPosiciones]);
 
-  // ── Submit ───────────────────────────────────────────────────────
-  const onSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!venta) return;
-      if (docsFase.faltantes.length > 0) {
-        toast.add({
-          title: 'Falta el checklist firmado',
-          description:
-            'Imprime el checklist, realiza la revisión de la vivienda, fírmalo y sube el escaneado.',
-          type: 'error',
-        });
-        return;
-      }
+  const fase11Cerrada = posiciones?.includes(11) ?? false;
+  const fase13Cerrada = posiciones?.includes(13) ?? false;
+  const yaCerrada = posiciones?.includes(14) ?? false;
+  const checklistListo = docsFase.faltantes.length === 0;
 
-      setSubmitting(true);
-      const { data: userRes } = await sb.auth.getUser();
-      const userId = userRes?.user?.id ?? null;
-
-      const result = await marcarFase(sb, {
-        ventaId: venta.id,
-        faseposicion: 14,
-        docs: [], // el documento ya vive en el expediente (subida incremental)
-        camposVenta: {},
-        notas: notas.trim() || null,
-        registradoPor: userId,
-      });
-
-      setSubmitting(false);
-      if (!result.ok) {
-        toast.add({
-          title: 'Error al cerrar Fase 14',
-          description: result.error ?? 'Error desconocido.',
-          type: 'error',
-        });
-        return;
-      }
-      toast.add({
-        title: 'Fase 14 cerrada',
-        description: 'Vivienda preparada para entrega. El checklist quedó en el expediente.',
-        type: 'success',
-      });
-      router.push(`/dilesa/ventas/${venta.id}`);
-    },
-    [docsFase.faltantes, notas, router, sb, toast, venta]
-  );
+  // "Preparada" = la fase 14 ya está cerrada, O las dos condiciones del
+  // auto-cierre coinciden ya (checklist cargado + facturada): el trigger en DB
+  // la cierra en el mismo INSERT del checklist, así que mostrarlo derivado evita
+  // re-consultar. Al volver al detalle, el provider confirma el estado real.
+  const preparada = yaCerrada || (checklistListo && fase13Cerrada);
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -197,25 +150,20 @@ function CapturarFase14Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={14}
-        descripcion="Calidad y Entrega revisa la vivienda con el checklist impreso y sube el escaneado firmado."
+        descripcion="Calidad y Entrega revisa la vivienda con el checklist impreso y sube el escaneado firmado. La fase avanza sola al facturar."
       />
 
-      {yaCerrada ? (
+      {preparada ? (
         <Banner
           tone="success"
-          title="Fase 14 ya está cerrada"
-          body="Esta vivienda ya quedó preparada para entrega. La siguiente fase es Entregada."
+          title="Preparada para Entrega ✓"
+          body="La vivienda ya quedó preparada y el checklist está en el expediente. La siguiente fase es Entregada."
         />
       ) : !fase11Cerrada ? (
         <Banner
           tone="warning"
           title="Falta cerrar Fase 11 (Escriturada)"
-          body={
-            <>
-              La preparación de entrega puede hacerse desde que se registra la escritura — sin
-              esperar Detonada ni Facturada. Vuelve al detalle y captura la Fase 11 primero.
-            </>
-          }
+          body="La preparación de entrega puede adelantarse desde que se registra la escritura, pero esa fase aún no está cerrada. Captura la Fase 11 primero."
           extra={
             <Link
               href={`/dilesa/ventas/${venta.id}`}
@@ -226,7 +174,19 @@ function CapturarFase14Body() {
           }
         />
       ) : (
-        <form onSubmit={onSubmit} className="space-y-6">
+        <div className="space-y-6">
+          <Banner
+            tone="info"
+            title={
+              fase13Cerrada ? 'La operación ya está facturada' : 'Puedes adelantar el checklist'
+            }
+            body={
+              fase13Cerrada
+                ? 'Sube el checklist firmado y la vivienda quedará Preparada para Entrega automáticamente.'
+                : 'Aún no se factura (Fase 13). Subir el checklist NO avanza la fase: la vivienda pasará a Preparada para Entrega sola en cuanto se facture. Así no se saltan Detonada ni Facturada.'
+            }
+          />
+
           <Section title="1 · Imprimir el checklist">
             <div className="flex flex-wrap items-center gap-3">
               <a
@@ -248,39 +208,19 @@ function CapturarFase14Body() {
           <DocsFaseSection state={docsFase} titulo="2 · Subir el checklist firmado" />
 
           <p className="text-[11px] text-[var(--text)]/50">
-            Subirlo cierra la fase y lo archiva en el expediente de la operación.
+            Subirlo lo archiva en el expediente de la operación. El paso a «Preparada para Entrega»
+            es automático: ocurre cuando la operación está facturada y el checklist cargado.
           </p>
-
-          <Section title="Notas (opcional)">
-            <textarea
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              rows={3}
-              placeholder="Daños menores pendientes, acuerdos con obra, etc."
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text)]/35 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
-            />
-          </Section>
 
           <div className="flex items-center justify-end gap-3">
             <Link
               href={`/dilesa/ventas/${venta.id}`}
               className="text-sm text-muted-foreground hover:text-[var(--text)]"
             >
-              Cancelar
+              Volver al detalle
             </Link>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 size-4" /> Guardar fase
-                </>
-              )}
-            </Button>
           </div>
-        </form>
+        </div>
       )}
     </div>
   );
@@ -301,14 +241,13 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="mt-2 text-[11px] text-[var(--text)]/50">{children}</p>;
 }
 
-/** Mismo slot estandarizado de las fases 2/3/5/9 (check + botón + drag-drop). */
 function Banner({
   tone,
   title,
   body,
   extra,
 }: {
-  tone: 'success' | 'warning';
+  tone: 'success' | 'warning' | 'info';
   title: string;
   body: React.ReactNode;
   extra?: React.ReactNode;
@@ -316,7 +255,9 @@ function Banner({
   const styles =
     tone === 'success'
       ? 'border-emerald-400/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
-      : 'border-amber-400/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+      : tone === 'warning'
+        ? 'border-amber-400/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+        : 'border-[var(--accent)]/30 bg-[var(--accent)]/5 text-[var(--text)]/90';
   return (
     <div className={`rounded-lg border p-4 ${styles}`}>
       <p className="text-sm font-medium">{title}</p>

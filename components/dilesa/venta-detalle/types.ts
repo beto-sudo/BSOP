@@ -236,13 +236,17 @@ export const CAPTURA_MODULO_BY_POSICION: Record<number, string> = {
 };
 
 /**
- * Gate de apertura por fase cuando NO es la inmediata anterior. Beto
- * (2026-06-10): la preparación de entrega (14) arranca desde que se registra
- * la escritura (11) — no espera Detonada (12) ni Facturada (13).
+ * Gate de apertura por fase cuando NO es la inmediata anterior.
+ *
+ * Vacío a propósito (2026-06-25, Beto): el pipeline avanza estrictamente de 1
+ * en 1 — ninguna fase "abre" brincándose las intermedias. La preparación de
+ * entrega (14) puede *adelantar su documento* (el checklist se sube desde la
+ * Escritura/11 en su page), pero eso NO avanza la fase: la 14 la cierra
+ * AUTOMÁTICAMENTE el trigger `dilesa.fn_auto_preparada_entrega` cuando coinciden
+ * Facturada (13) cerrada + checklist cargado. Habilitar la acción ≠ estar en la
+ * fase. Antes existía `{ 14: 11 }` y dejaba que la 14 saltara 12/13.
  */
-export const GATE_PREVIA_OVERRIDE: Record<number, number> = {
-  14: 11,
-};
+export const GATE_PREVIA_OVERRIDE: Record<number, number> = {};
 
 /**
  * Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas.

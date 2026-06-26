@@ -6378,6 +6378,10 @@ export type Database = {
         }
         Returns: string
       }
+      fn_auto_preparada_entrega: {
+        Args: { p_venta_id: string }
+        Returns: undefined
+      }
       fn_backfill_cxc: {
         Args: never
         Returns: {
@@ -7792,6 +7796,74 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      cuentas_contables: {
+        Row: {
+          activa: boolean
+          afectable: boolean
+          codigo_agrupador_sat: string | null
+          codigo_contpaqi: string | null
+          created_at: string
+          cuenta_padre_id: string | null
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          naturaleza: string
+          nivel: number
+          nombre: string
+          notas: string | null
+          numero: string
+          origen: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          afectable?: boolean
+          codigo_agrupador_sat?: string | null
+          codigo_contpaqi?: string | null
+          created_at?: string
+          cuenta_padre_id?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          naturaleza: string
+          nivel: number
+          nombre: string
+          notas?: string | null
+          numero: string
+          origen?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          afectable?: boolean
+          codigo_agrupador_sat?: string | null
+          codigo_contpaqi?: string | null
+          created_at?: string
+          cuenta_padre_id?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          naturaleza?: string
+          nivel?: number
+          nombre?: string
+          notas?: string | null
+          numero?: string
+          origen?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuentas_contables_cuenta_padre_id_fkey"
+            columns: ["cuenta_padre_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cxc_cargos: {
         Row: {
