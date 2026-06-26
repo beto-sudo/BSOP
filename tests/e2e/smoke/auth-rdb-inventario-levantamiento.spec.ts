@@ -154,7 +154,12 @@ test.describe('RDB › Inventario › Levantamiento físico', () => {
     }
   });
 
-  test('flujo completo: alta → captura → cierre → firma → aplicado → reporte', async ({ page }) => {
+  // SKIP — este test MUTA (alta → firma → aplicación). El e2e-bot es read-only
+  // y el E2E no debe escribir en prod (iniciativa testing-e2e-loop, S4: los
+  // tests de mutación necesitan un entorno desechable).
+  test.skip('flujo completo: alta → captura → cierre → firma → aplicado → reporte', async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
 
     // ── Paso 1: alta ───────────────────────────────────────────────────────
