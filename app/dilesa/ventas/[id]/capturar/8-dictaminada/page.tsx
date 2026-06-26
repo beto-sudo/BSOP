@@ -29,7 +29,16 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Loader2, MinusCircle, Save, Sparkles, Upload, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  MinusCircle,
+  Save,
+  Sparkles,
+  Upload,
+  XCircle,
+} from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
@@ -54,6 +63,13 @@ import {
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
 import {
+  fetchDocsFase,
+  subirDocFase,
+  type DocRolEstado,
+  type DocsPorRol,
+} from '@/lib/dilesa/captura/docs-fase';
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
+import {
   calcularGastosNotariales,
   cargarConfigVigente,
   type GastosNotarialesConfig,
@@ -66,6 +82,37 @@ import { GastosNotarialesPanel } from '@/components/dilesa/gastos-notariales-pan
 const SLOTS_PAGARE: SlotColaborativo[] = [
   { rol: 'pagare', label: 'Pagaré firmado por el cliente', requerido: true },
 ];
+
+// Re-firma de documentos (ADR-048 D5): cuando el precio dictaminado difiere del de
+// los documentos firmados, Gerencia re-sube estos 2 con el precio nuevo. Cada uno
+// PERSISTE al subirse (storage + erp.adjuntos, igual que el pagaré) — no espera al
+// botón de Dirección. La confirmación (solo Dirección) marca los viejos sustituidos
+// y mueve el snapshot; el documento subido lleva `metadata.refirma_precio` para
+// distinguir el del precio nuevo de los que ya estaban en el expediente.
+const REFIRMA_ROLES = ['solicitud_asignacion', 'contrato_promesa'] as const;
+const REFIRMA_LABEL: Record<string, string> = {
+  solicitud_asignacion: 'Solicitud de Asignación firmada',
+  contrato_promesa: 'Promesa de Compraventa firmada',
+};
+
+/** `erp.adjuntos.created_at` viene en UTC — formatear en hora local. */
+function fmtMomentoRefirma(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Precio con el que se subió un documento de re-firma (metadata.refirma_precio). */
+function refirmaPrecioDe(estado: DocRolEstado | undefined): number | null {
+  const rp = estado?.vigente.metadata?.refirma_precio;
+  return typeof rp === 'number' ? rp : null;
+}
 
 type VentaCtx = {
   id: string;
@@ -175,10 +222,13 @@ function CapturarFase8Body() {
   const [cdGuardado, setCdGuardado] = useState(false);
   // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales).
   const [resolviendoSaldo, setResolviendoSaldo] = useState(false);
-  // Re-firma de documentos (ADR-048 D5): los 2 PDF firmados que sube el gerente
-  // cuando el precio dictaminado cambió respecto al de los documentos firmados.
-  const [archivoSolicitudRef, setArchivoSolicitudRef] = useState<File | null>(null);
-  const [archivoPromesaRef, setArchivoPromesaRef] = useState<File | null>(null);
+  // Re-firma de documentos (ADR-048 D5): los 2 PDF firmados re-subidos con el precio
+  // nuevo. Persisten al subirse (Gerencia los carga; quedan en el expediente) — el
+  // estado aquí es lo persistido, no un File en memoria que se perdía al cambiar de
+  // usuario. La confirmación del cambio sigue siendo solo de Dirección.
+  const [docsRefirma, setDocsRefirma] = useState<DocsPorRol | null>(null);
+  const [subiendoRefirma, setSubiendoRefirma] = useState<string | null>(null);
+  const [usuarioId, setUsuarioId] = useState<string | null>(null);
   const [confirmandoRefirma, setConfirmandoRefirma] = useState(false);
   const [notarioNombre, setNotarioNombre] = useState<string | null>(null);
   const [fase7Cerrada, setFase7Cerrada] = useState<boolean | null>(null);
@@ -727,77 +777,109 @@ function CapturarFase8Body() {
     ]
   );
 
-  // Re-firma de documentos (ADR-048 D5): sube los 2 documentos firmados nuevos,
-  // marca los anteriores como sustituidos (no se borran — auditoría LFPIORPI) y
-  // actualiza el snapshot al precio dictaminado para que no se vuelva a pedir.
+  // Usuario autenticado → `uploaded_by` de los documentos de re-firma.
+  useEffect(() => {
+    sb.auth.getUser().then((r) => setUsuarioId(r.data?.user?.id ?? null));
+  }, [sb]);
+
+  // Documentos de re-firma ya en el expediente (los pudo subir Gerencia en otra
+  // sesión). Se cargan siempre: el indicador "del precio nuevo" se deriva del
+  // `metadata.refirma_precio` de cada vigente.
+  const cargarDocsRefirma = useCallback(async () => {
+    const r = await fetchDocsFase(ventaId, [...REFIRMA_ROLES]);
+    if (r.ok) setDocsRefirma(r.docs);
+  }, [ventaId]);
+  useEffect(() => {
+    if (ventaId) void cargarDocsRefirma();
+  }, [ventaId, cargarDocsRefirma]);
+
+  // Subir UN documento de re-firma — persiste de inmediato (storage + erp.adjuntos),
+  // como el pagaré. Lo puede cargar Gerencia: NO espera al botón de Dirección, así que
+  // el archivo ya no se pierde al cambiar de usuario. Sella `refirma_precio` con el
+  // precio nuevo para distinguirlo de los documentos viejos del expediente.
+  const onSubirRefirma = useCallback(
+    async (rol: string, archivo: File) => {
+      const valorNum = Number(valorEscrituracion) || 0;
+      if (valorNum <= 0) return;
+      setSubiendoRefirma(rol);
+      try {
+        const r = await subirDocFase(sb, {
+          ventaId,
+          rol,
+          archivo,
+          userId: usuarioId,
+          metadata: { refirma_precio: valorNum },
+        });
+        if (!r.ok) {
+          toast.add({
+            title: 'No se pudo subir el documento',
+            description: r.error,
+            type: 'error',
+          });
+          return;
+        }
+        toast.add({
+          title: `${REFIRMA_LABEL[rol] ?? 'Documento'} guardado`,
+          description:
+            'Quedó en el expediente — no se pierde al salir. Dirección confirma el cambio.',
+          type: 'success',
+        });
+        await cargarDocsRefirma();
+      } finally {
+        setSubiendoRefirma(null);
+      }
+    },
+    [sb, ventaId, usuarioId, valorEscrituracion, toast, cargarDocsRefirma]
+  );
+
+  // Confirmar la re-firma (solo Dirección, ADR-048 D5): los documentos del precio
+  // nuevo ya están subidos (Gerencia) — aquí solo se marcan los anteriores como
+  // sustituidos (auditoría LFPIORPI: no se borran) y se mueve el snapshot al precio
+  // dictaminado para que no se vuelva a pedir. No sube archivos.
   const confirmarRefirma = useCallback(async () => {
     if (!venta) return;
     const valorNum = Number(valorEscrituracion) || 0;
     if (valorNum <= 0) return;
-    if (!archivoSolicitudRef || !archivoPromesaRef) {
+    const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+    if (!esDir) {
       toast.add({
-        title: 'Faltan los documentos firmados',
-        description: 'Sube la Solicitud de Asignación y la Promesa de Compraventa firmadas.',
+        title: 'Solo Dirección confirma la re-firma',
+        description: 'Gerencia sube los documentos; Dirección registra el cambio de precio.',
         type: 'error',
       });
       return;
     }
-    setConfirmandoRefirma(true);
-    const { data: userRes } = await sb.auth.getUser();
-    const userId = userRes?.user?.id ?? null;
+    // Ambos roles deben tener un vigente sellado con el precio nuevo (no los viejos).
+    const vigentes = REFIRMA_ROLES.map((rol) => docsRefirma?.[rol]);
+    const completos = vigentes.every((est) => {
+      const rp = refirmaPrecioDe(est);
+      return rp != null && Math.abs(rp - valorNum) <= 0.5;
+    });
+    if (!completos) {
+      toast.add({
+        title: 'Faltan los documentos del precio nuevo',
+        description:
+          'Sube la Solicitud y la Promesa firmadas con el precio nuevo antes de confirmar.',
+        type: 'error',
+      });
+      return;
+    }
+    const vigenteIds = vigentes.map((est) => est?.vigente.id).filter((x): x is string => !!x);
 
-    // 1. Documentos vigentes (no sustituidos) de estos 2 roles = los que se reemplazan.
-    const { data: vigentes } = await sb
+    setConfirmandoRefirma(true);
+    // Marca como sustituidos los demás adjuntos de estos roles (los del precio viejo),
+    // conservando los vigentes (los recién subidos con el precio nuevo).
+    const { data: previos } = await sb
       .schema('erp')
       .from('adjuntos')
       .select('id')
       .eq('entidad_tipo', 'venta')
       .eq('entidad_id', venta.id)
-      .in('rol', ['solicitud_asignacion', 'contrato_promesa'])
+      .in('rol', [...REFIRMA_ROLES])
       .is('sustituido_at', null);
-    const idsViejos = (vigentes ?? []).map((a) => a.id as string);
-
-    // 2. Subir los 2 documentos nuevos.
-    const subir = async (archivo: File, rol: string): Promise<boolean> => {
-      const path = buildAdjuntoPath({
-        empresa: 'dilesa',
-        entidad: 'ventas',
-        entidadId: venta.id,
-        filename: archivo.name,
-      });
-      const { error: upErr } = await sb.storage
-        .from('adjuntos')
-        .upload(path, archivo, { contentType: archivo.type || 'application/pdf', upsert: false });
-      if (upErr) return false;
-      const { error: insErr } = await sb
-        .schema('erp')
-        .from('adjuntos')
-        .insert({
-          empresa_id: DILESA_EMPRESA_ID,
-          entidad_tipo: 'venta',
-          entidad_id: venta.id,
-          rol,
-          nombre: archivo.name,
-          url: path,
-          tipo_mime: archivo.type || null,
-          tamano_bytes: archivo.size,
-          uploaded_by: userId,
-        });
-      return !insErr;
-    };
-    const okS = await subir(archivoSolicitudRef, 'solicitud_asignacion');
-    const okP = await subir(archivoPromesaRef, 'contrato_promesa');
-    if (!okS || !okP) {
-      setConfirmandoRefirma(false);
-      toast.add({
-        title: 'No se pudieron subir los documentos',
-        description: 'Intenta de nuevo.',
-        type: 'error',
-      });
-      return;
-    }
-
-    // 3. Marcar los anteriores como sustituidos (siguen en el expediente).
+    const idsViejos = (previos ?? [])
+      .map((a) => a.id as string)
+      .filter((id) => !vigenteIds.includes(id));
     if (idsViejos.length > 0) {
       await sb
         .schema('erp')
@@ -806,7 +888,7 @@ function CapturarFase8Body() {
         .in('id', idsViejos);
     }
 
-    // 4. Snapshot = precio dictaminado (cierra la re-firma) + persiste el valor.
+    // Snapshot = precio dictaminado (cierra la re-firma) + persiste el valor.
     const { error: upVErr } = await sb
       .schema('dilesa')
       .from('ventas')
@@ -824,14 +906,13 @@ function CapturarFase8Body() {
     setVenta((v) =>
       v ? { ...v, precio_documentos_firmados: valorNum, valor_escrituracion: valorNum } : v
     );
-    setArchivoSolicitudRef(null);
-    setArchivoPromesaRef(null);
+    await cargarDocsRefirma();
     toast.add({
       title: 'Re-firma confirmada',
       description: 'Documentos actualizados con el precio nuevo. Ya puedes avanzar la fase.',
       type: 'success',
     });
-  }, [archivoPromesaRef, archivoSolicitudRef, sb, toast, valorEscrituracion, venta]);
+  }, [docsRefirma, me, sb, toast, valorEscrituracion, venta, cargarDocsRefirma]);
 
   // Imprime el documento de re-firma con el precio NUEVO. El endpoint del PDF
   // decide el precio leyendo `valor_escrituracion` de la BD (ADR-048 D5): si el
@@ -1080,6 +1161,13 @@ function CapturarFase8Body() {
 
   // Re-firma de documentos (ADR-048 D5): solo cuando el precio dictaminado difiere
   // del de los documentos firmados. Se reusa en ambos forms (cierre y "ya cerrada").
+  // Cada documento del precio nuevo ya está vigente cuando su `refirma_precio` casa
+  // con el valor capturado — independiente de quién lo subió (típico: Gerencia).
+  const refirmaOkDe = (rol: string): boolean => {
+    const rp = refirmaPrecioDe(docsRefirma?.[rol]);
+    return rp != null && valorEscrNum > 0 && Math.abs(rp - valorEscrNum) <= 0.5;
+  };
+  const refirmaCompleta = REFIRMA_ROLES.every((rol) => refirmaOkDe(rol));
   const refirmaSection = precioCambio ? (
     <Section title="Re-firma de documentos requerida">
       <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
@@ -1105,24 +1193,28 @@ function CapturarFase8Body() {
         </button>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FileSlot
-          label="Solicitud de Asignación firmada *"
-          archivo={archivoSolicitudRef}
-          onChange={setArchivoSolicitudRef}
-        />
-        <FileSlot
-          label="Promesa de Compraventa firmada *"
-          archivo={archivoPromesaRef}
-          onChange={setArchivoPromesaRef}
-        />
+        {REFIRMA_ROLES.map((rol) => (
+          <RefirmaDocSlot
+            key={rol}
+            label={`${REFIRMA_LABEL[rol]} *`}
+            estado={docsRefirma?.[rol]}
+            delPrecioNuevo={refirmaOkDe(rol)}
+            subiendo={subiendoRefirma === rol}
+            deshabilitado={subiendoRefirma != null && subiendoRefirma !== rol}
+            onPick={(f) => void onSubirRefirma(rol, f)}
+          />
+        ))}
       </div>
+      <p className="mt-3 text-[11px] text-[var(--text)]/55">
+        Cada documento se guarda al subirlo y queda en el expediente —{' '}
+        <strong>lo puede cargar Gerencia</strong> sin esperar a Dirección. Cuando los dos del precio
+        nuevo estén arriba, <strong>Dirección confirma</strong> para registrar el cambio y avanzar.
+      </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button
           type="button"
           onClick={confirmarRefirma}
-          disabled={
-            confirmandoRefirma || !esDireccion || !archivoSolicitudRef || !archivoPromesaRef
-          }
+          disabled={confirmandoRefirma || !esDireccion || !refirmaCompleta}
         >
           {confirmandoRefirma ? (
             <>
@@ -1136,7 +1228,11 @@ function CapturarFase8Body() {
         </Button>
         {!esDireccion ? (
           <span className="text-xs text-amber-700 dark:text-amber-300">
-            Solo Dirección confirma la re-firma.
+            Solo Dirección confirma la re-firma. Gerencia ya puede subir los documentos arriba.
+          </span>
+        ) : !refirmaCompleta ? (
+          <span className="text-xs text-amber-700 dark:text-amber-300">
+            Sube los 2 documentos firmados con el precio nuevo para confirmar.
           </span>
         ) : null}
       </div>
@@ -1703,6 +1799,135 @@ function FileSlot({
           accept="application/pdf,image/*"
           className="hidden"
           onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </div>
+  );
+}
+
+/**
+ * Slot de re-firma con persistencia inmediata (ADR-048 D5): a diferencia de
+ * `FileSlot` (File en memoria), muestra el documento YA en el expediente —
+ * quién lo subió y cuándo — para que la carga de Gerencia sobreviva entre
+ * sesiones. El check verde solo prende cuando el vigente es del precio NUEVO
+ * (`delPrecioNuevo`); un documento del precio anterior se ve en ámbar y pide
+ * re-subirse.
+ */
+function RefirmaDocSlot({
+  label,
+  estado,
+  delPrecioNuevo,
+  subiendo,
+  deshabilitado,
+  onPick,
+}: {
+  label: string;
+  estado: DocRolEstado | undefined;
+  delPrecioNuevo: boolean;
+  subiendo: boolean;
+  deshabilitado: boolean;
+  onPick: (f: File) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const doc = estado?.vigente;
+  const bloqueado = subiendo || deshabilitado;
+
+  const aceptar = (f: File | undefined) => {
+    if (!f || bloqueado) return;
+    const nombre = f.name.toLowerCase();
+    if (!(f.type === 'application/pdf' || f.type.startsWith('image/') || nombre.endsWith('.pdf'))) {
+      return;
+    }
+    onPick(f);
+  };
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        aceptar(e.dataTransfer.files?.[0]);
+      }}
+      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
+        dragOver
+          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
+          : 'border-[var(--border)]'
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+        {delPrecioNuevo ? (
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+        ) : (
+          <XCircle
+            className={`h-4 w-4 shrink-0 ${doc ? 'text-amber-500' : 'text-[var(--text)]/35'}`}
+          />
+        )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{label}</span>
+            {doc ? (
+              <a
+                href={getAdjuntoProxyUrl(doc.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 items-center gap-0.5 text-xs text-[var(--accent)] hover:underline"
+              >
+                Ver <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : null}
+          </div>
+          {doc ? (
+            <p className="truncate text-xs text-[var(--text)]/60">
+              <span className="font-mono">{doc.nombre}</span>
+              {' · '}
+              {doc.subidoPorNombre ? `Subió ${doc.subidoPorNombre}` : 'Subido'} ·{' '}
+              {fmtMomentoRefirma(doc.subidoAt)}
+              {!delPrecioNuevo ? (
+                <span className="ml-1 font-medium text-amber-700 dark:text-amber-300">
+                  · del precio anterior, vuelve a subir
+                </span>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--text)]/45">Sin documento del precio nuevo.</p>
+          )}
+        </div>
+      </div>
+      <label
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium ${
+          bloqueado
+            ? 'cursor-not-allowed text-[var(--text)]/40'
+            : 'cursor-pointer text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]'
+        }`}
+      >
+        {subiendo ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…
+          </>
+        ) : (
+          <>
+            <Upload className="h-3.5 w-3.5" />
+            {doc ? 'Cambiar' : 'Subir PDF'}
+          </>
+        )}
+        <input
+          type="file"
+          accept="application/pdf,image/*"
+          className="hidden"
+          disabled={bloqueado}
+          onChange={(e) => {
+            aceptar(e.target.files?.[0] ?? undefined);
+            e.target.value = '';
+          }}
         />
       </label>
     </div>
