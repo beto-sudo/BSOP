@@ -7,7 +7,7 @@
 **Próximo hito:** Fase 8 (Dictaminada) — la última con campos; tratamiento especial por ser financiera (cuadratura + re-firma): Gerencia autoguarda los datos del dictamen, Dirección cierra (ADR-051 D5). Pendiente de hacer con calidad + revisión en preview.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (Sprints 1-3a en prod: 8 fases con campos [9/4/7/11/3/5/6/12] + smoke E2E. Falta solo la fase 8; la 15/16 quedan fuera por diseño)
+**Última actualización:** 2026-06-26 (Sprints 1-3a en prod: 8 fases con campos [9/4/7/11/3/5/6/12] + smoke E2E. Falta solo la fase 8; la 15/16 quedan fuera por diseño. Ver **## Handoff** para el arranque de la fase 8 + chequeo de persistencia auto-limpiante)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -124,6 +124,61 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   captura **atómica de una sola persona** sin separación de roles (F15 notas, F16 encuesta) — no hay
   pérdida cross-rol y la F16 escribe a `venta_encuestas` con estado, donde un guardado parcial es
   ambiguo. El autoguardado se reserva para campos con destino directo y/o riesgo de pérdida cross-rol.
+
+## Handoff — Fase 8 (Dictaminada) + chequeo de persistencia (sesión limpia)
+
+> Arranque dejado el 2026-06-26 para retomar en sesión limpia. Es la última fase con
+> campos sin autoguardar; se separó por ser financiera (riesgo alto + contexto cargado).
+> Beto autorizó **write al bot e2e** para el chequeo de persistencia **con condición dura:
+> los tests NO dejan basura — restauran el estado original** (ver memoria
+> `feedback_e2e_tests_auto_limpiantes`).
+
+### Parte A — Autoguardado de la fase 8
+
+Archivo: `app/dilesa/ventas/[id]/capturar/8-dictaminada/page.tsx`. Campos del dictamen
+(estado del form, ~líneas 256-263): `fechaDictamen`, `montoTitular`, `montoCotitular`,
+`creditoTitularRef`, `creditoCotitularRef`, `gastosEscrituracion`, `valorEscrituracion`.
+Todos van a `dilesa.ventas` (los mismos que `onActualizarDatos` ya escribe por UPDATE).
+
+Plan (mismo patrón que las otras 8 fases):
+
+1. Importar `useAutoguardadoCampos` + `IndicadorAutoguardado`.
+2. Estado `guardado` con los 7 campos; sincronizarlo en la carga (la carga ya setea los
+   campos desde la venta, ~líneas 454-459 — agregar `setGuardado(...)`).
+3. Hook que autoguarda los 7 por **UPDATE directo** a `dilesa.ventas`, con
+   **`habilitado: !!venta && (!yaCerrada || esDireccion)`** — Gerencia autoguarda en la
+   captura (ADR-051 D5); una fase YA cerrada solo la modifica Dirección (ADR-048). `esDireccion`
+   ya está definido en la página.
+4. Indicador en las Sections de datos (hay 2 forms: cierre `onSubmit` con "Datos del dictamen"
+   ~1378 + "Confirmar datos del crédito" ~1413; "ya cerrada" `onActualizarDatos` con "Datos del
+   crédito y escrituración" ~1212). Reusar el `Section` con `accion` (ya existe en la página).
+
+**Matices a cuidar (por eso se separó):**
+
+- `valorEscrituracion` dispara la **re-firma** (`precioCambio` compara contra
+  `precio_documentos_firmados`). Autoguardarlo es correcto (Gerencia captura el valor real del
+  Anexo B → si difiere, aparece la re-firma → Dirección la confirma), pero **verificar** que no
+  pelea con `imprimirRefirma`/`confirmarRefirma` (que también escriben `valor_escrituracion`).
+  Como esos chequean `necesitaPersistir`, deberían ser idempotentes; confirmarlo.
+- La **cuadratura** (`useVentaCapturaResumen`) es un snapshot al cargar — no se refresca en vivo
+  con el autoguardado. Es aceptable (Dirección recarga al cuadrar), pero mencionarlo en el copy.
+- No tocar los botones/gates existentes de cuadratura, crédito directo, saldo residual, re-firma
+  ni el cierre — siguen siendo de Dirección.
+- **Hacer en PR propio, sin auto-merge** → revisar en preview con una venta real antes de mergear.
+
+### Parte B — Chequeo de persistencia con write al bot (auto-limpiante)
+
+1. **Dar write al bot** `e2e-bot@bsop.test` en las fases DILESA de forma **reversible**: migración
+   o SQL que agrega `acceso_escritura` a su rol en `core.permisos_rol` para los slugs
+   `dilesa.ventas.fase%` (hoy tiene 0 write / 18 read). Documentar cómo revertir.
+2. **Test auto-limpiante** (extiende `tests/e2e/smoke/auth-dilesa-captura-fases.spec.ts` o uno
+   nuevo): patrón **leer→modificar→verificar→restaurar** por campo —
+   (a) leer el valor actual del input, (b) escribir un valor de prueba, (c) esperar el indicador
+   "Guardado" + recargar y confirmar que persistió, (d) **restaurar el valor original** en un
+   `finally`. Cumple la condición de Beto: cero basura en prod.
+3. Alternativa más segura si se quiere aislar del todo: crear una **venta de prueba dedicada** en
+   el setup y borrarla en el teardown (runbook de borrado en memoria
+   `reference_dilesa_ventas_fechas_limpieza`), en vez de tocar ventas reales.
 
 ## Done
 
