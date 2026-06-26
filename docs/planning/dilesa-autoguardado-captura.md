@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — hook `useAutoguardadoCampos` + indicador + piloto fase 9 + fases simples (4, 7, 11, 15)
+**Próximo hito:** Sprint 1 — falta fase 11 (escritura/cheque); fase 15 (notas) se evalúa aparte (van a `venta_fases` al avanzar, sin destino directo). Luego Sprint 2.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (promovida — ADR-051 + arranca Sprint 1)
+**Última actualización:** 2026-06-26 (Sprint 1: hook + piloto fase 9 [#1072] + fases 4 y 7)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -68,6 +68,15 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   PRs #1067/#1070/#1071) + directiva de Beto de extender el principio a los campos. Decisiones de
   Beto: (1) **promover a iniciativa** con rollout por fases; (2) **fase 8 — Gerencia autoguarda los
   datos del dictamen, Dirección cierra**. Diseño en **[ADR-051](../adr/051_autoguardado_campos_captura_fase.md)**.
+- **2026-06-26 (Sprint 1)** — **[PR #1072](https://github.com/beto-sudo/BSOP/pull/1072) (mergeado):**
+  hook `useAutoguardadoCampos` + `<IndicadorAutoguardado>` (`components/dilesa/captura/autoguardado-campos.tsx`)
+  - piloto **fase 9** (fecha de validación patronal). **Sprint 1b (este PR):** fases **4** (valuador +
+    fecha de solicitud de avalúo) y **7** (notario + fecha de solicitud de dictamen) — autoguardan al
+    cambiar; el email al valuador/notario sigue disparándose solo al avanzar. Patrón confirmado:
+    el `Section` local gana un `accion` para el indicador; cada fase añade un estado "guardado"
+    (firma persistida que arranca = lo cargado, para no autoguardar el default "hoy"). **Falta del
+    Sprint 1:** fase **11** (escritura/cheque/monto, 4 campos). La fase **15** (notas) queda fuera —
+    sus notas van a `venta_fases` al avanzar, sin columna en `dilesa.ventas` donde autoguardar.
 
 ## Decisiones registradas
 
