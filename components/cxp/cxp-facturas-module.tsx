@@ -695,6 +695,11 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
   const filtered = useMemo(() => {
     return facturas.filter((f) => {
+      // Las facturas en espera del destajo (borrador + estimacion_id) viven en
+      // su panel dedicado de arriba; no las dupliques en la tabla principal —
+      // salvo que se filtre explícito por "Borrador". Reaparecen como filas
+      // normales en cuanto reciben su XML (→ por pagar).
+      if (f.estado_cxp === 'borrador' && f.estimacion_id && estado !== 'borrador') return false;
       if (estado && f.estado_cxp !== estado) return false;
       if (!search) return true;
       const q = search.toLowerCase();
