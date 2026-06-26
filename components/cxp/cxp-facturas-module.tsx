@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Ban,
   BookText,
+  CalendarClock,
   Check,
   Copy,
   FileUp,
@@ -44,7 +45,7 @@ import {
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,7 @@ import { useUrlFilters } from '@/hooks/use-url-filters';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import type { Json } from '@/types/supabase';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
 import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
@@ -85,6 +87,13 @@ const FILTER_DEFAULTS = {
 const VISTA_OPTIONS = [
   { value: 'por_programar', label: 'Por programar' },
   { value: 'todas', label: 'Todas' },
+];
+
+const METODO_PAGO_OPTIONS = [
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'tarjeta', label: 'Tarjeta' },
 ];
 
 export type CxpFacturasModuleProps = {
@@ -909,6 +918,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       <FacturaDrawer
         factura={selected}
         empresa={empresa}
+        empresaId={empresaId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         usaPartidas={usaPartidas}
@@ -926,6 +936,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
           if (selected) await asignarCuenta(selected.id, cuentaId);
         }}
         onCancelada={() => {
+          setDrawerOpen(false);
+          void fetchFacturas();
+        }}
+        onProgramado={() => {
           setDrawerOpen(false);
           void fetchFacturas();
         }}
@@ -965,6 +979,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 function FacturaDrawer({
   factura,
   empresa,
+  empresaId,
   open,
   onClose,
   usaPartidas,
@@ -978,9 +993,11 @@ function FacturaDrawer({
   onAsignar,
   onAsignarCuenta,
   onCancelada,
+  onProgramado,
 }: {
   factura: Factura | null;
   empresa: EmpresaSlug;
+  empresaId: string;
   open: boolean;
   onClose: () => void;
   usaPartidas: boolean;
@@ -995,9 +1012,13 @@ function FacturaDrawer({
   onAsignarCuenta: (cuentaId: string | null) => Promise<void>;
   /** Refresca la lista + cierra el drawer tras cancelar la factura. */
   onCancelada: () => void;
+  /** Refresca + cierra tras programar (= autorizar) el pago de la factura. */
+  onProgramado: () => void;
 }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const feedback = useActionFeedback();
+  const [programarOpen, setProgramarOpen] = useState(false);
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
@@ -1020,6 +1041,7 @@ function FacturaDrawer({
     setGuardandoPartida(false);
     setEditCuenta(false);
     setGuardandoCuenta(false);
+    setProgramarOpen(false);
   }
 
   useEffect(() => {
@@ -1123,6 +1145,17 @@ function FacturaDrawer({
     permissions.isAdmin &&
     factura != null &&
     (factura.estado_cxp === 'borrador' || factura.estado_cxp === 'por_pagar');
+
+  // Programar pago (= autoriza, S1 corte 2). Espejo en cliente del gate server
+  // de cxp_pago_aprobar (core.fn_is_admin() OR rol Dirección en la empresa).
+  // Solo aparece si la factura tiene monto por programar y hay proveedor enlazado.
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
+  const puedeProgramar =
+    esDireccion &&
+    factura != null &&
+    (factura.estado_cxp === 'por_pagar' || factura.estado_cxp === 'parcial') &&
+    factura.porProgramar > 0;
 
   const doCancelar = async (motivo: string) => {
     if (!factura) return;
@@ -1245,6 +1278,42 @@ function FacturaDrawer({
                 </div>
               </dl>
             </section>
+
+            {/* Programar pago (= autoriza, solo Dirección). Pone la acción en la
+                misma pantalla donde se clasifica partida/cuenta (pipeline S1). */}
+            {puedeProgramar && (
+              <>
+                <Separator />
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Programar pago
+                  </div>
+                  {factura.proveedor_id ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          Por programar{' '}
+                          <span className="font-semibold tabular-nums text-amber-600">
+                            {formatCurrency(factura.porProgramar)}
+                          </span>
+                        </span>
+                        <Button size="sm" className="gap-2" onClick={() => setProgramarOpen(true)}>
+                          <CalendarClock className="h-3.5 w-3.5" /> Programar pago
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Programar autoriza el pago (rol Dirección). Luego se ejecuta y se sube el
+                        comprobante en la pestaña Programación.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Enlaza un proveedor a la factura antes de programar el pago.
+                    </p>
+                  )}
+                </section>
+              </>
+            )}
 
             {/* Conceptos (líneas del CFDI, parseadas on-read del XML) */}
             <Separator />
@@ -1642,6 +1711,18 @@ function FacturaDrawer({
           confirmLabel="Cancelar factura"
           onClose={() => setMostrarCancelar(false)}
           onConfirm={doCancelar}
+        />
+      )}
+
+      {programarOpen && factura && (
+        <ProgramarFacturaDialog
+          factura={factura}
+          empresaId={empresaId}
+          onClose={() => setProgramarOpen(false)}
+          onDone={() => {
+            setProgramarOpen(false);
+            onProgramado();
+          }}
         />
       )}
     </DetailDrawer>
@@ -2097,6 +2178,161 @@ function RecibirXmlDialog({
               </Button>
             </>
           )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Dialog: programar (= autorizar) el pago de UNA factura desde el drawer ──────
+// Pipeline S1 corte 2: la pantalla Facturas absorbe la acción de programar.
+// "Programar = autoriza" → tras crear el pago (programado) se aprueba de
+// inmediato; el gate real lo impone el RPC server-side (admin O rol Dirección).
+
+function ProgramarFacturaDialog({
+  factura,
+  empresaId,
+  onClose,
+  onDone,
+}: {
+  factura: Factura;
+  empresaId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const feedback = useActionFeedback();
+  const [cuentas, setCuentas] = useState<{ id: string; nombre: string; banco: string | null }[]>(
+    []
+  );
+  const [cuentaId, setCuentaId] = useState('');
+  const [metodo, setMetodo] = useState('transferencia');
+  const [fecha, setFecha] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('cuentas_bancarias')
+        .select('id, nombre, banco')
+        .eq('empresa_id', empresaId)
+        .eq('activo', true)
+        .order('nombre');
+      if (activo)
+        setCuentas((data ?? []) as { id: string; nombre: string; banco: string | null }[]);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [empresaId]);
+
+  const handleSubmit = async () => {
+    if (!factura.proveedor_id) return;
+    setSubmitting(true);
+    setError(null);
+    const sb = createSupabaseBrowserClient();
+    // 1) Programar: crea el cxp_pago en estado 'programado' + la aplicación.
+    const { data: pagoId, error: progErr } = await sb.schema('erp').rpc('cxp_pago_programar', {
+      p_empresa_id: empresaId,
+      p_proveedor_id: factura.proveedor_id,
+      p_aplicaciones: [{ factura_id: factura.id, monto: factura.porProgramar }] as unknown as Json,
+      p_metodo_pago: metodo || undefined,
+      p_fecha_programada: fecha || undefined,
+      p_cuenta_bancaria_id: cuentaId || undefined,
+    });
+    if (progErr || !pagoId) {
+      setError(getSupabaseErrorMessage(progErr, 'No se pudo programar el pago.'));
+      setSubmitting(false);
+      return;
+    }
+    // 2) Programar = autoriza: aprobar de inmediato. El RPC valida Dirección/admin.
+    const { error: aprErr } = await sb
+      .schema('erp')
+      .rpc('cxp_pago_aprobar', { p_pago_id: pagoId as string });
+    setSubmitting(false);
+    if (aprErr) {
+      // Quedó programado pero no autorizado (no debería pasar: el botón ya gatea
+      // Dirección). Avisar sin bloquear — el pago existe y puede aprobarse aparte.
+      feedback.error(getSupabaseErrorMessage(aprErr, 'Se programó, pero no se pudo autorizar.'), {
+        title: 'Programado · falta autorizar',
+      });
+      onDone();
+      return;
+    }
+    feedback.success('Pago programado y autorizado', {
+      description: 'Pasa a la pestaña Programación para ejecutarlo y subir el comprobante.',
+    });
+    onDone();
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v && !submitting) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Programar pago</DialogTitle>
+          <DialogDescription>
+            {proveedorLabel(factura)} · {formatCurrency(factura.porProgramar)}. Al programar, el
+            pago queda autorizado (rol Dirección); no sale dinero hasta ejecutarlo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm">
+              <span className="text-xs text-muted-foreground">Método de pago</span>
+              <Combobox
+                value={metodo}
+                onChange={(v) => setMetodo(v ?? '')}
+                options={METODO_PAGO_OPTIONS}
+                placeholder="Método"
+                size="sm"
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-xs text-muted-foreground">Fecha programada</span>
+              <Input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                className="h-9"
+              />
+            </label>
+          </div>
+          <label className="space-y-1 text-sm">
+            <span className="text-xs text-muted-foreground">Cuenta bancaria (opcional)</span>
+            <Combobox
+              value={cuentaId}
+              onChange={(v) => setCuentaId(v ?? '')}
+              options={cuentas.map((c) => ({
+                value: c.id,
+                label: c.banco ? `${c.nombre} · ${c.banco}` : c.nombre,
+              }))}
+              placeholder={cuentas.length ? 'Elegir cuenta…' : 'Sin cuentas registradas'}
+              emptyText="Sin cuentas"
+              allowClear
+              size="sm"
+              className="w-full"
+            />
+          </label>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+            {submitting ? 'Programando…' : 'Programar y autorizar'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
