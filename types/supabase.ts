@@ -2952,6 +2952,131 @@ export type Database = {
         }
         Relationships: []
       }
+      gastos_notariales_config: {
+        Row: {
+          activa: boolean
+          anio: number
+          apertura_cuota_fija: number
+          apertura_umbral_cuota_fija: number
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          isai_pct: number
+          muni_avaluo_previo: number
+          muni_certificacion_planos: number
+          muni_copias_fotostaticas: number
+          muni_derechos: number
+          muni_valuacion_catastral: number
+          notas: string | null
+          otros_aviso_definitivo: number
+          otros_cnpr_por_derechohabiente: number
+          otros_copia_certificada: number
+          otros_forma_isai: number
+          otros_kinegrama: number
+          otros_plano: number
+          rp_aviso_preventivo: number
+          rp_clg: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          anio: number
+          apertura_cuota_fija?: number
+          apertura_umbral_cuota_fija?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          isai_pct?: number
+          muni_avaluo_previo?: number
+          muni_certificacion_planos?: number
+          muni_copias_fotostaticas?: number
+          muni_derechos?: number
+          muni_valuacion_catastral?: number
+          notas?: string | null
+          otros_aviso_definitivo?: number
+          otros_cnpr_por_derechohabiente?: number
+          otros_copia_certificada?: number
+          otros_forma_isai?: number
+          otros_kinegrama?: number
+          otros_plano?: number
+          rp_aviso_preventivo?: number
+          rp_clg?: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          anio?: number
+          apertura_cuota_fija?: number
+          apertura_umbral_cuota_fija?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          isai_pct?: number
+          muni_avaluo_previo?: number
+          muni_certificacion_planos?: number
+          muni_copias_fotostaticas?: number
+          muni_derechos?: number
+          muni_valuacion_catastral?: number
+          notas?: string | null
+          otros_aviso_definitivo?: number
+          otros_cnpr_por_derechohabiente?: number
+          otros_copia_certificada?: number
+          otros_forma_isai?: number
+          otros_kinegrama?: number
+          otros_plano?: number
+          rp_aviso_preventivo?: number
+          rp_clg?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gastos_notariales_tabulador: {
+        Row: {
+          config_id: string
+          empresa_id: string
+          id: string
+          limite_inferior: number
+          limite_superior: number | null
+          orden: number
+          tipo: string
+          valor_beneficio: number
+          valor_particular: number
+        }
+        Insert: {
+          config_id: string
+          empresa_id: string
+          id?: string
+          limite_inferior: number
+          limite_superior?: number | null
+          orden: number
+          tipo: string
+          valor_beneficio: number
+          valor_particular: number
+        }
+        Update: {
+          config_id?: string
+          empresa_id?: string
+          id?: string
+          limite_inferior?: number
+          limite_superior?: number | null
+          orden?: number
+          tipo?: string
+          valor_beneficio?: number
+          valor_particular?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gastos_notariales_tabulador_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "gastos_notariales_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_snapshot: {
         Row: {
           casas_en_obra: number
