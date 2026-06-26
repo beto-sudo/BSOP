@@ -34,6 +34,10 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   {
@@ -79,6 +83,10 @@ function CapturarFase3Body() {
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
   const [descuentoTotal, setDescuentoTotal] = useState<string>('');
+  // Autoguardado (ADR-051): firma del descuento persistido (arranca = lo cargado).
+  // Solo el descuento autoguarda — la fecha del contrato va a venta_fases.notas al
+  // avanzar (sin columna en dilesa.ventas), así que no tiene destino directo.
+  const [descuentoGuardado, setDescuentoGuardado] = useState<string>('');
   const [fechaContrato, setFechaContrato] = useState<string>(new Date().toISOString().slice(0, 10));
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
@@ -115,7 +123,10 @@ function CapturarFase3Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.descuento_total != null) setDescuentoTotal(String(v.descuento_total));
+      if (v.descuento_total != null) {
+        setDescuentoTotal(String(v.descuento_total));
+        setDescuentoGuardado(String(v.descuento_total));
+      }
 
       // Enforcement: Fase 2 cerrada + Fase 3 no cerrada.
       const { data: fRows } = await sb
@@ -137,6 +148,32 @@ function CapturarFase3Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado del descuento (ADR-051, vía RPC auditada D3) ────
+  // El descuento persiste al cambiarlo, por la MISMA RPC que el cierre
+  // (`fn_actualizar_descuentos_venta`) — registra cada cambio en el audit_log,
+  // no salta el rastro. La fecha del contrato NO autoguarda (va a notas al avanzar).
+  const auto = useAutoguardadoCampos({
+    clave: descuentoTotal,
+    claveGuardada: descuentoGuardado,
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      if (!venta) return { ok: false };
+      const descuento = descuentoTotal.trim() ? Number(descuentoTotal) : 0;
+      const { error: descErr } = await sb.schema('dilesa').rpc('fn_actualizar_descuentos_venta', {
+        p_venta_id: venta.id,
+        p_descuento_total: descuento,
+        p_motivo: 'Autoguardado en Formalizada (Fase 3)',
+      });
+      if (descErr)
+        return {
+          ok: false,
+          error: getSupabaseErrorMessage(descErr, 'No se pudo guardar el descuento.'),
+        };
+      setDescuentoGuardado(descuentoTotal);
+      return { ok: true };
+    },
+  });
 
   // ── Submit ─────────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -290,7 +327,10 @@ function CapturarFase3Body() {
         <form onSubmit={onSubmit} className="space-y-6">
           <DocsFaseSection state={docsFase} />
 
-          <Section title="Campos requeridos">
+          <Section
+            title="Campos requeridos"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Precio de asignación">
                 <div className="flex h-9 items-center rounded-md border border-[var(--border)] bg-[var(--bg)]/30 px-3 text-sm font-medium tabular-nums text-[var(--text)]">
@@ -345,12 +385,23 @@ function CapturarFase3Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );
