@@ -20,7 +20,18 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ban, Check, Copy, FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
+import {
+  Ban,
+  BookText,
+  Check,
+  Copy,
+  FileUp,
+  Link2,
+  RefreshCw,
+  Search,
+  Upload,
+  Wallet,
+} from 'lucide-react';
 
 import {
   ModuleFilters,
@@ -37,7 +48,7 @@ import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Combobox } from '@/components/ui/combobox';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -104,6 +115,8 @@ type Factura = {
   xml_url: string | null;
   pdf_url: string | null;
   partida_id: string | null;
+  /** Clasificación contable: cuenta del catálogo erp.cuentas_contables (DILESA). */
+  cuenta_contable_id: string | null;
   /** Destajo de origen (dilesa.estimaciones) si la factura nació de uno. */
   estimacion_id: string | null;
   /** Código del destajo de origen (para la bandeja "en espera"). */
@@ -383,6 +396,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [partidaLabelMap, setPartidaLabelMap] = useState<Map<string, string>>(new Map());
   const [proyectoNombreMap, setProyectoNombreMap] = useState<Map<string, string>>(new Map());
   const [partidaProyectoMap, setPartidaProyectoMap] = useState<Map<string, string>>(new Map());
+  // Cuentas contables afectables (DILESA) para clasificar el egreso: opciones
+  // del <Combobox> + mapa id→etiqueta. Iniciativa dilesa-catalogo-contable.
+  const [cuentaOpts, setCuentaOpts] = useState<ComboboxOption[]>([]);
+  const [cuentaLabelMap, setCuentaLabelMap] = useState<Map<string, string>>(new Map());
 
   // Columna "Partida" solo para empresas con presupuesto de obra (DILESA):
   // hace visible el gasto que NO suma al control presupuestal — una factura
@@ -415,8 +432,27 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         );
       },
     });
+    // Columna "Cuenta" (clasificación contable): hace visible el egreso sin
+    // clasificar para impulsar la captura. Iniciativa dilesa-catalogo-contable.
+    out.splice(out.findIndex((c) => c.key === 'partida') + 1, 0, {
+      key: 'cuenta_contable',
+      label: 'Cuenta',
+      sortable: false,
+      render: (f) =>
+        f.cuenta_contable_id ? (
+          <span className="block max-w-[180px] truncate text-xs text-muted-foreground">
+            {cuentaLabelMap.get(f.cuenta_contable_id) ?? 'Clasificada'}
+          </span>
+        ) : f.estado_cxp === 'cancelada' ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <Badge variant="outline" className="border-amber-500/60 text-amber-600">
+            Sin clasificar
+          </Badge>
+        ),
+    });
     return out;
-  }, [usaPartidas, partidaLabelMap]);
+  }, [usaPartidas, partidaLabelMap, cuentaLabelMap]);
 
   const fetchFacturas = useCallback(async () => {
     setLoading(true);
@@ -427,7 +463,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         .schema('erp')
         .from('facturas')
         .select(
-          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url, partida_id'
+          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url, partida_id, cuenta_contable_id'
         )
         .eq('empresa_id', empresaId)
         .eq('flujo', 'egreso')
@@ -604,6 +640,59 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     [feedback, fetchFacturas]
   );
 
+  // Carga del catálogo de cuentas afectables (solo DILESA) para el selector +
+  // la columna. El estado (cuentaOpts / cuentaLabelMap) vive arriba, junto a
+  // partidaProyectoMap, porque columnsConPartida lo consume.
+  useEffect(() => {
+    if (!usaPartidas) return;
+    let activo = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('cuentas_contables')
+        .select('id, numero, nombre, codigo_contpaqi, tipo')
+        .eq('empresa_id', empresaId)
+        .eq('afectable', true)
+        .eq('activa', true)
+        .is('deleted_at', null)
+        .order('numero', { ascending: true });
+      if (!activo) return;
+      const filas = data ?? [];
+      setCuentaOpts(
+        filas.map((c) => ({
+          value: c.id,
+          label: `${c.numero} · ${c.nombre}`,
+          searchLabel: `${c.numero.replace(/-/g, ' ')} ${c.nombre}`,
+          keywords: [c.numero, c.codigo_contpaqi ?? '', c.tipo].filter(Boolean),
+        }))
+      );
+      setCuentaLabelMap(new Map(filas.map((c) => [c.id, `${c.numero} · ${c.nombre}`])));
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [usaPartidas, empresaId]);
+
+  const asignarCuenta = useCallback(
+    async (facturaId: string, cuentaId: string | null) => {
+      const sb = createSupabaseBrowserClient();
+      const { error: e } = await sb
+        .schema('erp')
+        .from('facturas')
+        .update({ cuenta_contable_id: cuentaId })
+        .eq('id', facturaId);
+      if (e) {
+        feedback.error(getSupabaseErrorMessage(e, 'No se pudo asignar la cuenta.'));
+        return;
+      }
+      feedback.success(cuentaId ? 'Cuenta asignada' : 'Cuenta quitada');
+      setSelected((s) => (s && s.id === facturaId ? { ...s, cuenta_contable_id: cuentaId } : s));
+      void fetchFacturas();
+    },
+    [feedback, fetchFacturas]
+  );
+
   const filtered = useMemo(() => {
     return facturas.filter((f) => {
       if (estado && f.estado_cxp !== estado) return false;
@@ -757,8 +846,13 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         partidaLabelMap={partidaLabelMap}
         proyectoNombreMap={proyectoNombreMap}
         partidaProyectoMap={partidaProyectoMap}
+        cuentaOpts={cuentaOpts}
+        cuentaLabelMap={cuentaLabelMap}
         onAsignar={async (partidaId) => {
           if (selected) await asignarPartida(selected.id, partidaId);
+        }}
+        onAsignarCuenta={async (cuentaId) => {
+          if (selected) await asignarCuenta(selected.id, cuentaId);
         }}
         onCancelada={() => {
           setDrawerOpen(false);
@@ -808,7 +902,10 @@ function FacturaDrawer({
   partidaLabelMap,
   proyectoNombreMap,
   partidaProyectoMap,
+  cuentaOpts,
+  cuentaLabelMap,
   onAsignar,
+  onAsignarCuenta,
   onCancelada,
 }: {
   factura: Factura | null;
@@ -821,7 +918,10 @@ function FacturaDrawer({
   partidaLabelMap: Map<string, string>;
   proyectoNombreMap: Map<string, string>;
   partidaProyectoMap: Map<string, string>;
+  cuentaOpts: ComboboxOption[];
+  cuentaLabelMap: Map<string, string>;
   onAsignar: (partidaId: string | null) => Promise<void>;
+  onAsignarCuenta: (cuentaId: string | null) => Promise<void>;
   /** Refresca la lista + cierra el drawer tras cancelar la factura. */
   onCancelada: () => void;
 }) {
@@ -837,6 +937,9 @@ function FacturaDrawer({
   const [selProy, setSelProy] = useState('');
   const [selPart, setSelPart] = useState('');
   const [guardandoPartida, setGuardandoPartida] = useState(false);
+  const [editCuenta, setEditCuenta] = useState(false);
+  const [selCuenta, setSelCuenta] = useState('');
+  const [guardandoCuenta, setGuardandoCuenta] = useState(false);
 
   // Cierra el editor cuando cambia la factura (ajuste de estado en render, no en effect).
   const [trackedFacturaId, setTrackedFacturaId] = useState<string | null>(null);
@@ -844,6 +947,8 @@ function FacturaDrawer({
     setTrackedFacturaId(factura?.id ?? null);
     setEditPartida(false);
     setGuardandoPartida(false);
+    setEditCuenta(false);
+    setGuardandoCuenta(false);
   }
 
   useEffect(() => {
@@ -1227,6 +1332,91 @@ function FacturaDrawer({
                           }}
                         >
                           {guardandoPartida ? 'Guardando…' : 'Asignar'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+
+            {/* Cuenta contable (clasificación contable del egreso, DILESA).
+                Iniciativa dilesa-catalogo-contable. La cuenta vive en
+                erp.facturas.cuenta_contable_id; el selector ofrece solo cuentas
+                afectables del catálogo. */}
+            {usaPartidas && (
+              <>
+                <Separator />
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Cuenta contable
+                  </div>
+                  {!editCuenta ? (
+                    <div className="flex items-center justify-between gap-2">
+                      {factura.cuenta_contable_id ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <BookText className="h-4 w-4 text-muted-foreground" />
+                          {cuentaLabelMap.get(factura.cuenta_contable_id) ?? '—'}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Sin clasificar.</span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelCuenta(factura.cuenta_contable_id ?? '');
+                          setEditCuenta(true);
+                        }}
+                      >
+                        {factura.cuenta_contable_id ? 'Cambiar' : 'Clasificar'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Combobox
+                        value={selCuenta}
+                        onChange={setSelCuenta}
+                        options={cuentaOpts}
+                        placeholder="Cuenta contable…"
+                        searchPlaceholder="Buscar por número o nombre…"
+                        allowClear
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        {factura.cuenta_contable_id ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={guardandoCuenta}
+                            onClick={async () => {
+                              setGuardandoCuenta(true);
+                              await onAsignarCuenta(null);
+                              setGuardandoCuenta(false);
+                              setEditCuenta(false);
+                            }}
+                          >
+                            Quitar
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={guardandoCuenta}
+                          onClick={() => setEditCuenta(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!selCuenta || guardandoCuenta}
+                          onClick={async () => {
+                            setGuardandoCuenta(true);
+                            await onAsignarCuenta(selCuenta);
+                            setGuardandoCuenta(false);
+                            setEditCuenta(false);
+                          }}
+                        >
+                          {guardandoCuenta ? 'Guardando…' : 'Clasificar'}
                         </Button>
                       </div>
                     </div>

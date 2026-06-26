@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el schema es multi-empresa y queda listo para replicar a ANSA/COAGAN/RDB/Nigropetense cuando tengan su export CONTPAQi)
 **Schemas afectados:** `erp` (tabla nueva `cuentas_contables`, jerárquica self-FK, RLS empresa-scoped set-membership; Sprint 2 agrega columna `cuenta_contable_id` a `erp.facturas` y `erp.gastos`). `core` (RBAC: módulo nuevo `dilesa.contabilidad` + sub-slug del catálogo, ADR-014/030). Loader Python desde el export CONTPAQi en `scripts/import-contpaqi/`. **Línea roja:** v1 NO toca partida doble / pólizas / balanza — solo el catálogo y la clasificación contable de egresos que ya pasan por CxP.
 **Estado:** in_progress
-**Próximo hito:** Sprint 3 — ligar el selector de cuenta en la captura de factura (CxP) + auto-sugerencia (categoría/partida → cuenta) + vista de egresos sin clasificar. Sprints 1 (catálogo en prod, #1046) y 2 (módulo Contabilidad + catálogo navegable + columna `cuenta_contable_id`) ya aplicados a prod.
+**Próximo hito:** **v1 funcionalmente completo** (Sprints 1-3 en main): catálogo cargado + módulo Contabilidad en el sidebar + factura de CxP clasificable a una cuenta (selector + columna «sin clasificar»). Beto decide si cierra la iniciativa o suma los extras opcionales: auto-sugerencia (categoría/partida → cuenta) y clasificación de `erp.gastos` cuando exista su UI de captura (hoy no hay form de gasto en la app).
 **Dueño:** Beto
 **Creada:** 2026-06-25
-**Última actualización:** 2026-06-26 (Sprint 2 — módulo Contabilidad en el sidebar + catálogo navegable + `cuenta_contable_id` en facturas/gastos, aplicado a prod)
+**Última actualización:** 2026-06-26 (Sprint 3 — selector de cuenta en la captura de factura (CxP) + columna «sin clasificar» en la lista)
 
 > Detonante: los gastos de DILESA ya se registran y pagan por CxP en BSOP, pero
 > sin ninguna clasificación contable — `erp.facturas` y `erp.gastos` no tienen a
@@ -136,6 +136,12 @@ H→acreedora, L/K→orden); `tipo` del primer dígito del mayor (1 Activo … 8
   (tabla indentada por nivel, filtros tipo/naturaleza, buscador, KPIs);
   (3) columna `cuenta_contable_id` (nullable, FK) en `erp.facturas` y
   `erp.gastos` — el enganche para clasificar; su UI de captura va en Sprint 3.
+- **2026-06-26** — Sprint 3 (autónomo, **sin migración** — la columna ya existe):
+  selector de cuenta en el `FacturaDrawer` de CxP (`<Combobox>` con buscador,
+  solo cuentas afectables; asigna vía `.update()` directo, mirror de la asignación
+  de partida) + columna **«Cuenta»** en la lista que marca `Sin clasificar` en
+  ámbar. Cierra el alcance v1 «catálogo + ligar CxP» que Beto aprobó. Gastos
+  queda con la columna pero sin UI (no hay form de captura de gasto en la app).
 
 ## Decisiones registradas
 
