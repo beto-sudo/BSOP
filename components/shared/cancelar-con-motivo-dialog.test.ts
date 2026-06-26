@@ -9,7 +9,8 @@ import path from 'node:path';
  *
  * Contrato clave (D1: cancelar con motivo para auditoría):
  *  - el motivo es obligatorio por default y bloquea el botón confirmar;
- *  - el confirmar es destructivo;
+ *  - el confirmar es destructivo por default (configurable vía `confirmVariant`
+ *    para reusarlo en confirmaciones no destructivas, p. ej. override del tope);
  *  - si onConfirm lanza, el diálogo NO se cierra (el caller muestra el error).
  */
 const src = readFileSync(path.resolve(__dirname, 'cancelar-con-motivo-dialog.tsx'), 'utf8');
@@ -20,8 +21,9 @@ describe('CancelarConMotivoDialog (p2p-cancelaciones)', () => {
     expect(src).toMatch(/canConfirm\s*=\s*!motivoRequerido \|\| motivo\.trim\(\)\.length/);
   });
 
-  it('el botón confirmar es destructivo y se deshabilita sin motivo', () => {
-    expect(src).toContain('variant="destructive"');
+  it('el botón confirmar es destructivo por default y se deshabilita sin motivo', () => {
+    expect(src).toContain("confirmVariant = 'destructive'"); // default preservado
+    expect(src).toContain('variant={confirmVariant}');
     expect(src).toContain('disabled={!canConfirm || submitting}');
   });
 

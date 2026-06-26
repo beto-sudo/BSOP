@@ -25,6 +25,10 @@ export function CancelarConMotivoDialog({
   title,
   description,
   confirmLabel = 'Cancelar',
+  /** Texto del botón mientras se ejecuta `onConfirm`. */
+  submittingLabel = 'Cancelando…',
+  /** Variante del botón de confirmar — `destructive` por default (cancelaciones). */
+  confirmVariant = 'destructive',
   motivoRequerido = true,
   placeholder = 'Ej. error de captura, duplicado…',
   onClose,
@@ -33,6 +37,8 @@ export function CancelarConMotivoDialog({
   title: React.ReactNode;
   description?: React.ReactNode;
   confirmLabel?: string;
+  submittingLabel?: string;
+  confirmVariant?: 'default' | 'destructive';
   motivoRequerido?: boolean;
   placeholder?: string;
   onClose: () => void;
@@ -79,11 +85,11 @@ export function CancelarConMotivoDialog({
             Volver
           </Button>
           <Button
-            variant="destructive"
+            variant={confirmVariant}
             onClick={() => void handleConfirm()}
             disabled={!canConfirm || submitting}
           >
-            {submitting ? 'Cancelando…' : confirmLabel}
+            {submitting ? submittingLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

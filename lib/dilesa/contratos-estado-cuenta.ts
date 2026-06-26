@@ -118,3 +118,26 @@ export const TIPO_CONTRATO_LABEL: Record<string, string> = {
   obra_cabecera: 'Obra de cabecera',
   tarea_menor: 'Tarea menor',
 };
+
+/** Tolerancia (1 peso) para el tope vs contrato — absorbe el redondeo de centavos. */
+export const TOPE_EPSILON = 1;
+
+/**
+ * Tope duro vs el valor del contrato (S2): ¿autorizar esta estimación llevaría
+ * el devengado por encima del valor contratado? Espejo del guard server-side en
+ * `dilesa.obra_estimacion_autorizar` — el front lo usa para pedir el override de
+ * Dirección (motivo) antes de llamar la RPC, que de todos modos re-valida.
+ *
+ * `devengadoActual` = devengado neto del contrato SIN esta estimación (la que se
+ * autoriza está en borrador → no cuenta aún). Solo las estimaciones positivas
+ * pueden exceder; valor_total <= 0 se exime (contrato sin valor capturado).
+ */
+export function excedeTopeContrato(
+  devengadoActual: number,
+  montoEstimacion: number,
+  valorTotal: number
+): boolean {
+  if (montoEstimacion <= 0) return false;
+  if (valorTotal <= 0) return false;
+  return devengadoActual + montoEstimacion > valorTotal + TOPE_EPSILON;
+}
