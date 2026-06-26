@@ -32,6 +32,14 @@ type Script = {
   }[];
   /** dilesa.estimaciones para resolver el código del destajo. */
   estimaciones?: { id: string; codigo: string }[];
+  /** erp.personas de los contratistas de los placeholders (RFC + nombre). */
+  placeholderPersonas?: {
+    id: string;
+    rfc: string | null;
+    nombre: string | null;
+    apellido_paterno: string | null;
+    apellido_materno: string | null;
+  }[];
 };
 
 type Calls = {
@@ -113,6 +121,7 @@ function buildAdminMock(): any {
               let data: unknown = null;
               if (key === 'erp.facturas' && usedNot) data = script.placeholders ?? [];
               else if (key === 'dilesa.estimaciones') data = script.estimaciones ?? [];
+              else if (key === 'erp.personas') data = script.placeholderPersonas ?? [];
               return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
             },
           };
@@ -173,6 +182,19 @@ const XML_OTRO_RECEPTOR = XML_OK.replace('DIE030904866', 'XXX010101XX1').replace
   '88888888-8888-8888-8888-888888888888'
 );
 const XML_MALO = 'esto no es un CFDI';
+
+// Destajo del caso "persona duplicada": el emisor (con RFC) matchea una persona
+// distinta a la del placeholder (sin RFC), pero el nombre coincide. Total 1100.
+const XML_DESTAJO_NOMBRE = `<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+  Version="4.0" Serie="A" Folio="77" Fecha="2026-06-20T10:30:00"
+  SubTotal="1100.00" Total="1100.00" Moneda="MXN" FormaPago="03" MetodoPago="PUE" TipoDeComprobante="I">
+  <cfdi:Emisor Rfc="SAMD8409154U7" Nombre="DAVID EDUARDO SALAZAR MORALES" RegimenFiscal="612"/>
+  <cfdi:Receptor Rfc="DIE030904866" Nombre="DESARROLLO INMOBILIARIO" UsoCFDI="G03"/>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital Version="1.1" UUID="11112222-3333-4444-5555-666677778888" FechaTimbrado="2026-06-20T10:31:00"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>`;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -321,11 +343,18 @@ describe('POST /api/[empresa]/cxp/facturas/upload-xml', () => {
   function makeReqRaw(fields: {
     analyze?: boolean;
     decisiones?: Record<string, string>;
+    xml?: string;
+    filename?: string;
   }): NextRequest {
     const fd = new FormData();
     if (fields.analyze) fd.append('analyze', '1');
     if (fields.decisiones) fd.append('decisiones', JSON.stringify(fields.decisiones));
-    fd.append('file', new File([XML_OK], 'a.xml', { type: 'application/xml' }));
+    fd.append(
+      'file',
+      new File([fields.xml ?? XML_OK], fields.filename ?? 'a.xml', {
+        type: 'application/xml',
+      })
+    );
     return new NextRequest(new URL('http://localhost/api/dilesa/cxp/facturas/upload-xml'), {
       method: 'POST',
       body: fd,
@@ -361,6 +390,36 @@ describe('POST /api/[empresa]/cxp/facturas/upload-xml', () => {
     const body = await res.json();
     expect(body.analisis[0].candidatos).toHaveLength(0);
     expect(body.analisis[0].sugerencia).toBe('normal');
+  });
+
+  it('analyze → reconoce el destajo por nombre aunque la persona del destajo no tenga RFC (duplicado)', async () => {
+    // El placeholder cuelga de una persona SIN RFC; el emisor del CFDI matchea
+    // OTRA persona (con RFC). Mismo humano → debe ofrecerse el destajo igual.
+    script.placeholders = [
+      { id: 'ph-david', proveedor_id: 'prov-destajo', total: 1200, estimacion_id: 'est-david' },
+    ];
+    script.estimaciones = [{ id: 'est-david', codigo: 'EST-2026-W26-SALA-001' }];
+    script.placeholderPersonas = [
+      {
+        id: 'prov-destajo',
+        rfc: null,
+        nombre: 'DAVID EDUARDO',
+        apellido_paterno: 'SALAZAR',
+        apellido_materno: 'MORALES',
+      },
+    ];
+    script.personaByRfc = { SAMD8409154U7: { id: 'persona-con-rfc' } };
+    const res = await POST(
+      makeReqRaw({ analyze: true, xml: XML_DESTAJO_NOMBRE, filename: 'david.xml' }),
+      params
+    );
+    expect(res.status).toBe(200);
+    const a = (await res.json()).analisis[0];
+    expect(a.ok).toBe(true);
+    expect(a.proveedorId).toBe('persona-con-rfc'); // distinto al del destajo
+    expect(a.candidatos).toHaveLength(1);
+    expect(a.candidatos[0]).toMatchObject({ facturaId: 'ph-david', neto: 1200, delta: 100 });
+    expect(a.sugerencia).toBe('ph-david');
   });
 
   it('commit con decisiones → asocia el CFDI al destajo (recibir_cfdi, no alta)', async () => {

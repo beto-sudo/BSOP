@@ -73,10 +73,25 @@ type CxpFacturaAltaArgs = Database['erp']['Functions']['cxp_factura_alta']['Args
 type DestajoPlaceholder = {
   facturaId: string;
   proveedorId: string | null;
+  /** RFC del contratista del destajo (puede faltar si la persona no lo tiene). */
+  proveedorRfc: string | null;
+  /** Nombre del contratista del destajo, para el fallback por nombre. */
+  proveedorNombre: string | null;
   neto: number;
   estimacionId: string;
   codigo: string | null;
 };
+
+/** Normaliza un nombre para comparar: sin acentos, mayúsculas, espacios colapsados. */
+function normNombre(s: string | null | undefined): string {
+  if (!s) return '';
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 type DestajoCandidato = {
   facturaId: string;
@@ -105,15 +120,31 @@ type AnalisisArchivo = {
 
 const NETO_EPS = 1.005; // tolerancia de redondeo para "CFDI ≤ neto".
 
-/** Destajos abiertos cuyo neto ≥ total del CFDI (puede ser menor por materiales), tightest primero. */
+/**
+ * Destajos abiertos cuyo neto ≥ total del CFDI (puede ser menor por materiales),
+ * tightest primero. El contratista se reconoce por `proveedor_id`, por RFC, o
+ * por nombre normalizado — esto último rescata el caso de personas duplicadas
+ * (el destajo se capturó con una persona sin RFC y el CFDI matchea otra con RFC,
+ * mismo humano). El operador confirma en el review, así que el match por nombre
+ * es seguro.
+ */
 function candidatosParaCfdi(
   placeholders: DestajoPlaceholder[],
   proveedorId: string | null,
+  emisorRfc: string | null,
+  emisorNombre: string | null,
   total: number
 ): DestajoCandidato[] {
-  if (!proveedorId) return [];
+  const rfc = emisorRfc ? emisorRfc.toUpperCase().trim() : null;
+  const nom = normNombre(emisorNombre);
   return placeholders
-    .filter((p) => p.proveedorId === proveedorId && total <= p.neto * NETO_EPS)
+    .filter((p) => {
+      if (total > p.neto * NETO_EPS) return false;
+      const mismoProveedor = !!proveedorId && p.proveedorId === proveedorId;
+      const mismoRfc = !!rfc && !!p.proveedorRfc && p.proveedorRfc.toUpperCase().trim() === rfc;
+      const mismoNombre = !!nom && normNombre(p.proveedorNombre) === nom;
+      return mismoProveedor || mismoRfc || mismoNombre;
+    })
     .map((p) => ({
       facturaId: p.facturaId,
       codigo: p.codigo,
@@ -160,9 +191,30 @@ async function fetchDestajoPlaceholders(
       .in('id', estIds);
     for (const e of ests ?? []) codigoPorEst.set(e.id as string, (e.codigo as string | null) ?? '');
   }
+
+  // RFC + nombre del contratista de cada placeholder, para reconocerlo aunque la
+  // persona-id difiera de la que matchea el CFDI (personas duplicadas con/sin RFC).
+  const provIds = [...new Set(rows.map((r) => r.proveedor_id).filter((x): x is string => !!x))];
+  const persona = new Map<string, { rfc: string | null; nombre: string }>();
+  if (provIds.length > 0) {
+    const { data: pers } = await admin
+      .schema('erp')
+      .from('personas')
+      .select('id, rfc, nombre, apellido_paterno, apellido_materno')
+      .in('id', provIds);
+    for (const p of pers ?? []) {
+      persona.set(p.id as string, {
+        rfc: (p.rfc as string | null) ?? null,
+        nombre: [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' '),
+      });
+    }
+  }
+
   return rows.map((r) => ({
     facturaId: r.id,
     proveedorId: r.proveedor_id,
+    proveedorRfc: r.proveedor_id ? (persona.get(r.proveedor_id)?.rfc ?? null) : null,
+    proveedorNombre: r.proveedor_id ? (persona.get(r.proveedor_id)?.nombre ?? null) : null,
     neto: Number(r.total ?? 0),
     estimacionId: r.estimacion_id,
     codigo: codigoPorEst.get(r.estimacion_id) ?? null,
@@ -422,7 +474,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           .eq('rfc', cfdi.emisorRfc)
           .maybeSingle();
         a.proveedorId = prov?.id ?? null;
-        a.candidatos = candidatosParaCfdi(placeholders, a.proveedorId, cfdi.total);
+        a.candidatos = candidatosParaCfdi(
+          placeholders,
+          a.proveedorId,
+          cfdi.emisorRfc,
+          cfdi.emisorNombre,
+          cfdi.total
+        );
         a.sugerencia = sugerirAccion(a.candidatos, cfdi.total);
         a.ok = true;
       } catch (e) {
