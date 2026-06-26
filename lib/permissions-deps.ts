@@ -98,6 +98,8 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'dilesa.cxp.proveedores': [],
   'dilesa.manual': [],
   'dilesa.atencion_clientes': [],
+  // Contabilidad — catálogo de cuentas, standalone read-only (sin dependencias).
+  'dilesa.contabilidad': [],
   'dilesa.portafolio': [],
   // Hub Portafolio (ADR-030): tabs Inventario / Evaluación.
   'dilesa.portafolio.inventario': [],

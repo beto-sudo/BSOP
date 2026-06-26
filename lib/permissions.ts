@@ -146,6 +146,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // sub-slugs: ambos comparten el permiso `dilesa.atencion_clientes`.
   '/dilesa/atencion-clientes': 'dilesa.atencion_clientes',
   '/dilesa/atencion-clientes/respuestas': 'dilesa.atencion_clientes',
+  // Contabilidad — catálogo de cuentas (iniciativa dilesa-catalogo-contable).
+  // Módulo plano por ahora (una página); se vuelve hub con sub-slugs cuando
+  // lleguen balance/movimientos (ADR-030).
+  '/dilesa/contabilidad': 'dilesa.contabilidad',
 
   // RDB — home + operaciones
   '/rdb/home': 'rdb.home',

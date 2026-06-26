@@ -2617,6 +2617,7 @@ _(sin columnas)_
 - **partida_id** `uuid` — FK → `erp.presupuesto_partidas(id)`
 - **contrato_id** `uuid` — FK → `dilesa.contratos_construccion(id)`
 - **estimacion_id** `uuid` — FK → `dilesa.estimaciones(id)`
+- **cuenta_contable_id** `uuid` — FK → `erp.cuentas_contables(id)`
 
 ### `erp.finiquitos`
 
@@ -2666,6 +2667,7 @@ _(sin columnas)_
 - **registrado** `boolean` NOT NULL DEFAULT `false`
 - **created_at** `timestamp with time zone` NOT NULL DEFAULT `now()`
 - **updated_at** `timestamp with time zone`
+- **cuenta_contable_id** `uuid` — FK → `erp.cuentas_contables(id)`
 
 ### `erp.inventario`
 

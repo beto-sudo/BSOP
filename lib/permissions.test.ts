@@ -401,6 +401,9 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // Bandeja de Atención a Clientes (iniciativa dilesa-atencion-clientes Sprint 2).
   // Módulo top-level; cola de Ciori sobre datos existentes.
   'dilesa.atencion_clientes',
+  // Contabilidad — catálogo de cuentas (iniciativa dilesa-catalogo-contable
+  // Sprint 2). Módulo plano; migración 20260626033843_dilesa_modulo_contabilidad.sql.
+  'dilesa.contabilidad',
   // Sub-slugs por fase del pipeline (Sprint 7a captura por fase)
   'dilesa.ventas.fase01_solicitud',
   'dilesa.ventas.fase02_asignada',
