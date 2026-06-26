@@ -2,12 +2,12 @@ node_modules
 .next
 .env.local
 .env.test.local
-.env.test.local.example
 .vercel
 
 # Playwright
 playwright/.auth/
 playwright-report/
+test-results/
 test-results/
 
 # Build artifacts
