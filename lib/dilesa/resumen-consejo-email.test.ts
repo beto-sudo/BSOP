@@ -193,17 +193,22 @@ describe('renderResumenConsejoHtml — 4 secciones', () => {
     expect(html).toContain('Utilidad potencial total en inventario');
   });
 
-  it('renderiza el pipeline vivo y la línea de histórico aparte', () => {
+  it('renderiza el pipeline vivo (con movimiento del día) y la línea de histórico aparte', () => {
     const html = renderResumenConsejoHtml(
       {
         ...EMPTY,
-        tuberiaViva: [{ fase: 'Formalizada', clientes: 20, valor: 22000000 }],
+        tuberiaViva: [
+          { fase: 'Formalizada', clientes: 20, valor: 22000000, hoy: 3 },
+          { fase: 'Escriturada', clientes: 8, valor: 12000000, hoy: 0 },
+        ],
         tuberiaHistorico: { clientes: 1093, valor: 1060000000 },
       },
       { fechaTitulo: 'x' }
     );
     expect(html).toContain('Pipeline de Ventas (vivo)');
     expect(html).toContain('Formalizada');
+    expect(html).toContain('Movimiento del día');
+    expect(html).toContain('+3'); // entradas de hoy a Formalizada
     expect(html).toContain('Histórico acumulado: 1,093 operaciones');
   });
 
@@ -262,7 +267,7 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
     ]);
     // Solo la fase con clientes vivos; las fases en 0 se filtran del funnel.
     // `valor_escrituracion` tiene precedencia sobre `precio_asignacion` (el 9999 se ignora).
-    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 1500 }]);
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 1500, hoy: 0 }]);
     expect(historico).toEqual({ clientes: 2, valor: 3000 });
   });
 
@@ -282,7 +287,7 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
       },
     ]);
     // 800 (fallback a precio_asignacion) + 1200 (valor_escrituracion gana) = 2000.
-    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 2000 }]);
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 2, valor: 2000, hoy: 0 }]);
   });
 
   it('junta en "Sin fase asignada" las activas con fase NULL o fuera de catálogo', () => {
@@ -295,7 +300,12 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
         precio_asignacion: null,
       },
     ]);
-    expect(viva[viva.length - 1]).toEqual({ fase: 'Sin fase asignada', clientes: 2, valor: 700 });
+    expect(viva[viva.length - 1]).toEqual({
+      fase: 'Sin fase asignada',
+      clientes: 2,
+      valor: 700,
+      hoy: 0,
+    });
   });
 
   it('excluye desasignadas/expiradas: no entran ni al funnel ni al histórico', () => {
@@ -315,6 +325,28 @@ describe('armarTuberiaSplit — pipeline vivo vs histórico', () => {
     ]);
     expect(viva).toEqual([]);
     expect(historico).toEqual({ clientes: 0, valor: 0 });
+  });
+
+  it('anota el movimiento del día por posición de fase', () => {
+    const movHoy = new Map<number, number>([
+      [2, 3], // 3 ventas entraron a Asignada (pos 2) hoy
+      [1, 1], // 1 entró a Asignación Solicitada (pos 1) — sin clientes vivos, no aparece
+    ]);
+    const { viva } = armarTuberiaSplit(
+      CAT,
+      [
+        {
+          estado: 'activa',
+          fase_actual: 'Asignada',
+          valor_escrituracion: 1000,
+          precio_asignacion: null,
+        },
+      ],
+      movHoy
+    );
+    // El movimiento se anota en la fila por posición; pos 1 no tiene clientes
+    // vivos, así que su movimiento no aparece en el funnel (lo muestra el módulo Fases).
+    expect(viva).toEqual([{ fase: 'Asignada', clientes: 1, valor: 1000, hoy: 3 }]);
   });
 });
 

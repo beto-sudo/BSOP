@@ -1,0 +1,130 @@
+# Iniciativa — Autoguardado de campos en la captura de fase (DILESA)
+
+**Slug:** `dilesa-autoguardado-captura`
+**Empresas:** DILESA
+**Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
+**Estado:** in_progress
+**Próximo hito:** Fase 8 (Dictaminada) — la última con campos; tratamiento especial por ser financiera (cuadratura + re-firma): Gerencia autoguarda los datos del dictamen, Dirección cierra (ADR-051 D5). Pendiente de hacer con calidad + revisión en preview.
+**Dueño:** Beto
+**Creada:** 2026-06-26
+**Última actualización:** 2026-06-26 (Sprints 1-3a en prod: 8 fases con campos [9/4/7/11/3/5/6/12] + smoke E2E. Falta solo la fase 8; la 15/16 quedan fuera por diseño)
+
+> Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
+> fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
+> se persisten solo al avanzar la fase. Beto: _"hay que ver todos los campos igual que los
+> archivos para que persistan"_. La fase 10 ya tiene el molde (autoguardado debounced).
+
+## Problema
+
+Los campos de información de las pantallas de captura (fechas, montos, referencias, notas)
+se persisten **solo al presionar el botón que avanza la fase** (`marcarFase` + `camposVenta`).
+Si alguien captura datos pero no avanza —botón de otro rol (fase 8: Gerencia captura,
+Dirección cierra), falta una precondición, o cambia de pantalla— **pierde lo tecleado**.
+Es el mismo problema que ya se resolvió para los documentos, pero para los campos.
+
+## Outcome esperado
+
+Cada campo de captura **persiste al teclearse** (autoguardado debounced ~700 ms), con un
+indicador `Guardando… / Guardado ✓`, sin botón extra. El avance de fase queda **separado** de
+la captura (el botón solo avanza). En la fase 8, **Gerencia autoguarda los datos del dictamen**
+y **Dirección sigue controlando** la cuadratura/cierre (ADR-048 intacto). Paridad con los
+documentos: lo que se teclea no se pierde al salir.
+
+## Alcance
+
+Diseño y patrón en **[ADR-051](../adr/051_autoguardado_campos_captura_fase.md)**. Rollout por fases:
+
+- **Sprint 1 — patrón + piloto + simples:** hook `useAutoguardadoCampos` + `<IndicadorAutoguardado>`
+  - fases que solo capturan fechas/refs/notas (sin RPC ni gate financiero): **9** (piloto),
+    **4, 7, 11, 15**.
+- **Sprint 2 — campos con RPC auditada:** **3** (descuento → `fn_actualizar_descuentos_venta`),
+  **5** (avalúo → `fn_corregir_avaluo_venta`). El autoguardado llama la RPC, no UPDATE directo.
+- **Sprint 3 — financieras con gate:** **6** (montos de crédito), **8** (Gerencia autoguarda los
+  datos del dictamen; cuadratura/pagaré/avance = Dirección), **12** (detonación manual),
+  **16** (encuesta → `venta_encuestas`).
+
+Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
+
+## Riesgos
+
+- **Producción financiera.** Las fases 3/5/6/8/12 escriben cifras que alimentan la cuadratura,
+  la NC y la utilidad. El autoguardado no debe saltarse RPCs auditadas (ADR-051 D3) ni
+  recalcular con valores a medio teclear → debounce + de-dup + respetar el gate de cada fase.
+- **Triggers de avance.** Separar captura de avance (D4) sin romper los triggers que hoy corren
+  al insertar en `venta_fases`. Verificar fase por fase.
+- **Escrituras de más.** Un autoguardado mal puesto puede disparar UPDATEs en bucle → el hook
+  de-dup por firma y solo guarda si cambió respecto a lo persistido.
+
+## Métricas de éxito
+
+- 0 pérdidas de datos al salir de una pantalla de captura sin avanzar.
+- La fase 8 conserva lo que captura Gerencia sin que Gerencia pueda cerrar.
+- Un solo patrón (hook) en todas las fases; sin debounce re-implementado por pantalla.
+- Las cifras financieras siguen pasando por sus RPCs auditadas (audit trail intacto).
+
+## Bitácora
+
+- **2026-06-26** — Promovida. Detonante: el barrido de las 17 fases (persistencia de documentos,
+  PRs #1067/#1070/#1071) + directiva de Beto de extender el principio a los campos. Decisiones de
+  Beto: (1) **promover a iniciativa** con rollout por fases; (2) **fase 8 — Gerencia autoguarda los
+  datos del dictamen, Dirección cierra**. Diseño en **[ADR-051](../adr/051_autoguardado_campos_captura_fase.md)**.
+- **2026-06-26 (Sprint 1)** — **[PR #1072](https://github.com/beto-sudo/BSOP/pull/1072) (mergeado):**
+  hook `useAutoguardadoCampos` + `<IndicadorAutoguardado>` (`components/dilesa/captura/autoguardado-campos.tsx`)
+  - piloto **fase 9** (fecha de validación patronal). **Sprint 1b (este PR):** fases **4** (valuador +
+    fecha de solicitud de avalúo) y **7** (notario + fecha de solicitud de dictamen) — autoguardan al
+    cambiar; el email al valuador/notario sigue disparándose solo al avanzar. Patrón confirmado:
+    el `Section` local gana un `accion` para el indicador; cada fase añade un estado "guardado"
+    (firma persistida que arranca = lo cargado, para no autoguardar el default "hoy"). **Falta del
+    Sprint 1:** fase **11** (escritura/cheque/monto, 4 campos). La fase **15** (notas) queda fuera —
+    sus notas van a `venta_fases` al avanzar, sin columna en `dilesa.ventas` donde autoguardar.
+- **2026-06-26 (Sprint 1c — cierre + chequeo Playwright)** — fase **11** (4 campos de
+  escritura/cheque → `dilesa.ventas`) autoguarda al cambiar. **Chequeo Playwright** (Beto):
+  smoke `tests/e2e/smoke/auth-dilesa-captura-fases.spec.ts` que recorre las **17** pantallas de
+  captura y verifica que cargan sin crash (sin overlay de Next, body con contenido). Alcance con
+  el bot `e2e-bot` (viewer, 0 fases con escritura): confirma que ninguna ruta revienta al cablear
+  el autoguardado; el form no se monta (gate `write`) y el harness es read-only contra prod, así
+  que NO ejercita la persistencia. Para chequear el autoguardado real (interceptando el PATCH) haría
+  falta darle `write` al bot — pendiente, decisión de Beto. **Sprint 1 cerrado** (9/4/7/11).
+- **2026-06-26 (Sprint 2 — RPC auditada, [PR #1079](https://github.com/beto-sudo/BSOP/pull/1079))** —
+  fase **3** (Formalizada): el **descuento** autoguarda por la misma RPC auditada del cierre
+  (`fn_actualizar_descuentos_venta`, registra cada cambio en `audit_log`); la fecha del contrato
+  no autoguarda (va a `venta_fases.notas`). Fase **5** (Avalúo Cerrado): **monto + fecha del avalúo**
+  autoguardan (UPDATE directo pre-cierre); en corrección post-cierre se mantiene la RPC
+  `fn_corregir_avaluo_venta`.
+- **2026-06-26 (Sprint 3a — financieras, [PR #1080](https://github.com/beto-sudo/BSOP/pull/1080))** —
+  fase **6** (Inscrita): montos + referencias de crédito autoguardan (la fecha de inscripción va a
+  notas). Fase **12** (Detonada): fecha + monto autoguardan **solo para Dirección** (el form de
+  captura manual es solo de Dirección). **Patrón general consolidado:** un estado "guardado" por
+  fase (firma persistida = lo cargado), `habilitado` que hereda el gate de cada pantalla, los campos
+  que van a `venta_fases.notas` al avanzar (fechas de contrato/inscripción) no autoguardan.
+- **2026-06-26 (cierre parcial — qué queda)** — **Fuera del autoguardado por diseño:** fase **15**
+  (notas) y fase **16** (encuesta) — captura **atómica de una sola persona sin separación de roles**
+  (no hay pérdida cross-rol), y escriben a `venta_fases`/`venta_encuestas` con lógica de estado; un
+  autoguardado parcial de encuesta no tiene buena semántica. **Pendiente: fase 8 (Dictaminada)** — la
+  única con campos sin autoguardar. Se dejó deliberadamente para una sesión enfocada por ser la más
+  delicada: sus campos alimentan la **cuadratura** y la captura de `valor_escrituracion` dispara la
+  **re-firma**; tiene 2 forms (cierre + "ya cerrada") con gates distintos (ADR-048). **Diseño listo:**
+  un hook que autoguarda los 7 campos del dictamen (montos/refs/gastos/valor/fecha) vía UPDATE
+  directo, `habilitado: !!venta && (!yaCerrada || esDireccion)` — Gerencia autoguarda en la captura
+  (D5), pero una fase YA cerrada solo la modifica Dirección (ADR-048). Hacer + revisar en preview
+  (financiero, sin auto-merge).
+
+## Decisiones registradas
+
+- **2026-06-26 (autoguardado transparente, no botón)** — debounce ~700 ms + indicador, sin botón
+  "Guardar borrador" — para cumplir "que no se pierda" igual que los documentos (ADR-051 D1).
+- **2026-06-26 (respeta la capa de escritura)** — el autoguardado usa el mismo camino que hoy:
+  UPDATE directo para campos simples, **RPC auditada** para descuento (fase 3) y avalúo (fase 5).
+  No salta el audit trail (ADR-051 D3).
+- **2026-06-26 (fase 8: Gerencia autoguarda, Dirección cierra)** — decisión de Beto: los datos del
+  dictamen autoguardan al teclearlos Gerencia; la cuadratura/pagaré/avance siguen solo-Dirección
+  (ADR-048 intacto, ADR-051 D5).
+- **2026-06-26 (qué NO autoguarda)** — (a) campos que viven en `venta_fases.notas` al avanzar
+  (fecha de contrato F3, fecha de inscripción F6) — sin columna en `dilesa.ventas`; (b) fases de
+  captura **atómica de una sola persona** sin separación de roles (F15 notas, F16 encuesta) — no hay
+  pérdida cross-rol y la F16 escribe a `venta_encuestas` con estado, donde un guardado parcial es
+  ambiguo. El autoguardado se reserva para campos con destino directo y/o riesgo de pérdida cross-rol.
+
+## Done
+
+_(nada aún)_

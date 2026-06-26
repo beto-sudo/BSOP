@@ -31,6 +31,10 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 type VentaCtx = {
   id: string;
@@ -38,6 +42,7 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   valuador_id: string | null;
+  fecha_solicitud_avaluo: string | null;
 };
 
 type Valuador = {
@@ -72,6 +77,11 @@ function CapturarFase4Body() {
   const [fechaSolicitud, setFechaSolicitud] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
+  // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
+  const [guardado, setGuardado] = useState<{ valuadorId: string; fecha: string }>({
+    valuadorId: '',
+    fecha: new Date().toISOString().slice(0, 10),
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +99,7 @@ function CapturarFase4Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, empresa_id, persona_id, unidad_id, valuador_id')
+        .select('id, empresa_id, persona_id, unidad_id, valuador_id, fecha_solicitud_avaluo')
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -107,6 +117,12 @@ function CapturarFase4Body() {
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
       if (v.valuador_id) setValuadorId(v.valuador_id);
+      if (v.fecha_solicitud_avaluo) setFechaSolicitud(v.fecha_solicitud_avaluo);
+      // Firma persistida inicial = lo cargado (no autoguarda hasta que el usuario cambie).
+      setGuardado({
+        valuadorId: v.valuador_id ?? '',
+        fecha: v.fecha_solicitud_avaluo ?? new Date().toISOString().slice(0, 10),
+      });
 
       // Fases cerradas y catálogo de valuadores en paralelo.
       const [fRes, valRes] = await Promise.all([
@@ -141,6 +157,28 @@ function CapturarFase4Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Valuador + fecha persisten al cambiarlos, sin esperar al botón "Enviar
+  // solicitud". El email al valuador sigue disparándose solo al avanzar la fase.
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({ valuadorId, fecha: fechaSolicitud }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          valuador_id: valuadorId || null,
+          fecha_solicitud_avaluo: fechaSolicitud || null,
+        })
+        .eq('id', ventaId);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({ valuadorId, fecha: fechaSolicitud });
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -269,7 +307,10 @@ function CapturarFase4Body() {
         />
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
-          <Section title="Casa valuadora">
+          <Section
+            title="Casa valuadora"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Valuador *">
                 <select
@@ -351,12 +392,23 @@ function nombreValuador(v: Valuador): string {
   return apellidos ? `${v.nombre} ${apellidos}` : v.nombre;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

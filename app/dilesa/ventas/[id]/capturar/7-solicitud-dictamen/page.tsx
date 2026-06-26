@@ -33,6 +33,10 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import { listNotarias, type Notaria } from '@/lib/dilesa/notarios';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 type VentaCtx = {
   id: string;
@@ -40,6 +44,7 @@ type VentaCtx = {
   persona_id: string;
   unidad_id: string | null;
   notario_id: string | null;
+  fecha_solicitud_dictamen: string | null;
 };
 
 export default function CapturarFase7Page() {
@@ -66,6 +71,11 @@ function CapturarFase7Body() {
   const [fechaSolicitud, setFechaSolicitud] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
+  // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
+  const [guardado, setGuardado] = useState<{ notarioId: string; fecha: string }>({
+    notarioId: '',
+    fecha: new Date().toISOString().slice(0, 10),
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +93,7 @@ function CapturarFase7Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, empresa_id, persona_id, unidad_id, notario_id')
+        .select('id, empresa_id, persona_id, unidad_id, notario_id, fecha_solicitud_dictamen')
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -101,6 +111,11 @@ function CapturarFase7Body() {
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
       if (v.notario_id) setNotarioId(v.notario_id);
+      if (v.fecha_solicitud_dictamen) setFechaSolicitud(v.fecha_solicitud_dictamen);
+      setGuardado({
+        notarioId: v.notario_id ?? '',
+        fecha: v.fecha_solicitud_dictamen ?? new Date().toISOString().slice(0, 10),
+      });
 
       const [fRes, notarias] = await Promise.all([
         sb
@@ -126,6 +141,28 @@ function CapturarFase7Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Notario + fecha persisten al cambiarlos; el email al notario sigue
+  // disparándose solo al avanzar la fase.
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({ notarioId, fecha: fechaSolicitud }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          notario_id: notarioId || null,
+          fecha_solicitud_dictamen: fechaSolicitud || null,
+        })
+        .eq('id', ventaId);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({ notarioId, fecha: fechaSolicitud });
+      return { ok: true };
+    },
+  });
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -255,7 +292,10 @@ function CapturarFase7Body() {
         />
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
-          <Section title="Notaría">
+          <Section
+            title="Notaría"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Notario *">
                 <select
@@ -339,12 +379,23 @@ function nombreNotario(n: Notaria): string {
   return n.numeroNotaria ? `Notaría ${n.numeroNotaria} — ${n.nombre}` : n.nombre;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

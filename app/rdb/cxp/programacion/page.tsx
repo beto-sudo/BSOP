@@ -3,23 +3,23 @@
 /**
  * CxP · Programación (RDB) — wrapper delgado del módulo compartido (ADR-011, SM1).
  *
- * Toda la lógica vive en <CxpProgramacionModule> (components/cxp/). Este page
- * solo gatea con <RequireAccess> y pasa la identidad de la empresa. Se separa
- * el cuerpo del gate porque el módulo usa useSearchParams (vía useUrlFilters):
- * <RequireAccess> retorna null mientras carga y provee el boundary de Suspense.
+ * Pipeline S2: esta pestaña muestra los pagos **por ejecutar**
+ * (programado/aprobado) y permite marcar pagado + subir comprobante; al pagarse
+ * pasan solos a la pestaña "Pagos". Reusa <CxpPagosModule> con estado inicial
+ * 'pendientes'. (Programar el pago ahora vive en la pestaña Facturas — S1.)
  *
  * @module CxP — Programación (RDB)
- * @responsive desktop-only — programación administrativa en escritorio.
+ * @responsive desktop-only — ejecución de pagos administrativa en escritorio.
  */
 
 import { RequireAccess } from '@/components/require-access';
-import { CxpProgramacionModule } from '@/components/cxp/cxp-programacion-module';
+import { CxpPagosModule } from '@/components/cxp/cxp-pagos-module';
 import { RDB_EMPRESA_ID } from '@/lib/empresa-constants';
 
 export default function CxpProgramacionPage() {
   return (
     <RequireAccess empresa="rdb" modulo="rdb.cxp.programacion">
-      <CxpProgramacionModule empresaId={RDB_EMPRESA_ID} empresa="rdb" />
+      <CxpPagosModule empresaId={RDB_EMPRESA_ID} empresa="rdb" estadoInicial="pendientes" />
     </RequireAccess>
   );
 }

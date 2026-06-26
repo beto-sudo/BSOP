@@ -45,6 +45,10 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 import { requiereSeguroCalidad } from '@/lib/dilesa/captura/fase-roles';
 
 type VentaCtx = {
@@ -116,6 +120,11 @@ function CapturarFase5Body() {
   const docsFase = useDocsFaseColaborativos(ventaId, slotsF5);
   const [montoAvaluo, setMontoAvaluo] = useState<string>('');
   const [fechaAvaluo, setFechaAvaluo] = useState<string>(new Date().toISOString().slice(0, 10));
+  // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
+  const [guardado, setGuardado] = useState<{ monto: string; fecha: string }>({
+    monto: '',
+    fecha: new Date().toISOString().slice(0, 10),
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,9 +161,14 @@ function CapturarFase5Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.monto_avaluo != null) setMontoAvaluo(String(v.monto_avaluo));
+      const montoCargado = v.monto_avaluo != null ? String(v.monto_avaluo) : '';
       // En corrección (fase ya cerrada) mostramos la fecha real del cierre, no hoy.
-      if (v.fecha_avaluo_cerrado) setFechaAvaluo(v.fecha_avaluo_cerrado.slice(0, 10));
+      const fechaCargada = v.fecha_avaluo_cerrado
+        ? v.fecha_avaluo_cerrado.slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      if (v.monto_avaluo != null) setMontoAvaluo(montoCargado);
+      if (v.fecha_avaluo_cerrado) setFechaAvaluo(fechaCargada);
+      setGuardado({ monto: montoCargado, fecha: fechaCargada });
 
       const [fRes, valRes] = await Promise.all([
         sb
@@ -194,6 +208,30 @@ function CapturarFase5Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Monto + fecha del avalúo persisten al cambiarlos (UPDATE directo, igual que el
+  // cierre vía marcarFase). Solo PRE-cierre: en corrección (fase ya cerrada) la
+  // escritura va por la RPC auditada `fn_corregir_avaluo_venta` con su propio botón.
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({ monto: montoAvaluo, fecha: fechaAvaluo }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      if (!venta) return { ok: false };
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          monto_avaluo: montoAvaluo.trim() ? Number(montoAvaluo) : null,
+          fecha_avaluo_cerrado: fechaAvaluo || null,
+        })
+        .eq('id', venta.id);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({ monto: montoAvaluo, fecha: fechaAvaluo });
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -353,7 +391,12 @@ function CapturarFase5Body() {
 
           <DocsFaseSection state={docsFase} titulo="Documentos" />
 
-          <Section title="Datos del avalúo">
+          <Section
+            title="Datos del avalúo"
+            accion={
+              yaCerrada ? null : <IndicadorAutoguardado estado={auto.estado} error={auto.error} />
+            }
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Monto del avalúo *">
                 <Input
@@ -403,12 +446,23 @@ function CapturarFase5Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

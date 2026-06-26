@@ -15,12 +15,19 @@
  * esa fase (definida por `dilesa.ventas.fase_actual` denormalizado).
  *
  * Click en una card filtra hacia la lista de ventas en esa fase
- * (`/dilesa/ventas?fase=<nombre>`) — la lista del tab Ventas no consume
- * el query param hoy pero la URL queda como deep link futuro; mientras
- * tanto manda al usuario al tab Ventas con scroll natural a la lista.
+ * (`/dilesa/ventas?fase=<nombre>`) — el tab Ventas consume el query param
+ * y abre la lista ya filtrada por esa fase.
+ *
+ * Cada card muestra dos cifras: `Ventas activas` (cuántas están "en" la
+ * fase ahora, vía `dilesa.ventas.fase_actual`) y `Movimiento del día`
+ * (cuántas ENTRARON a la fase hoy, contando filas de `dilesa.venta_fases`
+ * con `fecha` = hoy local de Matamoros — una venta que avanza 3 fases en
+ * un día suma +1 en cada una). La misma cifra alimenta el correo al Consejo.
  *
  * Filtros: proyecto, vendedor, mes. Filtran las ventas que se cuentan
- * en cada fase. Los catálogos (las 17 fases) se cargan desde
+ * en cada fase. El chip `Movimiento del día` respeta proyecto/vendedor
+ * pero NO el filtro de mes (que es de creación de la venta, ortogonal a
+ * "hoy"). Los catálogos (las 17 fases) se cargan desde
  * `dilesa.venta_fase_catalogo` (single source of truth — viene del Coda
  * original).
  *
@@ -40,6 +47,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { deriveFasesKpis } from '@/lib/dilesa/kpis/fases';
 import { proximaFase } from '@/lib/dilesa/fases';
+import { fechaISOMatamoros } from '@/lib/fecha-mx';
 
 type Fase = {
   posicion: number;
@@ -63,6 +71,14 @@ type Unidad = {
   proyecto_id: string | null;
 };
 
+// Una fila de `dilesa.venta_fases` registrada con `fecha` = hoy: la venta entró
+// a `posicion` hoy. Cada avance es su propia fila, así que una venta que sube 3
+// fases en un día aporta a 3 posiciones distintas.
+type MovimientoFase = {
+  venta_id: string;
+  posicion: number | null;
+};
+
 const DEFAULT_FILTERS = {
   proyecto: '',
   vendedor: '',
@@ -84,6 +100,7 @@ function VentasFasesBody() {
 
   const [fases, setFases] = useState<Fase[]>([]);
   const [ventas, setVentas] = useState<Venta[]>([]);
+  const [movimientosHoy, setMovimientosHoy] = useState<MovimientoFase[]>([]);
   const [unidadProyecto, setUnidadProyecto] = useState<Map<string, string>>(new Map());
   const [proyectos, setProyectos] = useState<Array<{ id: string; nombre: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +111,12 @@ function VentasFasesBody() {
     setError(null);
     const sb = createSupabaseBrowserClient();
 
-    const [fasesRes, ventasRes, unidadesRes, prjRes] = await Promise.all([
+    // "Hoy" = fecha calendario local de Matamoros (DST real). El campo
+    // `venta_fases.fecha` es un `date` capturado localmente, así que comparamos
+    // contra la misma fecha local — no contra el día UTC.
+    const hoyISO = fechaISOMatamoros(new Date());
+
+    const [fasesRes, ventasRes, movHoyRes, unidadesRes, prjRes] = await Promise.all([
       sb
         .schema('dilesa')
         .from('venta_fase_catalogo')
@@ -112,6 +134,13 @@ function VentasFasesBody() {
         .is('deleted_at', null),
       sb
         .schema('dilesa')
+        .from('venta_fases')
+        .select('venta_id, posicion')
+        .eq('empresa_id', DILESA_EMPRESA_ID)
+        .is('deleted_at', null)
+        .eq('fecha', hoyISO),
+      sb
+        .schema('dilesa')
         .from('unidades')
         .select('id, proyecto_id')
         .eq('empresa_id', DILESA_EMPRESA_ID)
@@ -125,7 +154,8 @@ function VentasFasesBody() {
         .order('nombre', { ascending: true }),
     ]);
 
-    const firstErr = fasesRes.error ?? ventasRes.error ?? unidadesRes.error ?? prjRes.error;
+    const firstErr =
+      fasesRes.error ?? ventasRes.error ?? movHoyRes.error ?? unidadesRes.error ?? prjRes.error;
     if (firstErr) {
       setError(getSupabaseErrorMessage(firstErr, 'No se pudieron cargar las fases.'));
       setLoading(false);
@@ -134,6 +164,7 @@ function VentasFasesBody() {
 
     setFases((fasesRes.data ?? []) as Fase[]);
     setVentas((ventasRes.data ?? []) as Venta[]);
+    setMovimientosHoy((movHoyRes.data ?? []) as MovimientoFase[]);
     const m = new Map<string, string>();
     for (const u of (unidadesRes.data ?? []) as Unidad[]) {
       if (u.proyecto_id) m.set(u.id, u.proyecto_id);
@@ -194,6 +225,39 @@ function VentasFasesBody() {
   const totalActivas = useMemo(
     () => [...conteoPorFase.values()].reduce((s, n) => s + n, 0),
     [conteoPorFase]
+  );
+
+  // Ventas que pasan proyecto+vendedor (NO mes — el mes filtra por creación de
+  // la venta, ortogonal al movimiento de "hoy"). Acota el conteo del día para
+  // que cuadre con el chip "Ventas activas" cuando hay un proyecto/vendedor
+  // seleccionado.
+  const ventaIdsScope = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of ventas) {
+      if (filters.proyecto) {
+        if (!v.unidad_id || unidadProyecto.get(v.unidad_id) !== filters.proyecto) continue;
+      }
+      if (filters.vendedor && v.vendedor !== filters.vendedor) continue;
+      set.add(v.id);
+    }
+    return set;
+  }, [ventas, filters.proyecto, filters.vendedor, unidadProyecto]);
+
+  // Movimiento del día por posición: filas de `venta_fases` con fecha = hoy,
+  // contadas por posición (cada avance cuenta), acotadas al scope de filtros.
+  const movHoyPorPosicion = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const mov of movimientosHoy) {
+      if (mov.posicion == null) continue;
+      if (!ventaIdsScope.has(mov.venta_id)) continue;
+      m.set(mov.posicion, (m.get(mov.posicion) ?? 0) + 1);
+    }
+    return m;
+  }, [movimientosHoy, ventaIdsScope]);
+
+  const totalMovHoy = useMemo(
+    () => [...movHoyPorPosicion.values()].reduce((s, n) => s + n, 0),
+    [movHoyPorPosicion]
   );
 
   // KPIs sobre el dataset filtrado — ADR-034. Deriva del mismo array
@@ -299,13 +363,17 @@ function VentasFasesBody() {
         </button>
         <span className="ml-auto text-sm text-[var(--text)]/60">
           {totalActivas} ventas activas en pipeline
+          {totalMovHoy > 0 ? (
+            <span className="text-emerald-500"> · {totalMovHoy} movimiento(s) hoy</span>
+          ) : null}
         </span>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {fases.map((f) => {
           const cuenta = conteoPorFase.get(f.nombre) ?? 0;
-          return <FaseCard key={f.posicion} fase={f} cuenta={cuenta} />;
+          const movHoy = movHoyPorPosicion.get(f.posicion) ?? 0;
+          return <FaseCard key={f.posicion} fase={f} cuenta={cuenta} movHoy={movHoy} />;
         })}
       </div>
 
@@ -319,7 +387,7 @@ function VentasFasesBody() {
   );
 }
 
-function FaseCard({ fase, cuenta }: { fase: Fase; cuenta: number }) {
+function FaseCard({ fase, cuenta, movHoy }: { fase: Fase; cuenta: number; movHoy: number }) {
   const href = `/dilesa/ventas?fase=${encodeURIComponent(fase.nombre)}`;
   // "Lo que sigue por hacer" para las ventas en esta fase = la acción
   // (infinitivo) de la fase SIGUIENTE (posición + 1). null en la 17 (el final).
@@ -355,6 +423,15 @@ function FaseCard({ fase, cuenta }: { fase: Fase; cuenta: number }) {
         </span>
         <Badge tone={cuenta > 0 ? 'info' : 'neutral'}>{cuenta}</Badge>
       </div>
+      {movHoy > 0 ? (
+        <div
+          className="mt-1 flex items-baseline justify-between"
+          title="Movimiento del día — ventas que entraron a esta fase hoy"
+        >
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text)]/40">Hoy</span>
+          <Badge tone="success">+{movHoy}</Badge>
+        </div>
+      ) : null}
     </Link>
   );
 }

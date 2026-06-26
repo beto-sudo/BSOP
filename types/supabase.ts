@@ -5654,6 +5654,7 @@ export type Database = {
           fecha_validacion_patronal: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
+          gastos_notariales_desglose: Json | null
           hora_firma_programada: string | null
           id: string
           incremento_credito: number | null
@@ -5692,6 +5693,7 @@ export type Database = {
           saldo_residual_monto: number | null
           saldo_residual_resolucion: string | null
           sobreprecio_gastos_escrituracion: number
+          tiene_propiedad: boolean
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -5757,6 +5759,7 @@ export type Database = {
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          gastos_notariales_desglose?: Json | null
           hora_firma_programada?: string | null
           id?: string
           incremento_credito?: number | null
@@ -5795,6 +5798,7 @@ export type Database = {
           saldo_residual_monto?: number | null
           saldo_residual_resolucion?: string | null
           sobreprecio_gastos_escrituracion?: number
+          tiene_propiedad?: boolean
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -5860,6 +5864,7 @@ export type Database = {
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          gastos_notariales_desglose?: Json | null
           hora_firma_programada?: string | null
           id?: string
           incremento_credito?: number | null
@@ -5898,6 +5903,7 @@ export type Database = {
           saldo_residual_monto?: number | null
           saldo_residual_resolucion?: string | null
           sobreprecio_gastos_escrituracion?: number
+          tiene_propiedad?: boolean
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string

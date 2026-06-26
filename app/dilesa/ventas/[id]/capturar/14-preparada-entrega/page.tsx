@@ -8,13 +8,15 @@
  * firma, escanea y sube el PDF firmado. SUBIR el checklist es la única acción
  * de esta pantalla: queda en el expediente al instante.
  *
- * El AVANCE de fase es automático y secuencial (2026-06-25, Beto): subir el
- * checklist NO mueve la fase. La vivienda pasa a "Preparada para Entrega" (14)
- * sola, vía el trigger `dilesa.fn_auto_preparada_entrega`, cuando coinciden:
- *   (a) la operación está Facturada (fase 13 cerrada), y
+ * El AVANCE de fase es automático (2026-06-26, Beto): subir el checklist NO
+ * mueve la fase. La vivienda pasa a "Preparada para Entrega" (14) sola, vía el
+ * trigger `dilesa.fn_auto_preparada_entrega`, cuando coinciden:
+ *   (a) el pago entró — Detonada (fase 12 cerrada), y
  *   (b) el checklist está cargado.
- * Así el checklist puede ADELANTARSE desde la Escritura (fase 11) sin saltarse
- * Detonada (12) ni Facturada (13) — habilitar la acción ≠ estar en la fase.
+ * Así el checklist puede ADELANTARSE desde la Escritura (fase 11). La
+ * facturación (13) ya NO es prerrequisito de la entrega: puede ir por detrás
+ * (la regla previa la exigía y bloqueaba viviendas pagadas, #1048 → relajado).
+ * Lo que nunca se brinca es el pago — habilitar la acción ≠ estar en la fase.
  *
  * Acceso: `dilesa.ventas.fase14_preparada_entrega` (Atención a Clientes / Obra /
  * Dirección — escritura).
@@ -114,15 +116,15 @@ function CapturarFase14Body() {
   }, [ventaId, sb, cargarPosiciones]);
 
   const fase11Cerrada = posiciones?.includes(11) ?? false;
-  const fase13Cerrada = posiciones?.includes(13) ?? false;
+  const fase12Cerrada = posiciones?.includes(12) ?? false;
   const yaCerrada = posiciones?.includes(14) ?? false;
   const checklistListo = docsFase.faltantes.length === 0;
 
   // "Preparada" = la fase 14 ya está cerrada, O las dos condiciones del
-  // auto-cierre coinciden ya (checklist cargado + facturada): el trigger en DB
-  // la cierra en el mismo INSERT del checklist, así que mostrarlo derivado evita
-  // re-consultar. Al volver al detalle, el provider confirma el estado real.
-  const preparada = yaCerrada || (checklistListo && fase13Cerrada);
+  // auto-cierre coinciden ya (checklist cargado + pago detonado): el trigger en
+  // DB la cierra en el mismo INSERT del checklist, así que mostrarlo derivado
+  // evita re-consultar. Al volver al detalle, el provider confirma el estado real.
+  const preparada = yaCerrada || (checklistListo && fase12Cerrada);
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -177,13 +179,11 @@ function CapturarFase14Body() {
         <div className="space-y-6">
           <Banner
             tone="info"
-            title={
-              fase13Cerrada ? 'La operación ya está facturada' : 'Puedes adelantar el checklist'
-            }
+            title={fase12Cerrada ? 'El pago ya entró (Detonada)' : 'Puedes adelantar el checklist'}
             body={
-              fase13Cerrada
-                ? 'Sube el checklist firmado y la vivienda quedará Preparada para Entrega automáticamente.'
-                : 'Aún no se factura (Fase 13). Subir el checklist NO avanza la fase: la vivienda pasará a Preparada para Entrega sola en cuanto se facture. Así no se saltan Detonada ni Facturada.'
+              fase12Cerrada
+                ? 'Sube el checklist firmado y la vivienda quedará Preparada para Entrega automáticamente. La facturación puede ir por detrás, no bloquea la entrega.'
+                : 'Aún no entra el pago (Fase 12 — Detonada). Subir el checklist NO avanza la fase: la vivienda pasará a Preparada para Entrega sola en cuanto se detone el pago. La entrega nunca ocurre antes del pago.'
             }
           />
 

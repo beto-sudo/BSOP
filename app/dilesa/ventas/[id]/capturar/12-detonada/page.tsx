@@ -42,6 +42,10 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   { rol: 'imagen_detonacion', label: 'Comprobante de transferencia/depósito', requerido: true },
@@ -93,6 +97,11 @@ function CapturarFase12Body() {
     new Date().toISOString().slice(0, 10)
   );
   const [montoDetonado, setMontoDetonado] = useState<string>('');
+  // Autoguardado (ADR-051): firma de lo persistido (arranca = lo cargado).
+  const [guardado, setGuardado] = useState<{ fecha: string; monto: string }>({
+    fecha: new Date().toISOString().slice(0, 10),
+    monto: '',
+  });
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [loading, setLoading] = useState(true);
@@ -130,6 +139,10 @@ function CapturarFase12Body() {
       setVenta(v);
       if (v.fecha_detonacion) setFechaDetonacion(v.fecha_detonacion);
       if (v.monto_detonado != null) setMontoDetonado(String(v.monto_detonado));
+      setGuardado({
+        fecha: v.fecha_detonacion ?? new Date().toISOString().slice(0, 10),
+        monto: v.monto_detonado != null ? String(v.monto_detonado) : '',
+      });
 
       const { data: fRows } = await sb
         .schema('dilesa')
@@ -150,6 +163,29 @@ function CapturarFase12Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Fecha + monto de detonación persisten al cambiarlos. SOLO Dirección (el form
+  // de captura manual solo se le muestra a Dirección; el resto ve la guía de cobranza).
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({ fecha: fechaDetonacion, monto: montoDetonado }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada && esDireccion,
+    guardar: async () => {
+      if (!venta) return { ok: false };
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          fecha_detonacion: fechaDetonacion || null,
+          monto_detonado: montoDetonado.trim() ? Number(montoDetonado) : null,
+        })
+        .eq('id', venta.id);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({ fecha: fechaDetonacion, monto: montoDetonado });
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -300,7 +336,10 @@ function CapturarFase12Body() {
 
           <DocsFaseSection state={docsFase} titulo="Comprobante del depósito" />
 
-          <Section title="Datos de la detonación">
+          <Section
+            title="Datos de la detonación"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Fecha de detonación *">
                 <Input
@@ -379,12 +418,23 @@ function GuiaCobranza({ ventaId }: { ventaId: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

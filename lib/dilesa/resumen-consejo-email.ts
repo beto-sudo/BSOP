@@ -17,6 +17,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KpisDelDia } from './resumen-consejo-kpis';
+import { fechaISOMatamoros } from '@/lib/fecha-mx';
 
 // ── Tipos por sección ───────────────────────────────────────────────────────
 
@@ -53,6 +54,8 @@ export type TuberiaRow = {
   fase: string;
   clientes: number;
   valor: number;
+  /** Ventas que ENTRARON a esta fase hoy (movimiento del día). */
+  hoy: number;
 };
 
 export type VentaTuberiaInput = {
@@ -70,10 +73,17 @@ export type VentaTuberiaInput = {
  * asignada" para las activas con fase NULL o con grafía fuera de catálogo (así
  * la tubería nunca pierde clientes en silencio). Las desasignadas/expiradas no
  * cuentan: son ventas caídas.
+ *
+ * `movHoyPorPos` = movimiento del día por posición de fase (filas de
+ * `venta_fases` con fecha = hoy). Se anota en cada fila viva. Nota: el funnel
+ * solo lista fases con clientes vivos, así que un movimiento a una fase que ya
+ * quedó en cero vivos (entró y avanzó el mismo día) no aparece aquí — el módulo
+ * Fases sí lo muestra (lista las 17 siempre).
  */
 export function armarTuberiaSplit(
   fasesCat: { nombre: string; posicion: number }[],
-  ventas: VentaTuberiaInput[]
+  ventas: VentaTuberiaInput[],
+  movHoyPorPos: ReadonlyMap<number, number> = new Map()
 ): { viva: TuberiaRow[]; historico: { clientes: number; valor: number } } {
   const orden = [...fasesCat].sort((a, b) => a.posicion - b.posicion);
   const conocidas = new Set(orden.map((f) => f.nombre));
@@ -107,12 +117,18 @@ export function armarTuberiaSplit(
       fase: f.nombre,
       clientes: porFase.get(f.nombre)?.clientes ?? 0,
       valor: porFase.get(f.nombre)?.valor ?? 0,
+      hoy: movHoyPorPos.get(f.posicion) ?? 0,
     }))
     // Solo fases con clientes vivos — el funnel muestra dónde están las ventas,
     // no las 17 etapas en cero.
     .filter((r) => r.clientes > 0);
   if (sinFase.clientes > 0) {
-    viva.push({ fase: 'Sin fase asignada', clientes: sinFase.clientes, valor: sinFase.valor });
+    viva.push({
+      fase: 'Sin fase asignada',
+      clientes: sinFase.clientes,
+      valor: sinFase.valor,
+      hoy: 0,
+    });
   }
   return { viva, historico };
 }
@@ -613,8 +629,14 @@ function renderTuberiaViva(rows: TuberiaRow[]): string {
       { label: 'Fase' },
       { label: 'Clientes', align: 'right' },
       { label: 'Valor de escrituración', align: 'right' },
+      { label: 'Movimiento del día', align: 'right' },
     ],
-    rows.map((r) => [r.fase, fmtInt(r.clientes), fmtMoney(r.valor)])
+    rows.map((r) => [
+      r.fase,
+      fmtInt(r.clientes),
+      fmtMoney(r.valor),
+      r.hoy > 0 ? `+${fmtInt(r.hoy)}` : '—',
+    ])
   );
 }
 
@@ -879,6 +901,10 @@ export async function fetchResumenConsejoData(
   const inicioMes = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     .toISOString()
     .slice(0, 10);
+  // "Hoy" = fecha calendario local de Matamoros (el correo sale a las 20:00
+  // locales, ya con el día consumido). `venta_fases.fecha` es un `date` local,
+  // así que comparamos contra la misma fecha local — no contra el día UTC.
+  const hoyISO = fechaISOMatamoros(now);
   // Ventana de absorción: 3 meses móviles hasta hoy.
   const inicio3m = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - ABSORCION_VENTANA_MESES, now.getUTCDate())
@@ -898,6 +924,7 @@ export async function fetchResumenConsejoData(
     contratistaRes,
     saldosRes,
     asign3mRes,
+    movHoyRes,
   ] = await Promise.all([
     dilesa.from('proyectos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
     dilesa.from('v_proyecto_avances').select('*').eq('empresa_id', empresaId),
@@ -932,6 +959,12 @@ export async function fetchResumenConsejoData(
       .is('deleted_at', null)
       .eq('posicion', 2)
       .gte('fecha', inicio3m),
+    dilesa
+      .from('venta_fases')
+      .select('posicion')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .eq('fecha', hoyISO),
   ]);
 
   const proyNombre = new Map<string, string>(
@@ -970,10 +1003,18 @@ export async function fetchResumenConsejoData(
     protoNombre
   );
 
+  // Movimiento del día por posición: filas de `venta_fases` con fecha = hoy.
+  const movHoyPorPos = new Map<number, number>();
+  for (const r of (movHoyRes.data ?? []) as { posicion: number | null }[]) {
+    if (r.posicion == null) continue;
+    movHoyPorPos.set(r.posicion, (movHoyPorPos.get(r.posicion) ?? 0) + 1);
+  }
+
   // Tubería: pipeline vivo (activas por fase) + línea de histórico (terminadas).
   const { viva: tuberiaViva, historico: tuberiaHistorico } = armarTuberiaSplit(
     (fasesCatRes.data ?? []) as { nombre: string; posicion: number }[],
-    (ventasRes.data ?? []) as VentaTuberiaInput[]
+    (ventasRes.data ?? []) as VentaTuberiaInput[],
+    movHoyPorPos
   );
 
   // Asignaciones/escrituras del mes: por venta_fases del mes, agrupadas por prototipo.
