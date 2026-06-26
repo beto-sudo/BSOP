@@ -25,17 +25,21 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ExternalLink, Loader2, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { marcarFase, type DocCaptura } from '@/lib/dilesa/captura/marcar-fase';
+import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import { esLiderDeCola, type ColaHoldRow } from '@/lib/dilesa/hold-lider';
-import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
+import {
+  DocsFaseSection,
+  useDocsFaseColaborativos,
+  type SlotColaborativo,
+} from '@/components/dilesa/captura/docs-fase-colaborativos';
 
 const ROLES_REQUERIDOS = [
   'solicitud_asignacion',
@@ -51,6 +55,18 @@ const ROL_LABEL: Record<RolRequerido, string> = {
   ficu: 'FICU firmado',
   expediente_digital: 'Expediente digital (paquete KYC)',
 };
+
+// Expediente de la asignación (4 documentos). Patrón colaborativo: cada uno
+// PERSISTE al subirse (storage + erp.adjuntos), independiente del botón "Autorizar"
+// — que solo lo tiene el rol autorizador (Dirección/Nelcy). Antes vivían en
+// `useState<File>` acoplados a ese botón: quien armaba el expediente lo perdía si
+// no autorizaba. (La lectura colaborativa usa `entidad_tipo='venta'`, que es el
+// estándar del sistema — la query vieja usaba 'ventas' y no veía los adjuntos.)
+const SLOTS_FASE2: SlotColaborativo[] = ROLES_REQUERIDOS.map((rol) => ({
+  rol,
+  label: ROL_LABEL[rol],
+  requerido: true,
+}));
 
 type VentaCtx = {
   id: string;
@@ -72,14 +88,6 @@ type ReciboEnganche = {
   notas: string | null;
 };
 
-type AdjuntoCargado = {
-  id: string;
-  rol: string;
-  nombre: string;
-  url: string;
-  tipo_mime: string | null;
-};
-
 export default function CapturarFase2Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.ventas.autorizar">
@@ -93,13 +101,13 @@ function CapturarFase2Body() {
   const router = useRouter();
   const ventaId = params.id;
   const toast = useToast();
+  // Expediente colaborativo: cada documento persiste al subirse (no espera al botón
+  // "Autorizar", que solo tiene el rol autorizador). El cierre valida contra el
+  // expediente persistido (`faltantes`), no contra memoria del navegador.
+  const docsFase2 = useDocsFaseColaborativos(ventaId, SLOTS_FASE2);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [esLider, setEsLider] = useState<boolean | null>(null);
-  const [adjuntosCargados, setAdjuntosCargados] = useState<Map<string, AdjuntoCargado>>(new Map());
-  const [archivos, setArchivos] = useState<Partial<Record<RolRequerido, File>>>({});
-  /** Rol cuya zona está siendo hovered con un drag activo (para resaltar). */
-  const [dragOverRol, setDragOverRol] = useState<RolRequerido | null>(null);
   const [recibos, setRecibos] = useState<ReciboEnganche[]>([]);
   const [totalEnganchePagado, setTotalEnganchePagado] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -138,30 +146,9 @@ function CapturarFase2Body() {
       setEsLider(false);
     }
 
-    // Adjuntos cargados — incluimos url + nombre para hacer la card
-    // clickeable y abrir el doc. Si hay >1 adjunto por rol, se queda el
-    // más reciente por created_at DESC (primero en el array, gracias al
-    // .order). Eso es lo que el autorizador típicamente quiere ver.
-    const { data: adj } = await sb
-      .schema('erp')
-      .from('adjuntos')
-      .select('id, rol, nombre, url, tipo_mime, created_at')
-      .eq('entidad_tipo', 'ventas')
-      .eq('entidad_id', ventaId)
-      .order('created_at', { ascending: false });
-    const map = new Map<string, AdjuntoCargado>();
-    for (const a of (adj ?? []) as Array<AdjuntoCargado & { created_at: string }>) {
-      if (!map.has(a.rol)) {
-        map.set(a.rol, {
-          id: a.id,
-          rol: a.rol,
-          nombre: a.nombre,
-          url: a.url,
-          tipo_mime: a.tipo_mime,
-        });
-      }
-    }
-    setAdjuntosCargados(map);
+    // El expediente (Solicitud/Aviso/FICU/Expediente digital) lo carga y muestra
+    // `docsFase2` (useDocsFaseColaborativos) — persistencia inmediata + "subió X ·
+    // fecha" + link Ver, leyendo con `entidad_tipo='venta'` (estándar del sistema).
 
     // Recibos del enganche — la asignación requiere ver que el cliente
     // ya pagó el enganche. Leemos dilesa.venta_pagos con tipo='enganche'
@@ -202,7 +189,9 @@ function CapturarFase2Body() {
     cargar();
   }, [cargar]);
 
-  const todosCompletos = ROLES_REQUERIDOS.every((r) => adjuntosCargados.has(r) || archivos[r]);
+  // Expediente completo = los 4 documentos requeridos ya están en el expediente
+  // persistido (no en memoria del navegador). `docsFase2.faltantes` los valida.
+  const todosCompletos = docsFase2.faltantes.length === 0;
   // Bool tri-state: true=cubre, false=no cubre, null=no se sabe (loading).
   // Se usa para el banner de alerta — el botón NO se gatea por este valor
   // (decisión Beto: queda a criterio de Dirección/Nelcy).
@@ -228,13 +217,12 @@ function CapturarFase2Body() {
       const {
         data: { user },
       } = await sb.auth.getUser();
-      const docs: DocCaptura[] = (Object.entries(archivos) as Array<[RolRequerido, File]>)
-        .filter(([, f]) => !!f)
-        .map(([rol, archivo]) => ({ rol, archivo }));
+      // Los 4 documentos ya viven en el expediente (subida colaborativa) — no se
+      // suben aquí. `marcarFase` solo autoriza y avanza la fase.
       const res = await marcarFase(sb, {
         ventaId,
         faseposicion: 2,
-        docs,
+        docs: [],
         camposVenta: {
           fase_actual: 'Asignada',
           fase_posicion: 2,
@@ -304,111 +292,10 @@ function CapturarFase2Body() {
         </div>
       ) : null}
 
-      {/* Lista de docs requeridos */}
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-[var(--text)]/50">
-          Expediente requerido
-        </h2>
-        <div className="space-y-3">
-          {ROLES_REQUERIDOS.map((rol) => {
-            const cargado = adjuntosCargados.get(rol);
-            const fileSeleccionado = archivos[rol];
-            const completo = !!cargado || !!fileSeleccionado;
-            const href = cargado ? getAdjuntoProxyUrl(cargado.url) : null;
-            const isDragOver = dragOverRol === rol;
-            return (
-              <div
-                key={rol}
-                onDragOver={(e) => {
-                  // preventDefault es obligatorio para que `drop` se dispare;
-                  // sin esto el browser intenta navegar al archivo y nada
-                  // llega al handler. dataTransfer.dropEffect le da al usuario
-                  // el cursor "copy" estándar.
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
-                  if (dragOverRol !== rol) setDragOverRol(rol);
-                }}
-                onDragLeave={(e) => {
-                  // Solo limpiar si el drag salió DEL contenedor — los hijos
-                  // disparan leave/enter también y harían parpadear el ring.
-                  if (e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                    return;
-                  }
-                  setDragOverRol((current) => (current === rol ? null : current));
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverRol(null);
-                  const f = e.dataTransfer.files?.[0];
-                  if (!f) return;
-                  // Mismo filtro que el `accept` del input: PDF o imágenes.
-                  if (
-                    !(
-                      f.type === 'application/pdf' ||
-                      f.type.startsWith('image/') ||
-                      f.name.toLowerCase().endsWith('.pdf')
-                    )
-                  ) {
-                    return;
-                  }
-                  setArchivos((prev) => ({ ...prev, [rol]: f }));
-                }}
-                className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
-                  isDragOver
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
-                    : 'border-[var(--border)]'
-                }`}
-              >
-                {/* Lado izquierdo: clickeable cuando hay adjunto cargado */}
-                {href ? (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-1 items-center gap-2 text-sm hover:text-[var(--accent)]"
-                    title={cargado?.nombre ?? 'Ver documento'}
-                  >
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                    <span className="font-medium">{ROL_LABEL[rol]}</span>
-                    <span className="ml-1 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                      Ver documento <ExternalLink className="h-3 w-3" />
-                    </span>
-                  </a>
-                ) : (
-                  <div className="flex flex-1 items-center gap-2 text-sm">
-                    {completo ? (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
-                    )}
-                    <span className="font-medium">{ROL_LABEL[rol]}</span>
-                    {fileSeleccionado ? (
-                      <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-                        {fileSeleccionado.name}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
-
-                {/* Lado derecho: botón Subir / Cambiar / Reemplazar */}
-                <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-                  <Upload className="h-3.5 w-3.5" />
-                  {cargado ? 'Reemplazar' : fileSeleccionado ? 'Cambiar' : 'Subir PDF'}
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      setArchivos((prev) => ({ ...prev, [rol]: f ?? undefined }));
-                    }}
-                  />
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      {/* Expediente requerido — captura colaborativa: cada documento persiste al
+          subirlo (lo puede armar quien arma el expediente; el autorizador lo ve con
+          "subió X · fecha"). El gate de "Autorizar" sigue siendo del rol autorizador. */}
+      <DocsFaseSection state={docsFase2} titulo="Expediente requerido" />
 
       {/* Recibos del enganche — referencia para autorizar */}
       <RecibosEngancheSection

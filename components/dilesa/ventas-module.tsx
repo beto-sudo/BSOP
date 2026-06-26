@@ -450,7 +450,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   ];
 
   const onRowClick = (v: VentaListaRow) => {
-    router.push(`/dilesa/ventas/${v.id}`);
+    // Si estás viendo la lista filtrada por una fase, propaga esa fase al
+    // detalle (`?fase=`) para que su back-link regrese aquí, a la misma fase.
+    const qs = faseFiltro ? `?fase=${encodeURIComponent(faseFiltro)}` : '';
+    router.push(`/dilesa/ventas/${v.id}${qs}`);
   };
 
   return (

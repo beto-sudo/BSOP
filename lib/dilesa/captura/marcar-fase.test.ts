@@ -11,6 +11,10 @@ function mockClient(opts?: {
   adjuntoInsertError?: string;
   ventaUpdateError?: string;
   faseInsertError?: string;
+  /** fase_posicion actual de la venta (default 2: previa de la fase 3 base). */
+  fasePosicionActual?: number;
+  /** captura los campos que recibe el UPDATE de ventas (undefined si no se llamó). */
+  capture?: { ventaUpdateCampos?: Record<string, unknown> };
 }): SupabaseClient {
   const storageOk = !opts?.storageUploadError;
   const adjuntoOk = !opts?.adjuntoInsertError;
@@ -39,20 +43,23 @@ function mockClient(opts?: {
       if (s === 'dilesa' && table === 'ventas') {
         return {
           // SELECT para leer fase_posicion actual antes del UPDATE
-          // (defensa "solo avanza" — ver marcar-fase.ts).
+          // (defensa "avanza solo 1-en-1" — ver marcar-fase.ts).
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn(async () => ({
-                data: { fase_posicion: 1 },
+                data: { fase_posicion: opts?.fasePosicionActual ?? 2 },
                 error: null,
               })),
             })),
           })),
-          update: vi.fn(() => ({
-            eq: vi.fn(async () =>
-              ventaOk ? { error: null } : { error: { message: opts!.ventaUpdateError } }
-            ),
-          })),
+          update: vi.fn((campos: Record<string, unknown>) => {
+            if (opts?.capture) opts.capture.ventaUpdateCampos = campos;
+            return {
+              eq: vi.fn(async () =>
+                ventaOk ? { error: null } : { error: { message: opts!.ventaUpdateError } }
+              ),
+            };
+          }),
         };
       }
       if (s === 'dilesa' && table === 'venta_fases') {
@@ -129,10 +136,52 @@ describe('marcarFase', () => {
     expect(r.error).toContain('no se cerró la fase');
   });
 
-  it('camposVenta vacío salta el UPDATE de ventas', async () => {
-    const sb = mockClient();
+  it('re-capturar una fase ya pasada con camposVenta vacío salta el UPDATE de ventas', async () => {
+    const capture: { ventaUpdateCampos?: Record<string, unknown> } = {};
+    // posActual=5: re-capturar la fase 3 (anterior) sin campos → nada que tocar
+    const sb = mockClient({ fasePosicionActual: 5, capture });
     const r = await marcarFase(sb, { ...baseInput, camposVenta: {} });
     expect(r.ok).toBe(true);
+    expect(capture.ventaUpdateCampos).toBeUndefined();
+  });
+
+  it('avance estricto: capturar la fase inmediata siguiente mueve fase_posicion', async () => {
+    const capture: { ventaUpdateCampos?: Record<string, unknown> } = {};
+    const sb = mockClient({ fasePosicionActual: 2, capture });
+    const r = await marcarFase(sb, { ...baseInput, faseposicion: 3, camposVenta: {} });
+    expect(r.ok).toBe(true);
+    expect(capture.ventaUpdateCampos).toMatchObject({
+      fase_posicion: 3,
+      fase_actual: 'Formalizada',
+    });
+  });
+
+  it('anti-salto: capturar una fase adelantada NO mueve fase_posicion', async () => {
+    const capture: { ventaUpdateCampos?: Record<string, unknown> } = {};
+    // posActual=2, intentar cerrar la 4 (brincándose la 3): la fase no avanza,
+    // aunque el UPDATE corra por los camposVenta propios de la fase.
+    const sb = mockClient({ fasePosicionActual: 2, capture });
+    const r = await marcarFase(sb, {
+      ...baseInput,
+      faseposicion: 4,
+      camposVenta: { monto_avaluo: 1 },
+    });
+    expect(r.ok).toBe(true);
+    expect(capture.ventaUpdateCampos).toBeDefined();
+    expect(capture.ventaUpdateCampos).not.toHaveProperty('fase_posicion');
+    expect(capture.ventaUpdateCampos).not.toHaveProperty('fase_actual');
+  });
+
+  it('no retrocede: re-capturar una fase anterior NO baja fase_posicion', async () => {
+    const capture: { ventaUpdateCampos?: Record<string, unknown> } = {};
+    const sb = mockClient({ fasePosicionActual: 5, capture });
+    const r = await marcarFase(sb, {
+      ...baseInput,
+      faseposicion: 3,
+      camposVenta: { monto_avaluo: 1 },
+    });
+    expect(r.ok).toBe(true);
+    expect(capture.ventaUpdateCampos).not.toHaveProperty('fase_posicion');
   });
 
   it('múltiples docs se suben en orden', async () => {

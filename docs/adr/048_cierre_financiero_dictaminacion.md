@@ -51,3 +51,17 @@ Las ventas en **fase 10 (pagaré) que aún no programan firmas** se **regresan a
 
 - **Eliminar la fase 10 y absorberla en la 8** (planteada primero): descartada — la validación patronal (fase 9) tarda y hay que medirla, y la programación de firmas debe ir **después** de validar con el patrón. Mantener las fases simplifica y evita renumerar.
 - **Capturar el pagaré en la 10 con el dato real traído de la 8**: descartada — el cierre financiero (cuadrar y decidir el pagaré) es responsabilidad de Dirección en la dictaminación, no de quien programa firmas.
+
+## Addendum (2026-06-25) — Resolución del saldo residual de PRECIO
+
+- **Iniciativa**: [`dilesa-saldos-residuales`](../planning/dilesa-saldos-residuales.md)
+
+El cierre de la fase 8 (D1) gateaba **un** saldo: el faltante de **gastos notariales** (`coberturaGastos.pagareNecesario` → captura de crédito directo). Quedaba sin tratamiento el residual de **precio** (`saldoPrecioPorCubrir`): lo que el crédito de institución + el enganche no alcanzan a cubrir del precio de escrituración (p.ej. JUAN ANTONIO M3-L9: $792). Se mostraba como nota suave _"lo absorbe el bono"_, sin decisión, gate ni rastro — y el sistema no distinguía _"el cliente lo debe (por cobrar)"_ de _"DILESA lo absorbió (NC)"_.
+
+**A1 — La dictaminación resuelve también el residual de precio, "siempre explícito".** Cuando el residual supera el ruido de redondeo (`TOLERANCIA_SALDO` ~$5), Dirección debe **resolverlo** antes de cerrar la fase 8: **Absorber** (nota de crédito de DILESA) o **Cobrar** (el cliente lo paga con pagaré). Se persiste en `dilesa.ventas` (`saldo_residual_resolucion`/`_monto`/`_autorizado_por`/`_at`).
+
+**A2 — La nota de crédito se mantiene DERIVADA.** El monto absorbido ya cae en `montoNotaCredito = Facturado − Valor Real` (el faltante baja el Valor Real → sube el descuento real → sube la NC). El campo de la fase 8 es **gobierno** (autoriza + deja rastro), no un monto que re-tarifa.
+
+**A3 — El pagaré asigna gastos-primero (motor).** Un solo crédito directo (`monto_credito_directo`) puede cubrir el faltante de gastos **y** el residual de precio. El motor lo asigna: `pagareAGastos = min(pagaré, pagareNecesario)`, el resto `pagarePrecio` financia el precio. Así un pagaré tomado para el precio no sobre-fondea los gastos; eleva el Valor Real y **reduce la NC** (el cliente paga, DILESA no absorbe). En las ventas existentes (pagaré = faltante de gastos) la cuadratura es idéntica.
+
+**A4 — F13 reconcilia la absorción.** Al cerrar la fase 13, si Dirección **absorbió** un residual, la NC del CFDI debe cubrir la requerida por la cuadratura (que ya incluye lo absorbido); si queda corta, no cierra sin autorización de Dirección (mismo override con motivo). Acotado a ventas con absorción — no cambia el flujo de las demás.

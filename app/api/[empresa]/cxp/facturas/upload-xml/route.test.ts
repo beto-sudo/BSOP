@@ -23,6 +23,23 @@ type Script = {
   personaByRfc?: Record<string, { id: string }>;
   rpcResult?: { data: string | null; error: { message: string } | null };
   auditInsertError?: { message: string } | null;
+  /** Facturas en espera (placeholders de destajo) para el auto-match (S4). */
+  placeholders?: {
+    id: string;
+    proveedor_id: string | null;
+    total: number;
+    estimacion_id: string;
+  }[];
+  /** dilesa.estimaciones para resolver el código del destajo. */
+  estimaciones?: { id: string; codigo: string }[];
+  /** erp.personas de los contratistas de los placeholders (RFC + nombre). */
+  placeholderPersonas?: {
+    id: string;
+    rfc: string | null;
+    nombre: string | null;
+    apellido_paterno: string | null;
+    apellido_materno: string | null;
+  }[];
 };
 
 type Calls = {
@@ -41,10 +58,25 @@ function buildAdminMock(): any {
         from(tableName: string) {
           const key = `${schemaName}.${tableName}`;
           const filters: Record<string, unknown> = {};
+          let usedNot = false; // marca la query de placeholders (fetchDestajoPlaceholders)
           const builder: any = {
             select: () => builder,
             eq(col: string, val: unknown) {
               filters[col] = val;
+              return builder;
+            },
+            // fetchDestajoPlaceholders (S4): cadena .not().is() awaiteada directo.
+            // El mock devuelve vacío (sin placeholders) → carga normal, como antes.
+            not(col: string, _op: string, val: unknown) {
+              filters[col] = val;
+              usedNot = true;
+              return builder;
+            },
+            is(col: string, val: unknown) {
+              filters[col] = val;
+              return builder;
+            },
+            in() {
               return builder;
             },
             insert(rows: unknown) {
@@ -80,12 +112,17 @@ function buildAdminMock(): any {
                 };
               return { data: null, error: null };
             },
-            // Update chain awaiteado directo (facturas.update().eq()).
+            // Awaiteado directo: update().eq() (data null), la query de
+            // placeholders (erp.facturas + .not) y el lookup de estimaciones.
             then(
-              onFulfilled: (r: { data: null; error: null }) => unknown,
+              onFulfilled: (r: { data: unknown; error: null }) => unknown,
               onRejected?: (reason: unknown) => unknown
             ) {
-              return Promise.resolve({ data: null, error: null }).then(onFulfilled, onRejected);
+              let data: unknown = null;
+              if (key === 'erp.facturas' && usedNot) data = script.placeholders ?? [];
+              else if (key === 'dilesa.estimaciones') data = script.estimaciones ?? [];
+              else if (key === 'erp.personas') data = script.placeholderPersonas ?? [];
+              return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
             },
           };
           return builder;
@@ -145,6 +182,19 @@ const XML_OTRO_RECEPTOR = XML_OK.replace('DIE030904866', 'XXX010101XX1').replace
   '88888888-8888-8888-8888-888888888888'
 );
 const XML_MALO = 'esto no es un CFDI';
+
+// Destajo del caso "persona duplicada": el emisor (con RFC) matchea una persona
+// distinta a la del placeholder (sin RFC), pero el nombre coincide. Total 1100.
+const XML_DESTAJO_NOMBRE = `<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+  Version="4.0" Serie="A" Folio="77" Fecha="2026-06-20T10:30:00"
+  SubTotal="1100.00" Total="1100.00" Moneda="MXN" FormaPago="03" MetodoPago="PUE" TipoDeComprobante="I">
+  <cfdi:Emisor Rfc="SAMD8409154U7" Nombre="DAVID EDUARDO SALAZAR MORALES" RegimenFiscal="612"/>
+  <cfdi:Receptor Rfc="DIE030904866" Nombre="DESARROLLO INMOBILIARIO" UsoCFDI="G03"/>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital Version="1.1" UUID="11112222-3333-4444-5555-666677778888" FechaTimbrado="2026-06-20T10:31:00"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>`;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -286,5 +336,103 @@ describe('POST /api/[empresa]/cxp/facturas/upload-xml', () => {
     } finally {
       errSpy.mockRestore();
     }
+  });
+
+  // ── Auto-match destajo → CxP (S4) ──────────────────────────────────────
+
+  function makeReqRaw(fields: {
+    analyze?: boolean;
+    decisiones?: Record<string, string>;
+    xml?: string;
+    filename?: string;
+  }): NextRequest {
+    const fd = new FormData();
+    if (fields.analyze) fd.append('analyze', '1');
+    if (fields.decisiones) fd.append('decisiones', JSON.stringify(fields.decisiones));
+    fd.append(
+      'file',
+      new File([fields.xml ?? XML_OK], fields.filename ?? 'a.xml', {
+        type: 'application/xml',
+      })
+    );
+    return new NextRequest(new URL('http://localhost/api/dilesa/cxp/facturas/upload-xml'), {
+      method: 'POST',
+      body: fd,
+      headers: { 'user-agent': 'vitest-agent' },
+    });
+  }
+
+  it('analyze → sugiere asociar al destajo en espera del contratista (neto ≥ CFDI)', async () => {
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1200, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ analyze: true }), params);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    const a = body.analisis[0];
+    expect(a.ok).toBe(true);
+    expect(a.candidatos).toHaveLength(1);
+    // CFDI total 1160, neto 1200 → Δ materiales 40.
+    expect(a.candidatos[0]).toMatchObject({ facturaId: 'ph-1', neto: 1200, delta: 40 });
+    expect(a.sugerencia).toBe('ph-1');
+    expect(calls.rpc).toHaveLength(0); // analyze no escribe
+  });
+
+  it('analyze → si el CFDI excede el neto, no es candidato (sugiere normal)', async () => {
+    // neto 1000 < CFDI 1160 → fuera (la factura nunca debe ser mayor).
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1000, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ analyze: true }), params);
+    const body = await res.json();
+    expect(body.analisis[0].candidatos).toHaveLength(0);
+    expect(body.analisis[0].sugerencia).toBe('normal');
+  });
+
+  it('analyze → reconoce el destajo por nombre aunque la persona del destajo no tenga RFC (duplicado)', async () => {
+    // El placeholder cuelga de una persona SIN RFC; el emisor del CFDI matchea
+    // OTRA persona (con RFC). Mismo humano → debe ofrecerse el destajo igual.
+    script.placeholders = [
+      { id: 'ph-david', proveedor_id: 'prov-destajo', total: 1200, estimacion_id: 'est-david' },
+    ];
+    script.estimaciones = [{ id: 'est-david', codigo: 'EST-2026-W26-SALA-001' }];
+    script.placeholderPersonas = [
+      {
+        id: 'prov-destajo',
+        rfc: null,
+        nombre: 'DAVID EDUARDO',
+        apellido_paterno: 'SALAZAR',
+        apellido_materno: 'MORALES',
+      },
+    ];
+    script.personaByRfc = { SAMD8409154U7: { id: 'persona-con-rfc' } };
+    const res = await POST(
+      makeReqRaw({ analyze: true, xml: XML_DESTAJO_NOMBRE, filename: 'david.xml' }),
+      params
+    );
+    expect(res.status).toBe(200);
+    const a = (await res.json()).analisis[0];
+    expect(a.ok).toBe(true);
+    expect(a.proveedorId).toBe('persona-con-rfc'); // distinto al del destajo
+    expect(a.candidatos).toHaveLength(1);
+    expect(a.candidatos[0]).toMatchObject({ facturaId: 'ph-david', neto: 1200, delta: 100 });
+    expect(a.sugerencia).toBe('ph-david');
+  });
+
+  it('commit con decisiones → asocia el CFDI al destajo (recibir_cfdi, no alta)', async () => {
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1200, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ decisiones: { 'a.xml': 'ph-1' } }), params);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true, exitosos: 1 });
+    expect(calls.rpc).toHaveLength(1);
+    expect(calls.rpc[0].fn).toBe('cxp_factura_recibir_cfdi');
+    expect(calls.rpc[0].args.p_factura_id).toBe('ph-1');
   });
 });

@@ -37,6 +37,10 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   {
@@ -75,6 +79,9 @@ function CapturarFase9Body() {
   const [fechaValidacion, setFechaValidacion] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
+  // Autoguardado (ADR-051): firma de lo último persistido. Arranca = lo cargado, así
+  // que no autoguarda hasta que el usuario cambie la fecha (ni el default "hoy").
+  const [fechaGuardada, setFechaGuardada] = useState<string>(new Date().toISOString().slice(0, 10));
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [loading, setLoading] = useState(true);
@@ -110,7 +117,10 @@ function CapturarFase9Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.fecha_validacion_patronal) setFechaValidacion(v.fecha_validacion_patronal);
+      if (v.fecha_validacion_patronal) {
+        setFechaValidacion(v.fecha_validacion_patronal);
+        setFechaGuardada(v.fecha_validacion_patronal);
+      }
 
       const { data: fRows } = await sb
         .schema('dilesa')
@@ -131,6 +141,27 @@ function CapturarFase9Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado de la fecha (ADR-051) ──────────────────────────
+  // Persiste al teclear (debounced), sin esperar al botón "Guardar fase". No
+  // autoguarda en una fase ya cerrada (la fecha quedó sellada con el avance).
+  const auto = useAutoguardadoCampos({
+    clave: fechaValidacion,
+    claveGuardada: fechaGuardada,
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({ fecha_validacion_patronal: fechaValidacion || null })
+        .eq('id', ventaId);
+      if (upErr)
+        return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar la fecha.') };
+      setFechaGuardada(fechaValidacion);
+      setVenta((v) => (v ? { ...v, fecha_validacion_patronal: fechaValidacion || null } : v));
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -243,7 +274,10 @@ function CapturarFase9Body() {
             El cliente solicita este documento a su patrón. DILESA solo lo archiva al recibirlo.
           </p>
 
-          <Section title="Datos de la validación">
+          <Section
+            title="Datos de la validación"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Fecha de la validación *">
                 <Input
@@ -254,6 +288,9 @@ function CapturarFase9Body() {
                 />
               </Field>
             </div>
+            <p className="mt-2 text-[11px] text-[var(--text)]/45">
+              La fecha se guarda sola al cambiarla; cerrar la fase la confirma y avanza.
+            </p>
           </Section>
 
           <div className="flex items-center justify-end gap-3">
@@ -281,12 +318,23 @@ function CapturarFase9Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

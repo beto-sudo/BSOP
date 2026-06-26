@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 /**
- * Tests para `GET /api/dilesa/ventas/[ventaId]/docs` (Sprint 1 de
+ * Tests para `GET /api/dilesa/ventas/[id]/docs` (Sprint 1 de
  * `dilesa-ventas-captura-colaborativa`).
  *
  * El endpoint existe porque `core.usuarios` es RLS self-only: el "subido
@@ -68,7 +68,7 @@ function req(ventaId: string, roles?: string) {
   const url = `http://localhost/api/dilesa/ventas/${ventaId}/docs${
     roles != null ? `?roles=${encodeURIComponent(roles)}` : ''
   }`;
-  return GET(new NextRequest(url), { params: Promise.resolve({ ventaId }) });
+  return GET(new NextRequest(url), { params: Promise.resolve({ id: ventaId }) });
 }
 
 beforeEach(() => {
@@ -82,7 +82,7 @@ beforeEach(() => {
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
-describe('GET /api/dilesa/ventas/[ventaId]/docs', () => {
+describe('GET /api/dilesa/ventas/[id]/docs', () => {
   it('400 con ventaId que no es uuid', async () => {
     const res = await req('no-es-uuid', 'factura');
     expect(res.status).toBe(400);

@@ -833,9 +833,13 @@ function NuevaSolicitudForm() {
             const { error: adjErr } = await sb
               .schema('erp')
               .from('adjuntos')
+              // `entidad_tipo: 'venta'` (singular) = estándar del sistema (marcarFase,
+              // subirDocFase, endpoint /docs). Antes insertaba 'ventas' (plural), que
+              // la fase 2 leía con su query vieja pero el patrón colaborativo no — el
+              // expediente "desaparecía". Migración normaliza los 19 ya creados.
               .insert({
                 empresa_id: DILESA_EMPRESA_ID,
-                entidad_tipo: 'ventas',
+                entidad_tipo: 'venta',
                 entidad_id: ventaId,
                 rol: 'expediente_digital',
                 nombre: expedienteFile.name,

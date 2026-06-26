@@ -44,6 +44,10 @@ import {
   useDocsFaseColaborativos,
   type SlotColaborativo,
 } from '@/components/dilesa/captura/docs-fase-colaborativos';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 type VentaCtx = {
   id: string;
@@ -97,6 +101,9 @@ function CapturarFase6Body() {
   const [fechaInscripcion, setFechaInscripcion] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
+  // Autoguardado (ADR-051): firma de los campos de crédito persistidos (arranca =
+  // lo cargado). La fecha de inscripción NO autoguarda (va a venta_fases.notas).
+  const [guardado, setGuardado] = useState({ montoTit: '', montoCo: '', refTit: '', refCo: '' });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +148,12 @@ function CapturarFase6Body() {
       }
       if (v.credito_titular_ref) setCreditoTitularRef(v.credito_titular_ref);
       if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
+      setGuardado({
+        montoTit: v.monto_credito_titular != null ? String(v.monto_credito_titular) : '',
+        montoCo: v.monto_credito_cotitular != null ? String(v.monto_credito_cotitular) : '',
+        refTit: v.credito_titular_ref ?? '',
+        refCo: v.credito_cotitular_ref ?? '',
+      });
 
       const { data: fRows } = await sb
         .schema('dilesa')
@@ -187,6 +200,41 @@ function CapturarFase6Body() {
     [requiereTitular, requiereCotitular]
   );
   const docsFase = useDocsFaseColaborativos(ventaId, slotsConstancias);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Montos y referencias de crédito persisten al cambiarlos (UPDATE directo). La
+  // fecha de inscripción no autoguarda (va a venta_fases.notas al avanzar).
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({
+      montoTit: montoTitular,
+      montoCo: montoCotitular,
+      refTit: creditoTitularRef,
+      refCo: creditoCotitularRef,
+    }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      if (!venta) return { ok: false };
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
+          monto_credito_cotitular: montoCotitular.trim() ? Number(montoCotitular) : null,
+          credito_titular_ref: creditoTitularRef.trim() || null,
+          credito_cotitular_ref: creditoCotitularRef.trim() || null,
+        })
+        .eq('id', venta.id);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({
+        montoTit: montoTitular,
+        montoCo: montoCotitular,
+        refTit: creditoTitularRef,
+        refCo: creditoCotitularRef,
+      });
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -341,7 +389,10 @@ function CapturarFase6Body() {
             <DocsFaseSection state={docsFase} titulo="Constancias de crédito" />
           )}
 
-          <Section title="Montos aprobados por el banco">
+          <Section
+            title="Montos aprobados por el banco"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={`Monto Crédito Titular${sinCredito ? '' : ' *'}`}>
                 <Input
@@ -420,12 +471,23 @@ function CapturarFase6Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

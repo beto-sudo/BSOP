@@ -2952,6 +2952,131 @@ export type Database = {
         }
         Relationships: []
       }
+      gastos_notariales_config: {
+        Row: {
+          activa: boolean
+          anio: number
+          apertura_cuota_fija: number
+          apertura_umbral_cuota_fija: number
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          isai_pct: number
+          muni_avaluo_previo: number
+          muni_certificacion_planos: number
+          muni_copias_fotostaticas: number
+          muni_derechos: number
+          muni_valuacion_catastral: number
+          notas: string | null
+          otros_aviso_definitivo: number
+          otros_cnpr_por_derechohabiente: number
+          otros_copia_certificada: number
+          otros_forma_isai: number
+          otros_kinegrama: number
+          otros_plano: number
+          rp_aviso_preventivo: number
+          rp_clg: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          anio: number
+          apertura_cuota_fija?: number
+          apertura_umbral_cuota_fija?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          isai_pct?: number
+          muni_avaluo_previo?: number
+          muni_certificacion_planos?: number
+          muni_copias_fotostaticas?: number
+          muni_derechos?: number
+          muni_valuacion_catastral?: number
+          notas?: string | null
+          otros_aviso_definitivo?: number
+          otros_cnpr_por_derechohabiente?: number
+          otros_copia_certificada?: number
+          otros_forma_isai?: number
+          otros_kinegrama?: number
+          otros_plano?: number
+          rp_aviso_preventivo?: number
+          rp_clg?: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          anio?: number
+          apertura_cuota_fija?: number
+          apertura_umbral_cuota_fija?: number
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          isai_pct?: number
+          muni_avaluo_previo?: number
+          muni_certificacion_planos?: number
+          muni_copias_fotostaticas?: number
+          muni_derechos?: number
+          muni_valuacion_catastral?: number
+          notas?: string | null
+          otros_aviso_definitivo?: number
+          otros_cnpr_por_derechohabiente?: number
+          otros_copia_certificada?: number
+          otros_forma_isai?: number
+          otros_kinegrama?: number
+          otros_plano?: number
+          rp_aviso_preventivo?: number
+          rp_clg?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gastos_notariales_tabulador: {
+        Row: {
+          config_id: string
+          empresa_id: string
+          id: string
+          limite_inferior: number
+          limite_superior: number | null
+          orden: number
+          tipo: string
+          valor_beneficio: number
+          valor_particular: number
+        }
+        Insert: {
+          config_id: string
+          empresa_id: string
+          id?: string
+          limite_inferior: number
+          limite_superior?: number | null
+          orden: number
+          tipo: string
+          valor_beneficio: number
+          valor_particular: number
+        }
+        Update: {
+          config_id?: string
+          empresa_id?: string
+          id?: string
+          limite_inferior?: number
+          limite_superior?: number | null
+          orden?: number
+          tipo?: string
+          valor_beneficio?: number
+          valor_particular?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gastos_notariales_tabulador_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "gastos_notariales_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kpi_snapshot: {
         Row: {
           casas_en_obra: number
@@ -5529,6 +5654,7 @@ export type Database = {
           fecha_validacion_patronal: string | null
           forma_pago: string | null
           gastos_escrituracion: number | null
+          gastos_notariales_desglose: Json | null
           hora_firma_programada: string | null
           id: string
           incremento_credito: number | null
@@ -5567,6 +5693,7 @@ export type Database = {
           saldo_residual_monto: number | null
           saldo_residual_resolucion: string | null
           sobreprecio_gastos_escrituracion: number
+          tiene_propiedad: boolean
           tipo_credito: string | null
           unidad_id: string | null
           updated_at: string
@@ -5632,6 +5759,7 @@ export type Database = {
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          gastos_notariales_desglose?: Json | null
           hora_firma_programada?: string | null
           id?: string
           incremento_credito?: number | null
@@ -5670,6 +5798,7 @@ export type Database = {
           saldo_residual_monto?: number | null
           saldo_residual_resolucion?: string | null
           sobreprecio_gastos_escrituracion?: number
+          tiene_propiedad?: boolean
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -5735,6 +5864,7 @@ export type Database = {
           fecha_validacion_patronal?: string | null
           forma_pago?: string | null
           gastos_escrituracion?: number | null
+          gastos_notariales_desglose?: Json | null
           hora_firma_programada?: string | null
           id?: string
           incremento_credito?: number | null
@@ -5773,6 +5903,7 @@ export type Database = {
           saldo_residual_monto?: number | null
           saldo_residual_resolucion?: string | null
           sobreprecio_gastos_escrituracion?: number
+          tiene_propiedad?: boolean
           tipo_credito?: string | null
           unidad_id?: string | null
           updated_at?: string
@@ -6377,6 +6508,10 @@ export type Database = {
           p_tipo: string
         }
         Returns: string
+      }
+      fn_auto_preparada_entrega: {
+        Args: { p_venta_id: string }
+        Returns: undefined
       }
       fn_backfill_cxc: {
         Args: never
@@ -7793,6 +7928,74 @@ export type Database = {
         }
         Relationships: []
       }
+      cuentas_contables: {
+        Row: {
+          activa: boolean
+          afectable: boolean
+          codigo_agrupador_sat: string | null
+          codigo_contpaqi: string | null
+          created_at: string
+          cuenta_padre_id: string | null
+          deleted_at: string | null
+          empresa_id: string
+          id: string
+          naturaleza: string
+          nivel: number
+          nombre: string
+          notas: string | null
+          numero: string
+          origen: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          afectable?: boolean
+          codigo_agrupador_sat?: string | null
+          codigo_contpaqi?: string | null
+          created_at?: string
+          cuenta_padre_id?: string | null
+          deleted_at?: string | null
+          empresa_id: string
+          id?: string
+          naturaleza: string
+          nivel: number
+          nombre: string
+          notas?: string | null
+          numero: string
+          origen?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          afectable?: boolean
+          codigo_agrupador_sat?: string | null
+          codigo_contpaqi?: string | null
+          created_at?: string
+          cuenta_padre_id?: string | null
+          deleted_at?: string | null
+          empresa_id?: string
+          id?: string
+          naturaleza?: string
+          nivel?: number
+          nombre?: string
+          notas?: string | null
+          numero?: string
+          origen?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuentas_contables_cuenta_padre_id_fkey"
+            columns: ["cuenta_padre_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cxc_cargos: {
         Row: {
           concepto: string | null
@@ -8864,6 +9067,7 @@ export type Database = {
           condiciones_pago_dias: number | null
           contrato_id: string | null
           created_at: string
+          cuenta_contable_id: string | null
           emisor_nombre: string | null
           emisor_rfc: string | null
           empresa_id: string
@@ -8905,6 +9109,7 @@ export type Database = {
           condiciones_pago_dias?: number | null
           contrato_id?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id: string
@@ -8946,6 +9151,7 @@ export type Database = {
           condiciones_pago_dias?: number | null
           contrato_id?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id?: string
@@ -8982,6 +9188,13 @@ export type Database = {
           xml_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "facturas_cuenta_contable_id_fkey"
+            columns: ["cuenta_contable_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "facturas_orden_compra_id_fkey"
             columns: ["orden_compra_id"]
@@ -9147,6 +9360,7 @@ export type Database = {
           categoria_id: string | null
           creado_por: string | null
           created_at: string
+          cuenta_contable_id: string | null
           descripcion: string
           empresa_id: string
           fecha: string
@@ -9162,6 +9376,7 @@ export type Database = {
           categoria_id?: string | null
           creado_por?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           descripcion: string
           empresa_id: string
           fecha?: string
@@ -9177,6 +9392,7 @@ export type Database = {
           categoria_id?: string | null
           creado_por?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           descripcion?: string
           empresa_id?: string
           fecha?: string
@@ -9188,7 +9404,15 @@ export type Database = {
           registrado?: boolean
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gastos_cuenta_contable_id_fkey"
+            columns: ["cuenta_contable_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventario: {
         Row: {

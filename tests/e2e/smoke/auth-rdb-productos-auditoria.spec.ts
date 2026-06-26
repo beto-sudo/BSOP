@@ -21,6 +21,8 @@ test.describe('RDB › Productos · Auditoría', () => {
     if (page.url().includes('/login')) {
       testInfo.skip(true, 'Session not accepted — auth state may be stale');
     }
+    // Espera a que el reporte (lee recetas, pesado) cargue antes de asertar.
+    await page.waitForLoadState('networkidle').catch(() => {});
   });
 
   test('page renders without crash', async ({ page }) => {

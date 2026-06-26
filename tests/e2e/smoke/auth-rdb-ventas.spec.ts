@@ -17,6 +17,13 @@ test.describe('RDB › Ventas', () => {
     if (page.url().includes('/login')) {
       testInfo.skip(true, 'Session not accepted — auth state may be stale');
     }
+    // Espera a que el main (datos de Waitry, pesado) cargue antes de asertar —
+    // evita la fragilidad de los timeouts fijos contra una página lenta.
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .getByRole('heading', { name: 'Ventas' })
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {});
   });
 
   // ── Page structure ────────────────────────────────────────────────────────

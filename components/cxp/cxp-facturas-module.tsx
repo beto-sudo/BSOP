@@ -20,7 +20,19 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ban, Check, Copy, FileUp, Link2, RefreshCw, Search, Upload, Wallet } from 'lucide-react';
+import {
+  Ban,
+  BookText,
+  CalendarClock,
+  Check,
+  Copy,
+  FileUp,
+  Link2,
+  RefreshCw,
+  Search,
+  Upload,
+  Wallet,
+} from 'lucide-react';
 
 import {
   ModuleFilters,
@@ -33,11 +45,11 @@ import {
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
-import { usePermissions } from '@/components/providers';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Combobox } from '@/components/ui/combobox';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -52,19 +64,37 @@ import { useUrlFilters } from '@/hooks/use-url-filters';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
+import type { Json } from '@/types/supabase';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
 import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 import { hrefDoc } from '@/lib/gasto/hilo';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { buildProyectoOptions, type ProyectoSelectorRow } from '@/lib/dilesa/proyectos-selector';
+import type { AplicacionViva } from './cxp-programacion-module';
 
 const TZ = 'America/Matamoros';
 
+// Vista del pipeline (Sprint 7 S1): por defecto la pantalla Facturas muestra
+// solo lo que falta por programar — las facturas salen al programarse, como una
+// bandeja de pendientes. "Todas" recupera el catálogo completo.
 const FILTER_DEFAULTS = {
   search: '',
   estado: '',
+  vista: 'por_programar',
 };
+
+const VISTA_OPTIONS = [
+  { value: 'por_programar', label: 'Por programar' },
+  { value: 'todas', label: 'Todas' },
+];
+
+const METODO_PAGO_OPTIONS = [
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+];
 
 export type CxpFacturasModuleProps = {
   /** UUID de la empresa (`core.empresas.id`). Filtra todas las queries. */
@@ -104,10 +134,16 @@ type Factura = {
   xml_url: string | null;
   pdf_url: string | null;
   partida_id: string | null;
+  /** Clasificación contable: cuenta del catálogo erp.cuentas_contables (DILESA). */
+  cuenta_contable_id: string | null;
   /** Destajo de origen (dilesa.estimaciones) si la factura nació de uno. */
   estimacion_id: string | null;
   /** Código del destajo de origen (para la bandeja "en espera"). */
   destajo_codigo: string | null;
+  /** Σ aplicaciones en pagos vivos programado/aprobado (comprometido sin ejecutar). */
+  comprometido: number;
+  /** saldo − comprometido: lo que aún falta por programar. */
+  porProgramar: number;
 };
 
 type PagoAplicado = {
@@ -358,7 +394,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [error, setError] = useState<string | null>(null);
 
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(FILTER_DEFAULTS);
-  const { search, estado } = filters;
+  const { search, estado, vista } = filters;
 
   const [selected, setSelected] = useState<Factura | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -383,6 +419,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [partidaLabelMap, setPartidaLabelMap] = useState<Map<string, string>>(new Map());
   const [proyectoNombreMap, setProyectoNombreMap] = useState<Map<string, string>>(new Map());
   const [partidaProyectoMap, setPartidaProyectoMap] = useState<Map<string, string>>(new Map());
+  // Cuentas contables afectables (DILESA) para clasificar el egreso: opciones
+  // del <Combobox> + mapa id→etiqueta. Iniciativa dilesa-catalogo-contable.
+  const [cuentaOpts, setCuentaOpts] = useState<ComboboxOption[]>([]);
+  const [cuentaLabelMap, setCuentaLabelMap] = useState<Map<string, string>>(new Map());
 
   // Columna "Partida" solo para empresas con presupuesto de obra (DILESA):
   // hace visible el gasto que NO suma al control presupuestal — una factura
@@ -415,8 +455,27 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         );
       },
     });
+    // Columna "Cuenta" (clasificación contable): hace visible el egreso sin
+    // clasificar para impulsar la captura. Iniciativa dilesa-catalogo-contable.
+    out.splice(out.findIndex((c) => c.key === 'partida') + 1, 0, {
+      key: 'cuenta_contable',
+      label: 'Cuenta',
+      sortable: false,
+      render: (f) =>
+        f.cuenta_contable_id ? (
+          <span className="block max-w-[180px] truncate text-xs text-muted-foreground">
+            {cuentaLabelMap.get(f.cuenta_contable_id) ?? 'Clasificada'}
+          </span>
+        ) : f.estado_cxp === 'cancelada' ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <Badge variant="outline" className="border-amber-500/60 text-amber-600">
+            Sin clasificar
+          </Badge>
+        ),
+    });
     return out;
-  }, [usaPartidas, partidaLabelMap]);
+  }, [usaPartidas, partidaLabelMap, cuentaLabelMap]);
 
   const fetchFacturas = useCallback(async () => {
     setLoading(true);
@@ -427,7 +486,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         .schema('erp')
         .from('facturas')
         .select(
-          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url, partida_id'
+          'id, uuid_sat, emisor_nombre, emisor_rfc, proveedor_id, orden_compra_id, fecha_emision, fecha_vencimiento, fecha_pago_programada, subtotal, iva, tasa_iva, retencion_iva, retencion_isr, total, monto_pagado, saldo, estado_cxp, forma_pago_sat, metodo_pago_sat, uso_cfdi, xml_url, pdf_url, partida_id, cuenta_contable_id'
         )
         .eq('empresa_id', empresaId)
         .eq('flujo', 'egreso')
@@ -436,7 +495,12 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
       const rows = (data ?? []) as Omit<
         Factura,
-        'proveedor_nombre' | 'oc_codigo' | 'estimacion_id' | 'destajo_codigo'
+        | 'proveedor_nombre'
+        | 'oc_codigo'
+        | 'estimacion_id'
+        | 'destajo_codigo'
+        | 'comprometido'
+        | 'porProgramar'
       >[];
 
       // Nombres de proveedor (erp.personas) para filas con proveedor_id y sin
@@ -476,6 +540,27 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         for (const o of ocs ?? []) ocPorId.set(o.id as string, (o.codigo as string | null) ?? '');
       }
 
+      // Comprometido vivo sin ejecutar (pagos programado/aprobado): para derivar
+      // "por programar" = saldo − comprometido. Espejo de la pestaña Programación;
+      // sostiene la vista por defecto del pipeline (S1). Los pagos `pagado` ya
+      // bajaron el saldo vía trigger, no se cuentan aquí.
+      const comprometidoPorFactura = new Map<string, number>();
+      {
+        const { data: aplicaciones } = await sb
+          .schema('erp')
+          .from('cxp_pago_aplicaciones')
+          .select('factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)')
+          .eq('empresa_id', empresaId)
+          .in('pago.estado', ['programado', 'aprobado'])
+          .is('pago.deleted_at', null);
+        for (const a of (aplicaciones ?? []) as unknown as AplicacionViva[]) {
+          comprometidoPorFactura.set(
+            a.factura_id,
+            (comprometidoPorFactura.get(a.factura_id) ?? 0) + Number(a.monto_aplicado ?? 0)
+          );
+        }
+      }
+
       // Liga a destajo (facturas.estimacion_id, columna nueva aún no en types)
       // + código del destajo — para la bandeja "en espera del XML". Solo se
       // consulta para las facturas en borrador (las en espera).
@@ -512,6 +597,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       setFacturas(
         rows.map((r) => {
           const estimacionId = estimacionPorFactura.get(r.id) ?? null;
+          const comprometido = comprometidoPorFactura.get(r.id) ?? 0;
+          const porProgramar = Math.round((Number(r.saldo ?? 0) - comprometido) * 100) / 100;
           return {
             ...r,
             proveedor_nombre: r.proveedor_id
@@ -520,6 +607,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
             oc_codigo: r.orden_compra_id ? (ocPorId.get(r.orden_compra_id) ?? null) : null,
             estimacion_id: estimacionId,
             destajo_codigo: estimacionId ? (codigoPorEstimacion.get(estimacionId) ?? null) : null,
+            comprometido,
+            porProgramar,
           };
         })
       );
@@ -604,9 +693,74 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     [feedback, fetchFacturas]
   );
 
+  // Carga del catálogo de cuentas afectables (solo DILESA) para el selector +
+  // la columna. El estado (cuentaOpts / cuentaLabelMap) vive arriba, junto a
+  // partidaProyectoMap, porque columnsConPartida lo consume.
+  useEffect(() => {
+    if (!usaPartidas) return;
+    let activo = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('cuentas_contables')
+        .select('id, numero, nombre, codigo_contpaqi, tipo')
+        .eq('empresa_id', empresaId)
+        .eq('afectable', true)
+        .eq('activa', true)
+        .is('deleted_at', null)
+        .order('numero', { ascending: true });
+      if (!activo) return;
+      const filas = data ?? [];
+      setCuentaOpts(
+        filas.map((c) => ({
+          value: c.id,
+          label: `${c.numero} · ${c.nombre}`,
+          searchLabel: `${c.numero.replace(/-/g, ' ')} ${c.nombre}`,
+          keywords: [c.numero, c.codigo_contpaqi ?? '', c.tipo].filter(Boolean),
+        }))
+      );
+      setCuentaLabelMap(new Map(filas.map((c) => [c.id, `${c.numero} · ${c.nombre}`])));
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [usaPartidas, empresaId]);
+
+  const asignarCuenta = useCallback(
+    async (facturaId: string, cuentaId: string | null) => {
+      const sb = createSupabaseBrowserClient();
+      const { error: e } = await sb
+        .schema('erp')
+        .from('facturas')
+        .update({ cuenta_contable_id: cuentaId })
+        .eq('id', facturaId);
+      if (e) {
+        feedback.error(getSupabaseErrorMessage(e, 'No se pudo asignar la cuenta.'));
+        return;
+      }
+      feedback.success(cuentaId ? 'Cuenta asignada' : 'Cuenta quitada');
+      setSelected((s) => (s && s.id === facturaId ? { ...s, cuenta_contable_id: cuentaId } : s));
+      void fetchFacturas();
+    },
+    [feedback, fetchFacturas]
+  );
+
   const filtered = useMemo(() => {
     return facturas.filter((f) => {
-      if (estado && f.estado_cxp !== estado) return false;
+      // Las facturas en espera del destajo (borrador + estimacion_id) viven en
+      // su panel dedicado de arriba; no las dupliques en la tabla principal —
+      // salvo que se filtre explícito por "Borrador". Reaparecen como filas
+      // normales en cuanto reciben su XML (→ por pagar).
+      if (f.estado_cxp === 'borrador' && f.estimacion_id && estado !== 'borrador') return false;
+      // Vista "por programar" (pipeline S1): solo lo que aún tiene monto pendiente
+      // de programar; lo ya programado/pagado/cancelado sale de la pantalla.
+      if (vista === 'por_programar') {
+        if (f.estado_cxp !== 'por_pagar' && f.estado_cxp !== 'parcial') return false;
+        if (f.porProgramar <= 0) return false;
+      } else if (estado && f.estado_cxp !== estado) {
+        return false;
+      }
       if (!search) return true;
       const q = search.toLowerCase();
       return (
@@ -616,7 +770,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         (f.oc_codigo ?? '').toLowerCase().includes(q)
       );
     });
-  }, [facturas, search, estado]);
+  }, [facturas, search, estado, vista]);
 
   // Facturas EN ESPERA del XML: destajos aprobados en construcción cuya
   // factura nació en borrador. Administración sube aquí el XML del contratista
@@ -679,7 +833,11 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
         <ModuleFilters
           count={
-            loading ? 'Cargando…' : `${filtered.length} factura${filtered.length !== 1 ? 's' : ''}`
+            loading
+              ? 'Cargando…'
+              : vista === 'por_programar'
+                ? `${filtered.length} por programar`
+                : `${filtered.length} factura${filtered.length !== 1 ? 's' : ''}`
           }
           actions={
             <Button size="sm" onClick={() => setUploadOpen(true)} className="gap-2">
@@ -699,14 +857,25 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
           </div>
 
           <Combobox
-            value={estado}
-            onChange={(value) => setFilter('estado', value ?? '')}
-            options={ESTADO_OPTIONS}
-            placeholder="Estado"
-            allowClear
+            value={vista}
+            onChange={(value) => setFilter('vista', value ?? 'por_programar')}
+            options={VISTA_OPTIONS}
+            placeholder="Vista"
             size="sm"
-            className="w-44"
+            className="w-40"
           />
+
+          {vista === 'todas' && (
+            <Combobox
+              value={estado}
+              onChange={(value) => setFilter('estado', value ?? '')}
+              options={ESTADO_OPTIONS}
+              placeholder="Estado"
+              allowClear
+              size="sm"
+              className="w-44"
+            />
+          )}
 
           <ActiveFiltersChip count={activeCount} onClearAll={clearAll} />
 
@@ -749,6 +918,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       <FacturaDrawer
         factura={selected}
         empresa={empresa}
+        empresaId={empresaId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         usaPartidas={usaPartidas}
@@ -757,10 +927,19 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         partidaLabelMap={partidaLabelMap}
         proyectoNombreMap={proyectoNombreMap}
         partidaProyectoMap={partidaProyectoMap}
+        cuentaOpts={cuentaOpts}
+        cuentaLabelMap={cuentaLabelMap}
         onAsignar={async (partidaId) => {
           if (selected) await asignarPartida(selected.id, partidaId);
         }}
+        onAsignarCuenta={async (cuentaId) => {
+          if (selected) await asignarCuenta(selected.id, cuentaId);
+        }}
         onCancelada={() => {
+          setDrawerOpen(false);
+          void fetchFacturas();
+        }}
+        onProgramado={() => {
           setDrawerOpen(false);
           void fetchFacturas();
         }}
@@ -800,6 +979,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 function FacturaDrawer({
   factura,
   empresa,
+  empresaId,
   open,
   onClose,
   usaPartidas,
@@ -808,11 +988,16 @@ function FacturaDrawer({
   partidaLabelMap,
   proyectoNombreMap,
   partidaProyectoMap,
+  cuentaOpts,
+  cuentaLabelMap,
   onAsignar,
+  onAsignarCuenta,
   onCancelada,
+  onProgramado,
 }: {
   factura: Factura | null;
   empresa: EmpresaSlug;
+  empresaId: string;
   open: boolean;
   onClose: () => void;
   usaPartidas: boolean;
@@ -821,12 +1006,19 @@ function FacturaDrawer({
   partidaLabelMap: Map<string, string>;
   proyectoNombreMap: Map<string, string>;
   partidaProyectoMap: Map<string, string>;
+  cuentaOpts: ComboboxOption[];
+  cuentaLabelMap: Map<string, string>;
   onAsignar: (partidaId: string | null) => Promise<void>;
+  onAsignarCuenta: (cuentaId: string | null) => Promise<void>;
   /** Refresca la lista + cierra el drawer tras cancelar la factura. */
   onCancelada: () => void;
+  /** Refresca + cierra tras programar (= autorizar) el pago de la factura. */
+  onProgramado: () => void;
 }) {
   const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
   const feedback = useActionFeedback();
+  const [programarOpen, setProgramarOpen] = useState(false);
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
@@ -837,6 +1029,9 @@ function FacturaDrawer({
   const [selProy, setSelProy] = useState('');
   const [selPart, setSelPart] = useState('');
   const [guardandoPartida, setGuardandoPartida] = useState(false);
+  const [editCuenta, setEditCuenta] = useState(false);
+  const [selCuenta, setSelCuenta] = useState('');
+  const [guardandoCuenta, setGuardandoCuenta] = useState(false);
 
   // Cierra el editor cuando cambia la factura (ajuste de estado en render, no en effect).
   const [trackedFacturaId, setTrackedFacturaId] = useState<string | null>(null);
@@ -844,6 +1039,9 @@ function FacturaDrawer({
     setTrackedFacturaId(factura?.id ?? null);
     setEditPartida(false);
     setGuardandoPartida(false);
+    setEditCuenta(false);
+    setGuardandoCuenta(false);
+    setProgramarOpen(false);
   }
 
   useEffect(() => {
@@ -947,6 +1145,17 @@ function FacturaDrawer({
     permissions.isAdmin &&
     factura != null &&
     (factura.estado_cxp === 'borrador' || factura.estado_cxp === 'por_pagar');
+
+  // Programar pago (= autoriza, S1 corte 2). Espejo en cliente del gate server
+  // de cxp_pago_aprobar (core.fn_is_admin() OR rol Dirección en la empresa).
+  // Solo aparece si la factura tiene monto por programar y hay proveedor enlazado.
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
+  const puedeProgramar =
+    esDireccion &&
+    factura != null &&
+    (factura.estado_cxp === 'por_pagar' || factura.estado_cxp === 'parcial') &&
+    factura.porProgramar > 0;
 
   const doCancelar = async (motivo: string) => {
     if (!factura) return;
@@ -1069,6 +1278,42 @@ function FacturaDrawer({
                 </div>
               </dl>
             </section>
+
+            {/* Programar pago (= autoriza, solo Dirección). Pone la acción en la
+                misma pantalla donde se clasifica partida/cuenta (pipeline S1). */}
+            {puedeProgramar && (
+              <>
+                <Separator />
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Programar pago
+                  </div>
+                  {factura.proveedor_id ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          Por programar{' '}
+                          <span className="font-semibold tabular-nums text-amber-600">
+                            {formatCurrency(factura.porProgramar)}
+                          </span>
+                        </span>
+                        <Button size="sm" className="gap-2" onClick={() => setProgramarOpen(true)}>
+                          <CalendarClock className="h-3.5 w-3.5" /> Programar pago
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Programar autoriza el pago (rol Dirección). Luego se ejecuta y se sube el
+                        comprobante en la pestaña Programación.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Enlaza un proveedor a la factura antes de programar el pago.
+                    </p>
+                  )}
+                </section>
+              </>
+            )}
 
             {/* Conceptos (líneas del CFDI, parseadas on-read del XML) */}
             <Separator />
@@ -1235,6 +1480,91 @@ function FacturaDrawer({
               </>
             )}
 
+            {/* Cuenta contable (clasificación contable del egreso, DILESA).
+                Iniciativa dilesa-catalogo-contable. La cuenta vive en
+                erp.facturas.cuenta_contable_id; el selector ofrece solo cuentas
+                afectables del catálogo. */}
+            {usaPartidas && (
+              <>
+                <Separator />
+                <section className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Cuenta contable
+                  </div>
+                  {!editCuenta ? (
+                    <div className="flex items-center justify-between gap-2">
+                      {factura.cuenta_contable_id ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <BookText className="h-4 w-4 text-muted-foreground" />
+                          {cuentaLabelMap.get(factura.cuenta_contable_id) ?? '—'}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Sin clasificar.</span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelCuenta(factura.cuenta_contable_id ?? '');
+                          setEditCuenta(true);
+                        }}
+                      >
+                        {factura.cuenta_contable_id ? 'Cambiar' : 'Clasificar'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Combobox
+                        value={selCuenta}
+                        onChange={setSelCuenta}
+                        options={cuentaOpts}
+                        placeholder="Cuenta contable…"
+                        searchPlaceholder="Buscar por número o nombre…"
+                        allowClear
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        {factura.cuenta_contable_id ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={guardandoCuenta}
+                            onClick={async () => {
+                              setGuardandoCuenta(true);
+                              await onAsignarCuenta(null);
+                              setGuardandoCuenta(false);
+                              setEditCuenta(false);
+                            }}
+                          >
+                            Quitar
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={guardandoCuenta}
+                          onClick={() => setEditCuenta(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!selCuenta || guardandoCuenta}
+                          onClick={async () => {
+                            setGuardandoCuenta(true);
+                            await onAsignarCuenta(selCuenta);
+                            setGuardandoCuenta(false);
+                            setEditCuenta(false);
+                          }}
+                        >
+                          {guardandoCuenta ? 'Guardando…' : 'Clasificar'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+
             {/* Pagos aplicados */}
             <Separator />
             <section className="space-y-2 text-sm">
@@ -1383,6 +1713,18 @@ function FacturaDrawer({
           onConfirm={doCancelar}
         />
       )}
+
+      {programarOpen && factura && (
+        <ProgramarFacturaDialog
+          factura={factura}
+          empresaId={empresaId}
+          onClose={() => setProgramarOpen(false)}
+          onDone={() => {
+            setProgramarOpen(false);
+            onProgramado();
+          }}
+        />
+      )}
     </DetailDrawer>
   );
 }
@@ -1455,6 +1797,18 @@ function MoneyRow({
 
 // ── Dialog: cargar XML (1..N) ──────────────────────────────────────────────────
 
+type AnalisisArchivo = {
+  filename: string;
+  ok: boolean;
+  error?: string;
+  proveedorNombre: string | null;
+  total?: number;
+  uuid?: string | null;
+  yaCargada?: boolean;
+  candidatos: { facturaId: string; codigo: string | null; neto: number; delta: number }[];
+  sugerencia: string;
+};
+
 function UploadXmlDialog({
   empresa,
   open,
@@ -1467,31 +1821,72 @@ function UploadXmlDialog({
   onDone: (exitosos: number) => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<'select' | 'review' | 'results'>('select');
+  const [analisis, setAnalisis] = useState<AnalisisArchivo[]>([]);
+  // filename → facturaId del destajo a asociar, o 'normal'.
+  const [decisiones, setDecisiones] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [topError, setTopError] = useState<string | null>(null);
   const [results, setResults] = useState<
     { filename: string; ok: boolean; error?: string }[] | null
   >(null);
 
-  // Reset al cerrar.
   useEffect(() => {
     if (!open) {
       setFiles([]);
+      setPhase('select');
+      setAnalisis([]);
+      setDecisiones({});
+      setBusy(false);
+      setTopError(null);
       setResults(null);
-      setSubmitting(false);
     }
   }, [open]);
 
-  const handleSubmit = async () => {
-    if (files.length === 0) return;
-    setSubmitting(true);
-    setResults(null);
+  const url = `/api/${empresa}/cxp/facturas/upload-xml`;
+
+  // Paso 1: analizar (sugiere destajo o factura normal por archivo, sin escribir).
+  const handleAnalyze = async (chosen: File[]) => {
+    if (chosen.length === 0) return;
+    setBusy(true);
+    setTopError(null);
     try {
       const fd = new FormData();
-      for (const f of files) fd.append('file', f);
-      const res = await fetch(`/api/${empresa}/cxp/facturas/upload-xml`, {
-        method: 'POST',
-        body: fd,
-      });
+      fd.append('analyze', '1');
+      for (const f of chosen) fd.append('file', f);
+      const res = await fetch(url, { method: 'POST', body: fd });
+      const json = (await res.json()) as {
+        ok: boolean;
+        analisis?: AnalisisArchivo[];
+        error?: string;
+      };
+      if (!res.ok || !json.analisis) {
+        setTopError(json.error ?? 'No se pudo analizar.');
+        return;
+      }
+      setAnalisis(json.analisis);
+      const init: Record<string, string> = {};
+      for (const a of json.analisis) if (a.ok) init[a.filename] = a.sugerencia;
+      setDecisiones(init);
+      setPhase('review');
+    } catch (e) {
+      setTopError((e as Error).message ?? 'Error de red.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Paso 2: confirmar → carga (asocia o crea según las decisiones).
+  const handleCommit = async () => {
+    const okFiles = files.filter((f) => analisis.find((a) => a.filename === f.name)?.ok);
+    if (okFiles.length === 0) return;
+    setBusy(true);
+    setTopError(null);
+    try {
+      const fd = new FormData();
+      for (const f of okFiles) fd.append('file', f);
+      fd.append('decisiones', JSON.stringify(decisiones));
+      const res = await fetch(url, { method: 'POST', body: fd });
       const json = (await res.json()) as {
         ok: boolean;
         exitosos?: number;
@@ -1500,21 +1895,29 @@ function UploadXmlDialog({
       };
       if (!res.ok && !json.results) {
         setResults([{ filename: '(lote)', ok: false, error: json.error ?? 'Error en la carga.' }]);
+        setPhase('results');
         return;
       }
       setResults(json.results ?? []);
+      setPhase('results');
       onDone(json.exitosos ?? 0);
     } catch (e) {
       setResults([
         { filename: '(lote)', ok: false, error: (e as Error).message ?? 'Error de red.' },
       ]);
+      setPhase('results');
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
-  const exitosos = results?.filter((r) => r.ok).length ?? 0;
   const empresaLabel = empresa.toUpperCase();
+  const procesables = analisis.filter((a) => a.ok);
+  const aDestajo = procesables.filter(
+    (a) => (decisiones[a.filename] ?? 'normal') !== 'normal'
+  ).length;
+  const omitidas = analisis.length - procesables.length;
+  const exitosos = results?.filter((r) => r.ok).length ?? 0;
 
   return (
     <Dialog
@@ -1523,78 +1926,134 @@ function UploadXmlDialog({
         if (!v) onOpenChange(false);
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Cargar facturas (XML CFDI)</DialogTitle>
           <DialogDescription>
-            Selecciona uno o varios XML de facturas de egreso. Se valida que el receptor sea{' '}
-            {empresaLabel}, se evita duplicar por folio fiscal y se enlaza el proveedor por RFC.
+            Sube uno o varios XML. Se valida que el receptor sea {empresaLabel}, se evita duplicar
+            por folio fiscal, y si el CFDI es de un <strong>destajo en espera</strong> se asocia
+            automáticamente (en vez de duplicar).
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground hover:bg-muted/50">
-            <Upload className="h-4 w-4" />
-            {files.length > 0
-              ? `${files.length} archivo${files.length !== 1 ? 's' : ''} seleccionado${files.length !== 1 ? 's' : ''}`
-              : 'Elegir archivos XML…'}
-            <input
-              type="file"
-              accept=".xml,application/xml,text/xml"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                setFiles(Array.from(e.target.files ?? []));
-                setResults(null);
-              }}
-            />
-          </label>
+        {topError && <p className="text-sm text-destructive">{topError}</p>}
 
-          {files.length > 0 && !results && (
-            <ul className="max-h-32 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
-              {files.map((f) => (
-                <li key={f.name} className="truncate font-mono">
-                  {f.name}
+        {/* Paso 1: selección */}
+        {phase === 'select' && (
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground hover:bg-muted/50">
+              <Upload className="h-4 w-4" />
+              {busy ? 'Analizando…' : 'Elegir archivos XML…'}
+              <input
+                type="file"
+                accept=".xml,application/xml,text/xml"
+                multiple
+                disabled={busy}
+                className="hidden"
+                onChange={(e) => {
+                  const chosen = Array.from(e.target.files ?? []);
+                  setFiles(chosen);
+                  void handleAnalyze(chosen);
+                }}
+              />
+            </label>
+          </div>
+        )}
+
+        {/* Paso 2: revisar + confirmar */}
+        {phase === 'review' && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {procesables.length} factura{procesables.length !== 1 ? 's' : ''} ·{' '}
+              <span className="text-amber-600">{aDestajo} a destajo</span> ·{' '}
+              {procesables.length - aDestajo} normal
+              {procesables.length - aDestajo !== 1 ? 'es' : ''}
+              {omitidas > 0 ? ` · ${omitidas} omitida${omitidas !== 1 ? 's' : ''}` : ''}
+            </p>
+            <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+              {analisis.map((a) => (
+                <li key={a.filename} className="rounded-md border px-3 py-2 text-sm">
+                  {!a.ok ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-xs text-muted-foreground">
+                        {a.filename}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {a.yaCargada ? 'Ya cargada' : (a.error ?? 'omitida')}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-medium">
+                          {a.proveedorNombre ?? a.filename}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {formatCurrency(a.total ?? 0)}
+                        </span>
+                      </div>
+                      <select
+                        value={decisiones[a.filename] ?? 'normal'}
+                        onChange={(e) =>
+                          setDecisiones((d) => ({ ...d, [a.filename]: e.target.value }))
+                        }
+                        className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                      >
+                        <option value="normal">Factura normal (sin destajo)</option>
+                        {a.candidatos.map((c) => (
+                          <option key={c.facturaId} value={c.facturaId}>
+                            Destajo {c.codigo ?? '—'} · neto {formatCurrency(c.neto)}
+                            {c.delta > 0 ? ` · Δ materiales ${formatCurrency(c.delta)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
-          )}
+          </div>
+        )}
 
-          {results && (
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">
-                {exitosos} de {results.length} cargada{results.length !== 1 ? 's' : ''}.
-              </p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto text-xs">
-                {results.map((r, i) => (
-                  <li
-                    key={`${r.filename}-${i}`}
-                    className={r.ok ? 'text-emerald-600' : 'text-destructive'}
-                  >
-                    <span className="font-mono">{r.filename}</span>
-                    {r.ok ? ' · OK' : ` · ${r.error ?? 'error'}`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        {/* Paso 3: resultados */}
+        {phase === 'results' && results && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">
+              {exitosos} de {results.length} procesada{results.length !== 1 ? 's' : ''}.
+            </p>
+            <ul className="max-h-60 space-y-1 overflow-y-auto text-xs">
+              {results.map((r, i) => (
+                <li
+                  key={`${r.filename}-${i}`}
+                  className={r.ok ? 'text-emerald-600' : 'text-destructive'}
+                >
+                  <span className="font-mono">{r.filename}</span>
+                  {r.ok ? ' · OK' : ` · ${r.error ?? 'error'}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <DialogFooter>
-          {results ? (
+          {phase === 'results' ? (
             <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
-          ) : (
+          ) : phase === 'review' ? (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-                Cancelar
+              <Button variant="outline" onClick={() => setPhase('select')} disabled={busy}>
+                Atrás
               </Button>
               <Button
-                onClick={() => void handleSubmit()}
-                disabled={files.length === 0 || submitting}
+                onClick={() => void handleCommit()}
+                disabled={busy || procesables.length === 0}
               >
-                {submitting ? 'Cargando…' : `Cargar ${files.length || ''}`.trim()}
+                {busy ? 'Cargando…' : `Cargar ${procesables.length || ''}`.trim()}
               </Button>
             </>
+          ) : (
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancelar
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
@@ -1719,6 +2178,161 @@ function RecibirXmlDialog({
               </Button>
             </>
           )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Dialog: programar (= autorizar) el pago de UNA factura desde el drawer ──────
+// Pipeline S1 corte 2: la pantalla Facturas absorbe la acción de programar.
+// "Programar = autoriza" → tras crear el pago (programado) se aprueba de
+// inmediato; el gate real lo impone el RPC server-side (admin O rol Dirección).
+
+function ProgramarFacturaDialog({
+  factura,
+  empresaId,
+  onClose,
+  onDone,
+}: {
+  factura: Factura;
+  empresaId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const feedback = useActionFeedback();
+  const [cuentas, setCuentas] = useState<{ id: string; nombre: string; banco: string | null }[]>(
+    []
+  );
+  const [cuentaId, setCuentaId] = useState('');
+  const [metodo, setMetodo] = useState('transferencia');
+  const [fecha, setFecha] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    void (async () => {
+      const sb = createSupabaseBrowserClient();
+      const { data } = await sb
+        .schema('erp')
+        .from('cuentas_bancarias')
+        .select('id, nombre, banco')
+        .eq('empresa_id', empresaId)
+        .eq('activo', true)
+        .order('nombre');
+      if (activo)
+        setCuentas((data ?? []) as { id: string; nombre: string; banco: string | null }[]);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [empresaId]);
+
+  const handleSubmit = async () => {
+    if (!factura.proveedor_id) return;
+    setSubmitting(true);
+    setError(null);
+    const sb = createSupabaseBrowserClient();
+    // 1) Programar: crea el cxp_pago en estado 'programado' + la aplicación.
+    const { data: pagoId, error: progErr } = await sb.schema('erp').rpc('cxp_pago_programar', {
+      p_empresa_id: empresaId,
+      p_proveedor_id: factura.proveedor_id,
+      p_aplicaciones: [{ factura_id: factura.id, monto: factura.porProgramar }] as unknown as Json,
+      p_metodo_pago: metodo || undefined,
+      p_fecha_programada: fecha || undefined,
+      p_cuenta_bancaria_id: cuentaId || undefined,
+    });
+    if (progErr || !pagoId) {
+      setError(getSupabaseErrorMessage(progErr, 'No se pudo programar el pago.'));
+      setSubmitting(false);
+      return;
+    }
+    // 2) Programar = autoriza: aprobar de inmediato. El RPC valida Dirección/admin.
+    const { error: aprErr } = await sb
+      .schema('erp')
+      .rpc('cxp_pago_aprobar', { p_pago_id: pagoId as string });
+    setSubmitting(false);
+    if (aprErr) {
+      // Quedó programado pero no autorizado (no debería pasar: el botón ya gatea
+      // Dirección). Avisar sin bloquear — el pago existe y puede aprobarse aparte.
+      feedback.error(getSupabaseErrorMessage(aprErr, 'Se programó, pero no se pudo autorizar.'), {
+        title: 'Programado · falta autorizar',
+      });
+      onDone();
+      return;
+    }
+    feedback.success('Pago programado y autorizado', {
+      description: 'Pasa a la pestaña Programación para ejecutarlo y subir el comprobante.',
+    });
+    onDone();
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v && !submitting) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Programar pago</DialogTitle>
+          <DialogDescription>
+            {proveedorLabel(factura)} · {formatCurrency(factura.porProgramar)}. Al programar, el
+            pago queda autorizado (rol Dirección); no sale dinero hasta ejecutarlo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm">
+              <span className="text-xs text-muted-foreground">Método de pago</span>
+              <Combobox
+                value={metodo}
+                onChange={(v) => setMetodo(v ?? '')}
+                options={METODO_PAGO_OPTIONS}
+                placeholder="Método"
+                size="sm"
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-xs text-muted-foreground">Fecha programada</span>
+              <Input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                className="h-9"
+              />
+            </label>
+          </div>
+          <label className="space-y-1 text-sm">
+            <span className="text-xs text-muted-foreground">Cuenta bancaria (opcional)</span>
+            <Combobox
+              value={cuentaId}
+              onChange={(v) => setCuentaId(v ?? '')}
+              options={cuentas.map((c) => ({
+                value: c.id,
+                label: c.banco ? `${c.nombre} · ${c.banco}` : c.nombre,
+              }))}
+              placeholder={cuentas.length ? 'Elegir cuenta…' : 'Sin cuentas registradas'}
+              emptyText="Sin cuentas"
+              allowClear
+              size="sm"
+              className="w-full"
+            />
+          </label>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+            {submitting ? 'Programando…' : 'Programar y autorizar'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

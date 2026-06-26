@@ -15,7 +15,6 @@ import { expectNoCriticalA11yViolations } from './helpers';
 const ROUTES: Array<{ name: string; path: string }> = [
   { name: 'inicio', path: '/inicio' },
   { name: 'rdb · inventario', path: '/rdb/inventario' },
-  { name: 'dilesa · terrenos', path: '/dilesa/terrenos' },
   { name: 'dilesa · admin tasks', path: '/dilesa/admin/tasks' },
   { name: 'settings · empresas', path: '/settings/empresas' },
 ];

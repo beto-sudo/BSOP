@@ -36,8 +36,57 @@ describe('calcularCuadratura', () => {
     expect(c.valorRealVentaDilesa).toBe(884000); // 897,378 − 13,378 + 0
     expect(c.montoNotaCredito).toBe(276049.55); // 1,160,049.55 − 884,000
     expect(c.descuentoReal).toBe(15000); // 899,000 − 884,000
-    expect(c.comisionGerencia).toBe(4495); // 899,000 × 0.5%
-    expect(c.comisionVendedor).toBe(8990); // 899,000 × 1.0% (no Loma Verde)
+    expect(c.comisionGerencia).toBe(4420); // 884,000 (valor real) × 0.5% — ADR-050
+    expect(c.comisionVendedor).toBe(8840); // 884,000 (valor real) × 1.0% (no Loma Verde) — ADR-050
+  });
+
+  // ADR-050 (iniciativa dilesa-comision-valor-real): la base de comisión es el
+  // Valor Real Venta DILESA en AMBOS modelos. Antes el legacy comisionaba sobre el
+  // valor de ESCRITURACIÓN, que sobre-pagaba en ventas con descuento (la escritura
+  // es mayor que lo que DILESA realiza). Aquí valor real (884,000) < escrituración
+  // (899,000) por el descuento de 15,000 → la comisión baja en consecuencia.
+  it('legacy comisiona sobre el valor real, no la escrituración (ADR-050)', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 899000,
+      montoCreditoTitular: 636328.45,
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: 13378,
+      gastosEscrituracion: null,
+      depositos: [
+        { monto: 261049.55, directoCliente: true, tieneRecibo: true },
+        { monto: 636328.45, directoCliente: false, tieneRecibo: false },
+      ],
+      proyectoNombre: 'Lomas del Sol',
+    });
+    expect(c.tieneDesglose).toBe(false); // legacy
+    expect(c.valorRealVentaDilesa).toBe(884000);
+    // Base = valor real (884,000), NO la escrituración (899,000).
+    expect(c.comisionVendedor).toBe(8840);
+    expect(c.comisionGerencia).toBe(4420);
+  });
+
+  // ADR-050: el valor real usa el crédito de la VENTA + enganche del cliente, NO la
+  // suma de cxc_pagos. Robusto a ventas migradas de Coda cuyo crédito nunca se
+  // registró en cxc_pagos (solo el enganche): antes daban valor real ≈ enganche
+  // (basura) y comisión absurda. Caso real M14-L4-LDV (crédito 2.24M no en cxc).
+  it('legacy sin el crédito en los depósitos usa el crédito de la venta (ADR-050)', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 2242867,
+      montoCreditoTitular: 2242867, // el crédito vive en la venta…
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: null,
+      gastosEscrituracion: null,
+      // …pero en cxc_pagos solo está el enganche (el crédito de Coda no se migró).
+      depositos: [{ monto: 22429, directoCliente: true, tieneRecibo: false }],
+      proyectoNombre: 'Lomas del Valle',
+    });
+    expect(c.tieneDesglose).toBe(false);
+    // Valor real = crédito 2,242,867 + enganche 22,429 − cheque 0 + pagaré 0; NO el
+    // enganche solo (22,429 era el valor basura del bug).
+    expect(c.valorRealVentaDilesa).toBe(2265296);
+    expect(c.comisionVendedor).toBe(22652.96); // 2,265,296 × 1.0%
   });
 
   // Modelo confirmado por Beto 2026-06-15: el enganche se factura con su propio
@@ -449,6 +498,8 @@ describe('calcularCuadratura', () => {
         sobreprecio: 24651, // productos capturados
         sobreprecioCobertura: 24651, // el que cubre el presupuesto
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
+        pagareGastos: 9387, // todo el pagaré fondea gastos (= faltante)
+        pagarePrecio: 0, // nada del pagaré financia precio
         saldoCobertura: 0, // las fuentes cubren el presupuesto bruto
       });
     });
@@ -530,6 +581,38 @@ describe('calcularCuadratura', () => {
       expect(split.sobreprecio).toBe(0);
     });
 
+    // Camino "Cobrar" del residual de precio (iniciativa dilesa-saldos-residuales S2):
+    // el cliente firma un pagaré por los $792. El pagaré NO sobre-fondea los gastos
+    // (ya cuadran): se asigna al PRECIO, sube el Valor Real y baja la NC en $792.
+    it('Juan Antonio cobra el residual con pagaré: el pagaré va al precio, no a gastos', () => {
+      const base = {
+        valorEscrituracion: 920000,
+        montoCreditoTitular: 762265,
+        montoCreditoCotitular: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 42569.42,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 0,
+        promocionGastos: 15000,
+        depositos: [{ monto: 156943, directoCliente: true, tieneRecibo: false }],
+        proyectoNombre: 'Lomas de los Encinos',
+      };
+      const sinPagare = calcularCuadratura({ ...base, montoCreditoDirecto: null });
+      const conPagare = calcularCuadratura({ ...base, montoCreditoDirecto: 792 });
+      const cob = conPagare.coberturaGastos!;
+      expect(cob.pagareGastos).toBe(0); // gastos ya cuadran (pagareNecesario 0)
+      expect(cob.pagarePrecio).toBe(792); // todo el pagaré financia el precio
+      expect(cob.saldoCobertura).toBe(0); // gastos siguen cuadrando, sin sobre-fondeo
+      expect(conPagare.valorRealVentaDilesa - sinPagare.valorRealVentaDilesa).toBe(792);
+      expect(sinPagare.montoNotaCredito - conPagare.montoNotaCredito).toBe(792);
+      expect(conPagare.montoNotaCredito).toBe(12569.42);
+      // El motor sigue señalando el residual (la decisión "cobrar" vive en la venta,
+      // no en el motor); la fase 8 la combina con la resolución persistida.
+      expect(conPagare.requiereResolucionSaldoResidual).toBe(true);
+    });
+
     // Regresión (caso Ruben M3-L17-LDLE, reportado 2026-06-25): la cabecera mostraba
     // `saldoPrecioEscrituracion` crudo (158,551) mientras el panel ya restaba el
     // enganche y mostraba 1. `saldoPrecioPorCubrir` unifica ambos: crédito 761,449 +
@@ -584,6 +667,48 @@ describe('calcularCuadratura', () => {
       // Antes de capturar el pagaré (CD=0) y el cheque: el faltante sigue siendo 9,387.
       const c = mayra({ montoCreditoDirecto: 0, montoChequeNotaria: 0 });
       expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
+    });
+
+    // Raquel (M3-L6-LDLE, Infonavit Tradicional): venta legacy a la que se subió la
+    // escrituración 920,000 → 930,000 con un sobreprecio de 10,000 (margen del crédito
+    // para absorber gastos). Con el dato corregido (precio_base 920k + sobreprecio 10k),
+    // el split de cobertura respeta el sobreprecio capturado: sobreprecio 10,000 + bono
+    // 10,461 — NO el bono-primero (15,000 + sobreprecio 5,461). El descuento real, el
+    // valor real y el saldo NO cambian: solo se reparte distinto el mismo total.
+    it('Raquel (M3-L6): el sobreprecio capturado manda el split, no el bono-primero', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 930000,
+        montoCreditoTitular: 930000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 50461,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 10000,
+        promocionGastos: 15000,
+        depositos: [],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      const cob = c.coberturaGastos!;
+      // Formación del precio: base 920k + sobreprecio 10k = escrituración 930k.
+      expect(c.formacionPrecio?.precioBase).toBe(920000);
+      expect(c.formacionPrecio?.sobreprecioGastos).toBe(10000);
+      expect(c.formacionPrecio?.valorEscrituracion).toBe(930000);
+      // Cobertura del presupuesto notarial: el sobreprecio capturado (10k) manda; el
+      // bono es el residual (10,461). El subsidio Infonavit (30k) aparte. Cuadra en 0.
+      expect(cob.gastosBrutos).toBe(50461);
+      expect(cob.apoyoInfonavit).toBe(30000);
+      expect(cob.aportacionPromocion).toBe(10461);
+      expect(cob.sobreprecioCobertura).toBe(10000);
+      expect(cob.pagareNecesario).toBe(0); // 20,461 − 15,000 − 0 − 10,000 < 0 → 0
+      expect(cob.saldoCobertura).toBe(0);
+      // Invariantes que NO cambian con el split: descuento real (= a pagar notaría),
+      // valor real y comisión sobre el valor real menos el sobreprecio (no comisiona).
+      expect(c.descuentoReal).toBe(20461);
+      expect(c.valorRealVentaDilesa).toBe(909539);
+      expect(c.comisionVendedor).toBe(8995.39); // (909,539 − 10,000) × 1%
     });
 
     it('operacionCubierta es model-aware: cubierta aunque el saldoCliente legacy sea fantasma — Arizpe', () => {
@@ -793,5 +918,33 @@ describe('partirDescuento', () => {
 
   it('conserva centavos (escritura − valor real puede no ser entero)', () => {
     expect(partirDescuento(18313.29, 15000)).toEqual({ promocion: 15000, sobreprecio: 3313.29 });
+  });
+
+  // El sobreprecio CAPTURADO es piso del split: cuando se subió el precio para que
+  // el crédito absorbiera gastos, ese monto es sobreprecio aunque el bono no se
+  // haya agotado. Caso Raquel (M3-L6): descuento real 20,461, bono 15,000,
+  // sobreprecio capturado 10,000 → sobreprecio 10,000 (no 5,461) + bono 10,461.
+  it('el sobreprecio capturado es piso del split (Raquel M3-L6)', () => {
+    expect(partirDescuento(20461, 15000, 10000)).toEqual({ promocion: 10461, sobreprecio: 10000 });
+  });
+
+  it('piso ≤ residual no cambia nada (idéntico a 2 args)', () => {
+    // Residual sobre el bono = 18,313 − 15,000 = 3,313; un piso menor no manda.
+    expect(partirDescuento(18313, 15000, 3000)).toEqual({ promocion: 15000, sobreprecio: 3313 });
+    expect(partirDescuento(18313, 15000, 0)).toEqual({ promocion: 15000, sobreprecio: 3313 });
+    // MAYRA: el piso capturado coincide con el residual.
+    expect(partirDescuento(39651, 15000, 24651)).toEqual({ promocion: 15000, sobreprecio: 24651 });
+  });
+
+  it('el piso nunca inventa bono por encima del autorizado', () => {
+    // Sin piso, residual 5,461 + bono 15,000; con piso 10,000 el bono BAJA a 10,461
+    // (nunca sube de 15,000). El sobreprecio capturado solo puede mover bono→sobreprecio.
+    expect(partirDescuento(20461, 15000)).toEqual({ promocion: 15000, sobreprecio: 5461 });
+    expect(partirDescuento(20461, 15000, 10000).promocion).toBeLessThanOrEqual(15000);
+  });
+
+  it('el piso se topa al total (no genera bono negativo)', () => {
+    // Sobreprecio capturado mayor que el descuento real → todo sobreprecio, bono 0.
+    expect(partirDescuento(20461, 15000, 25000)).toEqual({ promocion: 0, sobreprecio: 20461 });
   });
 });

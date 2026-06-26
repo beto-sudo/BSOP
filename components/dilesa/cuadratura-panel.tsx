@@ -145,6 +145,33 @@ export function CuadraturaPanel({
             strong
           />
         </Bloque>
+      ) : c.precioAsignacion > 0 ? (
+        /* Resumen de precio para el legacy (sin desglose): empareja en claridad
+           con la card "Formación del precio" del modelo desglosado. No recalcula —
+           lee precioAsignacion + valorReal del motor. */
+        <Bloque titulo="Resumen de precio">
+          <Fila label="Precio de asignación (lista)" value={money(c.precioAsignacion)} />
+          <Fila
+            label="Valor escriturado"
+            value={money(valorEscrituracion)}
+            hint="el valor que se factura"
+          />
+          <div className="my-1 border-t border-dashed border-[var(--border)]" />
+          <Fila
+            label="(=) Valor real venta Dilesa"
+            value={money(c.valorRealVentaDilesa)}
+            strong
+            tone="ok"
+            formula="lo que DILESA realiza, neto"
+          />
+          {c.precioAsignacion - c.valorRealVentaDilesa > 0.5 ? (
+            <Fila
+              label="Bono al cliente"
+              value={money(c.precioAsignacion - c.valorRealVentaDilesa)}
+              formula="precio de asignación − valor real"
+            />
+          ) : null}
+        </Bloque>
       ) : null}
 
       {/* Cobertura del precio. Con desglose: simple (el precio lo cubre el
@@ -245,8 +272,18 @@ export function CuadraturaPanel({
           ) : null}
           <Fila label="(−) Aportación DILESA (promoción)" value={money(cob.aportacionPromocion)} />
           <Fila label="(−) Enganche del cliente" value={money(cob.engancheCliente)} />
-          <Fila label="(−) Sobreprecio" value={money(cob.sobreprecioCobertura)} />
-          <Fila label="(−) Pagaré del cliente" value={money(c.montoCreditoDirecto)} />
+          <Fila
+            label="(−) Sobreprecio"
+            value={money(cob.sobreprecioCobertura)}
+            hint={
+              cob.sobreprecioCobertura > 0 && cob.sobreprecioCobertura < 1
+                ? 'residuo de redondeo del enganche'
+                : undefined
+            }
+          />
+          {/* Solo la parte del pagaré que fondea GASTOS — el resto (si lo hay)
+              financia el residual de precio y se ve en la card de cobertura del precio. */}
+          <Fila label="(−) Pagaré del cliente" value={money(cob.pagareGastos)} />
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
             label={Math.abs(cob.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
@@ -315,24 +352,43 @@ export function CuadraturaPanel({
           hint={chequeCapturado ? `Sugerido: ${money(c.chequeNotariaCalculado)}` : undefined}
         />
         <Fila label="Depósitos recibidos (todos)" value={money(c.depositosRecibidos)} />
-        <Fila label="Valor real venta Dilesa" value={money(c.valorRealVentaDilesa)} strong />
+        <Fila
+          label="Valor real venta Dilesa"
+          value={money(c.valorRealVentaDilesa)}
+          strong
+          formula="detonación + enganche − cheque + pagaré"
+        />
         <Fila
           label={`Valor facturado ${hayFacturaCfdi ? '(CFDI)' : '(sugerido)'}`}
           value={money(c.valorFacturado)}
           hint={hayFacturaCfdi ? `Sugerido: ${money(c.valorFacturadoSugerido)}` : undefined}
+          formula="escrituración + enganche con recibo CFDI"
         />
         <Fila
           label={`Monto nota de crédito ${hayFacturaCfdi ? '(requerida)' : '(sugerido)'}`}
           value={money(c.montoNotaCredito)}
           hint={hayFacturaCfdi ? `Sugerido: ${money(c.montoNotaCreditoSugerido)}` : undefined}
+          formula="valor facturado − valor real"
         />
-        <Fila label="Descuento real" value={money(c.descuentoReal)} />
+        <Fila
+          label="Descuento real"
+          value={money(c.descuentoReal)}
+          formula="escrituración − valor real"
+        />
       </Bloque>
 
       {/* Comisiones */}
       <Bloque titulo="Comisiones">
-        <Fila label="Comisión vendedor" value={money(c.comisionVendedor)} />
-        <Fila label="Comisión gerencia" value={money(c.comisionGerencia)} />
+        <Fila
+          label="Comisión vendedor"
+          value={money(c.comisionVendedor)}
+          formula="1% del valor real (1.5% en Loma Verde)"
+        />
+        <Fila
+          label="Comisión gerencia"
+          value={money(c.comisionGerencia)}
+          formula="0.5% del valor real"
+        />
       </Bloque>
 
       <p className="text-[11px] leading-relaxed text-[var(--text)]/45">
@@ -342,18 +398,20 @@ export function CuadraturaPanel({
             DILESA realiza neto del cheque a notaría (detonación + enganche − cheque + pagaré); la{' '}
             <strong>Nota de Crédito</strong> = Valor Facturado − Valor real; el{' '}
             <strong>Descuento real</strong> = Escrituración − Valor real; y las comisiones van sobre
-            el Valor real menos productos adicionales. Con factura emitida, el Valor Facturado es el
-            del CFDI; antes de facturar se estima con el valor de escrituración («sugerido»).
+            el Valor real menos el sobreprecio para gastos. Con factura emitida, el Valor Facturado
+            es el del CFDI; antes de facturar se estima con el valor de escrituración («sugerido»).
           </>
         ) : (
           <>
             Con factura emitida, el Valor Facturado es el del CFDI y la Nota de Crédito se deriva
             como Valor Facturado − Valor real venta Dilesa; antes de facturar, la fórmula de Coda
-            los estima como «sugerido». El resto de los derivados sigue las fórmulas de Coda y queda
-            aproximado hasta capturar el apoyo de Infonavit por tipo de crédito y los buckets de
-            descuento otorgado.
+            los estima como «sugerido». Las comisiones van sobre el Valor real (igual que el modelo
+            desglosado); el resto de los derivados queda aproximado hasta capturar el apoyo de
+            Infonavit por tipo de crédito y los buckets de descuento otorgado.
           </>
-        )}
+        )}{' '}
+        Las comisiones mostradas son la <strong>base</strong> (porcentaje sobre el valor real); la
+        comisión pagada aplica encima el esquema de objetivos y cuotas trimestrales.
       </p>
     </div>
   );
@@ -376,12 +434,17 @@ function Fila({
   strong = false,
   tone,
   hint,
+  formula,
 }: {
   label: string;
   value: string;
   strong?: boolean;
   tone?: 'ok' | 'warn';
   hint?: string;
+  /** Fórmula de cómo se obtiene el monto, en subtítulo gris bajo el label
+   *  (iniciativa `dilesa-comision-valor-real`: hacer explícito de dónde sale cada
+   *  número, sin sacar al usuario del panel). */
+  formula?: string;
 }) {
   const toneClass =
     tone === 'ok'
@@ -394,6 +457,11 @@ function Fila({
       <span className={strong ? 'font-medium text-[var(--text)]/80' : 'text-[var(--text)]/65'}>
         {label}
         {hint ? <span className="ml-2 text-[10px] text-[var(--text)]/40">{hint}</span> : null}
+        {formula ? (
+          <span className="mt-0.5 block text-[10px] font-normal text-[var(--text)]/40">
+            {formula}
+          </span>
+        ) : null}
       </span>
       <span className={`${strong ? 'text-base font-semibold' : 'font-medium'} ${toneClass}`}>
         {value}

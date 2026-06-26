@@ -38,7 +38,9 @@
  *   Cheque Notaría (cálculo)  = min(Gastos Escrituración − Apoyo Infonavit,
  *                                Monto Disponible − Valor Escrituración
  *                                + Descuento Otorgado Total).
- *   Valor Real Venta Dilesa   = Depósitos Recibidos − Cheque Notaría + Pagaré.
+ *   Valor Real Venta Dilesa   = Crédito (detonación) + Enganche del cliente
+ *                               − Cheque Notaría + Pagaré (ambos modelos, ADR-050;
+ *                               usa el crédito de la VENTA, no la suma de cxc_pagos).
  *   Valor Facturado           = SUMA de los CFDIs timbrados: la factura de la
  *                               escrituración (el CFDI real `valorFacturadoReal`
  *                               si existe, si no el Valor Escrituración) + Σ
@@ -54,8 +56,8 @@
  *                               factura real usa el facturado real; la Fase 13
  *                               valida aparte que el CFDI de NC coincida.
  *   Descuento Real            = Valor Escrituración − Valor Real Venta Dilesa.
- *   Comisión Vendedor         = Escrituración × (1.5% Loma Verde / 1.0% resto).
- *   Comisión Gerencia         = Escrituración × 0.5%.
+ *   Comisión Vendedor         = (Valor Real − sobreprecio) × (1.5% LV / 1.0% resto).
+ *   Comisión Gerencia         = (Valor Real − sobreprecio) × 0.5%.
  *
  * GAPS de captura (aún no en BSOP; el motor los acepta opcionales y asume 0):
  * apoyoInfonavit (por tipo de crédito), los 4 buckets de descuento, y el
@@ -211,6 +213,9 @@ export type Cuadratura = {
   /** NC estimada: `valorFacturadoSugerido` − valor real venta DILESA. */
   montoNotaCreditoSugerido: number;
   descuentoReal: number;
+  /** Precio de asignación (lista). Eco del input — referencia del resumen de precio
+   *  del panel legacy (bono al cliente = precio de asignación − valor real). */
+  precioAsignacion: number;
   comisionVendedor: number;
   comisionGerencia: number;
   /**
@@ -255,8 +260,14 @@ export type Cuadratura = {
      *  la fase 10 / gate. NO es el pagaré real: cuando DILESA absorbe más que la
      *  promo (Máxima Aportación) el pagaré del cliente es menor (o 0). */
     pagareNecesario: number;
+    /** Parte del pagaré (`montoCreditoDirecto`) asignada a GASTOS (= min(pagaré,
+     *  `pagareNecesario`)). La card de cobertura resta esto, no el pagaré completo. */
+    pagareGastos: number;
+    /** Parte del pagaré que financia el residual de PRECIO (camino "Cobrar" de la
+     *  dictaminación). 0 en ventas existentes; eleva el Valor Real y reduce la NC. */
+    pagarePrecio: number;
     /** Saldo de la cobertura: gastos brutos − subsidio − promoción − enganche −
-     *  sobreprecio − pagaré. ≈ 0 cuando las fuentes cubren el presupuesto. */
+     *  sobreprecio − pagaré (la parte a gastos). ≈ 0 cuando las fuentes cubren. */
     saldoCobertura: number;
   } | null;
   /**
@@ -376,19 +387,32 @@ export function topeDescuentoAutorizado(
 /**
  * Parte el descuento real (= Escrituración − Valor Real, columna "Descuento" de
  * Michelle) en sus dos orígenes, para las cards de la cuadratura:
- *  - `promocion`: el bono autorizado del catálogo, usado hasta el total (topado
- *    al máximo autorizado).
- *  - `sobreprecio`: el resto, que DILESA concede subiendo el precio (pendiente de
- *    formalizar como Máxima Aportación en la solicitud).
- * Con descuento ≥ 0 se cumple `promocion + sobreprecio = descuentoReal`.
+ *  - `sobreprecio`: lo que DILESA concede subiendo el precio para que el crédito
+ *    absorba los gastos (NO le cuesta a DILESA; lo paga el crédito).
+ *  - `promocion`: el bono autorizado del catálogo (SÍ le cuesta a DILESA); el
+ *    residual tras el sobreprecio.
+ *
+ * El `sobreprecioCapturado` (`dilesa.ventas.sobreprecio_gastos_escrituracion`) es
+ * un HECHO escriturado y actúa como PISO del sobreprecio: si se subió el precio
+ * 10,000, esos 10,000 son sobreprecio aunque el bono no se haya agotado. Sin
+ * sobreprecio capturado (0/undefined) se cae al residual sobre la promoción
+ * topada — comportamiento idéntico al previo (el bono se quema primero). El piso
+ * NO puede inventar bono por encima del autorizado: `sobreprecio ≥ total − promo`
+ * garantiza `promocion ≤ promocionAutorizada`. Con `total ≥ 0` se mantiene
+ * `promocion + sobreprecio = total` (el sobreprecio se topa a `total`).
  */
 export function partirDescuento(
   descuentoReal: number,
-  promocionAutorizada: number | null | undefined
+  promocionAutorizada: number | null | undefined,
+  sobreprecioCapturado?: number | null | undefined
 ): { promocion: number; sobreprecio: number } {
   const total = round2(descuentoReal);
-  const promocion = total <= 0 ? 0 : round2(Math.min(total, n(promocionAutorizada)));
-  const sobreprecio = round2(Math.max(0, total - promocion));
+  if (total <= 0) return { promocion: 0, sobreprecio: 0 };
+  const residualSobrePromo = Math.max(0, total - n(promocionAutorizada));
+  const sobreprecio = round2(
+    Math.min(total, Math.max(n(sobreprecioCapturado), residualSobrePromo))
+  );
+  const promocion = round2(total - sobreprecio);
   return { promocion, sobreprecio };
 }
 
@@ -479,13 +503,27 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const pagareNecesario = tieneDesglose
     ? round2(Math.max(0, gastosNetosR - promocionGastos - engancheAGastos - sobreprecioGastos))
     : 0;
+  // Asignación del pagaré (iniciativa `dilesa-saldos-residuales` S2): el crédito
+  // directo cubre PRIMERO el faltante de gastos (`pagareNecesario`); el EXCEDENTE
+  // financia el residual de PRECIO (camino "Cobrar" de la dictaminación). Así un
+  // pagaré tomado para el precio no sobre-fondea los gastos. En las ventas
+  // existentes el pagaré = faltante de gastos ⇒ `pagareAGastos = montoCreditoDirecto`
+  // y `pagareAPrecio = 0` → cuadratura idéntica (verificado en los tests).
+  const pagareAGastos = round2(Math.min(montoCreditoDirecto, pagareNecesario));
+  const pagareAPrecio = round2(Math.max(0, montoCreditoDirecto - pagareAGastos));
   // Lo que DILESA debe cubrir del presupuesto tras el enganche (excedente del
-  // precio) y el pagaré del cliente, partido en promoción (topada al bono) +
-  // sobreprecio (el resto).
-  const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - montoCreditoDirecto);
+  // precio) y la parte del pagaré que SÍ fondea gastos, partido en promoción
+  // (topada al bono) + sobreprecio (el resto).
+  const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - pagareAGastos);
+  // El sobreprecio CAPTURADO es piso del split: si se subió el precio para que el
+  // crédito absorbiera gastos, ese monto es sobreprecio (no bono), aunque la
+  // promoción no se haya agotado. Sin él, residual sobre la promo topada (igual
+  // que antes). No cambia el total (promo + sobreprecio = faltante) ⇒ saldoCobertura
+  // intacto; solo reparte distinto bono↔sobreprecio en la card.
   const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
     faltanteGastosDilesa,
-    promocionGastos
+    promocionGastos,
+    sobreprecioGastos
   );
   const saldoCobertura = round2(
     gastosBrutosR -
@@ -493,7 +531,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       aportacionPromocion -
       engancheAGastos -
       sobreprecioCobertura -
-      montoCreditoDirecto
+      pagareAGastos
   );
   const coberturaGastos = tieneDesglose
     ? {
@@ -507,6 +545,12 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         sobreprecio: round2(sobreprecioGastos),
         sobreprecioCobertura,
         pagareNecesario,
+        /** Parte del pagaré (`montoCreditoDirecto`) que fondea GASTOS (= min(pagaré,
+         *  pagareNecesario)). La card de cobertura resta esto, no el pagaré completo. */
+        pagareGastos: pagareAGastos,
+        /** Parte del pagaré que financia el residual de PRECIO (camino "Cobrar"). 0
+         *  en las ventas existentes. Eleva el Valor Real y reduce la NC. */
+        pagarePrecio: pagareAPrecio,
         saldoCobertura,
       }
     : null;
@@ -596,17 +640,24 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
 
   // Valor Real Venta DILESA = lo que DILESA realiza NETO: crédito (detonación) +
   // enganche del cliente − cheque a notaría (los gastos que pasan al notario NO
-  // son ingreso de DILESA) + pagaré. Es la fórmula operativa que validan Michelle
-  // (Notas de crédito) y Ale (participación), alineada el 2026-06-18 — antes el
-  // desglose usaba el precio interno BRUTO y no restaba el cheque, por lo que la
-  // NC no cuadraba. Con desglose se usa el crédito de la columna (los depósitos
-  // solos dan negativo en FOVISSSTE); sin desglose, la fórmula vieja por depósitos.
-  // Detonación = disbursement real del crédito (Fase 12); antes de detonar se usa
-  // el crédito institución como estimado (mismo criterio que el archivo de Michelle).
+  // son ingreso de DILESA) + pagaré. Fórmula operativa que validan Michelle (Notas
+  // de crédito) y Ale (participación), alineada el 2026-06-18.
+  //
+  // UNIFICADO en AMBOS modelos el 2026-06-26 (ADR-050). Antes el legacy sumaba
+  // `depositosRecibidos` (TODOS los abonos de cxc_pagos): daba un valor real BASURA
+  // en las ~76 ventas migradas de Coda cuyo CRÉDITO nunca se registró en cxc_pagos
+  // (solo el enganche) → valor real ≈ enganche (M14-L4: 22,429 en vez de 2.26M; la
+  // comisión salía 224 en vez de 22,652). Usar el crédito de la VENTA (detonación o,
+  // antes de detonar, el crédito institución) + el enganche del cliente (depósitos
+  // fuente='cliente') es robusto a ese hueco y NO dobla el crédito cuando SÍ está en
+  // cxc_pagos: idéntico resultado que el cálculo viejo para Jorge Luis y el ejemplo
+  // de Coda (ahí el crédito = un abono institución = `montoCreditoTitular`).
+  // Detonación = disbursement real del crédito (Fase 12); antes de detonar se usa el
+  // crédito institución como estimado (mismo criterio que el archivo de Michelle).
   const detonacion = i.montoDetonado != null ? n(i.montoDetonado) : creditoInstitucion;
-  const valorRealVentaDilesa = tieneDesglose
-    ? round2(detonacion + depositosDirectoCliente - chequeNotariaUsado + montoCreditoDirecto)
-    : round2(depositosRecibidos - chequeNotariaUsado + montoCreditoDirecto);
+  const valorRealVentaDilesa = round2(
+    detonacion + depositosDirectoCliente - chequeNotariaUsado + montoCreditoDirecto
+  );
   // Valor Facturado = SUMA de los CFDIs timbrados de la operación: la factura de
   // la escrituración + los recibos de caja con CFDI del enganche (cada depósito
   // del cliente con recibo se factura aparte). La factura de escrituración toma
@@ -650,15 +701,17 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       }
     : null;
 
-  // Con desglose, las comisiones se calculan sobre el Valor Real Venta DILESA
-  // menos el SOBREPRECIO para gastos (lo absorbe el crédito, NO comisiona) — base
-  // operativa de Michelle/Ale (col "Venta Dilesa comisiones" = valor real −
-  // sobreprecio), alineada el 2026-06-18. Los productos reales del paquete
-  // (closets/upgrades) SÍ comisionan, por eso NO se restan de la base. Sin
-  // desglose, sobre el valor de escrituración (fallback).
-  const baseComision = tieneDesglose
-    ? round2(valorRealVentaDilesa - sobreprecioGastos)
-    : valorEscrituracion;
+  // Base de comisión = Valor Real Venta DILESA − sobreprecio para gastos (lo
+  // absorbe el crédito y NO comisiona), en AMBOS modelos — base operativa de
+  // Michelle/Ale (col "Venta Dilesa comisiones" = valor real − sobreprecio). Los
+  // productos reales del paquete (closets/upgrades) SÍ comisionan, por eso NO se
+  // restan. Hasta el 2026-06-26 el modelo legacy comisionaba sobre el valor de
+  // ESCRITURACIÓN, lo que sobre-pagaba en ventas con descuento (p.ej. escritura
+  // inflada para aforo); se unificó a la base de valor real (iniciativa
+  // `dilesa-comision-valor-real`, ADR-050). OJO: esto es solo la BASE — la comisión
+  // PAGADA lleva encima un esquema de objetivos y cuotas trimestrales que se modela
+  // aparte (pendiente).
+  const baseComision = round2(valorRealVentaDilesa - sobreprecioGastos);
   const comisionVendedor = round2(baseComision * (esLomaVerde(i.proyectoNombre) ? 0.015 : 0.01));
   const comisionGerencia = round2(baseComision * 0.005);
 
@@ -684,6 +737,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     montoNotaCredito,
     montoNotaCreditoSugerido,
     descuentoReal,
+    precioAsignacion: round2(n(i.precioAsignacion)),
     comisionVendedor,
     comisionGerencia,
     tieneDesglose,

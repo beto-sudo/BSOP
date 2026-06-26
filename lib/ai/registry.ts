@@ -132,7 +132,7 @@ export const AI_USOS = {
     envVar: 'ANTHROPIC_API_KEY',
     criticidad: 'alta',
     descripcion: 'Extrae el Informe de Avisos PLD para el cruce determinista contra el expediente.',
-    archivo: 'app/api/dilesa/ventas/[ventaId]/revision-pld/route.ts',
+    archivo: 'app/api/dilesa/ventas/[id]/revision-pld/route.ts',
   },
   'dilesa-pld-acuse': {
     label: 'Revisión PLD — Acuse de envío (Fase 13)',
@@ -143,7 +143,7 @@ export const AI_USOS = {
     envVar: 'ANTHROPIC_API_KEY',
     criticidad: 'alta',
     descripcion: 'Extrae el Acuse de envío PLD que cierra el ciclo (presentado ante el SPPLD).',
-    archivo: 'app/api/dilesa/ventas/[ventaId]/revision-pld/route.ts',
+    archivo: 'app/api/dilesa/ventas/[id]/revision-pld/route.ts',
   },
   'sanren-recibo-extraccion': {
     label: 'Extracción de recibos de servicios (SANREN)',

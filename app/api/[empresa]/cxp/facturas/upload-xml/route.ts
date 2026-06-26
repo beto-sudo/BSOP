@@ -14,6 +14,17 @@
  *      `auth.uid()` es NULL).
  *   6. Sube el XML a storage (`adjuntos`) + registra `erp.adjuntos` + `xml_url`.
  *
+ * Auto-match destajo → CxP (S4, iniciativa dilesa-estimaciones-cxp): si el
+ * emisor tiene una factura EN ESPERA (placeholder borrador con estimacion_id),
+ * el CFDI se ASOCIA a ella (la promueve a por_pagar) en vez de duplicar.
+ *   - `analyze=1` → devuelve por archivo la sugerencia (destajo o normal) +
+ *     candidatos, SIN escribir. El uploader lo usa para el review.
+ *   - `decisiones` (JSON filename→facturaId|'normal') → el commit asocia o crea
+ *     según lo que confirmó el operador. Sin decisiones → todo se crea normal.
+ *   - `factura_id` → recepción directa sobre una factura en espera (bandeja).
+ *   Regla: la factura del contratista nunca debe ser MAYOR que el neto del
+ *   destajo (puede ser menor por materiales descontados, solo informativo).
+ *
  * Devuelve un resultado por archivo (éxito o error) para no abortar el lote
  * completo por un XML malo. Status: 200 todo cargado, 207 lote parcial,
  * 422 ningún archivo pasó (el body es idéntico en los tres casos).
@@ -55,6 +66,160 @@ type AuditLogInsert = Database['core']['Tables']['audit_log']['Insert'];
 type CxpFacturaAltaArgs = Database['erp']['Functions']['cxp_factura_alta']['Args'] & {
   p_usuario_id?: string;
 };
+
+// ── Auto-match destajo → CxP (S4) ──────────────────────────────────────────
+// Una factura EN ESPERA (placeholder borrador con estimacion_id) por contratista.
+
+type DestajoPlaceholder = {
+  facturaId: string;
+  proveedorId: string | null;
+  /** RFC del contratista del destajo (puede faltar si la persona no lo tiene). */
+  proveedorRfc: string | null;
+  /** Nombre del contratista del destajo, para el fallback por nombre. */
+  proveedorNombre: string | null;
+  neto: number;
+  estimacionId: string;
+  codigo: string | null;
+};
+
+/** Normaliza un nombre para comparar: sin acentos, mayúsculas, espacios colapsados. */
+function normNombre(s: string | null | undefined): string {
+  if (!s) return '';
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+type DestajoCandidato = {
+  facturaId: string;
+  codigo: string | null;
+  neto: number;
+  /** materiales descontados = neto − CFDI (≥ 0, solo informativo). */
+  delta: number;
+};
+
+type AnalisisArchivo = {
+  filename: string;
+  /** parseó + receptor correcto + no duplicada. */
+  ok: boolean;
+  error?: string;
+  proveedorNombre: string | null;
+  emisorRfc?: string;
+  proveedorId?: string | null;
+  total?: number;
+  uuid?: string | null;
+  /** ya existe una factura con ese folio fiscal. */
+  yaCargada?: boolean;
+  candidatos: DestajoCandidato[];
+  /** facturaId del destajo sugerido, o 'normal'. */
+  sugerencia: string;
+};
+
+const NETO_EPS = 1.005; // tolerancia de redondeo para "CFDI ≤ neto".
+
+/**
+ * Destajos abiertos cuyo neto ≥ total del CFDI (puede ser menor por materiales),
+ * tightest primero. El contratista se reconoce por `proveedor_id`, por RFC, o
+ * por nombre normalizado — esto último rescata el caso de personas duplicadas
+ * (el destajo se capturó con una persona sin RFC y el CFDI matchea otra con RFC,
+ * mismo humano). El operador confirma en el review, así que el match por nombre
+ * es seguro.
+ */
+function candidatosParaCfdi(
+  placeholders: DestajoPlaceholder[],
+  proveedorId: string | null,
+  emisorRfc: string | null,
+  emisorNombre: string | null,
+  total: number
+): DestajoCandidato[] {
+  const rfc = emisorRfc ? emisorRfc.toUpperCase().trim() : null;
+  const nom = normNombre(emisorNombre);
+  return placeholders
+    .filter((p) => {
+      if (total > p.neto * NETO_EPS) return false;
+      const mismoProveedor = !!proveedorId && p.proveedorId === proveedorId;
+      const mismoRfc = !!rfc && !!p.proveedorRfc && p.proveedorRfc.toUpperCase().trim() === rfc;
+      const mismoNombre = !!nom && normNombre(p.proveedorNombre) === nom;
+      return mismoProveedor || mismoRfc || mismoNombre;
+    })
+    .map((p) => ({
+      facturaId: p.facturaId,
+      codigo: p.codigo,
+      neto: p.neto,
+      delta: Math.max(0, p.neto - total),
+    }))
+    .sort((a, b) => a.neto - b.neto);
+}
+
+/** Sugerencia: el destajo de mejor encaje (tightest) si el CFDI no es muy menor; si no, factura normal. */
+function sugerirAccion(candidatos: DestajoCandidato[], total: number): string {
+  const tightest = candidatos[0];
+  if (tightest && total >= tightest.neto * 0.8) return tightest.facturaId;
+  return 'normal';
+}
+
+/** Carga las facturas en espera (placeholders de destajo) de la empresa, con código y neto. */
+async function fetchDestajoPlaceholders(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  empresaId: string
+): Promise<DestajoPlaceholder[]> {
+  if (!admin) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: facs } = await (admin.schema('erp') as any)
+    .from('facturas')
+    .select('id, proveedor_id, total, estimacion_id')
+    .eq('empresa_id', empresaId)
+    .eq('estado_cxp', 'borrador')
+    .not('estimacion_id', 'is', null)
+    .is('cancelada_at', null);
+  const rows = (facs ?? []) as {
+    id: string;
+    proveedor_id: string | null;
+    total: number | null;
+    estimacion_id: string;
+  }[];
+  const estIds = [...new Set(rows.map((r) => r.estimacion_id))];
+  const codigoPorEst = new Map<string, string>();
+  if (estIds.length > 0) {
+    const { data: ests } = await admin
+      .schema('dilesa')
+      .from('estimaciones')
+      .select('id, codigo')
+      .in('id', estIds);
+    for (const e of ests ?? []) codigoPorEst.set(e.id as string, (e.codigo as string | null) ?? '');
+  }
+
+  // RFC + nombre del contratista de cada placeholder, para reconocerlo aunque la
+  // persona-id difiera de la que matchea el CFDI (personas duplicadas con/sin RFC).
+  const provIds = [...new Set(rows.map((r) => r.proveedor_id).filter((x): x is string => !!x))];
+  const persona = new Map<string, { rfc: string | null; nombre: string }>();
+  if (provIds.length > 0) {
+    const { data: pers } = await admin
+      .schema('erp')
+      .from('personas')
+      .select('id, rfc, nombre, apellido_paterno, apellido_materno')
+      .in('id', provIds);
+    for (const p of pers ?? []) {
+      persona.set(p.id as string, {
+        rfc: (p.rfc as string | null) ?? null,
+        nombre: [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' '),
+      });
+    }
+  }
+
+  return rows.map((r) => ({
+    facturaId: r.id,
+    proveedorId: r.proveedor_id,
+    proveedorRfc: r.proveedor_id ? (persona.get(r.proveedor_id)?.rfc ?? null) : null,
+    proveedorNombre: r.proveedor_id ? (persona.get(r.proveedor_id)?.nombre ?? null) : null,
+    neto: Number(r.total ?? 0),
+    estimacionId: r.estimacion_id,
+    codigo: codigoPorEst.get(r.estimacion_id) ?? null,
+  }));
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { empresa: empresaSlug } = await params;
@@ -173,6 +338,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    // Regla del destajo: la factura nunca debe ser MAYOR que el neto (puede ser
+    // menor por materiales descontados). Si excede, es probable error de captura.
+    const netoEsperado = Number(fac.total ?? 0);
+    if (netoEsperado > 0 && cfdi.total > netoEsperado * NETO_EPS) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `La factura ($${cfdi.total.toLocaleString('es-MX')}) excede el neto del destajo ($${netoEsperado.toLocaleString('es-MX')}). La factura del contratista nunca debería ser mayor que el destajo — revisa el XML.`,
+        },
+        { status: 422 }
+      );
+    }
+
     // RPC aún no en types — mismo patrón de cast que el resto de CxP.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: rpcErr } = await (admin.schema('erp') as any).rpc('cxp_factura_recibir_cfdi', {
@@ -224,12 +402,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       await admin.schema('erp').from('facturas').update({ xml_url: path }).eq('id', facturaId);
     }
 
-    // Warning (no bloqueante): el total del CFDI difiere del neto autorizado.
+    // Informativo (no bloqueante): el CFDI vino por menos que el neto = materiales
+    // descontados al contratista.
     const esperado = Number(fac.total ?? 0);
-    const dif = Math.abs(cfdi.total - esperado);
+    const deltaMateriales = esperado - cfdi.total;
     const warning =
-      esperado > 0 && dif > Math.max(1, esperado * 0.005)
-        ? `El total del CFDI (${cfdi.total.toLocaleString('es-MX')}) difiere del neto autorizado (${esperado.toLocaleString('es-MX')}). Se tomó el monto del CFDI; revísalo si no esperabas la diferencia.`
+      esperado > 0 && deltaMateriales > Math.max(1, esperado * 0.005)
+        ? `Δ materiales $${deltaMateriales.toLocaleString('es-MX')} (neto del destajo $${esperado.toLocaleString('es-MX')}, facturado $${cfdi.total.toLocaleString('es-MX')}).`
         : null;
 
     await admin
@@ -246,6 +425,83 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
 
     return NextResponse.json({ ok: true, facturaId, uuid: cfdi.uuid, warning }, { status: 200 });
+  }
+
+  // Facturas en espera (placeholders de destajo) para el auto-match (S4).
+  const placeholders = await fetchDestajoPlaceholders(admin, emp.id);
+
+  // ── Modo ANALYZE: por cada XML devuelve la sugerencia (destajo o normal),
+  // sin escribir nada. El uploader lo llama antes del commit para el review.
+  if (form.get('analyze') === '1') {
+    const analisis: AnalisisArchivo[] = [];
+    for (const file of files) {
+      const a: AnalisisArchivo = {
+        filename: file.name,
+        ok: false,
+        proveedorNombre: null,
+        candidatos: [],
+        sugerencia: 'normal',
+      };
+      try {
+        const cfdi = parseCfdiXml(await file.text());
+        a.emisorRfc = cfdi.emisorRfc;
+        a.total = cfdi.total;
+        a.uuid = cfdi.uuid;
+        a.proveedorNombre = cfdi.emisorNombre;
+        if (empresaRfc && cfdi.receptorRfc !== empresaRfc) {
+          a.error = `El CFDI es para el RFC ${cfdi.receptorRfc}, no para ${empresaSlug}.`;
+          analisis.push(a);
+          continue;
+        }
+        if (cfdi.uuid) {
+          const { data: dup } = await admin
+            .schema('erp')
+            .from('facturas')
+            .select('id')
+            .eq('uuid_sat', cfdi.uuid)
+            .maybeSingle();
+          if (dup) {
+            a.yaCargada = true;
+            a.error = `Ya cargada (folio ${cfdi.uuid.slice(0, 8)}…).`;
+            analisis.push(a);
+            continue;
+          }
+        }
+        const { data: prov } = await admin
+          .schema('erp')
+          .from('personas')
+          .select('id')
+          .eq('rfc', cfdi.emisorRfc)
+          .maybeSingle();
+        a.proveedorId = prov?.id ?? null;
+        a.candidatos = candidatosParaCfdi(
+          placeholders,
+          a.proveedorId,
+          cfdi.emisorRfc,
+          cfdi.emisorNombre,
+          cfdi.total
+        );
+        a.sugerencia = sugerirAccion(a.candidatos, cfdi.total);
+        a.ok = true;
+      } catch (e) {
+        a.error =
+          e instanceof CfdiParseError ? e.message : `Error inesperado: ${(e as Error).message}`;
+      }
+      analisis.push(a);
+    }
+    return NextResponse.json({ ok: true, analisis }, { status: 200 });
+  }
+
+  // Decisiones del operador (commit del review): filename → destajo a asociar o 'normal'.
+  // Sin decisiones → todo se crea como factura normal (compat con la carga directa).
+  let decisiones: Record<string, string> = {};
+  const decisionesRaw = form.get('decisiones');
+  if (typeof decisionesRaw === 'string' && decisionesRaw) {
+    try {
+      decisiones = JSON.parse(decisionesRaw) as Record<string, string>;
+    } catch {
+      decisiones = {};
+    }
   }
 
   const results: FacturaResult[] = [];
@@ -321,6 +577,85 @@ export async function POST(req: NextRequest, { params }: Params) {
           results.push(r);
           continue;
         }
+      }
+
+      // ── Decisión del operador: asociar este CFDI a un destajo en espera ──
+      // (en vez de crear factura nueva → evita el duplicado del placeholder).
+      const decision = decisiones[file.name];
+      if (decision && decision !== 'normal') {
+        const targetId = decision;
+        const cand = placeholders.find((p) => p.facturaId === targetId);
+        if (cand && cfdi.total > cand.neto * NETO_EPS) {
+          r.error = `La factura ($${cfdi.total.toLocaleString('es-MX')}) excede el neto del destajo ($${cand.neto.toLocaleString('es-MX')}) — nunca debería ser mayor.`;
+          addRechazo({
+            filename: file.name,
+            motivo: r.error,
+            uuidSat: cfdi.uuid,
+            emisorRfc: cfdi.emisorRfc,
+          });
+          results.push(r);
+          continue;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: recErr } = await (admin.schema('erp') as any).rpc(
+          'cxp_factura_recibir_cfdi',
+          {
+            p_factura_id: targetId,
+            p_uuid_sat: cfdi.uuid ?? undefined,
+            p_total: cfdi.total,
+            p_subtotal: cfdi.subtotal,
+            p_iva: cfdi.ivaTrasladado,
+            p_fecha_emision: cfdi.fecha || undefined,
+            p_emisor_rfc: cfdi.emisorRfc,
+            p_emisor_nombre: cfdi.emisorNombre ?? undefined,
+            p_receptor_rfc: cfdi.receptorRfc,
+            p_forma_pago_sat: cfdi.formaPago ?? undefined,
+            p_metodo_pago_sat:
+              cfdi.metodoPago === 'PUE' || cfdi.metodoPago === 'PPD' ? cfdi.metodoPago : undefined,
+            p_uso_cfdi: cfdi.usoCfdi ?? undefined,
+            p_tasa_iva: cfdi.tasaIva ?? undefined,
+            p_retencion_iva: cfdi.retencionIva,
+            p_retencion_isr: cfdi.retencionIsr,
+          }
+        );
+        if (recErr) {
+          r.error = (recErr as { message: string }).message;
+          addRechazo({
+            filename: file.name,
+            motivo: r.error,
+            uuidSat: cfdi.uuid,
+            emisorRfc: cfdi.emisorRfc,
+          });
+          results.push(r);
+          continue;
+        }
+        const pathA = buildAdjuntoPath({
+          empresa: empresaSlug as EmpresaSlug,
+          entidad: 'facturas',
+          entidadId: targetId,
+          filename: file.name,
+        });
+        const bytesA = new Uint8Array(await file.arrayBuffer());
+        const { error: upErrA } = await admin.storage
+          .from('adjuntos')
+          .upload(pathA, bytesA, { contentType: 'application/xml', upsert: false });
+        if (!upErrA) {
+          await admin.schema('erp').from('adjuntos').insert({
+            empresa_id: emp.id,
+            entidad_tipo: 'cxp_factura',
+            entidad_id: targetId,
+            rol: 'xml_cfdi',
+            nombre: file.name,
+            url: pathA,
+            tipo_mime: 'application/xml',
+          });
+          await admin.schema('erp').from('facturas').update({ xml_url: pathA }).eq('id', targetId);
+        }
+        r.ok = true;
+        r.facturaId = targetId;
+        r.uuid = cfdi.uuid;
+        results.push(r);
+        continue;
       }
 
       // Emisor → proveedor (persona por RFC).
