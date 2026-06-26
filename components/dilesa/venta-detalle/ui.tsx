@@ -9,9 +9,9 @@
  * `dilesa-ventas-expediente-tabs`).
  */
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Download, ExternalLink, FileText, Mail } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,13 +29,41 @@ import { formatearVencimiento, type HoldSnapshot } from '@/lib/dilesa/hold-cola'
 import { regresarAFase, desasignarVenta } from '@/app/dilesa/ventas/[id]/actions';
 import type { Adjunto } from './types';
 
+/**
+ * Back-link del expediente. Context-aware: si llegaste desde una fase
+ * (`/dilesa/ventas?fase=<X>` → fila → venta), regresa a la lista YA filtrada por
+ * esa fase ("Volver a Fase: X"); si no, vuelve al listado completo.
+ *
+ * El origen (`?fase=`) se captura UNA vez con `useState` lazy. El shell que
+ * monta este link vive en el layout `[id]`, que NO se re-monta al cambiar de tab
+ * (Operación↔Pipeline↔…) — así el origen sobrevive aunque los Links de tab
+ * borren el query. Se reinicia al navegar a otra venta (el layout sí re-monta).
+ */
 export function BackLink() {
   return (
+    <Suspense fallback={<BackLinkView origenFase={null} />}>
+      <BackLinkInner />
+    </Suspense>
+  );
+}
+
+function BackLinkInner() {
+  const searchParams = useSearchParams();
+  const [origenFase] = useState(() => searchParams.get('fase'));
+  return <BackLinkView origenFase={origenFase} />;
+}
+
+function BackLinkView({ origenFase }: { origenFase: string | null }) {
+  const href = origenFase
+    ? `/dilesa/ventas?fase=${encodeURIComponent(origenFase)}`
+    : '/dilesa/ventas';
+  return (
     <Link
-      href="/dilesa/ventas"
+      href={href}
       className="inline-flex items-center gap-1.5 text-sm text-[var(--text)]/60 hover:text-[var(--text)]"
     >
-      <ArrowLeft className="size-4" /> Volver a ventas
+      <ArrowLeft className="size-4" />{' '}
+      {origenFase ? `Volver a Fase: ${origenFase}` : 'Volver a ventas'}
     </Link>
   );
 }
