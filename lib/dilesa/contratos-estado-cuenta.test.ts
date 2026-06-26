@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   deriveEstadoCuenta,
+  excedeTopeContrato,
   findFacturaTotal,
   type EstimacionCuenta,
   type FacturaCuenta,
@@ -90,5 +91,28 @@ describe('findFacturaTotal', () => {
   });
   it('null si solo hay facturas por estimación', () => {
     expect(findFacturaTotal([fac({}), fac({ obra_estimacion_id: 'e2' })])).toBeNull();
+  });
+});
+
+describe('excedeTopeContrato', () => {
+  it('excede cuando devengado + estimación supera el valor del contrato', () => {
+    expect(excedeTopeContrato(80, 30, 100)).toBe(true); // 110 > 100
+  });
+  it('no excede cuando cuadra justo al valor', () => {
+    expect(excedeTopeContrato(70, 30, 100)).toBe(false); // 100 == 100
+  });
+  it('tolera el redondeo de centavos (epsilon 1 peso)', () => {
+    expect(excedeTopeContrato(100, 0.5, 100)).toBe(false); // 100.5 <= 100+1
+    expect(excedeTopeContrato(100, 2, 100)).toBe(true); // 102 > 100+1
+  });
+  it('las estimaciones no positivas (amortizaciones) nunca exceden', () => {
+    expect(excedeTopeContrato(120, -30, 100)).toBe(false);
+    expect(excedeTopeContrato(120, 0, 100)).toBe(false);
+  });
+  it('contratos sin valor capturado (valor_total <= 0) se eximen', () => {
+    expect(excedeTopeContrato(0, 50, 0)).toBe(false);
+  });
+  it('un contrato ya excedido bloquea cualquier suma adicional', () => {
+    expect(excedeTopeContrato(150, 10, 100)).toBe(true);
   });
 });
