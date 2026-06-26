@@ -12583,6 +12583,10 @@ export type Database = {
         Args: { p_estimacion_id: string }
         Returns: string
       }
+      cxp_factura_desde_estimacion_obra_espera: {
+        Args: { p_estimacion_id: string }
+        Returns: string
+      }
       cxp_factura_recibir_cfdi: {
         Args: {
           p_emisor_nombre?: string
