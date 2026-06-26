@@ -230,65 +230,62 @@ def sql_str(s: str) -> str:
 
 
 def emit_sql(rows: list[dict], version: str) -> str:
+    emp = f"(SELECT id FROM core.empresas WHERE slug = {sql_str(EMPRESA_SLUG)})"
     head = f"""-- ╭─ {version}_dilesa_catalogo_cuentas_data ─╮
 -- Iniciativa dilesa-catalogo-contable · Sprint 1 · carga del catálogo.
 -- Generado por scripts/import-contpaqi/dilesa_catalogo_cuentas.py desde el
 -- export de CONTPAQi (cuentas COMPLETO.xlsx). NO editar a mano: regenerar con
 -- el loader si cambia el export. {len(rows)} cuentas de DILESA.
 --
--- Idempotente: ON CONFLICT (empresa_id, numero) DO NOTHING. Preview-safe: si la
--- empresa DILESA no existe (Preview branch sin datos), el CROSS JOIN no produce
--- filas y la carga es no-op (no rompe el branch). Requiere la tabla creada en
+-- Dos statements independientes (sin tabla temporal ni dependencia de la
+-- transacción): robusto bajo db push, MCP apply_migration o execute_sql.
+-- Idempotente: ON CONFLICT (empresa_id, numero) DO NOTHING + UPDATE con guard.
+-- Preview-safe: si la empresa DILESA no existe (Preview sin datos), el CROSS
+-- JOIN no produce filas y la carga es no-op. Requiere la tabla creada en
 -- 20260625193524_dilesa_catalogo_cuentas.sql.
 
 BEGIN;
 
-CREATE TEMP TABLE _stage (
-  codigo_contpaqi text, numero text, nombre text, naturaleza text, tipo text,
-  nivel int, agrupador text, afectable boolean, padre_contpaqi text
-) ON COMMIT DROP;
-
-INSERT INTO _stage
-  (codigo_contpaqi, numero, nombre, naturaleza, tipo, nivel, agrupador, afectable, padre_contpaqi)
-VALUES
-"""
-    values = []
-    for r in rows:
-        padre = sql_str(r["padre_contpaqi"]) if r["padre_contpaqi"] else "NULL"
-        values.append(
-            f"  ({sql_str(r['codigo_contpaqi'])}, {sql_str(r['numero'])}, "
-            f"{sql_str(r['nombre'])}, {sql_str(r['naturaleza'])}, {sql_str(r['tipo'])}, "
-            f"{r['nivel']}, {sql_str(r['agrupador'])}, {str(r['afectable']).lower()}, {padre})"
-        )
-    body = ",\n".join(values)
-
-    tail = f"""
-;
-
--- Inserta las cuentas (sin padre todavía).
+-- 1. Inserta las cuentas (la jerarquía se resuelve en el statement 2).
 INSERT INTO erp.cuentas_contables
   (empresa_id, numero, codigo_contpaqi, nombre, naturaleza, tipo, nivel,
    codigo_agrupador_sat, afectable, origen)
-SELECT e.id, s.numero, s.codigo_contpaqi, s.nombre, s.naturaleza, s.tipo, s.nivel,
-       s.agrupador, s.afectable, 'contpaqi'
-FROM _stage s
-CROSS JOIN (SELECT id FROM core.empresas WHERE slug = {sql_str(EMPRESA_SLUG)}) e
+SELECT e.id, v.numero, v.codigo_contpaqi, v.nombre, v.naturaleza, v.tipo,
+       v.nivel, v.agrupador, v.afectable, 'contpaqi'
+FROM (VALUES
+"""
+    ins = []
+    for r in rows:
+        ins.append(
+            f"  ({sql_str(r['codigo_contpaqi'])}, {sql_str(r['numero'])}, "
+            f"{sql_str(r['nombre'])}, {sql_str(r['naturaleza'])}, {sql_str(r['tipo'])}, "
+            f"{r['nivel']}, {sql_str(r['agrupador'])}, {str(r['afectable']).lower()})"
+        )
+    mid = f"""
+) AS v(codigo_contpaqi, numero, nombre, naturaleza, tipo, nivel, agrupador, afectable)
+CROSS JOIN {emp} e
 ON CONFLICT (empresa_id, numero) DO NOTHING;
 
--- Resuelve la jerarquía padre-hijo por código CONTPAQi.
+-- 2. Resuelve la jerarquía padre-hijo por código CONTPAQi.
 UPDATE erp.cuentas_contables c
 SET cuenta_padre_id = p.id
-FROM _stage s
-JOIN (SELECT id FROM core.empresas WHERE slug = {sql_str(EMPRESA_SLUG)}) e ON true
-JOIN erp.cuentas_contables p ON p.empresa_id = e.id AND p.codigo_contpaqi = s.padre_contpaqi
+FROM (VALUES
+"""
+    upd = [
+        f"  ({sql_str(r['codigo_contpaqi'])}, {sql_str(r['padre_contpaqi'])})"
+        for r in rows if r["padre_contpaqi"]
+    ]
+    tail = f"""
+) AS v(codigo_contpaqi, padre_contpaqi)
+JOIN {emp} e ON true
+JOIN erp.cuentas_contables p ON p.empresa_id = e.id AND p.codigo_contpaqi = v.padre_contpaqi
 WHERE c.empresa_id = e.id
-  AND c.codigo_contpaqi = s.codigo_contpaqi
-  AND s.padre_contpaqi IS NOT NULL
+  AND c.codigo_contpaqi = v.codigo_contpaqi
   AND c.cuenta_padre_id IS DISTINCT FROM p.id;
 
 COMMIT;
 """
-    return head + body + tail
+    return head + ",\n".join(ins) + mid + ",\n".join(upd) + tail
 
 
 def main() -> None:
