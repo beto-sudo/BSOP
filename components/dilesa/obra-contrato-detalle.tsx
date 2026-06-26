@@ -1,11 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect --
- * Mismo data-sync pattern que las páginas de detalle DILESA (cf.
- * app/dilesa/construccion/contratos/[id]/page.tsx): la carga inicial corre
- * en un effect que setea loading/data.
- */
-
 /**
  * ObraContratoDetalle — secciones de un contrato de obra NO-vivienda en el
  * detalle de contrato (`/dilesa/construccion/contratos/[id]`).
@@ -52,6 +46,7 @@ import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import {
   deriveEstadoCuenta,
+  excedeTopeContrato,
   findFacturaTotal,
   type FacturaCuenta,
   type ObraEstimacionEstado,
@@ -74,6 +69,8 @@ export type ObraEstimacion = {
   /** Cancelada (p2p-cancelaciones): visible con badge, excluida del devengo. */
   cancelada_at: string | null;
   motivo_cancelacion: string | null;
+  /** S2: motivo del override del tope vs contrato (obra extra). NULL = dentro del valor. */
+  tope_override_motivo: string | null;
 };
 
 type FacturaContrato = FacturaCuenta & { id: string; fecha_emision: string | null };
@@ -159,7 +156,7 @@ export function ObraContratoDetalle({
     const { data, error: e } = await (sb.schema('dilesa') as any)
       .from('obra_estimaciones')
       .select(
-        'id, orden, etiqueta, fecha, factura_ref, monto_total, retencion, es_anticipo, es_finiquito, nota_pago, estado, autorizada_at, cancelada_at, motivo_cancelacion'
+        'id, orden, etiqueta, fecha, factura_ref, monto_total, retencion, es_anticipo, es_finiquito, nota_pago, estado, autorizada_at, cancelada_at, motivo_cancelacion, tope_override_motivo'
       )
       .eq('empresa_id', DILESA_EMPRESA_ID)
       .eq('contrato_id', contratoId)
@@ -188,6 +185,7 @@ export function ObraContratoDetalle({
       autorizada_at: (r.autorizada_at as string | null) ?? null,
       cancelada_at: (r.cancelada_at as string | null) ?? null,
       motivo_cancelacion: (r.motivo_cancelacion as string | null) ?? null,
+      tope_override_motivo: (r.tope_override_motivo as string | null) ?? null,
     }));
     setEstimaciones(rows);
 
@@ -324,33 +322,60 @@ export function ObraContratoDetalle({
     [sb, toast, cargar, programando]
   );
 
-  // Autorizar (D2): solo Dirección; la RPC re-valida server-side y deja audit_log.
+  /** Estimación que se autoriza por encima del contrato (monta el diálogo de override). */
+  const [overrideTarget, setOverrideTarget] = useState<ObraEstimacion | null>(null);
+
+  // Autorizar (D2): solo Dirección; la RPC re-valida server-side (incl. el tope
+  // vs contrato del S2). `overrideMotivo` se pasa cuando Dirección autoriza obra
+  // extra por encima del valor del contrato. Devuelve si autorizó (el diálogo de
+  // override lo usa para mantenerse abierto ante un error).
   const autorizar = useCallback(
-    async (est: ObraEstimacion) => {
-      if (autorizando) return;
+    async (est: ObraEstimacion, overrideMotivo?: string): Promise<boolean> => {
+      if (autorizando) return false;
       setAutorizando(est.id);
-      // RPC S1 aún no en types — mismo patrón de cast que las queries.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: e } = await (sb.schema('dilesa') as any).rpc('obra_estimacion_autorizar', {
-        p_estimacion_id: est.id,
-      });
-      if (e) {
-        toast.add({
-          title: 'No se pudo autorizar',
-          description: getSupabaseErrorMessage(e, 'Error al autorizar la estimación.'),
-          type: 'error',
+      try {
+        // RPC S2 aún no en types — mismo patrón de cast que las queries.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: e } = await (sb.schema('dilesa') as any).rpc('obra_estimacion_autorizar', {
+          p_estimacion_id: est.id,
+          p_override_motivo: overrideMotivo ?? null,
         });
-      } else {
+        if (e) {
+          toast.add({
+            title: 'No se pudo autorizar',
+            description: getSupabaseErrorMessage(e, 'Error al autorizar la estimación.'),
+            type: 'error',
+          });
+          return false;
+        }
         toast.add({
-          title: 'Estimación autorizada',
-          description: `«${est.etiqueta}» ya cuenta como devengo del contrato.`,
+          title: overrideMotivo ? 'Autorizada con override' : 'Estimación autorizada',
+          description: overrideMotivo
+            ? `«${est.etiqueta}» se autorizó como obra extra por encima del contrato.`
+            : `«${est.etiqueta}» ya cuenta como devengo del contrato.`,
           type: 'success',
         });
         await cargar();
+        return true;
+      } finally {
+        setAutorizando(null);
       }
-      setAutorizando(null);
     },
     [sb, toast, cargar, autorizando]
+  );
+
+  // Click "Autorizar": si lleva el devengado por encima del valor del contrato,
+  // pide override de Dirección (motivo); si no, autoriza directo. El server
+  // re-valida el tope de todos modos.
+  const onAutorizarClick = useCallback(
+    (est: ObraEstimacion) => {
+      if (excedeTopeContrato(cuenta.devengado, est.monto_total, valorTotal)) {
+        setOverrideTarget(est);
+      } else {
+        void autorizar(est);
+      }
+    },
+    [cuenta.devengado, valorTotal, autorizar]
   );
 
   const montoNum = Number(monto) || 0;
@@ -657,6 +682,14 @@ export function ObraContratoDetalle({
                       >
                         {ESTADO_ESTIMACION[e.estado].label}
                       </span>
+                      {e.tope_override_motivo ? (
+                        <span
+                          title={`Obra extra (override del tope): ${e.tope_override_motivo}`}
+                          className="ml-1 inline-block rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium text-amber-600"
+                        >
+                          obra extra
+                        </span>
+                      ) : null}
                     </td>
                     <td className="py-1.5 pr-3 text-[var(--text)]/70">{e.fecha ?? '—'}</td>
                     <td className="py-1.5 pr-3 text-[var(--text)]/70">{e.factura_ref ?? '—'}</td>
@@ -691,7 +724,7 @@ export function ObraContratoDetalle({
                         {e.estado === 'borrador' && esDireccion ? (
                           <button
                             type="button"
-                            onClick={() => void autorizar(e)}
+                            onClick={() => onAutorizarClick(e)}
                             disabled={autorizando === e.id}
                             title="Autorizar (Dirección): la estimación pasa a contar como devengo"
                             className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)]/40 px-2 py-0.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-50"
@@ -733,6 +766,23 @@ export function ObraContratoDetalle({
             placeholder="Ej. error de captura, monto equivocado…"
             onClose={() => setCancelando(null)}
             onConfirm={(motivo) => cancelarEstimacion(cancelando.id, motivo)}
+          />
+        ) : null}
+
+        {overrideTarget ? (
+          <CancelarConMotivoDialog
+            key={`override-${overrideTarget.id}`}
+            title="Autorizar como obra extra"
+            description={`Autorizar «${overrideTarget.etiqueta}» (${formatCurrency(overrideTarget.monto_total)}) lleva el devengado por encima del valor del contrato (${formatCurrency(valorTotal)}). Indica el motivo del override de Dirección (obra extra). Queda registrado y auditado.`}
+            confirmLabel="Autorizar con override"
+            submittingLabel="Autorizando…"
+            confirmVariant="default"
+            placeholder="Ej. obra extra autorizada por…, volumen adicional…"
+            onClose={() => setOverrideTarget(null)}
+            onConfirm={async (motivo) => {
+              const ok = await autorizar(overrideTarget, motivo);
+              if (!ok) throw new Error('falló la autorización'); // mantiene el diálogo abierto
+            }}
           />
         ) : null}
       </section>
