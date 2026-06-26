@@ -71,6 +71,12 @@ export type CxpPagosModuleProps = {
   empresaId: string;
   /** Slug de la empresa para armar links del hilo del gasto (dilesa, rdb, …). */
   empresa: EmpresaSlug;
+  /**
+   * Filtro de estado inicial (pipeline S2). 'pendientes' (default) = pagos por
+   * ejecutar (pestaña Programación: marcar pagado + comprobante); 'pagado' =
+   * histórico (pestaña Pagos). El usuario puede cambiarlo con el filtro.
+   */
+  estadoInicial?: string;
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -274,12 +280,16 @@ export function filtrarPagosPorEstado<T extends { estado: EstadoPago }>(
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 
-export function CxpPagosModule({ empresaId, empresa }: CxpPagosModuleProps) {
+export function CxpPagosModule({
+  empresaId,
+  empresa,
+  estadoInicial = 'pendientes',
+}: CxpPagosModuleProps) {
   const feedback = useActionFeedback();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [estado, setEstado] = useState('pendientes');
+  const [estado, setEstado] = useState(estadoInicial);
 
   const [selected, setSelected] = useState<Pago | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
