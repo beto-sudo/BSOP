@@ -1650,6 +1650,18 @@ function MoneyRow({
 
 // ── Dialog: cargar XML (1..N) ──────────────────────────────────────────────────
 
+type AnalisisArchivo = {
+  filename: string;
+  ok: boolean;
+  error?: string;
+  proveedorNombre: string | null;
+  total?: number;
+  uuid?: string | null;
+  yaCargada?: boolean;
+  candidatos: { facturaId: string; codigo: string | null; neto: number; delta: number }[];
+  sugerencia: string;
+};
+
 function UploadXmlDialog({
   empresa,
   open,
@@ -1662,31 +1674,72 @@ function UploadXmlDialog({
   onDone: (exitosos: number) => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<'select' | 'review' | 'results'>('select');
+  const [analisis, setAnalisis] = useState<AnalisisArchivo[]>([]);
+  // filename → facturaId del destajo a asociar, o 'normal'.
+  const [decisiones, setDecisiones] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [topError, setTopError] = useState<string | null>(null);
   const [results, setResults] = useState<
     { filename: string; ok: boolean; error?: string }[] | null
   >(null);
 
-  // Reset al cerrar.
   useEffect(() => {
     if (!open) {
       setFiles([]);
+      setPhase('select');
+      setAnalisis([]);
+      setDecisiones({});
+      setBusy(false);
+      setTopError(null);
       setResults(null);
-      setSubmitting(false);
     }
   }, [open]);
 
-  const handleSubmit = async () => {
-    if (files.length === 0) return;
-    setSubmitting(true);
-    setResults(null);
+  const url = `/api/${empresa}/cxp/facturas/upload-xml`;
+
+  // Paso 1: analizar (sugiere destajo o factura normal por archivo, sin escribir).
+  const handleAnalyze = async (chosen: File[]) => {
+    if (chosen.length === 0) return;
+    setBusy(true);
+    setTopError(null);
     try {
       const fd = new FormData();
-      for (const f of files) fd.append('file', f);
-      const res = await fetch(`/api/${empresa}/cxp/facturas/upload-xml`, {
-        method: 'POST',
-        body: fd,
-      });
+      fd.append('analyze', '1');
+      for (const f of chosen) fd.append('file', f);
+      const res = await fetch(url, { method: 'POST', body: fd });
+      const json = (await res.json()) as {
+        ok: boolean;
+        analisis?: AnalisisArchivo[];
+        error?: string;
+      };
+      if (!res.ok || !json.analisis) {
+        setTopError(json.error ?? 'No se pudo analizar.');
+        return;
+      }
+      setAnalisis(json.analisis);
+      const init: Record<string, string> = {};
+      for (const a of json.analisis) if (a.ok) init[a.filename] = a.sugerencia;
+      setDecisiones(init);
+      setPhase('review');
+    } catch (e) {
+      setTopError((e as Error).message ?? 'Error de red.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Paso 2: confirmar → carga (asocia o crea según las decisiones).
+  const handleCommit = async () => {
+    const okFiles = files.filter((f) => analisis.find((a) => a.filename === f.name)?.ok);
+    if (okFiles.length === 0) return;
+    setBusy(true);
+    setTopError(null);
+    try {
+      const fd = new FormData();
+      for (const f of okFiles) fd.append('file', f);
+      fd.append('decisiones', JSON.stringify(decisiones));
+      const res = await fetch(url, { method: 'POST', body: fd });
       const json = (await res.json()) as {
         ok: boolean;
         exitosos?: number;
@@ -1695,21 +1748,29 @@ function UploadXmlDialog({
       };
       if (!res.ok && !json.results) {
         setResults([{ filename: '(lote)', ok: false, error: json.error ?? 'Error en la carga.' }]);
+        setPhase('results');
         return;
       }
       setResults(json.results ?? []);
+      setPhase('results');
       onDone(json.exitosos ?? 0);
     } catch (e) {
       setResults([
         { filename: '(lote)', ok: false, error: (e as Error).message ?? 'Error de red.' },
       ]);
+      setPhase('results');
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
-  const exitosos = results?.filter((r) => r.ok).length ?? 0;
   const empresaLabel = empresa.toUpperCase();
+  const procesables = analisis.filter((a) => a.ok);
+  const aDestajo = procesables.filter(
+    (a) => (decisiones[a.filename] ?? 'normal') !== 'normal'
+  ).length;
+  const omitidas = analisis.length - procesables.length;
+  const exitosos = results?.filter((r) => r.ok).length ?? 0;
 
   return (
     <Dialog
@@ -1718,78 +1779,134 @@ function UploadXmlDialog({
         if (!v) onOpenChange(false);
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Cargar facturas (XML CFDI)</DialogTitle>
           <DialogDescription>
-            Selecciona uno o varios XML de facturas de egreso. Se valida que el receptor sea{' '}
-            {empresaLabel}, se evita duplicar por folio fiscal y se enlaza el proveedor por RFC.
+            Sube uno o varios XML. Se valida que el receptor sea {empresaLabel}, se evita duplicar
+            por folio fiscal, y si el CFDI es de un <strong>destajo en espera</strong> se asocia
+            automáticamente (en vez de duplicar).
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground hover:bg-muted/50">
-            <Upload className="h-4 w-4" />
-            {files.length > 0
-              ? `${files.length} archivo${files.length !== 1 ? 's' : ''} seleccionado${files.length !== 1 ? 's' : ''}`
-              : 'Elegir archivos XML…'}
-            <input
-              type="file"
-              accept=".xml,application/xml,text/xml"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                setFiles(Array.from(e.target.files ?? []));
-                setResults(null);
-              }}
-            />
-          </label>
+        {topError && <p className="text-sm text-destructive">{topError}</p>}
 
-          {files.length > 0 && !results && (
-            <ul className="max-h-32 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
-              {files.map((f) => (
-                <li key={f.name} className="truncate font-mono">
-                  {f.name}
+        {/* Paso 1: selección */}
+        {phase === 'select' && (
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground hover:bg-muted/50">
+              <Upload className="h-4 w-4" />
+              {busy ? 'Analizando…' : 'Elegir archivos XML…'}
+              <input
+                type="file"
+                accept=".xml,application/xml,text/xml"
+                multiple
+                disabled={busy}
+                className="hidden"
+                onChange={(e) => {
+                  const chosen = Array.from(e.target.files ?? []);
+                  setFiles(chosen);
+                  void handleAnalyze(chosen);
+                }}
+              />
+            </label>
+          </div>
+        )}
+
+        {/* Paso 2: revisar + confirmar */}
+        {phase === 'review' && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {procesables.length} factura{procesables.length !== 1 ? 's' : ''} ·{' '}
+              <span className="text-amber-600">{aDestajo} a destajo</span> ·{' '}
+              {procesables.length - aDestajo} normal
+              {procesables.length - aDestajo !== 1 ? 'es' : ''}
+              {omitidas > 0 ? ` · ${omitidas} omitida${omitidas !== 1 ? 's' : ''}` : ''}
+            </p>
+            <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+              {analisis.map((a) => (
+                <li key={a.filename} className="rounded-md border px-3 py-2 text-sm">
+                  {!a.ok ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-xs text-muted-foreground">
+                        {a.filename}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {a.yaCargada ? 'Ya cargada' : (a.error ?? 'omitida')}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-medium">
+                          {a.proveedorNombre ?? a.filename}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {formatCurrency(a.total ?? 0)}
+                        </span>
+                      </div>
+                      <select
+                        value={decisiones[a.filename] ?? 'normal'}
+                        onChange={(e) =>
+                          setDecisiones((d) => ({ ...d, [a.filename]: e.target.value }))
+                        }
+                        className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                      >
+                        <option value="normal">Factura normal (sin destajo)</option>
+                        {a.candidatos.map((c) => (
+                          <option key={c.facturaId} value={c.facturaId}>
+                            Destajo {c.codigo ?? '—'} · neto {formatCurrency(c.neto)}
+                            {c.delta > 0 ? ` · Δ materiales ${formatCurrency(c.delta)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
-          )}
+          </div>
+        )}
 
-          {results && (
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">
-                {exitosos} de {results.length} cargada{results.length !== 1 ? 's' : ''}.
-              </p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto text-xs">
-                {results.map((r, i) => (
-                  <li
-                    key={`${r.filename}-${i}`}
-                    className={r.ok ? 'text-emerald-600' : 'text-destructive'}
-                  >
-                    <span className="font-mono">{r.filename}</span>
-                    {r.ok ? ' · OK' : ` · ${r.error ?? 'error'}`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        {/* Paso 3: resultados */}
+        {phase === 'results' && results && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">
+              {exitosos} de {results.length} procesada{results.length !== 1 ? 's' : ''}.
+            </p>
+            <ul className="max-h-60 space-y-1 overflow-y-auto text-xs">
+              {results.map((r, i) => (
+                <li
+                  key={`${r.filename}-${i}`}
+                  className={r.ok ? 'text-emerald-600' : 'text-destructive'}
+                >
+                  <span className="font-mono">{r.filename}</span>
+                  {r.ok ? ' · OK' : ` · ${r.error ?? 'error'}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <DialogFooter>
-          {results ? (
+          {phase === 'results' ? (
             <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
-          ) : (
+          ) : phase === 'review' ? (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-                Cancelar
+              <Button variant="outline" onClick={() => setPhase('select')} disabled={busy}>
+                Atrás
               </Button>
               <Button
-                onClick={() => void handleSubmit()}
-                disabled={files.length === 0 || submitting}
+                onClick={() => void handleCommit()}
+                disabled={busy || procesables.length === 0}
               >
-                {submitting ? 'Cargando…' : `Cargar ${files.length || ''}`.trim()}
+                {busy ? 'Cargando…' : `Cargar ${procesables.length || ''}`.trim()}
               </Button>
             </>
+          ) : (
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancelar
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

@@ -23,6 +23,15 @@ type Script = {
   personaByRfc?: Record<string, { id: string }>;
   rpcResult?: { data: string | null; error: { message: string } | null };
   auditInsertError?: { message: string } | null;
+  /** Facturas en espera (placeholders de destajo) para el auto-match (S4). */
+  placeholders?: {
+    id: string;
+    proveedor_id: string | null;
+    total: number;
+    estimacion_id: string;
+  }[];
+  /** dilesa.estimaciones para resolver el código del destajo. */
+  estimaciones?: { id: string; codigo: string }[];
 };
 
 type Calls = {
@@ -41,10 +50,25 @@ function buildAdminMock(): any {
         from(tableName: string) {
           const key = `${schemaName}.${tableName}`;
           const filters: Record<string, unknown> = {};
+          let usedNot = false; // marca la query de placeholders (fetchDestajoPlaceholders)
           const builder: any = {
             select: () => builder,
             eq(col: string, val: unknown) {
               filters[col] = val;
+              return builder;
+            },
+            // fetchDestajoPlaceholders (S4): cadena .not().is() awaiteada directo.
+            // El mock devuelve vacío (sin placeholders) → carga normal, como antes.
+            not(col: string, _op: string, val: unknown) {
+              filters[col] = val;
+              usedNot = true;
+              return builder;
+            },
+            is(col: string, val: unknown) {
+              filters[col] = val;
+              return builder;
+            },
+            in() {
               return builder;
             },
             insert(rows: unknown) {
@@ -80,12 +104,16 @@ function buildAdminMock(): any {
                 };
               return { data: null, error: null };
             },
-            // Update chain awaiteado directo (facturas.update().eq()).
+            // Awaiteado directo: update().eq() (data null), la query de
+            // placeholders (erp.facturas + .not) y el lookup de estimaciones.
             then(
-              onFulfilled: (r: { data: null; error: null }) => unknown,
+              onFulfilled: (r: { data: unknown; error: null }) => unknown,
               onRejected?: (reason: unknown) => unknown
             ) {
-              return Promise.resolve({ data: null, error: null }).then(onFulfilled, onRejected);
+              let data: unknown = null;
+              if (key === 'erp.facturas' && usedNot) data = script.placeholders ?? [];
+              else if (key === 'dilesa.estimaciones') data = script.estimaciones ?? [];
+              return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
             },
           };
           return builder;
@@ -286,5 +314,66 @@ describe('POST /api/[empresa]/cxp/facturas/upload-xml', () => {
     } finally {
       errSpy.mockRestore();
     }
+  });
+
+  // ── Auto-match destajo → CxP (S4) ──────────────────────────────────────
+
+  function makeReqRaw(fields: {
+    analyze?: boolean;
+    decisiones?: Record<string, string>;
+  }): NextRequest {
+    const fd = new FormData();
+    if (fields.analyze) fd.append('analyze', '1');
+    if (fields.decisiones) fd.append('decisiones', JSON.stringify(fields.decisiones));
+    fd.append('file', new File([XML_OK], 'a.xml', { type: 'application/xml' }));
+    return new NextRequest(new URL('http://localhost/api/dilesa/cxp/facturas/upload-xml'), {
+      method: 'POST',
+      body: fd,
+      headers: { 'user-agent': 'vitest-agent' },
+    });
+  }
+
+  it('analyze → sugiere asociar al destajo en espera del contratista (neto ≥ CFDI)', async () => {
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1200, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ analyze: true }), params);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    const a = body.analisis[0];
+    expect(a.ok).toBe(true);
+    expect(a.candidatos).toHaveLength(1);
+    // CFDI total 1160, neto 1200 → Δ materiales 40.
+    expect(a.candidatos[0]).toMatchObject({ facturaId: 'ph-1', neto: 1200, delta: 40 });
+    expect(a.sugerencia).toBe('ph-1');
+    expect(calls.rpc).toHaveLength(0); // analyze no escribe
+  });
+
+  it('analyze → si el CFDI excede el neto, no es candidato (sugiere normal)', async () => {
+    // neto 1000 < CFDI 1160 → fuera (la factura nunca debe ser mayor).
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1000, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ analyze: true }), params);
+    const body = await res.json();
+    expect(body.analisis[0].candidatos).toHaveLength(0);
+    expect(body.analisis[0].sugerencia).toBe('normal');
+  });
+
+  it('commit con decisiones → asocia el CFDI al destajo (recibir_cfdi, no alta)', async () => {
+    script.placeholders = [
+      { id: 'ph-1', proveedor_id: 'prov-1', total: 1200, estimacion_id: 'est-1' },
+    ];
+    script.estimaciones = [{ id: 'est-1', codigo: 'EST-2026-W26-AAA-001' }];
+    const res = await POST(makeReqRaw({ decisiones: { 'a.xml': 'ph-1' } }), params);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true, exitosos: 1 });
+    expect(calls.rpc).toHaveLength(1);
+    expect(calls.rpc[0].fn).toBe('cxp_factura_recibir_cfdi');
+    expect(calls.rpc[0].args.p_factura_id).toBe('ph-1');
   });
 });
