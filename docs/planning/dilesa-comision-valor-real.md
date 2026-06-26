@@ -3,8 +3,8 @@
 **Slug:** `dilesa-comision-valor-real`
 **Empresas:** DILESA
 **Schemas afectados:** `lib/dilesa/cuadratura.ts` (base de comisión unificada a Valor Real − sobreprecio; expone `precioAsignacion`), `components/dilesa/cuadratura-panel.tsx` (fórmulas inline + card "Resumen de precio" para legacy + etiqueta de redondeo). Backfill de `dilesa.ventas.comision_vendedor`/`comision_gerencia` en las ventas con valor real válido (script con el motor real + audit trail). [ADR-050](../adr/050_base_comision_valor_real.md).
-**Estado:** in_progress
-**Próximo hito:** decisión de Beto — cerrar la iniciativa (el overlay de objetivos/cuotas trimestrales es iniciativa futura separada)
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-06-26
 **Última actualización:** 2026-06-26 (Sprint 1 [#1053] + fix [#1057] mergeados; backfill aplicado a prod — 940 ventas + audit trail; pendiente: Beto decide el cierre)
