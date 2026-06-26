@@ -1,0 +1,90 @@
+name: Schema Shadow De-risk (S0)
+
+# THROWAWAY — Sprint 0 de la iniciativa `derivados-sin-drift`.
+# Prueba la hipótesis central: que las migraciones del repo reconstruyen un
+# schema idéntico al de prod (módulo migraciones foráneas no mergeadas).
+#
+# Levanta una shadow DB local con `supabase start` (aplica las 474 migraciones —
+# si alguna no reproduce, el step falla y encontramos el drift R1), genera el
+# SCHEMA_REF desde la shadow DB y desde prod, y los diffea. Diff esperado = solo
+# lo que aportan las migraciones aplicadas-a-prod-sin-mergear (hoy:
+# dilesa_obra_estimacion_cxp_espera). Cualquier otra cosa = drift de contenido.
+#
+# Se borra (o se evoluciona al job real del Sprint 1) una vez leído el resultado.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/quizzical-euclid-55e483]
+    paths: ['.github/workflows/schema-shadow-derisk.yml']
+
+concurrency:
+  group: schema-derisk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  derisk:
+    name: Shadow DB vs prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start shadow DB (aplica las 474 migraciones desde cero)
+        id: start
+        run: |
+          # `supabase start` aplica supabase/migrations/* a una DB local limpia.
+          # Si una migración no reproduce desde cero, falla aquí (R1 detectado).
+          supabase start || {
+            echo "::error::supabase start FALLÓ — alguna migración no reproduce desde cero (R1)."
+            exit 1
+          }
+          echo "shadow DB up en 127.0.0.1:54322"
+
+      - name: Generar SCHEMA_REF desde la shadow DB (migraciones de la rama)
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: npx tsx scripts/gen-schema-ref.ts --out /tmp/schema_shadow.md
+
+      - name: Generar SCHEMA_REF desde prod
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret no configurado — no puedo comparar contra prod."
+            exit 1
+          fi
+          npx tsx scripts/gen-schema-ref.ts --out /tmp/schema_prod.md
+
+      - name: Diff shadow (migraciones) vs prod
+        run: |
+          echo "=== Resumen de diferencias (ignorando 'Last regenerated') ==="
+          # -I ignora la línea de timestamp. Conteo de líneas que difieren.
+          if diff -q -I '^  Last regenerated: ' /tmp/schema_shadow.md /tmp/schema_prod.md > /dev/null; then
+            echo "✅ IDÉNTICOS — las migraciones reproducen prod exactamente."
+          else
+            ADDED=$(diff -I '^  Last regenerated: ' /tmp/schema_shadow.md /tmp/schema_prod.md | grep -c '^> ' || true)
+            REMOVED=$(diff -I '^  Last regenerated: ' /tmp/schema_shadow.md /tmp/schema_prod.md | grep -c '^< ' || true)
+            echo "⚠️  Difieren: ${REMOVED} líneas solo-en-shadow, ${ADDED} líneas solo-en-prod."
+            echo "    (Esperado: las líneas solo-en-prod deberían ser SOLO de migraciones"
+            echo "     aplicadas-a-prod-sin-mergear, p.ej. dilesa_obra_estimacion_cxp_espera.)"
+            echo ""
+            echo "=== Diff completo ==="
+            diff -u -I '^  Last regenerated: ' /tmp/schema_shadow.md /tmp/schema_prod.md || true
+          fi
