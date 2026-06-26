@@ -255,8 +255,14 @@ export type Cuadratura = {
      *  la fase 10 / gate. NO es el pagaré real: cuando DILESA absorbe más que la
      *  promo (Máxima Aportación) el pagaré del cliente es menor (o 0). */
     pagareNecesario: number;
+    /** Parte del pagaré (`montoCreditoDirecto`) asignada a GASTOS (= min(pagaré,
+     *  `pagareNecesario`)). La card de cobertura resta esto, no el pagaré completo. */
+    pagareGastos: number;
+    /** Parte del pagaré que financia el residual de PRECIO (camino "Cobrar" de la
+     *  dictaminación). 0 en ventas existentes; eleva el Valor Real y reduce la NC. */
+    pagarePrecio: number;
     /** Saldo de la cobertura: gastos brutos − subsidio − promoción − enganche −
-     *  sobreprecio − pagaré. ≈ 0 cuando las fuentes cubren el presupuesto. */
+     *  sobreprecio − pagaré (la parte a gastos). ≈ 0 cuando las fuentes cubren. */
     saldoCobertura: number;
   } | null;
   /**
@@ -479,10 +485,18 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   const pagareNecesario = tieneDesglose
     ? round2(Math.max(0, gastosNetosR - promocionGastos - engancheAGastos - sobreprecioGastos))
     : 0;
+  // Asignación del pagaré (iniciativa `dilesa-saldos-residuales` S2): el crédito
+  // directo cubre PRIMERO el faltante de gastos (`pagareNecesario`); el EXCEDENTE
+  // financia el residual de PRECIO (camino "Cobrar" de la dictaminación). Así un
+  // pagaré tomado para el precio no sobre-fondea los gastos. En las ventas
+  // existentes el pagaré = faltante de gastos ⇒ `pagareAGastos = montoCreditoDirecto`
+  // y `pagareAPrecio = 0` → cuadratura idéntica (verificado en los tests).
+  const pagareAGastos = round2(Math.min(montoCreditoDirecto, pagareNecesario));
+  const pagareAPrecio = round2(Math.max(0, montoCreditoDirecto - pagareAGastos));
   // Lo que DILESA debe cubrir del presupuesto tras el enganche (excedente del
-  // precio) y el pagaré del cliente, partido en promoción (topada al bono) +
-  // sobreprecio (el resto).
-  const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - montoCreditoDirecto);
+  // precio) y la parte del pagaré que SÍ fondea gastos, partido en promoción
+  // (topada al bono) + sobreprecio (el resto).
+  const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - pagareAGastos);
   const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
     faltanteGastosDilesa,
     promocionGastos
@@ -493,7 +507,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
       aportacionPromocion -
       engancheAGastos -
       sobreprecioCobertura -
-      montoCreditoDirecto
+      pagareAGastos
   );
   const coberturaGastos = tieneDesglose
     ? {
@@ -507,6 +521,12 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
         sobreprecio: round2(sobreprecioGastos),
         sobreprecioCobertura,
         pagareNecesario,
+        /** Parte del pagaré (`montoCreditoDirecto`) que fondea GASTOS (= min(pagaré,
+         *  pagareNecesario)). La card de cobertura resta esto, no el pagaré completo. */
+        pagareGastos: pagareAGastos,
+        /** Parte del pagaré que financia el residual de PRECIO (camino "Cobrar"). 0
+         *  en las ventas existentes. Eleva el Valor Real y reduce la NC. */
+        pagarePrecio: pagareAPrecio,
         saldoCobertura,
       }
     : null;

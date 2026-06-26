@@ -426,10 +426,27 @@ function CapturarFase8Body() {
         });
         return;
       }
-      // Si la cuadratura arroja un saldo, el crédito directo (pagaré) debe estar
-      // guardado antes de cerrar — se captura aquí, con el saldo real del Anexo B.
-      const cob = resumen.status === 'ready' ? resumen.props.cuadratura.coberturaGastos : null;
-      if (cob && cob.pagareNecesario > 0.0049 && !cdGuardado) {
+      // Saldo residual de precio "siempre explícito" (iniciativa dilesa-saldos-residuales):
+      // si el precio queda con un residual real, Dirección lo resuelve (cobrar/absorber)
+      // antes de cerrar. La NC sigue derivada; esto registra la decisión.
+      const cuadResumen = resumen.status === 'ready' ? resumen.props.cuadratura : null;
+      const cob = cuadResumen?.coberturaGastos ?? null;
+      if (cuadResumen?.requiereResolucionSaldoResidual && venta.saldo_residual_resolucion == null) {
+        toast.add({
+          title: 'Falta resolver el saldo del cliente',
+          description:
+            'Hay un saldo de precio por resolver. Cóbralo (pagaré) o absórbelo (nota de crédito) antes de cerrar la dictaminación.',
+          type: 'error',
+        });
+        return;
+      }
+      // El crédito directo (pagaré) se exige por faltante de GASTOS o porque Dirección
+      // eligió "Cobrar" el residual de precio (S2). Un solo pagaré cubre ambos; el motor
+      // lo asigna gastos-primero. Debe estar guardado + firmado antes de cerrar.
+      const requierePagare =
+        (cob != null && cob.pagareNecesario > 0.0049) ||
+        venta.saldo_residual_resolucion === 'cobrar';
+      if (requierePagare && !cdGuardado) {
         toast.add({
           title: 'Falta configurar el crédito directo',
           description:
@@ -438,25 +455,10 @@ function CapturarFase8Body() {
         });
         return;
       }
-      // El pagaré firmado se recaba en la dictaminación (decisión Beto 2026-06-24):
-      // obligatorio para cerrar la fase cuando la operación lleva crédito directo.
-      if (cob && cob.pagareNecesario > 0.0049 && docsPagare.faltantes.length > 0) {
+      if (requierePagare && docsPagare.faltantes.length > 0) {
         toast.add({
           title: 'Falta el pagaré firmado',
           description: 'Sube el pagaré firmado por el cliente antes de cerrar la dictaminación.',
-          type: 'error',
-        });
-        return;
-      }
-      // Saldo residual de precio "siempre explícito" (iniciativa dilesa-saldos-residuales):
-      // si el precio queda con un residual real, Dirección lo resuelve (cobrar/absorber)
-      // antes de cerrar. La NC sigue derivada; esto registra la decisión.
-      const cuadResumen = resumen.status === 'ready' ? resumen.props.cuadratura : null;
-      if (cuadResumen?.requiereResolucionSaldoResidual && venta.saldo_residual_resolucion == null) {
-        toast.add({
-          title: 'Falta resolver el saldo del cliente',
-          description:
-            'Hay un saldo de precio por resolver. Cóbralo (pagaré) o absórbelo (nota de crédito) antes de cerrar la dictaminación.',
           type: 'error',
         });
         return;
@@ -783,12 +785,9 @@ function CapturarFase8Body() {
   // fase. Gerencia sube el dictamen + pre-llena, pero el cierre lo hace Dirección.
   const esDireccion =
     !!me?.isAdmin || (venta != null && (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id));
-  // Cuadratura + saldo del pagaré desde el motor (resumen del shell). El saldo es
-  // el faltante de gastos que cubre el crédito directo (igual que en la fase 10).
+  // Cuadratura desde el motor (resumen del shell).
   const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
   const cobGastos = cuadratura?.coberturaGastos ?? null;
-  const saldoCD = cobGastos ? cobGastos.pagareNecesario : 0;
-  const aplicaCD = saldoCD > 0.0049;
 
   // Saldo residual de precio (iniciativa dilesa-saldos-residuales): cuando el
   // precio queda con un residual real (> tolerancia), Dirección decide explícito
@@ -797,6 +796,14 @@ function CapturarFase8Body() {
   const requiereResolucionSaldo = cuadratura?.requiereResolucionSaldoResidual ?? false;
   const saldoResidualMonto = cuadratura?.saldoPrecioPorCubrir ?? 0;
   const resolucionSaldo = venta?.saldo_residual_resolucion ?? null;
+
+  // Crédito directo (pagaré): cubre el faltante de GASTOS y, si Dirección eligió
+  // "Cobrar", también el residual de PRECIO (S2 — un solo pagaré; el motor lo asigna
+  // gastos-primero). `saldoCD` = lo que el cliente debe financiar; el captura se
+  // muestra por faltante de gastos o porque se eligió cobrar el residual.
+  const saldoGastosPagare = cobGastos ? cobGastos.pagareNecesario : 0;
+  const saldoCD = saldoGastosPagare + (resolucionSaldo === 'cobrar' ? saldoResidualMonto : 0);
+  const aplicaCD = saldoGastosPagare > 0.0049 || resolucionSaldo === 'cobrar';
   const resolverSaldo = useCallback(
     async (tipo: 'cobrar' | 'absorber') => {
       if (!venta) return;
@@ -909,7 +916,7 @@ function CapturarFase8Body() {
         <p className="mt-3 text-[11px] text-emerald-700 dark:text-emerald-300">
           {resolucionSaldo === 'absorber'
             ? `Absorbido por DILESA (nota de crédito) por ${money2(venta?.saldo_residual_monto)}.`
-            : `Por cobrar al cliente (pagaré) por ${money2(venta?.saldo_residual_monto)}. Captura el pago como abono/enganche o formaliza el pagaré.`}
+            : `Por cobrar al cliente (pagaré) por ${money2(venta?.saldo_residual_monto)}. Configura el crédito directo abajo y sube el pagaré firmado para cerrar.`}
         </p>
       ) : (
         <p className="mt-3 text-[11px] text-amber-700 dark:text-amber-300">
@@ -1135,6 +1142,8 @@ function CapturarFase8Body() {
               </Section>
             ) : null}
 
+            {saldoResidualSection}
+
             {aplicaCD ? (
               <Section title="Crédito directo (DILESA financia el saldo)">
                 <CreditoDirectoCaptura
@@ -1154,8 +1163,6 @@ function CapturarFase8Body() {
                 />
               </Section>
             ) : null}
-
-            {saldoResidualSection}
 
             {pagareFirmadoSection}
 
@@ -1347,6 +1354,8 @@ function CapturarFase8Body() {
             </Section>
           ) : null}
 
+          {saldoResidualSection}
+
           {aplicaCD ? (
             <Section title="Crédito directo (DILESA financia el saldo)">
               <CreditoDirectoCaptura
@@ -1366,8 +1375,6 @@ function CapturarFase8Body() {
               />
             </Section>
           ) : null}
-
-          {saldoResidualSection}
 
           {pagareFirmadoSection}
 
