@@ -99,7 +99,7 @@ function post(body?: Record<string, unknown>) {
       body: JSON.stringify(body ?? {}),
       headers: { 'Content-Type': 'application/json' },
     }),
-    { params: Promise.resolve({ ventaId: VENTA_ID }) }
+    { params: Promise.resolve({ id: VENTA_ID }) }
   );
 }
 
@@ -137,7 +137,7 @@ beforeEach(() => {
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
-describe('POST /api/dilesa/ventas/[ventaId]/cerrar-fase13', () => {
+describe('POST /api/dilesa/ventas/[id]/cerrar-fase13', () => {
   it('cierra con revisión vigente en verde: inserta la fase y audita fase13_cerrada', async () => {
     const res = await post({ valorRealSnapshot: 897378 });
     expect(res.status).toBe(200);

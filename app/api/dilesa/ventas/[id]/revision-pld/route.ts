@@ -61,7 +61,7 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-type Params = { params: Promise<{ ventaId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FASE = 13;
@@ -237,7 +237,7 @@ function revisionDto(r: RevisionRow, ejecutadoPorNombre: string | null, vigente:
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const { ventaId } = await params;
+  const { id: ventaId } = await params;
   const auth = await autorizar(ventaId);
   if (!auth.ok) return auth.res;
 
@@ -260,7 +260,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function POST(_req: NextRequest, { params }: Params) {
-  const { ventaId } = await params;
+  const { id: ventaId } = await params;
   const auth = await autorizar(ventaId);
   if (!auth.ok) return auth.res;
   const { admin, userId } = auth;

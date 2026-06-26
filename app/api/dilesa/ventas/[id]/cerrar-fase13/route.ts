@@ -5,7 +5,7 @@
  */
 
 /**
- * POST /api/dilesa/ventas/[ventaId]/cerrar-fase13 — cierre de la Fase 13
+ * POST /api/dilesa/ventas/[id]/cerrar-fase13 — cierre de la Fase 13
  * con gate de revisión (iniciativa `dilesa-ventas-captura-colaborativa`,
  * Sprint 3). El cierre dejó de ser client-side: el gate se valida AQUÍ.
  *
@@ -39,7 +39,7 @@ import { leerCfdiMetadata } from '@/lib/dilesa/captura/cfdi-validacion';
 import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
 import { requiereNotaCredito } from '@/lib/dilesa/captura/pld-revision';
 
-type Params = { params: Promise<{ ventaId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FASE = 13;
@@ -48,7 +48,7 @@ const money = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const { ventaId } = await params;
+  const { id: ventaId } = await params;
   if (!UUID_RE.test(ventaId)) {
     return NextResponse.json({ ok: false, error: 'Venta inválida.' }, { status: 400 });
   }
