@@ -3156,6 +3156,7 @@ export type Database = {
           retencion: number
           source_ref: string | null
           subtotal: number | null
+          tope_override_motivo: string | null
           updated_at: string
         }
         Insert: {
@@ -3185,6 +3186,7 @@ export type Database = {
           retencion?: number
           source_ref?: string | null
           subtotal?: number | null
+          tope_override_motivo?: string | null
           updated_at?: string
         }
         Update: {
@@ -3214,6 +3216,7 @@ export type Database = {
           retencion?: number
           source_ref?: string | null
           subtotal?: number | null
+          tope_override_motivo?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -6643,7 +6646,7 @@ export type Database = {
         Returns: undefined
       }
       obra_estimacion_autorizar: {
-        Args: { p_estimacion_id: string }
+        Args: { p_estimacion_id: string; p_override_motivo?: string }
         Returns: undefined
       }
       obra_estimacion_cancelar: {
