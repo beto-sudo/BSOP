@@ -620,6 +620,48 @@ describe('calcularCuadratura', () => {
       expect(c.coberturaGastos?.pagareNecesario).toBe(9387);
     });
 
+    // Raquel (M3-L6-LDLE, Infonavit Tradicional): venta legacy a la que se subió la
+    // escrituración 920,000 → 930,000 con un sobreprecio de 10,000 (margen del crédito
+    // para absorber gastos). Con el dato corregido (precio_base 920k + sobreprecio 10k),
+    // el split de cobertura respeta el sobreprecio capturado: sobreprecio 10,000 + bono
+    // 10,461 — NO el bono-primero (15,000 + sobreprecio 5,461). El descuento real, el
+    // valor real y el saldo NO cambian: solo se reparte distinto el mismo total.
+    it('Raquel (M3-L6): el sobreprecio capturado manda el split, no el bono-primero', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 930000,
+        montoCreditoTitular: 930000,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 50461,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 10000,
+        promocionGastos: 15000,
+        depositos: [],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      const cob = c.coberturaGastos!;
+      // Formación del precio: base 920k + sobreprecio 10k = escrituración 930k.
+      expect(c.formacionPrecio?.precioBase).toBe(920000);
+      expect(c.formacionPrecio?.sobreprecioGastos).toBe(10000);
+      expect(c.formacionPrecio?.valorEscrituracion).toBe(930000);
+      // Cobertura del presupuesto notarial: el sobreprecio capturado (10k) manda; el
+      // bono es el residual (10,461). El subsidio Infonavit (30k) aparte. Cuadra en 0.
+      expect(cob.gastosBrutos).toBe(50461);
+      expect(cob.apoyoInfonavit).toBe(30000);
+      expect(cob.aportacionPromocion).toBe(10461);
+      expect(cob.sobreprecioCobertura).toBe(10000);
+      expect(cob.pagareNecesario).toBe(0); // 20,461 − 15,000 − 0 − 10,000 < 0 → 0
+      expect(cob.saldoCobertura).toBe(0);
+      // Invariantes que NO cambian con el split: descuento real (= a pagar notaría),
+      // valor real y comisión sobre el valor real menos el sobreprecio (no comisiona).
+      expect(c.descuentoReal).toBe(20461);
+      expect(c.valorRealVentaDilesa).toBe(909539);
+      expect(c.comisionVendedor).toBe(8995.39); // (909,539 − 10,000) × 1%
+    });
+
     it('operacionCubierta es model-aware: cubierta aunque el saldoCliente legacy sea fantasma — Arizpe', () => {
       // El crédito cubre el precio (909,000) y las fuentes cubren los gastos. El
       // `saldoCliente` legacy = cheque 18,313 − descuento 15,000 = 3,313 (fantasma,
@@ -827,5 +869,33 @@ describe('partirDescuento', () => {
 
   it('conserva centavos (escritura − valor real puede no ser entero)', () => {
     expect(partirDescuento(18313.29, 15000)).toEqual({ promocion: 15000, sobreprecio: 3313.29 });
+  });
+
+  // El sobreprecio CAPTURADO es piso del split: cuando se subió el precio para que
+  // el crédito absorbiera gastos, ese monto es sobreprecio aunque el bono no se
+  // haya agotado. Caso Raquel (M3-L6): descuento real 20,461, bono 15,000,
+  // sobreprecio capturado 10,000 → sobreprecio 10,000 (no 5,461) + bono 10,461.
+  it('el sobreprecio capturado es piso del split (Raquel M3-L6)', () => {
+    expect(partirDescuento(20461, 15000, 10000)).toEqual({ promocion: 10461, sobreprecio: 10000 });
+  });
+
+  it('piso ≤ residual no cambia nada (idéntico a 2 args)', () => {
+    // Residual sobre el bono = 18,313 − 15,000 = 3,313; un piso menor no manda.
+    expect(partirDescuento(18313, 15000, 3000)).toEqual({ promocion: 15000, sobreprecio: 3313 });
+    expect(partirDescuento(18313, 15000, 0)).toEqual({ promocion: 15000, sobreprecio: 3313 });
+    // MAYRA: el piso capturado coincide con el residual.
+    expect(partirDescuento(39651, 15000, 24651)).toEqual({ promocion: 15000, sobreprecio: 24651 });
+  });
+
+  it('el piso nunca inventa bono por encima del autorizado', () => {
+    // Sin piso, residual 5,461 + bono 15,000; con piso 10,000 el bono BAJA a 10,461
+    // (nunca sube de 15,000). El sobreprecio capturado solo puede mover bono→sobreprecio.
+    expect(partirDescuento(20461, 15000)).toEqual({ promocion: 15000, sobreprecio: 5461 });
+    expect(partirDescuento(20461, 15000, 10000).promocion).toBeLessThanOrEqual(15000);
+  });
+
+  it('el piso se topa al total (no genera bono negativo)', () => {
+    // Sobreprecio capturado mayor que el descuento real → todo sobreprecio, bono 0.
+    expect(partirDescuento(20461, 15000, 25000)).toEqual({ promocion: 0, sobreprecio: 20461 });
   });
 });

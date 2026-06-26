@@ -96,10 +96,11 @@ export function CuadraturaAjustes({
   //    No se captura aquí; se deriva. ──
   if (tieneDesglose) {
     const descuentoTotal = Math.round(descuentoReal * 100) / 100;
-    // Parte el descuento real en promoción (bono autorizado, topado) + sobreprecio
-    // (el resto). Mismo helper que la card de cobertura del presupuesto notarial.
+    // Parte el descuento real en sobreprecio (piso = el capturado, que sube el
+    // precio para que el crédito absorba gastos) + promoción (bono autorizado, el
+    // residual). Mismo helper que la card de cobertura del presupuesto notarial.
     const { promocion: descuentoPorPromocion, sobreprecio: descuentoPorSobreprecio } =
-      partirDescuento(descuentoReal, descuentoPromocion);
+      partirDescuento(descuentoReal, descuentoPromocion, sobreprecioCapturado);
     // Cuánto del sobreprecio aún no está formalizado como productos adicionales
     // (precio inflado) → pendiente de capturar como Máxima Aportación.
     const sobreprecioPorCapturar =
