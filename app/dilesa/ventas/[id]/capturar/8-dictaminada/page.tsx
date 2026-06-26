@@ -69,6 +69,12 @@ import {
   type DocsPorRol,
 } from '@/lib/dilesa/captura/docs-fase';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
+import {
+  calcularGastosNotariales,
+  cargarConfigVigente,
+  type GastosNotarialesConfig,
+} from '@/lib/dilesa/gastos-notariales';
+import { GastosNotarialesPanel } from '@/components/dilesa/gastos-notariales-panel';
 
 // Pagaré firmado (decisión Beto 2026-06-24): el documento se recaba en la
 // dictaminación (no en la firma). Mismo adjunto (rol `pagare`) que reconoce la
@@ -121,6 +127,8 @@ type VentaCtx = {
   monto_credito_cotitular: number | null;
   gastos_escrituracion: number | null;
   valor_escrituracion: number | null;
+  // Gastos notariales (iniciativa dilesa-gastos-notariales).
+  tiene_propiedad: boolean | null;
   // Re-firma de documentos (ADR-048 D5): si el precio dictaminado difiere del que
   // tienen los documentos firmados vigentes, hay que re-firmar Solicitud + Promesa.
   precio_asignacion: number | null;
@@ -236,6 +244,45 @@ function CapturarFase8Body() {
   const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
   const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
   const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
+  // Gastos notariales (iniciativa dilesa-gastos-notariales): config vigente +
+  // flag de propiedad previa (elige la columna del tabulador de compraventa).
+  const [tienePropiedad, setTienePropiedad] = useState<boolean>(false);
+  const [configGN, setConfigGN] = useState<GastosNotarialesConfig | null>(null);
+
+  // Carga la config de gastos notariales vigente de la empresa de la venta.
+  const empresaIdVenta = venta?.empresa_id ?? null;
+  useEffect(() => {
+    if (!empresaIdVenta) return;
+    let activo = true;
+    cargarConfigVigente(sb, empresaIdVenta).then((cfg) => {
+      if (activo) setConfigGN(cfg);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [sb, empresaIdVenta]);
+
+  // Desglose calculado reactivo: precarga el campo de gastos y alimenta el panel.
+  const desgloseGastosNotariales = useMemo(() => {
+    const valor = Number(valorEscrituracion) || 0;
+    if (!configGN || valor <= 0) return null;
+    return calcularGastosNotariales(
+      {
+        valorEscrituracion: valor,
+        montoCreditoTitular: Number(montoTitular) || 0,
+        montoCreditoCotitular: Number(montoCotitular) || 0,
+        tienePropiedad,
+      },
+      configGN
+    );
+  }, [configGN, valorEscrituracion, montoTitular, montoCotitular, tienePropiedad]);
+
+  // Precarga suave: si el cálculo está listo y el campo de gastos sigue vacío, lo
+  // llena con el total (Dirección lo confirma o ajusta contra el notario).
+  useEffect(() => {
+    if (!desgloseGastosNotariales) return;
+    setGastosEscrituracion((prev) => (prev.trim() ? prev : String(desgloseGastosNotariales.total)));
+  }, [desgloseGastosNotariales]);
 
   // Análisis IA automático al subir documentos (o de los ya cargados).
   const [analizando, setAnalizando] = useState(false);
@@ -386,7 +433,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio, saldo_residual_resolucion, saldo_residual_monto, saldo_residual_autorizado_por, saldo_residual_at'
+          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio, saldo_residual_resolucion, saldo_residual_monto, saldo_residual_autorizado_por, saldo_residual_at, tiene_propiedad'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -410,6 +457,7 @@ function CapturarFase8Body() {
       if (v.credito_cotitular_ref) setCreditoCotitularRef(v.credito_cotitular_ref);
       if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
       if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
+      setTienePropiedad(v.tiene_propiedad ?? false);
 
       const [fRes, notRes] = await Promise.all([
         sb
@@ -574,6 +622,8 @@ function CapturarFase8Body() {
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
           gastos_escrituracion: gastosNum,
           valor_escrituracion: valorEscrituracion.trim() ? Number(valorEscrituracion) : null,
+          tiene_propiedad: tienePropiedad,
+          gastos_notariales_desglose: desgloseGastosNotariales ?? null,
         },
         notas: null,
         registradoPor: userId,
@@ -605,6 +655,8 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      tienePropiedad,
+      desgloseGastosNotariales,
       adjuntosNotariales,
       cdGuardado,
       docsPagare,
@@ -917,6 +969,22 @@ function CapturarFase8Body() {
   // Cuadratura desde el motor (resumen del shell).
   const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
   const cobGastos = cuadratura?.coberturaGastos ?? null;
+
+  // Panel de gastos notariales (iniciativa dilesa-gastos-notariales): muestra el
+  // desglose calculado para que Dirección lo confirme/ajuste; se usa en ambos
+  // formularios (cierre y actualización post-cierre).
+  const gastosNotarialesSection = desgloseGastosNotariales ? (
+    <Section title="Gastos notariales (cálculo estimado)">
+      <GastosNotarialesPanel
+        desglose={desgloseGastosNotariales}
+        gastosCapturado={gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null}
+        tienePropiedad={tienePropiedad}
+        onTienePropiedadChange={setTienePropiedad}
+        onUsarCalculo={() => setGastosEscrituracion(String(desgloseGastosNotariales.total))}
+        editable={esDireccion}
+      />
+    </Section>
+  ) : null;
 
   // Saldo residual de precio (iniciativa dilesa-saldos-residuales): cuando el
   // precio queda con un residual real (> tolerancia), Dirección decide explícito
@@ -1266,6 +1334,8 @@ function CapturarFase8Body() {
               </div>
             </Section>
 
+            {gastosNotarialesSection}
+
             {/* Cuadratura + crédito directo también con la fase ya cerrada
                 (ADR-048): Dirección cuadra el pagaré con los datos reales del
                 dictamen. El crédito directo se guarda aparte (su propio botón). */}
@@ -1473,6 +1543,8 @@ function CapturarFase8Body() {
               </Field>
             </div>
           </Section>
+
+          {gastosNotarialesSection}
 
           {/* Cuadratura completa (ADR-048): Dirección cuadra aquí, con los datos
               reales del dictamen. Refleja lo persistido — guarda los datos de

@@ -4,10 +4,10 @@
 **Empresas:** DILESA (única que escritura vivienda; las tarifas son del notario que atiende >90% de la escrituración, pero se aplican a todas las ventas sin discriminar por notario)
 **Schemas afectados:** `dilesa` (tablas nuevas `gastos_notariales_config` + `gastos_notariales_tabulador`, RLS empresa-scoped set-membership; Sprint 3 agrega columna `tiene_propiedad` a `dilesa.ventas` para elegir la columna del tabulador). `core` (Sprint 2: módulo RBAC nuevo para la pantalla de configuración, ADR-014). Helper `lib/dilesa/gastos-notariales/` (cálculo puro + carga de config). **Línea roja:** NO toca el motor de cuadratura (`lib/dilesa/cuadratura.ts`) ni `fn_calcular_precio_venta` — solo precarga el campo `dilesa.ventas.gastos_escrituracion` que ya existe, igual que hoy lo hace el análisis IA del PDF.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 (datos + cálculo + test) en PR. Beto aplica la migración a prod (config financiera de referencia) → regenerar SCHEMA_REF/types → mergear. Luego Sprint 2 (UI de configuración) y Sprint 3 (integración en la fase de dictaminar).
+**Próximo hito:** Sprint 2 — UI de configuración para editar las tarifas cada enero (mientras tanto se editan por SQL). Sprint 1 (datos + cálculo) y Sprint 3 (integración en la fase de dictaminar: panel + precarga + flag de propiedad) ya en prod.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (promoción + arranque Sprint 1)
+**Última actualización:** 2026-06-26 (S1 en prod #1061 + S3 integración en la fase de dictaminar)
 
 > Detonante: en la fase 8 (dictaminar) el campo «Gastos de escrituración» es
 > captura 100% manual. Beto creía que se extraía del Anexo B, pero el notario
@@ -122,6 +122,17 @@ apertura II). Input nuevo: `tiene_propiedad` (Sprint 3).
   cálculo contra el ejemplo del notario ($44,208 al peso). Alcance v1 cerrado con
   Beto (tarifas en DB + precargar/confirmar + set único de Memo). Arranca
   Sprint 1.
+- **2026-06-26** — Sprint 1 en prod ([#1061](https://github.com/beto-sudo/BSOP/pull/1061)):
+  migración aplicada (db push, ledger 1:1), helper de cálculo + test al peso.
+  Corrección de Beto: en el tabulador de apertura DILESA usa la columna «DILESA»
+  (no la CONSTRU provisional) y la apertura no depende de la propiedad.
+- **2026-06-26** — Sprint 3 (integración fase 8): columnas `tiene_propiedad` +
+  `gastos_notariales_desglose` en `dilesa.ventas` (en prod), helper
+  `cargarConfigVigente`/`mapearConfig` (con test), componente
+  `GastosNotarialesPanel` (desglose + confirmar/ajustar + check de propiedad)
+  integrado en la pantalla de dictaminar (precarga suave del campo + snapshot del
+  desglose al cerrar, en ambos formularios). Se hizo S3 antes que S2 porque da el
+  valor visible; S2 (editar tarifas) es mantenimiento anual.
 
 ## Decisiones registradas
 
@@ -131,3 +142,6 @@ apertura II). Input nuevo: `tiene_propiedad` (Sprint 3).
 - **2026-06-26** — El cálculo **precarga** `gastos_escrituracion`, no lo
   reemplaza ni candadea: Dirección sigue siendo la autoridad final y puede
   ajustar contra el notario. No toca cuadratura ni precio (línea roja).
+- **2026-06-26** — Apertura de crédito usa la columna «DILESA» del tabulador (no
+  CONSTRU) y NO depende de la propiedad previa (eso solo aplica a compraventa).
+  Confirmado por Beto.
