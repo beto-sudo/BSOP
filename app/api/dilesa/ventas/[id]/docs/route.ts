@@ -1,5 +1,5 @@
 /**
- * GET /api/dilesa/ventas/[ventaId]/docs?roles=factura,nota_credito,aviso_pld
+ * GET /api/dilesa/ventas/[id]/docs?roles=factura,nota_credito,aviso_pld
  *
  * Documentos del expediente de una venta (erp.adjuntos, entidad_tipo='venta')
  * para los roles pedidos, con `subidoPorNombre` resuelto server-side —
@@ -18,13 +18,13 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import type { DocFase } from '@/lib/dilesa/captura/docs-fase';
 
-type Params = { params: Promise<{ ventaId: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROL_RE = /^[a-z0-9_]+$/;
 
 export async function GET(req: NextRequest, { params }: Params) {
-  const { ventaId } = await params;
+  const { id: ventaId } = await params;
   if (!UUID_RE.test(ventaId)) {
     return NextResponse.json({ ok: false, error: 'Venta inválida.' }, { status: 400 });
   }

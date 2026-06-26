@@ -12,7 +12,7 @@
  * "Cambiar" NO borra: inserta una versión nueva y conserva la anterior
  * (audit trail). El vigente por rol es el adjunto más reciente.
  *
- * La lectura va por `GET /api/dilesa/ventas/[ventaId]/docs` porque
+ * La lectura va por `GET /api/dilesa/ventas/[id]/docs` porque
  * `core.usuarios` es RLS self-only: el "subido por" de terceros solo se
  * resuelve server-side con el admin client.
  */
