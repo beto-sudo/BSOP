@@ -104,6 +104,10 @@ type Factura = {
   xml_url: string | null;
   pdf_url: string | null;
   partida_id: string | null;
+  /** Destajo de origen (dilesa.estimaciones) si la factura nació de uno. */
+  estimacion_id: string | null;
+  /** Código del destajo de origen (para la bandeja "en espera"). */
+  destajo_codigo: string | null;
 };
 
 type PagoAplicado = {
@@ -369,6 +373,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     }
   );
   const [uploadOpen, setUploadOpen] = useState(false);
+  // Factura en espera destino de la subida de XML (bandeja destajo → CxP).
+  const [recibirTarget, setRecibirTarget] = useState<Factura | null>(null);
 
   // Binding de partida de presupuesto — solo empresas con presupuesto de obra (DILESA-first).
   const usaPartidas = empresa === 'dilesa';
@@ -428,7 +434,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         .order('fecha_emision', { ascending: false });
       if (qErr) throw qErr;
 
-      const rows = (data ?? []) as Omit<Factura, 'proveedor_nombre' | 'oc_codigo'>[];
+      const rows = (data ?? []) as Omit<
+        Factura,
+        'proveedor_nombre' | 'oc_codigo' | 'estimacion_id' | 'destajo_codigo'
+      >[];
 
       // Nombres de proveedor (erp.personas) para filas con proveedor_id y sin
       // emisor_nombre, y códigos de OC enlazada. Dos queries puntuales con
@@ -467,12 +476,52 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         for (const o of ocs ?? []) ocPorId.set(o.id as string, (o.codigo as string | null) ?? '');
       }
 
+      // Liga a destajo (facturas.estimacion_id, columna nueva aún no en types)
+      // + código del destajo — para la bandeja "en espera del XML". Solo se
+      // consulta para las facturas en borrador (las en espera).
+      const borradorIds = rows.filter((r) => r.estado_cxp === 'borrador').map((r) => r.id);
+      const estimacionPorFactura = new Map<string, string>();
+      const codigoPorEstimacion = new Map<string, string>();
+      if (borradorIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: facEst } = await (sb.schema('erp') as any)
+          .from('facturas')
+          .select('id, estimacion_id')
+          .in('id', borradorIds);
+        const estIds = [
+          ...new Set(
+            ((facEst ?? []) as { id: string; estimacion_id: string | null }[])
+              .map((f) => f.estimacion_id)
+              .filter((x): x is string => !!x)
+          ),
+        ];
+        for (const f of (facEst ?? []) as { id: string; estimacion_id: string | null }[]) {
+          if (f.estimacion_id) estimacionPorFactura.set(f.id, f.estimacion_id);
+        }
+        if (estIds.length > 0) {
+          const { data: ests } = await sb
+            .schema('dilesa')
+            .from('estimaciones')
+            .select('id, codigo')
+            .in('id', estIds);
+          for (const e of ests ?? [])
+            codigoPorEstimacion.set(e.id as string, (e.codigo as string | null) ?? '');
+        }
+      }
+
       setFacturas(
-        rows.map((r) => ({
-          ...r,
-          proveedor_nombre: r.proveedor_id ? (nombrePorPersona.get(r.proveedor_id) ?? null) : null,
-          oc_codigo: r.orden_compra_id ? (ocPorId.get(r.orden_compra_id) ?? null) : null,
-        }))
+        rows.map((r) => {
+          const estimacionId = estimacionPorFactura.get(r.id) ?? null;
+          return {
+            ...r,
+            proveedor_nombre: r.proveedor_id
+              ? (nombrePorPersona.get(r.proveedor_id) ?? null)
+              : null,
+            oc_codigo: r.orden_compra_id ? (ocPorId.get(r.orden_compra_id) ?? null) : null,
+            estimacion_id: estimacionId,
+            destajo_codigo: estimacionId ? (codigoPorEstimacion.get(estimacionId) ?? null) : null,
+          };
+        })
       );
     } catch (e) {
       setError(getSupabaseErrorMessage(e, 'No se pudieron cargar las facturas.'));
@@ -569,6 +618,14 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     });
   }, [facturas, search, estado]);
 
+  // Facturas EN ESPERA del XML: destajos aprobados en construcción cuya
+  // factura nació en borrador. Administración sube aquí el XML del contratista
+  // (sin teclear folio). Iniciativa dilesa-estimaciones-cxp.
+  const enEspera = useMemo(
+    () => facturas.filter((f) => f.estado_cxp === 'borrador' && !!f.estimacion_id),
+    [facturas]
+  );
+
   const openDetail = useCallback((f: Factura) => {
     setSelected(f);
     setDrawerOpen(true);
@@ -578,6 +635,48 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     <>
       <DesktopOnlyNotice module="Cuentas por Pagar" />
       <div className="hidden sm:block">
+        {enEspera.length > 0 && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <FileUp className="h-4 w-4 text-amber-600" />
+              Facturas en espera del XML · {enEspera.length}
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Destajos aprobados en construcción. Sube el XML del contratista para pasarlas a por
+              pagar — sin teclear folio.
+            </p>
+            <ul className="space-y-1.5">
+              {enEspera.map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{proveedorLabel(f)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {f.destajo_codigo && f.estimacion_id ? (
+                        <a
+                          href={`/dilesa/construccion/estimaciones/${f.estimacion_id}`}
+                          className="font-mono hover:underline"
+                        >
+                          {f.destajo_codigo}
+                        </a>
+                      ) : (
+                        'Destajo'
+                      )}{' '}
+                      · neto {formatCurrency(f.total)}
+                    </div>
+                  </div>
+                  <Button size="sm" className="gap-2" onClick={() => setRecibirTarget(f)}>
+                    <FileUp className="h-3.5 w-3.5" />
+                    Subir XML
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <ModuleFilters
           count={
             loading ? 'Cargando…' : `${filtered.length} factura${filtered.length !== 1 ? 's' : ''}`
@@ -678,6 +777,18 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
             );
             void fetchFacturas();
           }
+        }}
+      />
+
+      <RecibirXmlDialog
+        empresa={empresa}
+        factura={recibirTarget}
+        onClose={() => setRecibirTarget(null)}
+        onDone={(warning) => {
+          feedback.success(
+            warning ? 'XML recibido (con aviso)' : 'XML recibido · factura por pagar'
+          );
+          void fetchFacturas();
         }}
       />
     </>
@@ -1482,6 +1593,129 @@ function UploadXmlDialog({
                 disabled={files.length === 0 || submitting}
               >
                 {submitting ? 'Cargando…' : `Cargar ${files.length || ''}`.trim()}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Dialog: recibir el XML sobre una factura en espera (destajo → CxP) ──────────
+
+function RecibirXmlDialog({
+  empresa,
+  factura,
+  onClose,
+  onDone,
+}: {
+  empresa: EmpresaSlug;
+  /** Factura en espera destino; null = diálogo cerrado. */
+  factura: Factura | null;
+  onClose: () => void;
+  onDone: (warning: string | null) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{
+    ok: boolean;
+    error?: string;
+    warning?: string | null;
+  } | null>(null);
+
+  const open = factura != null;
+
+  useEffect(() => {
+    if (!open) {
+      setFile(null);
+      setResult(null);
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  const handleSubmit = async () => {
+    if (!file || !factura) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('factura_id', factura.id);
+      const res = await fetch(`/api/${empresa}/cxp/facturas/upload-xml`, {
+        method: 'POST',
+        body: fd,
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string; warning?: string | null };
+      if (!res.ok || !json.ok) {
+        setResult({ ok: false, error: json.error ?? 'No se pudo asociar el XML.' });
+        return;
+      }
+      setResult({ ok: true, warning: json.warning ?? null });
+      onDone(json.warning ?? null);
+    } catch (e) {
+      setResult({ ok: false, error: (e as Error).message ?? 'Error de red.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Subir XML del contratista</DialogTitle>
+          <DialogDescription>
+            {factura ? proveedorLabel(factura) : ''}
+            {factura?.destajo_codigo ? ` · ${factura.destajo_codigo}` : ''} · neto{' '}
+            {formatCurrency(factura?.total ?? 0)}. El folio fiscal y los montos se leen del CFDI; la
+            factura pasa a por pagar.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground hover:bg-muted/50">
+            <Upload className="h-4 w-4" />
+            {file ? file.name : 'Elegir el XML del CFDI…'}
+            <input
+              type="file"
+              accept=".xml,application/xml,text/xml"
+              className="hidden"
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setResult(null);
+              }}
+            />
+          </label>
+
+          {result && !result.ok && <p className="text-sm text-destructive">{result.error}</p>}
+          {result && result.ok && (
+            <div className="space-y-1 text-sm">
+              <p className="text-emerald-600">XML asociado · la factura quedó por pagar.</p>
+              {result.warning && (
+                <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700">
+                  {result.warning}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          {result?.ok ? (
+            <Button onClick={onClose}>Cerrar</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={submitting}>
+                Cancelar
+              </Button>
+              <Button onClick={() => void handleSubmit()} disabled={!file || submitting}>
+                {submitting ? 'Subiendo…' : 'Subir XML'}
               </Button>
             </>
           )}

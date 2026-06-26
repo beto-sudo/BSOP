@@ -7,14 +7,18 @@
 /**
  * Detalle de una estimación de pago a contratista (DILESA).
  *
- * Iniciativa dilesa-estimaciones · Sprint 3. Solo lectura — los botones
- * de transición de estado (aprobar/marcar facturada/marcar pagada) y la
- * generación de borradores nuevos llegan en Sprint 4-5.
+ * Iniciativa dilesa-estimaciones-cxp. Construcción solo aprueba el devengo:
+ * "Aprobar" llama a `dilesa.estimacion_destajo_autorizar` (RPC), que genera
+ * la factura EN ESPERA en Cuentas por Pagar por el neto. A partir de ahí la
+ * factura recibida (XML) y el pago se procesan en CxP; los estados
+ * `facturada`/`pagada` se DERIVAN aquí (read-only) vía trigger de sync. El
+ * botón "Ver en CxP →" lleva a la factura ligada.
  *
  * Secciones:
  *   1. Datos generales — código, contratista, fechas, retención, montos
  *      brutos/retenidos/netos, factura (si existe), audit trail.
- *   2. Desglose por obra — acordeón con todas las construcciones
+ *   2. Factura y pago — derivados de CxP (folio fiscal, fechas, referencia).
+ *   3. Desglose por obra — acordeón con todas las construcciones
  *      afectadas, sus tareas vinculadas y subtotales. La estimación
  *      es multi-obra por diseño (1 contratista trabaja varias
  *      viviendas a la vez).
@@ -30,7 +34,6 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
-  FileText,
   Loader2,
   Mail,
   X,
@@ -148,7 +151,7 @@ export default function EstimacionDetailPage() {
   );
 }
 
-type ModalKind = 'aprobar' | 'facturar' | 'pagar' | 'cancelar' | null;
+type ModalKind = 'aprobar' | 'cancelar' | null;
 
 function DetailInner() {
   const params = useParams<{ id: string }>();
@@ -182,6 +185,8 @@ function DetailInner() {
   const [tareasCat, setTareasCat] = useState<Map<string, Tarea>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Factura de CxP ligada (para "Ver en CxP →"). Existe desde que se aprueba.
+  const [facturaId, setFacturaId] = useState<string | null>(null);
 
   // Refresca el estado de la estimación tras una transición (sin recargar
   // toda la página). Hace una query liviana al row de estimaciones.
@@ -197,21 +202,18 @@ function DetailInner() {
     if (data) setEstim(data as unknown as Estimacion);
   }
 
-  /** Transición borrador → aprobada. En Sprint 5 esto disparará el email. */
+  /** Transición borrador → aprobada. La RPC aprueba el devengo y genera la
+   *  factura EN ESPERA en Cuentas por Pagar (por el neto). A partir de aquí
+   *  administración la procesa en CxP (sube el XML, programa, paga). */
   async function aprobar() {
     if (!estim || savingTransition) return;
     setSavingTransition(true);
     const sb = createSupabaseBrowserClient();
-    const { data: auth } = await sb.auth.getUser();
-    const { error: e } = await sb
-      .schema('dilesa')
-      .from('estimaciones')
-      .update({
-        estado: 'aprobada',
-        aprobada_por_user_id: auth?.user?.id ?? null,
-        aprobada_at: new Date().toISOString(),
-      })
-      .eq('id', estim.id);
+    // RPC aún no en types — mismo patrón de cast que el detalle de obra.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: e } = await (sb.schema('dilesa') as any).rpc('estimacion_destajo_autorizar', {
+      p_estimacion_id: estim.id,
+    });
     setSavingTransition(false);
     if (e) {
       toast.add({
@@ -221,112 +223,32 @@ function DetailInner() {
       });
       return;
     }
-    toast.add({ title: 'Estimación aprobada', type: 'success' });
+    toast.add({
+      title: 'Destajo aprobado',
+      description: 'Factura en espera creada en CxP — administración la procesa allí.',
+      type: 'success',
+    });
     setModal(null);
     await refetchEstim();
   }
 
-  /** Transición aprobada → facturada. Captura folio + URL + fecha. */
-  async function marcarFacturada(input: { folio: string; url: string; fecha: string }) {
-    if (!estim || savingTransition) return;
-    setSavingTransition(true);
-    const sb = createSupabaseBrowserClient();
-    const { error: e } = await sb
-      .schema('dilesa')
-      .from('estimaciones')
-      .update({
-        estado: 'facturada',
-        factura_folio: input.folio || null,
-        factura_url: input.url || null,
-        factura_fecha: input.fecha || null,
-      })
-      .eq('id', estim.id);
-    setSavingTransition(false);
-    if (e) {
-      toast.add({
-        title: 'No se pudo registrar la factura',
-        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
-        type: 'error',
-      });
-      return;
-    }
-    toast.add({ title: 'Factura registrada', type: 'success' });
-    setModal(null);
-    await refetchEstim();
-  }
-
-  /** Transición facturada → pagada. Captura referencia + fecha de pago.
-   *  Tras esto, las tareas vinculadas quedan locked (trigger SQL). */
-  async function marcarPagada(input: { referencia: string; fechaPago: string }) {
-    if (!estim || savingTransition) return;
-    setSavingTransition(true);
-    const sb = createSupabaseBrowserClient();
-    const { data: auth } = await sb.auth.getUser();
-    const pagadaAt = input.fechaPago
-      ? new Date(`${input.fechaPago}T12:00:00`).toISOString()
-      : new Date().toISOString();
-    const { error: e } = await sb
-      .schema('dilesa')
-      .from('estimaciones')
-      .update({
-        estado: 'pagada',
-        pagada_por_user_id: auth?.user?.id ?? null,
-        pagada_at: pagadaAt,
-        referencia_pago: input.referencia || null,
-      })
-      .eq('id', estim.id);
-    setSavingTransition(false);
-    if (e) {
-      toast.add({
-        title: 'No se pudo registrar el pago',
-        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
-        type: 'error',
-      });
-      return;
-    }
-    toast.add({ title: 'Estimación pagada · tareas locked', type: 'success' });
-    setModal(null);
-    await refetchEstim();
-  }
-
-  /** Transición borrador|aprobada → cancelada. Libera las tareas
-   *  borrando las filas de estimacion_tareas (CASCADE no aplica porque
-   *  estimaciones queda como cancelada, no eliminada). */
+  /** Transición borrador|aprobada → cancelada (RPC). Cancela la factura en
+   *  espera ligada en CxP (si la hay y no tiene pagos) y libera las tareas
+   *  borrando las filas de estimacion_tareas. */
   async function cancelar() {
     if (!estim || savingTransition) return;
     setSavingTransition(true);
     const sb = createSupabaseBrowserClient();
-    // 1. Borrar las vinculaciones para liberar las tareas.
-    const { error: dErr } = await sb
-      .schema('dilesa')
-      .from('estimacion_tareas')
-      .delete()
-      .eq('estimacion_id', estim.id);
-    if (dErr) {
-      setSavingTransition(false);
-      toast.add({
-        title: 'No se pudieron liberar las tareas',
-        description: getSupabaseErrorMessage(dErr, 'Error al borrar vinculaciones.'),
-        type: 'error',
-      });
-      return;
-    }
-    // 2. Marcar estimación como cancelada + zero montos.
-    const { error: uErr } = await sb
-      .schema('dilesa')
-      .from('estimaciones')
-      .update({
-        estado: 'cancelada',
-        monto_bruto: 0,
-        retencion_monto: 0,
-        monto_neto: 0,
-      })
-      .eq('id', estim.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: e } = await (sb.schema('dilesa') as any).rpc('estimacion_destajo_cancelar', {
+      p_estimacion_id: estim.id,
+      p_motivo: null,
+    });
     setSavingTransition(false);
-    if (uErr) {
+    if (e) {
       toast.add({
         title: 'No se pudo cancelar',
-        description: getSupabaseErrorMessage(uErr, 'Error al transicionar.'),
+        description: getSupabaseErrorMessage(e, 'Error al transicionar.'),
         type: 'error',
       });
       return;
@@ -553,6 +475,31 @@ function DetailInner() {
     };
   }, [id]);
 
+  // Factura de CxP ligada al destajo (para el link "Ver en CxP"). Existe
+  // desde que se aprueba; el estado factura/pago se deriva de CxP.
+  const estadoActual = estim?.estado;
+  useEffect(() => {
+    if (!id || !estadoActual || !['aprobada', 'facturada', 'pagada'].includes(estadoActual)) {
+      setFacturaId(null);
+      return;
+    }
+    let activo = true;
+    const sb = createSupabaseBrowserClient();
+    void (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (sb.schema('erp') as any)
+        .from('facturas')
+        .select('id')
+        .eq('estimacion_id', id)
+        .is('cancelada_at', null)
+        .maybeSingle();
+      if (activo) setFacturaId((data?.id as string | undefined) ?? null);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [id, estadoActual]);
+
   /** Desglose: por construccion_id, lista de tareas con su nombre + monto. */
   const desglosePorObra = useMemo(() => {
     const grupos = new Map<
@@ -644,8 +591,6 @@ function DetailInner() {
         <ActionBar
           estado={estim.estado}
           onAprobar={() => setModal('aprobar')}
-          onFacturar={() => setModal('facturar')}
-          onPagar={() => setModal('pagar')}
           onCancelar={() => setModal('cancelar')}
         />
       ) : null}
@@ -669,6 +614,15 @@ function DetailInner() {
               <Mail className="size-4" />
               Enviar al contratista
             </Button>
+          ) : null}
+          {facturaId ? (
+            <Link
+              href={`/dilesa/cxp?focus=${facturaId}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm font-medium text-[var(--text)] hover:bg-[var(--bg)]/30"
+            >
+              <Banknote className="size-4" />
+              Ver en CxP
+            </Link>
           ) : null}
           {!contratistaEmail ? (
             <span className="text-[11px] text-amber-700 dark:text-amber-400">
@@ -773,13 +727,10 @@ function DetailInner() {
         <TransitionModal
           kind={modal}
           codigo={estim.codigo}
-          montoBruto={estim.monto_bruto}
-          fechaPagoProgramado={estim.fecha_pago_programado}
+          montoNeto={estim.monto_neto}
           saving={savingTransition}
           onClose={() => (savingTransition ? null : setModal(null))}
           onAprobar={aprobar}
-          onFacturar={marcarFacturada}
-          onPagar={marcarPagada}
           onCancelar={cancelar}
         />
       ) : null}
@@ -906,18 +857,15 @@ function EmailModal({
 function ActionBar({
   estado,
   onAprobar,
-  onFacturar,
-  onPagar,
   onCancelar,
 }: {
   estado: string;
   onAprobar: () => void;
-  onFacturar: () => void;
-  onPagar: () => void;
   onCancelar: () => void;
 }) {
-  // Botones contextuales según estado actual. Estados terminales
-  // (pagada/cancelada) no tienen acciones.
+  // Botones contextuales. La factura y el pago ya NO se capturan aquí: viven
+  // en Cuentas por Pagar (se derivan de la factura en espera). En construcción
+  // solo se aprueba el devengo y, si hace falta, se cancela.
   const acciones: React.ReactNode[] = [];
   if (estado === 'borrador') {
     acciones.push(
@@ -930,17 +878,8 @@ function ActionBar({
     );
   } else if (estado === 'aprobada') {
     acciones.push(
-      <Button key="facturar" onClick={onFacturar}>
-        <FileText className="size-4" /> Marcar factura recibida
-      </Button>,
       <Button key="cancelar" variant="outline" onClick={onCancelar}>
         <X className="size-4" /> Cancelar
-      </Button>
-    );
-  } else if (estado === 'facturada') {
-    acciones.push(
-      <Button key="pagar" onClick={onPagar}>
-        <Banknote className="size-4" /> Marcar pagada
       </Button>
     );
   }
@@ -958,41 +897,21 @@ function ActionBar({
 function TransitionModal({
   kind,
   codigo,
-  montoBruto,
-  fechaPagoProgramado,
+  montoNeto,
   saving,
   onClose,
   onAprobar,
-  onFacturar,
-  onPagar,
   onCancelar,
 }: {
   kind: NonNullable<ModalKind>;
   codigo: string;
-  montoBruto: number;
-  fechaPagoProgramado: string;
+  montoNeto: number;
   saving: boolean;
   onClose: () => void;
   onAprobar: () => void | Promise<void>;
-  onFacturar: (input: { folio: string; url: string; fecha: string }) => void | Promise<void>;
-  onPagar: (input: { referencia: string; fechaPago: string }) => void | Promise<void>;
   onCancelar: () => void | Promise<void>;
 }) {
-  // State local del modal según kind (formularios distintos).
-  const [folio, setFolio] = useState('');
-  const [url, setUrl] = useState('');
-  const [fechaFactura, setFechaFactura] = useState(new Date().toISOString().slice(0, 10));
-  const [referencia, setReferencia] = useState('');
-  const [fechaPago, setFechaPago] = useState(fechaPagoProgramado);
-
-  const titulo = (
-    {
-      aprobar: 'Aprobar estimación',
-      facturar: 'Registrar factura recibida',
-      pagar: 'Marcar como pagada',
-      cancelar: 'Cancelar estimación',
-    } as Record<NonNullable<ModalKind>, string>
-  )[kind];
+  const titulo = kind === 'aprobar' ? 'Aprobar estimación' : 'Cancelar estimación';
 
   return (
     <div
@@ -1017,71 +936,22 @@ function TransitionModal({
         </div>
 
         <p className="mb-4 text-xs text-[var(--text)]/60">
-          {codigo} · {moneyFmt.format(montoBruto)} bruto
+          {codigo} · {moneyFmt.format(montoNeto)} neto
         </p>
 
         {kind === 'aprobar' ? (
           <p className="mb-4 text-sm text-[var(--text)]/80">
-            Una vez aprobada, la estimación queda lista para que se reciba la factura del
-            contratista. (Sprint 5 enviará automáticamente PDF + email al aprobar.)
+            Al aprobar se crea la <strong>factura en espera</strong> en Cuentas por Pagar por el
+            monto neto. A partir de ahí administración la procesa allí: sube el XML del contratista,
+            programa y paga. El estado de factura y pago se reflejará aquí automáticamente.
           </p>
-        ) : null}
-
-        {kind === 'cancelar' ? (
+        ) : (
           <div className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
             Al cancelar, las tareas vinculadas se liberan y vuelven a aparecer como pendientes de
-            pago. Esta acción no se puede deshacer.
+            pago. Si ya tenía factura en espera en CxP, también se cancela. Esta acción no se puede
+            deshacer.
           </div>
-        ) : null}
-
-        {kind === 'facturar' ? (
-          <div className="mb-4 space-y-3">
-            <ModalField label="Folio de factura *">
-              <Input value={folio} onChange={(e) => setFolio(e.target.value)} required />
-            </ModalField>
-            <ModalField label="URL de la factura (opcional)">
-              <Input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://…"
-              />
-            </ModalField>
-            <ModalField label="Fecha de la factura *">
-              <Input
-                type="date"
-                value={fechaFactura}
-                onChange={(e) => setFechaFactura(e.target.value)}
-                required
-              />
-            </ModalField>
-          </div>
-        ) : null}
-
-        {kind === 'pagar' ? (
-          <div className="mb-4 space-y-3">
-            <ModalField label="Referencia de pago *">
-              <Input
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-                placeholder="SPEI, transferencia, cheque…"
-                required
-              />
-            </ModalField>
-            <ModalField label="Fecha de pago *">
-              <Input
-                type="date"
-                value={fechaPago}
-                onChange={(e) => setFechaPago(e.target.value)}
-                required
-              />
-            </ModalField>
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] text-amber-700 dark:text-amber-300">
-              Una vez pagada, las tareas vinculadas quedan locked: nadie las puede des-palomear
-              excepto Dirección o admin.
-            </div>
-          </div>
-        ) : null}
+        )}
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>
@@ -1090,15 +960,9 @@ function TransitionModal({
           <Button
             onClick={() => {
               if (kind === 'aprobar') void onAprobar();
-              else if (kind === 'facturar') void onFacturar({ folio, url, fecha: fechaFactura });
-              else if (kind === 'pagar') void onPagar({ referencia, fechaPago });
-              else if (kind === 'cancelar') void onCancelar();
+              else void onCancelar();
             }}
-            disabled={
-              saving ||
-              (kind === 'facturar' && (!folio.trim() || !fechaFactura)) ||
-              (kind === 'pagar' && (!referencia.trim() || !fechaPago))
-            }
+            disabled={saving}
           >
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             Confirmar
