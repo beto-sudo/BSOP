@@ -6345,6 +6345,14 @@ export type Database = {
         Args: { p_contrato_id: string; p_motivo: string }
         Returns: undefined
       }
+      estimacion_destajo_autorizar: {
+        Args: { p_estimacion_id: string }
+        Returns: string
+      }
+      estimacion_destajo_cancelar: {
+        Args: { p_estimacion_id: string; p_motivo?: string }
+        Returns: undefined
+      }
       fn_actualizar_activo: {
         Args: { p_activo_id: string; p_master: Json; p_satelite?: Json }
         Returns: undefined
@@ -8861,6 +8869,7 @@ export type Database = {
           empresa_id: string
           estado_cxp: string
           estado_id: string | null
+          estimacion_id: string | null
           fecha_emision: string
           fecha_pago_programada: string | null
           fecha_vencimiento: string | null
@@ -8901,6 +8910,7 @@ export type Database = {
           empresa_id: string
           estado_cxp?: string
           estado_id?: string | null
+          estimacion_id?: string | null
           fecha_emision: string
           fecha_pago_programada?: string | null
           fecha_vencimiento?: string | null
@@ -8941,6 +8951,7 @@ export type Database = {
           empresa_id?: string
           estado_cxp?: string
           estado_id?: string | null
+          estimacion_id?: string | null
           fecha_emision?: string
           fecha_pago_programada?: string | null
           fecha_vencimiento?: string | null
@@ -12342,6 +12353,30 @@ export type Database = {
       }
       cxp_factura_desde_estimacion: {
         Args: { p_condiciones_pago_dias?: number; p_estimacion_id: string }
+        Returns: string
+      }
+      cxp_factura_desde_estimacion_destajo: {
+        Args: { p_estimacion_id: string }
+        Returns: string
+      }
+      cxp_factura_recibir_cfdi: {
+        Args: {
+          p_emisor_nombre?: string
+          p_emisor_rfc?: string
+          p_factura_id: string
+          p_fecha_emision?: string
+          p_forma_pago_sat?: string
+          p_iva?: number
+          p_metodo_pago_sat?: string
+          p_receptor_rfc?: string
+          p_retencion_isr?: number
+          p_retencion_iva?: number
+          p_subtotal?: number
+          p_tasa_iva?: number
+          p_total: number
+          p_uso_cfdi?: string
+          p_uuid_sat: string
+        }
         Returns: string
       }
       cxp_factura_total_contrato: {
