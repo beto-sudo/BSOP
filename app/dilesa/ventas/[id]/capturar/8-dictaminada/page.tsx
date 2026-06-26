@@ -781,6 +781,54 @@ function CapturarFase8Body() {
     });
   }, [archivoPromesaRef, archivoSolicitudRef, sb, toast, valorEscrituracion, venta]);
 
+  // Imprime el documento de re-firma con el precio NUEVO. El endpoint del PDF
+  // decide el precio leyendo `valor_escrituracion` de la BD (ADR-048 D5): si el
+  // precio dictaminado solo vive en el form (precarga IA sin guardar), el PDF
+  // cae al precio congelado y sale el VIEJO. Por eso lo persistimos antes de
+  // abrir el PDF. Requiere Dirección para persistir (igual que el resto del
+  // cierre financiero); si ya está guardado, cualquiera puede reimprimir.
+  const imprimirRefirma = useCallback(
+    async (tipo: 'solicitud-asignacion' | 'promesa-compraventa') => {
+      if (!venta) return;
+      const valorNum = Number(valorEscrituracion) || 0;
+      const url = `/api/dilesa/ventas/${venta.id}/pdf/${tipo}`;
+      const necesitaPersistir = valorNum > 0 && Number(venta.valor_escrituracion ?? 0) !== valorNum;
+      const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
+      if (necesitaPersistir && !esDir) {
+        toast.add({
+          title: 'Solo Dirección fija el valor de escrituración',
+          description:
+            'El precio nuevo aún no está guardado. Pide a Dirección que lo confirme antes de imprimir.',
+          type: 'error',
+        });
+        return;
+      }
+      // Abrimos la pestaña dentro del gesto del click (sincrónico) para que el
+      // popup blocker no la mate tras el await del guardado.
+      const win = window.open('about:blank', '_blank');
+      if (necesitaPersistir) {
+        const { error: upErr } = await sb
+          .schema('dilesa')
+          .from('ventas')
+          .update({ valor_escrituracion: valorNum })
+          .eq('id', venta.id);
+        if (upErr) {
+          win?.close();
+          toast.add({
+            title: 'No se pudo guardar el precio antes de imprimir',
+            description: getSupabaseErrorMessage(upErr, 'Intenta de nuevo.'),
+            type: 'error',
+          });
+          return;
+        }
+        setVenta((v) => (v ? { ...v, valor_escrituracion: valorNum } : v));
+      }
+      if (win) win.location.href = url;
+      else window.location.href = url; // popup bloqueado: dispara la descarga aquí
+    },
+    [venta, valorEscrituracion, me, sb, toast]
+  );
+
   // Gate de Dirección (ADR-048): solo Dirección (o admin) cuadra y cierra la
   // fase. Gerencia sube el dictamen + pre-llena, pero el cierre lo hace Dirección.
   const esDireccion =
@@ -973,22 +1021,20 @@ function CapturarFase8Body() {
         avanzar la fase.
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
-        <a
-          href={`/api/dilesa/ventas/${venta.id}/pdf/solicitud-asignacion`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => void imprimirRefirma('solicitud-asignacion')}
           className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
         >
           <Upload className="h-3.5 w-3.5" /> Imprimir Solicitud (precio nuevo)
-        </a>
-        <a
-          href={`/api/dilesa/ventas/${venta.id}/pdf/promesa-compraventa`}
-          target="_blank"
-          rel="noopener noreferrer"
+        </button>
+        <button
+          type="button"
+          onClick={() => void imprimirRefirma('promesa-compraventa')}
           className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
         >
           <Upload className="h-3.5 w-3.5" /> Imprimir Promesa (precio nuevo)
-        </a>
+        </button>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FileSlot
