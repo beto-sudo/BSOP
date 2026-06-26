@@ -69,13 +69,23 @@ import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 import { hrefDoc } from '@/lib/gasto/hilo';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { buildProyectoOptions, type ProyectoSelectorRow } from '@/lib/dilesa/proyectos-selector';
+import type { AplicacionViva } from './cxp-programacion-module';
 
 const TZ = 'America/Matamoros';
 
+// Vista del pipeline (Sprint 7 S1): por defecto la pantalla Facturas muestra
+// solo lo que falta por programar — las facturas salen al programarse, como una
+// bandeja de pendientes. "Todas" recupera el catálogo completo.
 const FILTER_DEFAULTS = {
   search: '',
   estado: '',
+  vista: 'por_programar',
 };
+
+const VISTA_OPTIONS = [
+  { value: 'por_programar', label: 'Por programar' },
+  { value: 'todas', label: 'Todas' },
+];
 
 export type CxpFacturasModuleProps = {
   /** UUID de la empresa (`core.empresas.id`). Filtra todas las queries. */
@@ -121,6 +131,10 @@ type Factura = {
   estimacion_id: string | null;
   /** Código del destajo de origen (para la bandeja "en espera"). */
   destajo_codigo: string | null;
+  /** Σ aplicaciones en pagos vivos programado/aprobado (comprometido sin ejecutar). */
+  comprometido: number;
+  /** saldo − comprometido: lo que aún falta por programar. */
+  porProgramar: number;
 };
 
 type PagoAplicado = {
@@ -371,7 +385,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
   const [error, setError] = useState<string | null>(null);
 
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(FILTER_DEFAULTS);
-  const { search, estado } = filters;
+  const { search, estado, vista } = filters;
 
   const [selected, setSelected] = useState<Factura | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -472,7 +486,12 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
       const rows = (data ?? []) as Omit<
         Factura,
-        'proveedor_nombre' | 'oc_codigo' | 'estimacion_id' | 'destajo_codigo'
+        | 'proveedor_nombre'
+        | 'oc_codigo'
+        | 'estimacion_id'
+        | 'destajo_codigo'
+        | 'comprometido'
+        | 'porProgramar'
       >[];
 
       // Nombres de proveedor (erp.personas) para filas con proveedor_id y sin
@@ -512,6 +531,27 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         for (const o of ocs ?? []) ocPorId.set(o.id as string, (o.codigo as string | null) ?? '');
       }
 
+      // Comprometido vivo sin ejecutar (pagos programado/aprobado): para derivar
+      // "por programar" = saldo − comprometido. Espejo de la pestaña Programación;
+      // sostiene la vista por defecto del pipeline (S1). Los pagos `pagado` ya
+      // bajaron el saldo vía trigger, no se cuentan aquí.
+      const comprometidoPorFactura = new Map<string, number>();
+      {
+        const { data: aplicaciones } = await sb
+          .schema('erp')
+          .from('cxp_pago_aplicaciones')
+          .select('factura_id, monto_aplicado, pago:cxp_pagos!pago_id!inner(estado, deleted_at)')
+          .eq('empresa_id', empresaId)
+          .in('pago.estado', ['programado', 'aprobado'])
+          .is('pago.deleted_at', null);
+        for (const a of (aplicaciones ?? []) as unknown as AplicacionViva[]) {
+          comprometidoPorFactura.set(
+            a.factura_id,
+            (comprometidoPorFactura.get(a.factura_id) ?? 0) + Number(a.monto_aplicado ?? 0)
+          );
+        }
+      }
+
       // Liga a destajo (facturas.estimacion_id, columna nueva aún no en types)
       // + código del destajo — para la bandeja "en espera del XML". Solo se
       // consulta para las facturas en borrador (las en espera).
@@ -548,6 +588,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       setFacturas(
         rows.map((r) => {
           const estimacionId = estimacionPorFactura.get(r.id) ?? null;
+          const comprometido = comprometidoPorFactura.get(r.id) ?? 0;
+          const porProgramar = Math.round((Number(r.saldo ?? 0) - comprometido) * 100) / 100;
           return {
             ...r,
             proveedor_nombre: r.proveedor_id
@@ -556,6 +598,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
             oc_codigo: r.orden_compra_id ? (ocPorId.get(r.orden_compra_id) ?? null) : null,
             estimacion_id: estimacionId,
             destajo_codigo: estimacionId ? (codigoPorEstimacion.get(estimacionId) ?? null) : null,
+            comprometido,
+            porProgramar,
           };
         })
       );
@@ -700,7 +744,14 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       // salvo que se filtre explícito por "Borrador". Reaparecen como filas
       // normales en cuanto reciben su XML (→ por pagar).
       if (f.estado_cxp === 'borrador' && f.estimacion_id && estado !== 'borrador') return false;
-      if (estado && f.estado_cxp !== estado) return false;
+      // Vista "por programar" (pipeline S1): solo lo que aún tiene monto pendiente
+      // de programar; lo ya programado/pagado/cancelado sale de la pantalla.
+      if (vista === 'por_programar') {
+        if (f.estado_cxp !== 'por_pagar' && f.estado_cxp !== 'parcial') return false;
+        if (f.porProgramar <= 0) return false;
+      } else if (estado && f.estado_cxp !== estado) {
+        return false;
+      }
       if (!search) return true;
       const q = search.toLowerCase();
       return (
@@ -710,7 +761,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         (f.oc_codigo ?? '').toLowerCase().includes(q)
       );
     });
-  }, [facturas, search, estado]);
+  }, [facturas, search, estado, vista]);
 
   // Facturas EN ESPERA del XML: destajos aprobados en construcción cuya
   // factura nació en borrador. Administración sube aquí el XML del contratista
@@ -773,7 +824,11 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
         <ModuleFilters
           count={
-            loading ? 'Cargando…' : `${filtered.length} factura${filtered.length !== 1 ? 's' : ''}`
+            loading
+              ? 'Cargando…'
+              : vista === 'por_programar'
+                ? `${filtered.length} por programar`
+                : `${filtered.length} factura${filtered.length !== 1 ? 's' : ''}`
           }
           actions={
             <Button size="sm" onClick={() => setUploadOpen(true)} className="gap-2">
@@ -793,14 +848,25 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
           </div>
 
           <Combobox
-            value={estado}
-            onChange={(value) => setFilter('estado', value ?? '')}
-            options={ESTADO_OPTIONS}
-            placeholder="Estado"
-            allowClear
+            value={vista}
+            onChange={(value) => setFilter('vista', value ?? 'por_programar')}
+            options={VISTA_OPTIONS}
+            placeholder="Vista"
             size="sm"
-            className="w-44"
+            className="w-40"
           />
+
+          {vista === 'todas' && (
+            <Combobox
+              value={estado}
+              onChange={(value) => setFilter('estado', value ?? '')}
+              options={ESTADO_OPTIONS}
+              placeholder="Estado"
+              allowClear
+              size="sm"
+              className="w-44"
+            />
+          )}
 
           <ActiveFiltersChip count={activeCount} onClearAll={clearAll} />
 
