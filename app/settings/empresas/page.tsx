@@ -244,6 +244,8 @@ function EmpresasSettingsInner() {
               fetchEmpresas().finally(() => setLoading(false));
             }}
             disabled={loading}
+            aria-label="Refrescar"
+            title="Refrescar"
             className="rounded-xl border-[var(--border)] bg-[var(--card)] text-[var(--text)] hover:bg-[var(--panel)]"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
