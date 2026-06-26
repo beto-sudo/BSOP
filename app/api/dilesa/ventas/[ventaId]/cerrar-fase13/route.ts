@@ -95,7 +95,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: ventaRow } = await admin
     .schema('dilesa')
     .from('ventas')
-    .select('id, valor_escrituracion, fase_posicion')
+    .select(
+      'id, valor_escrituracion, fase_posicion, saldo_residual_resolucion, saldo_residual_monto'
+    )
     .eq('id', ventaId)
     .is('deleted_at', null)
     .maybeSingle();
@@ -106,6 +108,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     id: string;
     valor_escrituracion: number | null;
     fase_posicion: number | null;
+    saldo_residual_resolucion: 'cobrar' | 'absorber' | null;
+    saldo_residual_monto: number | null;
   };
 
   const { data: fasesRows } = await admin
@@ -180,6 +184,17 @@ export async function POST(req: NextRequest, { params }: Params) {
   const ncXml = vigentePorRol.get('nota_credito_xml');
   const ncPdf = vigentePorRol.get('nota_credito');
   const ncFaltante = ncRequerida && (!ncXml || !ncPdf);
+  // Total del CFDI de la NC (si existe), para reconciliar contra la cuadratura.
+  const totalNc = leerCfdiMetadata(ncXml?.metadata)?.total ?? null;
+  // Reconciliación de la absorción (iniciativa `dilesa-saldos-residuales` S2): si en
+  // la dictaminación Dirección ABSORBIÓ un residual de precio con nota de crédito,
+  // ese monto ya está en la NC derivada (`montoNc`). La NC emitida debe cubrirlo —
+  // si el CFDI de NC queda por debajo de lo requerido, no cierra sin autorización de
+  // Dirección. Acotado a las ventas con absorción (no cambia el flujo de las demás).
+  const absorcion =
+    venta.saldo_residual_resolucion === 'absorber' ? Number(venta.saldo_residual_monto ?? 0) : 0;
+  const ncAbsorcionInsuficiente =
+    absorcion > 0 && ncRequerida && !!ncXml && !!ncPdf && totalNc != null && totalNc < montoNc - 1;
 
   // ── Gate de revisión (ciclo completo: informe + acuse) ──────────
   const { data: revRow } = await (admin.schema('dilesa') as any)
@@ -210,16 +225,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   const motivoOverride = body.override?.motivo?.trim() ?? '';
   let cierreConOverride = false;
 
-  if (!revisionVigenteVerde || ncFaltante) {
+  if (!revisionVigenteVerde || ncFaltante || ncAbsorcionInsuficiente) {
     const razon = ncFaltante
       ? `La cuadratura exige nota de crédito por ${money(montoNc)} y falta su ${!ncXml ? 'XML' : 'PDF'} en el expediente. Súbela y re-ejecuta la revisión.`
-      : !revision
-        ? 'La operación no tiene revisión PLD.'
-        : revisionStale
-          ? 'El Aviso PLD o su acuse cambiaron después de la última revisión.'
-          : revision.estado !== 'completada'
-            ? 'La última revisión no pudo completarse.'
-            : `La revisión está en ${revision.veredicto}.`;
+      : ncAbsorcionInsuficiente
+        ? `La nota de crédito del CFDI (${money(totalNc ?? 0)}) no cubre la requerida por la cuadratura (${money(montoNc)}), que incluye ${money(absorcion)} absorbidos por Dirección en la dictaminación. Re-emítela por el total o autoriza el cierre con motivo.`
+        : !revision
+          ? 'La operación no tiene revisión PLD.'
+          : revisionStale
+            ? 'El Aviso PLD o su acuse cambiaron después de la última revisión.'
+            : revision.estado !== 'completada'
+              ? 'La última revisión no pudo completarse.'
+              : `La revisión está en ${revision.veredicto}.`;
 
     if (!motivoOverride) {
       return NextResponse.json(
@@ -246,8 +263,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // ── Snapshot de montos + cierre ──────────────────────────────────
+  // `totalNc` ya se leyó arriba (reconciliación de la absorción).
   const totalFactura = leerCfdiMetadata(facturaXml.metadata)?.total ?? null;
-  const totalNc = leerCfdiMetadata(vigentePorRol.get('nota_credito_xml')?.metadata)?.total ?? null;
 
   const campos: {
     valor_facturado?: number;
@@ -316,7 +333,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         veredicto: revision?.veredicto ?? null,
         revision_id: revision?.id ?? null,
         nc_requerida: ncRequerida,
-        ...(cierreConOverride ? { motivo: motivoOverride, nc_faltante: ncFaltante } : {}),
+        // Rastro de la resolución del saldo residual (S2): qué decidió Dirección y,
+        // si absorbió, cuánto entró a la NC.
+        saldo_residual_resolucion: venta.saldo_residual_resolucion,
+        saldo_residual_absorbido: absorcion || null,
+        ...(cierreConOverride
+          ? {
+              motivo: motivoOverride,
+              nc_faltante: ncFaltante,
+              nc_absorcion_insuficiente: ncAbsorcionInsuficiente,
+            }
+          : {}),
       },
     });
 

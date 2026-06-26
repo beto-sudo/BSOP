@@ -449,6 +449,8 @@ describe('calcularCuadratura', () => {
         sobreprecio: 24651, // productos capturados
         sobreprecioCobertura: 24651, // el que cubre el presupuesto
         pagareNecesario: 9387, // faltante si DILESA solo aporta la promo autorizada
+        pagareGastos: 9387, // todo el pagaré fondea gastos (= faltante)
+        pagarePrecio: 0, // nada del pagaré financia precio
         saldoCobertura: 0, // las fuentes cubren el presupuesto bruto
       });
     });
@@ -528,6 +530,38 @@ describe('calcularCuadratura', () => {
       const split = partirDescuento(c.descuentoReal, cob.promocion);
       expect(split.promocion).toBe(13361.42);
       expect(split.sobreprecio).toBe(0);
+    });
+
+    // Camino "Cobrar" del residual de precio (iniciativa dilesa-saldos-residuales S2):
+    // el cliente firma un pagaré por los $792. El pagaré NO sobre-fondea los gastos
+    // (ya cuadran): se asigna al PRECIO, sube el Valor Real y baja la NC en $792.
+    it('Juan Antonio cobra el residual con pagaré: el pagaré va al precio, no a gastos', () => {
+      const base = {
+        valorEscrituracion: 920000,
+        montoCreditoTitular: 762265,
+        montoCreditoCotitular: 0,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 42569.42,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 0,
+        promocionGastos: 15000,
+        depositos: [{ monto: 156943, directoCliente: true, tieneRecibo: false }],
+        proyectoNombre: 'Lomas de los Encinos',
+      };
+      const sinPagare = calcularCuadratura({ ...base, montoCreditoDirecto: null });
+      const conPagare = calcularCuadratura({ ...base, montoCreditoDirecto: 792 });
+      const cob = conPagare.coberturaGastos!;
+      expect(cob.pagareGastos).toBe(0); // gastos ya cuadran (pagareNecesario 0)
+      expect(cob.pagarePrecio).toBe(792); // todo el pagaré financia el precio
+      expect(cob.saldoCobertura).toBe(0); // gastos siguen cuadrando, sin sobre-fondeo
+      expect(conPagare.valorRealVentaDilesa - sinPagare.valorRealVentaDilesa).toBe(792);
+      expect(sinPagare.montoNotaCredito - conPagare.montoNotaCredito).toBe(792);
+      expect(conPagare.montoNotaCredito).toBe(12569.42);
+      // El motor sigue señalando el residual (la decisión "cobrar" vive en la venta,
+      // no en el motor); la fase 8 la combina con la resolución persistida.
+      expect(conPagare.requiereResolucionSaldoResidual).toBe(true);
     });
 
     // Regresión (caso Ruben M3-L17-LDLE, reportado 2026-06-25): la cabecera mostraba

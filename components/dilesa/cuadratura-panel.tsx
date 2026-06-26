@@ -246,7 +246,9 @@ export function CuadraturaPanel({
           <Fila label="(−) Aportación DILESA (promoción)" value={money(cob.aportacionPromocion)} />
           <Fila label="(−) Enganche del cliente" value={money(cob.engancheCliente)} />
           <Fila label="(−) Sobreprecio" value={money(cob.sobreprecioCobertura)} />
-          <Fila label="(−) Pagaré del cliente" value={money(c.montoCreditoDirecto)} />
+          {/* Solo la parte del pagaré que fondea GASTOS — el resto (si lo hay)
+              financia el residual de precio y se ve en la card de cobertura del precio. */}
+          <Fila label="(−) Pagaré del cliente" value={money(cob.pagareGastos)} />
           <div className="my-1 border-t border-[var(--border)]" />
           <Fila
             label={Math.abs(cob.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
