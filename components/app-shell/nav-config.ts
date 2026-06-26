@@ -72,6 +72,13 @@ export const NAV_ITEMS: NavItem[] = [
         ],
       },
       {
+        // Contabilidad — catálogo de cuentas (estructura CONTPAQi / agrupador
+        // SAT). A futuro: balance y movimientos. Iniciativa
+        // `dilesa-catalogo-contable`.
+        label: 'Contabilidad',
+        children: [{ label: 'Catálogo de cuentas', href: '/dilesa/contabilidad' }],
+      },
+      {
         label: 'Recursos Humanos',
         children: [
           { label: 'Personal', href: '/dilesa/rh/personal' },

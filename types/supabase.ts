@@ -8936,6 +8936,7 @@ export type Database = {
           condiciones_pago_dias: number | null
           contrato_id: string | null
           created_at: string
+          cuenta_contable_id: string | null
           emisor_nombre: string | null
           emisor_rfc: string | null
           empresa_id: string
@@ -8977,6 +8978,7 @@ export type Database = {
           condiciones_pago_dias?: number | null
           contrato_id?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id: string
@@ -9018,6 +9020,7 @@ export type Database = {
           condiciones_pago_dias?: number | null
           contrato_id?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           emisor_nombre?: string | null
           emisor_rfc?: string | null
           empresa_id?: string
@@ -9054,6 +9057,13 @@ export type Database = {
           xml_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "facturas_cuenta_contable_id_fkey"
+            columns: ["cuenta_contable_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "facturas_orden_compra_id_fkey"
             columns: ["orden_compra_id"]
@@ -9219,6 +9229,7 @@ export type Database = {
           categoria_id: string | null
           creado_por: string | null
           created_at: string
+          cuenta_contable_id: string | null
           descripcion: string
           empresa_id: string
           fecha: string
@@ -9234,6 +9245,7 @@ export type Database = {
           categoria_id?: string | null
           creado_por?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           descripcion: string
           empresa_id: string
           fecha?: string
@@ -9249,6 +9261,7 @@ export type Database = {
           categoria_id?: string | null
           creado_por?: string | null
           created_at?: string
+          cuenta_contable_id?: string | null
           descripcion?: string
           empresa_id?: string
           fecha?: string
@@ -9260,7 +9273,15 @@ export type Database = {
           registrado?: boolean
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gastos_cuenta_contable_id_fkey"
+            columns: ["cuenta_contable_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventario: {
         Row: {

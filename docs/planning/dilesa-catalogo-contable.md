@@ -4,10 +4,10 @@
 **Empresas:** DILESA (golden; el schema es multi-empresa y queda listo para replicar a ANSA/COAGAN/RDB/Nigropetense cuando tengan su export CONTPAQi)
 **Schemas afectados:** `erp` (tabla nueva `cuentas_contables`, jerárquica self-FK, RLS empresa-scoped set-membership; Sprint 2 agrega columna `cuenta_contable_id` a `erp.facturas` y `erp.gastos`). `core` (RBAC: módulo nuevo `dilesa.contabilidad` + sub-slug del catálogo, ADR-014/030). Loader Python desde el export CONTPAQi en `scripts/import-contpaqi/`. **Línea roja:** v1 NO toca partida doble / pólizas / balanza — solo el catálogo y la clasificación contable de egresos que ya pasan por CxP.
 **Estado:** in_progress
-**Próximo hito:** Beto da OK para aplicar a prod la migración de schema del Sprint 1 (`erp.cuentas_contables`) + la carga del catálogo (1,331 cuentas CONTPAQi de DILESA). Luego Sprint 2 (ligar `cuenta_contable_id` en facturas/gastos de CxP).
+**Próximo hito:** Sprint 3 — ligar el selector de cuenta en la captura de factura (CxP) + auto-sugerencia (categoría/partida → cuenta) + vista de egresos sin clasificar. Sprints 1 (catálogo en prod, #1046) y 2 (módulo Contabilidad + catálogo navegable + columna `cuenta_contable_id`) ya aplicados a prod.
 **Dueño:** Beto
 **Creada:** 2026-06-25
-**Última actualización:** 2026-06-25 (promoción + Sprint 1 en curso: schema + loader del catálogo)
+**Última actualización:** 2026-06-26 (Sprint 2 — módulo Contabilidad en el sidebar + catálogo navegable + `cuenta_contable_id` en facturas/gastos, aplicado a prod)
 
 > Detonante: los gastos de DILESA ya se registran y pagan por CxP en BSOP, pero
 > sin ninguna clasificación contable — `erp.facturas` y `erp.gastos` no tienen a
@@ -125,6 +125,17 @@ H→acreedora, L/K→orden); `tipo` del primer dígito del mayor (1 Activo … 8
 - **2026-06-25** — Promoción de la iniciativa. Análisis del export CONTPAQi
   (`cuentas COMPLETO.xlsx`): 1,331 cuentas, 1,069 afectables, niveles 0-3, 8
   grupos mayores SAT. Arranca Sprint 1 (schema + loader).
+- **2026-06-25** — Sprint 1 aplicado a prod y mergeado ([#1046](https://github.com/beto-sudo/BSOP/pull/1046)):
+  `erp.cuentas_contables` + 1,331 cuentas cargadas (jerarquía 0 huérfanos,
+  encoding CONTPAQi reconstruido). Aplicado con `psql -f` + `migration repair`
+  (sin drift) en medio de la sesión paralela #1043, sin pisarse.
+- **2026-06-26** — Sprint 2 (modo autónomo, aplicado a prod vía MCP por `op read`
+  colgado headless): (1) módulo **Contabilidad** en el sidebar de DILESA
+  (`dilesa.contabilidad`, sección Tesorería) + permisos clonados de `dilesa.cxp`
+  (8 roles); (2) página `/dilesa/contabilidad` con el catálogo navegable
+  (tabla indentada por nivel, filtros tipo/naturaleza, buscador, KPIs);
+  (3) columna `cuenta_contable_id` (nullable, FK) en `erp.facturas` y
+  `erp.gastos` — el enganche para clasificar; su UI de captura va en Sprint 3.
 
 ## Decisiones registradas
 
