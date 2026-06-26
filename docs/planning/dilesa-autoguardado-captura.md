@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — falta fase 11 (escritura/cheque); fase 15 (notas) se evalúa aparte (van a `venta_fases` al avanzar, sin destino directo). Luego Sprint 2.
+**Próximo hito:** Sprint 2 — fases 3 (descuento) y 5 (avalúo) con RPC auditada.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (Sprint 1: hook + piloto fase 9 [#1072] + fases 4 y 7)
+**Última actualización:** 2026-06-26 (Sprint 1 cerrado: fases 9/4/7/11 + smoke E2E de carga de las 17 pantallas de captura)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -77,6 +77,14 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
     (firma persistida que arranca = lo cargado, para no autoguardar el default "hoy"). **Falta del
     Sprint 1:** fase **11** (escritura/cheque/monto, 4 campos). La fase **15** (notas) queda fuera —
     sus notas van a `venta_fases` al avanzar, sin columna en `dilesa.ventas` donde autoguardar.
+- **2026-06-26 (Sprint 1c — cierre + chequeo Playwright)** — fase **11** (4 campos de
+  escritura/cheque → `dilesa.ventas`) autoguarda al cambiar. **Chequeo Playwright** (Beto):
+  smoke `tests/e2e/smoke/auth-dilesa-captura-fases.spec.ts` que recorre las **17** pantallas de
+  captura y verifica que cargan sin crash (sin overlay de Next, body con contenido). Alcance con
+  el bot `e2e-bot` (viewer, 0 fases con escritura): confirma que ninguna ruta revienta al cablear
+  el autoguardado; el form no se monta (gate `write`) y el harness es read-only contra prod, así
+  que NO ejercita la persistencia. Para chequear el autoguardado real (interceptando el PATCH) haría
+  falta darle `write` al bot — pendiente, decisión de Beto. **Sprint 1 cerrado** (9/4/7/11).
 
 ## Decisiones registradas
 

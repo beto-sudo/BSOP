@@ -31,6 +31,10 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 type VentaCtx = {
   id: string;
@@ -75,6 +79,13 @@ function CapturarFase11Body() {
   const [fechaEscritura, setFechaEscritura] = useState<string>('');
   const [numeroCheque, setNumeroCheque] = useState<string>('');
   const [montoCheque, setMontoCheque] = useState<string>('');
+  // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
+  const [guardado, setGuardado] = useState({
+    numeroEscritura: '',
+    fechaEscritura: '',
+    numeroCheque: '',
+    montoCheque: '',
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,10 +122,17 @@ function CapturarFase11Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.numero_escritura) setNumeroEscritura(v.numero_escritura);
-      if (v.fecha_escritura) setFechaEscritura(v.fecha_escritura);
-      if (v.numero_cheque_notaria) setNumeroCheque(v.numero_cheque_notaria);
-      if (v.monto_cheque_notaria != null) setMontoCheque(String(v.monto_cheque_notaria));
+      const cargado = {
+        numeroEscritura: v.numero_escritura ?? '',
+        fechaEscritura: v.fecha_escritura ?? '',
+        numeroCheque: v.numero_cheque_notaria ?? '',
+        montoCheque: v.monto_cheque_notaria != null ? String(v.monto_cheque_notaria) : '',
+      };
+      setNumeroEscritura(cargado.numeroEscritura);
+      setFechaEscritura(cargado.fechaEscritura);
+      setNumeroCheque(cargado.numeroCheque);
+      setMontoCheque(cargado.montoCheque);
+      setGuardado(cargado); // firma persistida inicial = lo cargado (no autoguarda hasta cambiar)
 
       const { data: fRows } = await sb
         .schema('dilesa')
@@ -135,6 +153,31 @@ function CapturarFase11Body() {
       activo = false;
     };
   }, [ventaId, sb]);
+
+  // ── Autoguardado (ADR-051) ──────────────────────────────────────
+  // Los 4 campos (número/fecha de escritura, número/monto del cheque) persisten al
+  // cambiarlos, sin esperar al botón. El cierre/avance sigue exigiéndolos.
+  const actual = { numeroEscritura, fechaEscritura, numeroCheque, montoCheque };
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify(actual),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && !yaCerrada,
+    guardar: async () => {
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          numero_escritura: numeroEscritura.trim() || null,
+          fecha_escritura: fechaEscritura || null,
+          numero_cheque_notaria: numeroCheque.trim() || null,
+          monto_cheque_notaria: montoCheque.trim() ? Number(montoCheque) : null,
+        })
+        .eq('id', ventaId);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado(actual);
+      return { ok: true };
+    },
+  });
 
   // ── Submit ───────────────────────────────────────────────────────
   const onSubmit = useCallback(
@@ -365,7 +408,10 @@ function CapturarFase11Body() {
         />
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
-          <Section title="Datos de la escritura">
+          <Section
+            title="Datos de la escritura"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Fecha de escritura *">
                 <Input
@@ -439,12 +485,23 @@ function CapturarFase11Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );
