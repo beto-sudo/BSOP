@@ -66,6 +66,29 @@ describe('calcularCuadratura', () => {
     expect(c.comisionGerencia).toBe(4420);
   });
 
+  // ADR-050: el valor real usa el crédito de la VENTA + enganche del cliente, NO la
+  // suma de cxc_pagos. Robusto a ventas migradas de Coda cuyo crédito nunca se
+  // registró en cxc_pagos (solo el enganche): antes daban valor real ≈ enganche
+  // (basura) y comisión absurda. Caso real M14-L4-LDV (crédito 2.24M no en cxc).
+  it('legacy sin el crédito en los depósitos usa el crédito de la venta (ADR-050)', () => {
+    const c = calcularCuadratura({
+      valorEscrituracion: 2242867,
+      montoCreditoTitular: 2242867, // el crédito vive en la venta…
+      montoCreditoCotitular: 0,
+      montoCreditoDirecto: 0,
+      montoChequeNotaria: null,
+      gastosEscrituracion: null,
+      // …pero en cxc_pagos solo está el enganche (el crédito de Coda no se migró).
+      depositos: [{ monto: 22429, directoCliente: true, tieneRecibo: false }],
+      proyectoNombre: 'Lomas del Valle',
+    });
+    expect(c.tieneDesglose).toBe(false);
+    // Valor real = crédito 2,242,867 + enganche 22,429 − cheque 0 + pagaré 0; NO el
+    // enganche solo (22,429 era el valor basura del bug).
+    expect(c.valorRealVentaDilesa).toBe(2265296);
+    expect(c.comisionVendedor).toBe(22652.96); // 2,265,296 × 1.0%
+  });
+
   // Modelo confirmado por Beto 2026-06-15: el enganche se factura con su propio
   // recibo-CFDI y la operación se factura por la escrituración → el Valor
   // Facturado SUMA ambos. La factura de escrituración usa el total del CFDI real
