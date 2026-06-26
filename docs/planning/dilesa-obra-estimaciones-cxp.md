@@ -4,7 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (`obra_estimaciones`, `contratos_construccion`: amortización de anticipo, retención acumulada, topes), `erp` (`facturas`/`cxp_pagos` ligas a obra; nuevo/ajuste de RPC de emisión en espera-del-XML), UI en `app/dilesa/construccion/contratos/**` y `components/cxp/**`
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 — estimación de obra autorizada → CxP con el patrón "en espera del XML" (igual que los destajos de vivienda). Sprints 2-4 (tope vs contrato, amortización de anticipo, retención/finiquito) dependen de 3 decisiones abiertas que Beto cierra al arrancar.
+**Próximo hito:** Sprint 1 en curso — estimación de obra autorizada → CxP con el patrón "en espera del XML" (igual que los destajos de vivienda). Decisiones D-a/D-b/D-c cerradas por Beto (2026-06-26): amortización **lineal**, tope **al autorizar**, **solo obra** por ahora.
 **Dueño:** Beto
 **Creada:** 2026-06-26
 **Última actualización:** 2026-06-26
@@ -58,6 +58,20 @@ El control presupuestal de los contratos de obra ya existe (compromiso por parti
 - Retención **liberada = retención acumulada** al finiquito (sin sobrantes ni faltantes).
 
 ## Decisiones registradas
+
+### 2026-06-26 — Decisiones de Beto (cierran D-a/D-b/D-c) + plan técnico del Sprint 1
+
+**Decisiones:** (a) anticipo se amortiza **lineal** (mismo `anticipo_pct` en cada estimación); (b) el tope vs contrato bloquea **al autorizar** (donde nace el compromiso); (c) **solo obra** por ahora (vivienda sigue con su flujo de destajos).
+
+**Plan técnico del S1 — espejo verificado del flujo de vivienda** (defs leídas en prod 2026-06-26):
+
+1. **Nueva `erp.cxp_factura_desde_estimacion_obra_espera(p_estimacion_id)`** — espejo de `cxp_factura_desde_estimacion_destajo`. Crea la factura **en espera** (`INSERT erp.facturas … estado_cxp='borrador'`, `obra_estimacion_id`, `contrato_id`, `partida_id`, `proveedor_id=contratista`, `total = monto_total − retencion`, sin `uuid_sat`) + audit. Precondición: estimación `autorizada`, neto > 0, sin factura activa, contrato non-vivienda, sin factura TOTAL activa (bloqueo D5).
+2. **`dilesa.obra_estimacion_autorizar`** — al autorizar, llamar la función anterior para que la factura en espera **nazca en el mismo acto** (igual que `estimacion_destajo_autorizar` llama a la de destajo). El paso manual "Emitir a CxP" (`cxp_factura_desde_estimacion`, que crea `por_pagar`) se retira del modo por-estimación; queda solo el modo **factura TOTAL** (`cxp_factura_total_contrato`) para contratos que se facturan de una.
+3. **`erp.cxp_factura_recibir_cfdi`** — ampliar el guard `IF v_fac.estimacion_id IS NULL THEN RAISE 'no proviene de un destajo'` a aceptar también `obra_estimacion_id` (mensaje genérico "no proviene de un destajo/estimación de obra").
+4. **`app/api/[empresa]/cxp/facturas/upload-xml/route.ts`** — `fetchDestajoPlaceholders` debe traer también las facturas en espera de obra (`estado_cxp='borrador'` con `obra_estimacion_id`), resolviendo código vía `dilesa.obra_estimaciones`→`contratos_construccion`. El auto-match por contratista (RFC/nombre, ya robusto a personas duplicadas, #1062) aplica igual.
+5. **`components/cxp/cxp-facturas-module.tsx`** — la bandeja "Facturas en espera del XML" (hoy filtra `estado_cxp='borrador' && estimacion_id`) debe incluir también las de obra (`obra_estimacion_id`); el código del destajo se lee del contrato/estimación de obra.
+
+Migración financiera → archivo `db:new`, aplicar con OK de Beto. La amortización lineal (S3) reducirá el `total` de la factura en espera por la parte del anticipo; en S1 el neto es solo `monto_total − retencion`.
 
 ### 2026-06-26 — Promoción
 
