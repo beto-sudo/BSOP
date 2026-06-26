@@ -43,10 +43,16 @@ export async function expectNoCriticalA11yViolations(
 
   if (blocking.length > 0) {
     const summary = blocking
-      .map(
-        (v) =>
-          `  • [${v.impact}] ${v.id} — ${v.help}\n    ${v.helpUrl}\n    ${v.nodes.length} node(s) affected`
-      )
+      .map((v) => {
+        const targets = v.nodes
+          .slice(0, 6)
+          .map(
+            (n) => `    → ${n.target.join(' ')}\n      ${n.html.replace(/\s+/g, ' ').slice(0, 140)}`
+          )
+          .join('\n');
+        const more = v.nodes.length > 6 ? `\n    … +${v.nodes.length - 6} más` : '';
+        return `  • [${v.impact}] ${v.id} — ${v.help}\n    ${v.helpUrl}\n    ${v.nodes.length} node(s):\n${targets}${more}`;
+      })
       .join('\n');
     throw new Error(
       `axe-core found ${blocking.length} blocking a11y violation(s) (critical|serious):\n${summary}`
