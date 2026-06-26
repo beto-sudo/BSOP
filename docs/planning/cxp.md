@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 6)
 **Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`; extiende `movimientos_bancarios` con referencia polimórfica, ADR-037)
 **Estado:** in_progress
-**Próximo hito:** Sprint 5 (pago en efectivo + conciliación contra cortes, engancha cortes-conciliacion) + Sprint 6 (migrar erp.gastos → CxP + rollout COAGAN/ANSA). Sprints 1-4 (schema + ingesta XML CFDI + match OC + UI programación/aprobación de pagos) ya en prod
+**Próximo hito:** Sprint 7 (rediseño del flujo en 3 etapas, una pantalla por etapa: Facturas = por programar + programar; Programación = ejecutar pago + comprobante; Pagos = pagadas) — Sprint 1 (pantalla Facturas) en curso. Pendientes previos: Sprint 5 (pago efectivo + cortes), Sprint 6 (migrar gastos + rollout)
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-12 (audit trail server-side de rechazos en upload-xml + `p_usuario_id` en `cxp_factura_alta` — migración aplicada a prod con OK de Beto, PR #859)
+**Última actualización:** 2026-06-26 (rediseño del flujo en 3 etapas promovido como Sprint 7; fix de auto-match de destajo por persona duplicada, PR #1062; reconciliación del caso David en prod con OK de Beto)
 
 ## Problema
 
@@ -140,17 +140,45 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                | Estado    | PR        |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                         | _este PR_ | —         |
-| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF | aplicado  | _este PR_ |
-| 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                 | en PR     | _este PR_ |
-| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                       | en PR     | _este PR_ |
-| 4   | UI programación + aprobación (RDB + DILESA, componentes compartidos). Email de notificación diferido a follow-up                                                                                                     | en PR     | _este PR_ |
-| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                      | pending   | —         |
-| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                       | pending   | —         |
+| #   | Scope                                                                                                                                                                                                                                                                           | Estado           | PR        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------- |
+| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                                                                                    | _este PR_        | —         |
+| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF                                                            | aplicado         | _este PR_ |
+| 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                                                                            | en PR            | _este PR_ |
+| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                                                                                  | en PR            | _este PR_ |
+| 4   | UI programación + aprobación (RDB + DILESA, componentes compartidos). Email de notificación diferido a follow-up                                                                                                                                                                | en PR            | _este PR_ |
+| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                                                                                 | pending          | —         |
+| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                                                                                  | pending          | —         |
+| 7   | Rediseño del flujo en 3 etapas (pipeline por pestaña). S1: pantalla Facturas absorbe la programación (filtro "por programar" + acción programar gateada a Dirección, programar=autoriza). S2: pantalla Programación ejecuta el pago + comprobante. S3: pantalla Pagos = pagadas | in_progress (S1) | —         |
 
 ## Decisiones registradas
+
+### 2026-06-26 — Rediseño del flujo de CxP en 3 etapas (pipeline por pestaña)
+
+Beto rediseña la navegación del módulo para que cada pestaña sea una etapa del
+ciclo y el trabajo "avance de pantalla" conforme se procesa:
+
+- **Pantalla 1 · Facturas** — entrada: facturas cargadas + en espera del XML.
+  Contabilidad clasifica **cuenta contable** y **partida** (cualquiera con
+  acceso al módulo). **Dirección programa el pago**, y esa programación **es la
+  autorización** (un solo paso; no hay aprobación separada). Las facturas
+  programadas salen de esta pantalla.
+- **Pantalla 2 · Programación** — los pagos ya programados (= autorizados). Aquí
+  se **ejecuta el pago** y se **sube el comprobante**; al marcarse pagado pasa
+  solo a la pantalla 3.
+- **Pantalla 3 · Pagos** — las ya pagadas (histórico).
+
+**Cambia la decisión de 2026-04-28** ("aprobación = cualquier miembro del Comité
+Ejecutivo, sin tiers"): la autorización del pago se **restringe al rol
+Dirección** y se **fusiona con la programación** (programar ⇒ autorizado). El
+gate usa `direccionEmpresaIds` (ver memoria `reference_roles_por_empresa`). La
+clasificación contable / de partida queda abierta a contabilidad.
+
+Implementación **incremental por sprint** (S1 pantalla 1, S2 pantalla 2, S3
+pantalla 3) para no romper el flujo de pagos en producción; cada sprint con
+Vercel Preview revisable antes de merge. El primer corte del auto-match de
+destajo por persona duplicada (PR #1062) y la reconciliación del caso David ya
+quedaron resueltos como prerequisito de higiene de datos.
 
 ### 2026-04-28 — Decisiones cerradas por Beto al promover la iniciativa
 
