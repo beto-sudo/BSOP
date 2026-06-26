@@ -73,6 +73,10 @@ import {
   type GastosNotarialesConfig,
 } from '@/lib/dilesa/gastos-notariales';
 import { GastosNotarialesPanel } from '@/components/dilesa/gastos-notariales-panel';
+import {
+  IndicadorAutoguardado,
+  useAutoguardadoCampos,
+} from '@/components/dilesa/captura/autoguardado-campos';
 
 // Pagaré firmado (decisión Beto 2026-06-24): el documento se recaba en la
 // dictaminación (no en la firma). Mismo adjunto (rol `pagare`) que reconoce la
@@ -261,6 +265,17 @@ function CapturarFase8Body() {
   const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
   const [gastosEscrituracion, setGastosEscrituracion] = useState<string>('');
   const [valorEscrituracion, setValorEscrituracion] = useState<string>('');
+  // Autoguardado (ADR-051 D5): firma de los 6 campos financieros del dictamen ya
+  // persistidos (arranca = lo cargado de la venta). La fecha del dictamen NO entra
+  // — se fija al cerrar (marcarFase) y `onActualizarDatos` tampoco la toca post-cierre.
+  const [guardado, setGuardado] = useState({
+    valor: '',
+    gastos: '',
+    montoTit: '',
+    montoCo: '',
+    refTit: '',
+    refCo: '',
+  });
   // Gastos notariales (iniciativa dilesa-gastos-notariales): config vigente +
   // flag de propiedad previa (elige la columna del tabulador de compraventa).
   const [tienePropiedad, setTienePropiedad] = useState<boolean>(false);
@@ -446,6 +461,16 @@ function CapturarFase8Body() {
       if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
       if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
       setTienePropiedad(v.tiene_propiedad ?? false);
+      // Firma inicial del autoguardado = lo que vino de la venta (no dispara guardado
+      // hasta que algo cambie de verdad respecto a lo persistido).
+      setGuardado({
+        valor: v.valor_escrituracion != null ? String(v.valor_escrituracion) : '',
+        gastos: v.gastos_escrituracion != null ? String(v.gastos_escrituracion) : '',
+        montoTit: v.monto_credito_titular != null ? String(v.monto_credito_titular) : '',
+        montoCo: v.monto_credito_cotitular != null ? String(v.monto_credito_cotitular) : '',
+        refTit: v.credito_titular_ref ?? '',
+        refCo: v.credito_cotitular_ref ?? '',
+      });
 
       const [fRes, notRes] = await Promise.all([
         sb
@@ -907,6 +932,73 @@ function CapturarFase8Body() {
   const cuadratura = resumen.status === 'ready' ? resumen.props.cuadratura : null;
   const cobGastos = cuadratura?.coberturaGastos ?? null;
 
+  // Autoguardado de los datos del dictamen (ADR-051 D5): los 6 campos financieros
+  // persisten al teclearlos por UPDATE directo a `dilesa.ventas` (los mismos que el
+  // form de "ya cerrada" escribe). `habilitado`: Gerencia autoguarda durante el cierre
+  // (D5); una fase YA cerrada solo la modifica Dirección (ADR-048). Cubre el caso real:
+  // Gerencia sube el dictamen, la IA precarga los números y, aunque no pueda cerrar
+  // (eso es de Dirección), lo capturado ya no se pierde. No toca la fecha del dictamen,
+  // la cuadratura, el pagaré ni el avance — esos siguen su gate. Refresca la firma
+  // `guardado` y el estado `venta` (la re-firma lee `venta.valor_escrituracion`).
+  const auto = useAutoguardadoCampos({
+    clave: JSON.stringify({
+      valor: valorEscrituracion,
+      gastos: gastosEscrituracion,
+      montoTit: montoTitular,
+      montoCo: montoCotitular,
+      refTit: creditoTitularRef,
+      refCo: creditoCotitularRef,
+    }),
+    claveGuardada: JSON.stringify(guardado),
+    habilitado: !!venta && (!yaCerrada || esDireccion),
+    guardar: async () => {
+      if (!venta) return { ok: false };
+      const valorNum = valorEscrituracion.trim() ? Number(valorEscrituracion) : null;
+      const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
+      const montoTitNum = montoTitular.trim() ? Number(montoTitular) : null;
+      const montoCoNum = montoCotitular.trim() ? Number(montoCotitular) : null;
+      const refTit = creditoTitularRef.trim() || null;
+      const refCo = creditoCotitularRef.trim() || null;
+      const { error: upErr } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .update({
+          monto_credito_titular: montoTitNum,
+          monto_credito_cotitular: montoCoNum,
+          credito_titular_ref: refTit,
+          credito_cotitular_ref: refCo,
+          gastos_escrituracion: gastosNum,
+          valor_escrituracion: valorNum,
+        })
+        .eq('id', venta.id);
+      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
+      setGuardado({
+        valor: valorEscrituracion,
+        gastos: gastosEscrituracion,
+        montoTit: montoTitular,
+        montoCo: montoCotitular,
+        refTit: creditoTitularRef,
+        refCo: creditoCotitularRef,
+      });
+      // Mantén `venta` en sync: la re-firma (precioCambio/imprimirRefirma/confirmarRefirma)
+      // compara contra venta.valor_escrituracion; sin esto quedaría stale tras autoguardar.
+      setVenta((v) =>
+        v
+          ? {
+              ...v,
+              monto_credito_titular: montoTitNum,
+              monto_credito_cotitular: montoCoNum,
+              credito_titular_ref: refTit,
+              credito_cotitular_ref: refCo,
+              gastos_escrituracion: gastosNum,
+              valor_escrituracion: valorNum,
+            }
+          : v
+      );
+      return { ok: true };
+    },
+  });
+
   // Panel de gastos notariales (iniciativa dilesa-gastos-notariales): muestra el
   // desglose calculado para que Dirección lo confirme/ajuste; se usa en ambos
   // formularios (cierre y actualización post-cierre).
@@ -1209,7 +1301,10 @@ function CapturarFase8Body() {
 
             <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
 
-            <Section title="Datos del crédito y escrituración">
+            <Section
+              title="Datos del crédito y escrituración"
+              accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+            >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Valor de Escrituración">
                   <Input
@@ -1375,7 +1470,10 @@ function CapturarFase8Body() {
 
           <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
 
-          <Section title="Datos del dictamen">
+          <Section
+            title="Datos del dictamen"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Fecha del dictamen *">
                 <Input
@@ -1410,7 +1508,10 @@ function CapturarFase8Body() {
             </div>
           </Section>
 
-          <Section title="Confirmar datos del crédito">
+          <Section
+            title="Confirmar datos del crédito"
+            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
+          >
             <p className="mb-3 text-xs text-[var(--text)]/50">
               Acarreados de Inscrita (Fase 6). Confirma o corrige si el banco cambió algo.
             </p>
@@ -1534,12 +1635,23 @@ function CapturarFase8Body() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  accion,
+  children,
+}: {
+  title: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--text)]/60">
+          {title}
+        </h2>
+        {accion}
+      </div>
       {children}
     </section>
   );

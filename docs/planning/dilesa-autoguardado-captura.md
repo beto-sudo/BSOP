@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
 **Estado:** in_progress
-**Próximo hito:** Fase 8 (Dictaminada) — la última con campos; tratamiento especial por ser financiera (cuadratura + re-firma): Gerencia autoguarda los datos del dictamen, Dirección cierra (ADR-051 D5). Pendiente de hacer con calidad + revisión en preview.
+**Próximo hito:** Mergear [#1085](https://github.com/beto-sudo/BSOP/pull/1085) (autoguardado fase 8) tras revisión en preview con una venta real (sin auto-merge por financiero). Luego **Parte B** del handoff: chequeo de persistencia E2E auto-limpiante con write al bot e2e (requiere decisión de aplicar el grant a prod).
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (Sprints 1-3a en prod: 8 fases con campos [9/4/7/11/3/5/6/12] + smoke E2E. Falta solo la fase 8; la 15/16 quedan fuera por diseño. Ver **## Handoff** para el arranque de la fase 8 + chequeo de persistencia auto-limpiante)
+**Última actualización:** 2026-06-26 (Sprint 3b: autoguardado de la fase 8 en [#1085](https://github.com/beto-sudo/BSOP/pull/1085) — cierra el rollout de campos. **9/9 fases con campos cableadas** [9/4/7/11/3/5/6/12/8]; 15/16 fuera por diseño. Pendiente: merge de #1085 en preview + **Parte B** del handoff, chequeo de persistencia)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -108,6 +108,18 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   directo, `habilitado: !!venta && (!yaCerrada || esDireccion)` — Gerencia autoguarda en la captura
   (D5), pero una fase YA cerrada solo la modifica Dirección (ADR-048). Hacer + revisar en preview
   (financiero, sin auto-merge).
+- **2026-06-26 (Sprint 3b — fase 8, [PR #1085](https://github.com/beto-sudo/BSOP/pull/1085))** —
+  **Parte A del handoff hecha.** La fase **8 (Dictaminada)** autoguarda los 6 campos financieros del
+  dictamen (montos titular/co-titular, refs de crédito, gastos y valor de escrituración) por UPDATE
+  directo a `dilesa.ventas`; indicador en las 3 Sections (los 2 forms del cierre + el de "ya
+  cerrada"). Gate `!!venta && (!yaCerrada || esDireccion)` — Gerencia autoguarda durante el cierre
+  (resuelve la pérdida cross-rol que motivó la iniciativa: Gerencia captura / la IA precarga pero no
+  cierra), una fase ya cerrada solo la modifica Dirección (ADR-048). La **fecha del dictamen no
+  autoguarda** (se fija al cerrar; consistente con ADR-051 D5, que lista montos/refs/gastos/valor).
+  El `guardar` refresca firma + estado `venta` para no dejar stale la lógica de re-firma
+  (`precioCambio`/`imprimirRefirma`/`confirmarRefirma`). **Sin auto-merge** (financiero → revisión en
+  preview con venta real). Con esto, **9/9 fases con campos quedan cableadas**; 15/16 fuera por
+  diseño. **Falta la Parte B**: chequeo de persistencia E2E auto-limpiante con write al bot e2e.
 
 ## Decisiones registradas
 
