@@ -387,19 +387,32 @@ export function topeDescuentoAutorizado(
 /**
  * Parte el descuento real (= Escrituración − Valor Real, columna "Descuento" de
  * Michelle) en sus dos orígenes, para las cards de la cuadratura:
- *  - `promocion`: el bono autorizado del catálogo, usado hasta el total (topado
- *    al máximo autorizado).
- *  - `sobreprecio`: el resto, que DILESA concede subiendo el precio (pendiente de
- *    formalizar como Máxima Aportación en la solicitud).
- * Con descuento ≥ 0 se cumple `promocion + sobreprecio = descuentoReal`.
+ *  - `sobreprecio`: lo que DILESA concede subiendo el precio para que el crédito
+ *    absorba los gastos (NO le cuesta a DILESA; lo paga el crédito).
+ *  - `promocion`: el bono autorizado del catálogo (SÍ le cuesta a DILESA); el
+ *    residual tras el sobreprecio.
+ *
+ * El `sobreprecioCapturado` (`dilesa.ventas.sobreprecio_gastos_escrituracion`) es
+ * un HECHO escriturado y actúa como PISO del sobreprecio: si se subió el precio
+ * 10,000, esos 10,000 son sobreprecio aunque el bono no se haya agotado. Sin
+ * sobreprecio capturado (0/undefined) se cae al residual sobre la promoción
+ * topada — comportamiento idéntico al previo (el bono se quema primero). El piso
+ * NO puede inventar bono por encima del autorizado: `sobreprecio ≥ total − promo`
+ * garantiza `promocion ≤ promocionAutorizada`. Con `total ≥ 0` se mantiene
+ * `promocion + sobreprecio = total` (el sobreprecio se topa a `total`).
  */
 export function partirDescuento(
   descuentoReal: number,
-  promocionAutorizada: number | null | undefined
+  promocionAutorizada: number | null | undefined,
+  sobreprecioCapturado?: number | null | undefined
 ): { promocion: number; sobreprecio: number } {
   const total = round2(descuentoReal);
-  const promocion = total <= 0 ? 0 : round2(Math.min(total, n(promocionAutorizada)));
-  const sobreprecio = round2(Math.max(0, total - promocion));
+  if (total <= 0) return { promocion: 0, sobreprecio: 0 };
+  const residualSobrePromo = Math.max(0, total - n(promocionAutorizada));
+  const sobreprecio = round2(
+    Math.min(total, Math.max(n(sobreprecioCapturado), residualSobrePromo))
+  );
+  const promocion = round2(total - sobreprecio);
   return { promocion, sobreprecio };
 }
 
@@ -502,9 +515,15 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // precio) y la parte del pagaré que SÍ fondea gastos, partido en promoción
   // (topada al bono) + sobreprecio (el resto).
   const faltanteGastosDilesa = round2(gastosNetosR - engancheAGastos - pagareAGastos);
+  // El sobreprecio CAPTURADO es piso del split: si se subió el precio para que el
+  // crédito absorbiera gastos, ese monto es sobreprecio (no bono), aunque la
+  // promoción no se haya agotado. Sin él, residual sobre la promo topada (igual
+  // que antes). No cambia el total (promo + sobreprecio = faltante) ⇒ saldoCobertura
+  // intacto; solo reparte distinto bono↔sobreprecio en la card.
   const { promocion: aportacionPromocion, sobreprecio: sobreprecioCobertura } = partirDescuento(
     faltanteGastosDilesa,
-    promocionGastos
+    promocionGastos,
+    sobreprecioGastos
   );
   const saldoCobertura = round2(
     gastosBrutosR -
