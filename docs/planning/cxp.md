@@ -242,6 +242,19 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-26 — Fix auto-match de destajo por persona duplicada + reconciliación + promoción del Sprint 7.**
+  Síntoma: facturas de destajo con XML ya cargado seguían en "en espera del
+  XML". Causa: el auto-match reconocía al contratista solo por `proveedor_id`
+  exacto; cuando el destajo se capturó con una persona sin RFC y el CFDI matchea
+  otra con RFC (mismo humano, registro duplicado), creaba una factura normal y
+  dejaba el placeholder huérfano. Fix (PR #1062, mergeado): `candidatosParaCfdi`
+  reconoce por `proveedor_id`, RFC o nombre normalizado. Dato reconciliado en
+  prod con OK de Beto (caso David Salazar, destajo EST-2026-W26): placeholder
+  cancelado + factura real ligada (estimación → 'facturada'), audit trail.
+  Quedan 4 contratistas con persona duplicada (limpieza de catálogo aparte).
+  Promovido el **Sprint 7** (rediseño del flujo en 3 etapas) con la decisión de
+  Beto sobre programar=autoriza gateado a Dirección (PR #1064).
+
 - **2026-06-12 — Audit trail server-side en upload-xml (caso Norberto).**
   Los rechazos por archivo del endpoint de ingesta XML (duplicado por
   `uuid_sat`, RFC receptor ajeno, error de parseo, error del RPC) solo se
