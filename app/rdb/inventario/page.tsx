@@ -323,6 +323,7 @@ function InventarioStockBody() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar producto…"
+              aria-label="Buscar producto"
               value={search}
               onChange={(e) => setFilter('search', e.target.value)}
               className="pl-9"
@@ -384,6 +385,7 @@ function InventarioStockBody() {
             <span className="text-sm text-muted-foreground">Al corte:</span>
             <input
               type="date"
+              aria-label="Fecha de corte del inventario"
               max={new Date().toISOString().split('T')[0]}
               value={fechaCorte}
               onChange={(e) => setFilter('fechaCorte', e.target.value)}
