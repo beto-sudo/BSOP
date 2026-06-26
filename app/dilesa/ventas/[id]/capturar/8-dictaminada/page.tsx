@@ -48,8 +48,6 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
-import { buildAdjuntoPath } from '@/lib/storage/path';
-import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { useEffectiveUser } from '@/components/providers';
 import { useVentaCapturaResumen } from '@/components/dilesa/venta-detalle/captura-shell';
 import { CuadraturaPanel } from '@/components/dilesa/cuadratura-panel';
@@ -81,6 +79,24 @@ import { GastosNotarialesPanel } from '@/components/dilesa/gastos-notariales-pan
 // fase Escriturar; obligatorio para cerrar la fase cuando hay crédito directo.
 const SLOTS_PAGARE: SlotColaborativo[] = [
   { rol: 'pagare', label: 'Pagaré firmado por el cliente', requerido: true },
+];
+
+// Documentos del notario — Carta de Instrucción + Anexo B (ADR-048 D2). Los sube
+// Gerencia (o el notario por su magic link); cada uno PERSISTE al subirse (storage
+// + erp.adjuntos, patrón colaborativo igual que el pagaré) — NO espera al botón de
+// cierre, que es solo de Dirección. Antes vivían en `useState<File>` acoplados a ese
+// botón: si Gerencia los subía, el gate de Dirección rebotaba y se perdían. La Carta
+// es obligatoria para cerrar; el Anexo B solo en Infonavit (se valida aparte).
+const ROL_CARTA = 'carta_instruccion_notarial';
+const ROL_CONDICIONES = 'condiciones_financieras';
+const DICTAMEN_ROLES = [ROL_CARTA, ROL_CONDICIONES] as const;
+const SLOTS_DICTAMEN: SlotColaborativo[] = [
+  { rol: ROL_CARTA, label: 'Carta de Instrucción firmada por el notario', requerido: true },
+  {
+    rol: ROL_CONDICIONES,
+    label: 'Condiciones Financieras — Anexo B (obligatorio en Infonavit)',
+    requerido: false,
+  },
 ];
 
 // Re-firma de documentos (ADR-048 D5): cuando el precio dictaminado difiere del de
@@ -215,6 +231,9 @@ function CapturarFase8Body() {
   const { data: me } = useEffectiveUser();
   // Pagaré firmado: estado del adjunto colaborativo (rol `pagare`) — gate del cierre.
   const docsPagare = useDocsFaseColaborativos(ventaId, SLOTS_PAGARE);
+  // Carta de Instrucción + Anexo B (ADR-048 D2): adjuntos colaborativos — persisten
+  // al subirse (Gerencia o notario), independientes del botón de cierre de Dirección.
+  const docsDictamen = useDocsFaseColaborativos(ventaId, SLOTS_DICTAMEN);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   // El crédito directo (pagaré) reporta su estado "guardado" para el gate del
@@ -235,8 +254,6 @@ function CapturarFase8Body() {
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
   const [fechaDictamen, setFechaDictamen] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [archivoCondiciones, setArchivoCondiciones] = useState<File | null>(null);
   // Confirmar/editar (acarrean de Fase 6) + capturar gastos de escrituración.
   const [montoTitular, setMontoTitular] = useState<string>('');
   const [montoCotitular, setMontoCotitular] = useState<string>('');
@@ -284,13 +301,16 @@ function CapturarFase8Body() {
     setGastosEscrituracion((prev) => (prev.trim() ? prev : String(desgloseGastosNotariales.total)));
   }, [desgloseGastosNotariales]);
 
-  // Análisis IA automático al subir documentos (o de los ya cargados).
+  // Análisis IA automático de la Carta/Anexo B (los del expediente vía `docsDictamen`).
   const [analizando, setAnalizando] = useState(false);
   const [verif, setVerif] = useState<Verificaciones | null>(null);
   const [extracciones, setExtracciones] = useState<Extraccion[]>([]);
-  const [adjuntosNotariales, setAdjuntosNotariales] = useState<AdjuntoNotarial[]>([]);
-  // Evita re-analizar los adjuntos existentes en cada re-render.
-  const adjuntosProcesadosRef = useRef(false);
+  // Ids de los documentos presentes al abrir la página (magic link / captura previa):
+  // su análisis es SUAVE (no pisa campos). Los subidos DESPUÉS sí pisan (reflejan el
+  // documento nuevo). `null` hasta la primera carga de `docsDictamen`.
+  const idsInicialesDictamenRef = useRef<Set<string> | null>(null);
+  // Ids ya enviados a análisis — evita re-analizar en cada recarga/re-render.
+  const analizadosDictamenRef = useRef<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -331,73 +351,41 @@ function CapturarFase8Body() {
   );
 
   /**
-   * Analiza el PDF con Claude apenas se selecciona y PRECARGA los campos del
-   * form (el operador revisa/edita antes de guardar — nada se persiste aquí).
-   * Si la extracción falla o el doc no trae un dato, los campos quedan como
-   * están y se capturan a mano (créditos no-Infonavit, escaneos malos, etc.).
-   */
-  const analizarArchivo = useCallback(
-    async (f: File) => {
-      setAnalizando(true);
-      try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await fetch(`/api/dilesa/ventas/${ventaId}/analizar-notarial`, {
-          method: 'POST',
-          body: fd,
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(body?.error ?? `HTTP ${res.status}`);
-        }
-        const { extraccion, verificaciones } = (await res.json()) as {
-          extraccion: Extraccion;
-          verificaciones: Verificaciones;
-        };
-        registrarAnalisis(extraccion, verificaciones, true);
-        toast.add({
-          title: 'Documento analizado',
-          description: 'Campos precargados — revisa los datos antes de guardar.',
-          type: 'success',
-        });
-      } catch (e) {
-        toast.add({
-          title: 'No se pudo analizar el documento',
-          description: `${e instanceof Error ? e.message : 'Error'}. Captura los datos manualmente.`,
-          type: 'error',
-        });
-      } finally {
-        setAnalizando(false);
-      }
-    },
-    [registrarAnalisis, toast, ventaId]
-  );
-
-  /**
-   * Análisis de los documentos YA cargados (típico: el notario los subió por
-   * su magic link). Los que ya tienen `metadata.analisis_notarial` se
-   * muestran al instante; los que no, se analizan una vez (el endpoint
-   * persiste el resultado). Precarga suave: solo campos vacíos.
+   * Análisis IA de la Carta/Anexo B del expediente (vía `docsDictamen`). Corre al
+   * cambiar los documentos: analiza los vigentes que aún no se enviaron. Los que ya
+   * traen `metadata.analisis_notarial` (el endpoint lo persiste) se muestran al
+   * instante; el resto se analizan por `adjunto_id`. Los presentes al ABRIR la
+   * página (magic link / captura previa) precargan SUAVE (no pisan lo capturado);
+   * los subidos DESPUÉS pisan (reflejan el documento nuevo). Reemplaza el análisis
+   * por `File`: ahora el documento ya está persistido al subirse (patrón colaborativo),
+   * así que no se pierde aunque el cierre (solo Dirección) no proceda.
    */
   useEffect(() => {
-    if (adjuntosProcesadosRef.current || adjuntosNotariales.length === 0) return;
-    adjuntosProcesadosRef.current = true;
+    const docs = docsDictamen.docs;
+    if (!docs) return;
+    const vigentes = DICTAMEN_ROLES.map((r) => docs[r]?.vigente).filter(
+      (d): d is NonNullable<typeof d> => !!d
+    );
+    // Primera carga: los ids presentes ahora son "iniciales" → análisis suave.
+    if (idsInicialesDictamenRef.current === null) {
+      idsInicialesDictamenRef.current = new Set(vigentes.map((d) => d.id));
+    }
+    const iniciales = idsInicialesDictamenRef.current;
+    const pendientes = vigentes.filter((d) => !analizadosDictamenRef.current.has(d.id));
+    if (pendientes.length === 0) return;
     let activo = true;
 
     (async () => {
-      const pendientes: AdjuntoNotarial[] = [];
-      for (const adj of adjuntosNotariales) {
-        const previo = adj.metadata?.analisis_notarial;
-        if (previo) {
-          registrarAnalisis(previo.extraccion, previo.verificaciones, false);
-        } else {
-          pendientes.push(adj);
-        }
-      }
-      if (pendientes.length === 0) return;
       setAnalizando(true);
       try {
         for (const adj of pendientes) {
+          analizadosDictamenRef.current.add(adj.id);
+          const pisar = !iniciales.has(adj.id); // subido tras abrir → pisa los campos
+          const previo = (adj.metadata as AdjuntoNotarial['metadata'])?.analisis_notarial;
+          if (previo) {
+            registrarAnalisis(previo.extraccion, previo.verificaciones, pisar);
+            continue;
+          }
           const res = await fetch(`/api/dilesa/ventas/${ventaId}/analizar-notarial`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -409,7 +397,7 @@ function CapturarFase8Body() {
             extraccion: Extraccion;
             verificaciones: Verificaciones;
           };
-          registrarAnalisis(extraccion, verificaciones, false);
+          registrarAnalisis(extraccion, verificaciones, pisar);
         }
       } finally {
         if (activo) setAnalizando(false);
@@ -419,7 +407,7 @@ function CapturarFase8Body() {
     return () => {
       activo = false;
     };
-  }, [adjuntosNotariales, registrarAnalisis, ventaId]);
+  }, [docsDictamen.docs, registrarAnalisis, ventaId]);
 
   useEffect(() => {
     if (!ventaId) return;
@@ -490,16 +478,9 @@ function CapturarFase8Body() {
       setFase7Cerrada(posiciones.includes(7));
       setYaCerrada(posiciones.includes(8));
 
-      // Documentos del notario ya cargados (magic link o captura previa) —
-      // disparan el análisis IA automático (efecto aparte).
-      const { data: adjs } = await sb
-        .schema('erp')
-        .from('adjuntos')
-        .select('id, rol, metadata')
-        .eq('entidad_tipo', 'venta')
-        .eq('entidad_id', v.id)
-        .in('rol', ['carta_instruccion_notarial', 'condiciones_financieras']);
-      if (activo) setAdjuntosNotariales((adjs ?? []) as AdjuntoNotarial[]);
+      // La Carta/Anexo B (magic link o captura previa) los carga `docsDictamen`
+      // (useDocsFaseColaborativos) por su cuenta; el efecto de análisis IA los toma
+      // de ahí. Aquí ya no hace falta una lectura aparte de adjuntos.
 
       setLoading(false);
     })();
@@ -577,10 +558,10 @@ function CapturarFase8Body() {
         });
         return;
       }
-      // El notario pudo subir la carta por el magic link (ADR-048: sin avanzar la
-      // fase). Si ya está cargada, Dirección cierra sin re-subirla.
-      const cartaYaSubida = adjuntosNotariales.some((a) => a.rol === 'carta_instruccion_notarial');
-      if (!archivo && !cartaYaSubida) {
+      // El notario o Gerencia ya subió la Carta (persiste al instante vía
+      // `docsDictamen`, ADR-048 D2). El cierre solo valida que esté en el expediente.
+      const cartaSubida = !!docsDictamen.docs?.[ROL_CARTA];
+      if (!cartaSubida) {
         toast.add({
           title: 'Falta la Carta de Instrucción',
           description: 'Sube el PDF entregado por el notario (o pídele que lo suba por su enlace).',
@@ -591,8 +572,8 @@ function CapturarFase8Body() {
       // Anexo B (Condiciones Financieras) obligatorio en créditos Infonavit
       // (Beto 2026-06-23). De aquí en adelante; las ya cerradas se quedan.
       const esInfonavit = (venta.tipo_credito ?? '').toLowerCase().includes('infonavit');
-      const condicionesSubida = adjuntosNotariales.some((a) => a.rol === 'condiciones_financieras');
-      if (esInfonavit && !archivoCondiciones && !condicionesSubida) {
+      const condicionesSubida = !!docsDictamen.docs?.[ROL_CONDICIONES];
+      if (esInfonavit && !condicionesSubida) {
         toast.add({
           title: 'Falta el Anexo B',
           description:
@@ -607,13 +588,12 @@ function CapturarFase8Body() {
       const userId = userRes?.user?.id ?? null;
 
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
-      const docs = archivo ? [{ rol: 'carta_instruccion_notarial', archivo }] : [];
-      if (archivoCondiciones)
-        docs.push({ rol: 'condiciones_financieras', archivo: archivoCondiciones });
+      // La Carta y el Anexo B ya viven en el expediente (subida colaborativa) — no se
+      // suben aquí. `marcarFase` solo cierra la fase + persiste los campos del dictamen.
       const result = await marcarFase(sb, {
         ventaId: venta.id,
         faseposicion: 8,
-        docs,
+        docs: [],
         camposVenta: {
           fecha_dictaminada: fechaDictamen,
           monto_credito_titular: montoTitular.trim() ? Number(montoTitular) : null,
@@ -646,8 +626,7 @@ function CapturarFase8Body() {
       router.push(`/dilesa/ventas/${venta.id}`);
     },
     [
-      archivo,
-      archivoCondiciones,
+      docsDictamen,
       fechaDictamen,
       montoTitular,
       montoCotitular,
@@ -657,7 +636,6 @@ function CapturarFase8Body() {
       valorEscrituracion,
       tienePropiedad,
       desgloseGastosNotariales,
-      adjuntosNotariales,
       cdGuardado,
       docsPagare,
       me,
@@ -672,14 +650,15 @@ function CapturarFase8Body() {
   // Caso magic link: el notario ya cerró F8 subiendo la carta, pero los
   // datos administrativos (número de crédito + gastos de escrituración)
   // los captura Gerencia Ventas. Este path hace UPDATE directo de la venta
-  // SIN insertar otra fila en venta_fases (la fase ya está cerrada). Si
-  // se subieron las Condiciones Financieras aquí, se archivan como adjunto.
+  // SIN insertar otra fila en venta_fases (la fase ya está cerrada). La Carta y
+  // el Anexo B se suben aparte (sección colaborativa) y persisten al instante.
   const onActualizarDatos = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!venta) return;
       // ADR-048: solo Dirección modifica/cuadra la dictaminación, también con la
-      // fase ya cerrada.
+      // fase ya cerrada. (La subida de la Carta/Anexo B NO pasa por aquí — es
+      // colaborativa y la puede hacer Gerencia; este botón solo guarda los datos.)
       const esDir = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(venta.empresa_id);
       if (!esDir) {
         toast.add({
@@ -690,47 +669,6 @@ function CapturarFase8Body() {
         return;
       }
       setSubmitting(true);
-      const { data: userRes } = await sb.auth.getUser();
-      const userId = userRes?.user?.id ?? null;
-
-      if (archivoCondiciones) {
-        const path = buildAdjuntoPath({
-          empresa: 'dilesa',
-          entidad: 'ventas',
-          entidadId: venta.id,
-          filename: archivoCondiciones.name,
-        });
-        const { error: upStorageErr } = await sb.storage
-          .from('adjuntos')
-          .upload(path, archivoCondiciones, {
-            contentType: archivoCondiciones.type || 'application/octet-stream',
-            upsert: false,
-          });
-        if (!upStorageErr) {
-          await sb
-            .schema('erp')
-            .from('adjuntos')
-            .insert({
-              empresa_id: DILESA_EMPRESA_ID,
-              entidad_tipo: 'venta',
-              entidad_id: venta.id,
-              rol: 'condiciones_financieras',
-              nombre: archivoCondiciones.name,
-              url: path,
-              tipo_mime: archivoCondiciones.type || null,
-              tamano_bytes: archivoCondiciones.size,
-              uploaded_by: userId,
-            });
-        } else {
-          toast.add({
-            title: 'No se pudo subir el PDF de condiciones',
-            description: upStorageErr.message,
-            type: 'error',
-          });
-          setSubmitting(false);
-          return;
-        }
-      }
 
       const gastosNum = gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null;
       const { error: upErr } = await sb
@@ -762,7 +700,6 @@ function CapturarFase8Body() {
       router.push(`/dilesa/ventas/${venta.id}`);
     },
     [
-      archivoCondiciones,
       montoTitular,
       montoCotitular,
       creditoTitularRef,
@@ -1063,6 +1000,22 @@ function CapturarFase8Body() {
     [venta, me, resumen, sb, toast]
   );
 
+  // Documentos del notario — Carta de Instrucción + Anexo B (ADR-048 D2): adjuntos
+  // colaborativos que PERSISTEN al subirse (Gerencia o notario), independientes del
+  // botón de cierre de Dirección. Reusada en ambos forms (cierre y "ya cerrada") para
+  // que también se actualicen en ventas ya dictaminadas. Al subir, el efecto IA
+  // analiza el documento y precarga los campos de abajo.
+  const dictamenDocsSection = (
+    <div className="space-y-1.5">
+      <DocsFaseSection state={docsDictamen} titulo="Documentos del notario" />
+      <p className="px-1 text-[11px] text-[var(--text)]/55">
+        Cada documento se guarda al subirlo — lo puede cargar Gerencia y queda en el expediente; al
+        subirlo se analiza y se precargan los campos de abajo. El Anexo B es obligatorio en créditos
+        Infonavit.
+      </p>
+    </div>
+  );
+
   // Pagaré firmado (decisión Beto 2026-06-24): se recaba en la dictaminación, no
   // en la firma. Obligatorio para cerrar la fase cuando hay crédito directo (el
   // gate vive en onSubmit). Reusado en ambos forms (cierre y "ya cerrada") para
@@ -1135,8 +1088,6 @@ function CapturarFase8Body() {
   const precioDocs = venta?.precio_documentos_firmados ?? null;
   const precioCambio =
     valorEscrNum > 0 && precioDocs != null && Math.abs(valorEscrNum - precioDocs) > 0.5;
-  // Anexo B obligatorio en créditos Infonavit (Beto 2026-06-23, de aquí en adelante).
-  const esInfonavitVenta = (venta?.tipo_credito ?? '').toLowerCase().includes('infonavit');
 
   if (loading) {
     return (
@@ -1254,20 +1205,7 @@ function CapturarFase8Body() {
             body="La Carta de Instrucción ya está capturada. Aquí puedes confirmar/actualizar los números de crédito y los gastos de escrituración (útil si el notario cerró la fase desde el enlace del correo)."
           />
           <form onSubmit={onActualizarDatos} className="mt-4 space-y-6">
-            <Section title="Condiciones Financieras (Anexo B)">
-              <FileSlot
-                label="Condiciones Financieras Definitivas (opcional)"
-                archivo={archivoCondiciones}
-                onChange={(f) => {
-                  setArchivoCondiciones(f);
-                  if (f) void analizarArchivo(f);
-                }}
-              />
-              <Hint>
-                Al subirlo se analiza automáticamente y se precargan los datos del crédito — revisa
-                y guarda. Si el crédito no es Infonavit y no hay anexo, captura manual.
-              </Hint>
-            </Section>
+            {dictamenDocsSection}
 
             <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
 
@@ -1433,35 +1371,7 @@ function CapturarFase8Body() {
             </div>
           ) : null}
 
-          <Section title="Documentos del notario">
-            <div className="space-y-3">
-              <FileSlot
-                label="Carta de Instrucción firmada por el notario *"
-                archivo={archivo}
-                onChange={(f) => {
-                  setArchivo(f);
-                  if (f) void analizarArchivo(f);
-                }}
-              />
-              <FileSlot
-                label={
-                  esInfonavitVenta
-                    ? 'Condiciones Financieras Definitivas — Anexo B *'
-                    : 'Condiciones Financieras Definitivas — Anexo B (opcional)'
-                }
-                archivo={archivoCondiciones}
-                onChange={(f) => {
-                  setArchivoCondiciones(f);
-                  if (f) void analizarArchivo(f);
-                }}
-              />
-            </div>
-            <Hint>
-              Al seleccionar cada PDF se analiza automáticamente y se precargan los campos de abajo
-              — revisa antes de guardar. Créditos no-Infonavit: se extrae lo que el documento
-              traiga; lo demás se captura manual.
-            </Hint>
-          </Section>
+          {dictamenDocsSection}
 
           <PanelAnalisis analizando={analizando} verif={verif} extracciones={extracciones} />
 
@@ -1734,84 +1644,12 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-[11px] text-[var(--text)]/50">{children}</p>;
 }
 
-function FileSlot({
-  label,
-  archivo,
-  onChange,
-}: {
-  label: string;
-  archivo: File | null;
-  onChange: (f: File | null) => void;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const completo = !!archivo;
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        if (!dragOver) setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (!f) return;
-        if (
-          !(
-            f.type === 'application/pdf' ||
-            f.type.startsWith('image/') ||
-            f.name.toLowerCase().endsWith('.pdf')
-          )
-        ) {
-          return;
-        }
-        onChange(f);
-      }}
-      className={`flex items-center justify-between gap-3 rounded-lg border bg-[var(--card)] px-4 py-3 transition-colors ${
-        dragOver
-          ? 'border-[var(--accent)] bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/40'
-          : 'border-[var(--border)]'
-      }`}
-    >
-      <div className="flex flex-1 items-center gap-2 text-sm">
-        {completo ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-        ) : (
-          <XCircle className="h-4 w-4 shrink-0 text-[var(--text)]/35" />
-        )}
-        <span className="font-medium">{label}</span>
-        {archivo ? (
-          <span className="ml-1 truncate text-xs text-[var(--text)]/60">
-            {archivo.name} · {(archivo.size / 1024).toFixed(0)} KB
-          </span>
-        ) : null}
-      </div>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40 hover:text-[var(--text)]">
-        <Upload className="h-3.5 w-3.5" />
-        {archivo ? 'Cambiar' : 'Subir PDF'}
-        <input
-          type="file"
-          accept="application/pdf,image/*"
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
-    </div>
-  );
-}
-
 /**
- * Slot de re-firma con persistencia inmediata (ADR-048 D5): a diferencia de
- * `FileSlot` (File en memoria), muestra el documento YA en el expediente —
- * quién lo subió y cuándo — para que la carga de Gerencia sobreviva entre
- * sesiones. El check verde solo prende cuando el vigente es del precio NUEVO
- * (`delPrecioNuevo`); un documento del precio anterior se ve en ámbar y pide
- * re-subirse.
+ * Slot de re-firma con persistencia inmediata (ADR-048 D5): muestra el documento
+ * YA en el expediente — quién lo subió y cuándo — para que la carga de Gerencia
+ * sobreviva entre sesiones (en vez de un File en memoria que se perdía). El check
+ * verde solo prende cuando el vigente es del precio NUEVO (`delPrecioNuevo`); un
+ * documento del precio anterior se ve en ámbar y pide re-subirse.
  */
 function RefirmaDocSlot({
   label,
