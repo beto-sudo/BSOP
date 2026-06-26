@@ -7,7 +7,7 @@
 **Próximo hito:** backfill de las 354 ventas con valor real válido (pendiente OK explícito de Beto; las 4 con datos incompletos se dejan intactas)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (motor + panel + tests listos en PR; backfill pendiente OK)
+**Última actualización:** 2026-06-26 (Sprint 1 en [PR #1053](https://github.com/beto-sudo/BSOP/pull/1053), sin auto-merge para revisar el Vercel Preview; backfill pendiente OK)
 
 > Detonante: revisando la cuadratura de JORGE LUIS LOPEZ (M12-L9-LDS) y EDUARDO SALAS (M4-L29-LDLE), Beto notó que el panel mostraba la comisión sobre el valor de **escrituración**, mientras Michelle/Ale la calculan sobre el **valor real**. En ventas con descuento (o escritura inflada para aforo) eso sobre-paga la comisión. Beto: _"el pago de la comisión correcta debe ser sobre el valor real… estos números en BSOP son de referencia solamente, así que debe quedar plasmado el número que debió o debe de ser, retroactivo y parejo"_.
 
@@ -58,7 +58,7 @@ El panel de cuadratura, además, es **menos explícito de lo necesario**: las f�
 
 ## Bitácora
 
-- **2026-06-26** — Promovida. Detonante: M12-L9 (escritura inflada) y M4-L29 (desglosado) mostraban comisión sobre escritura; Michelle/Ale la quieren sobre valor real. Universo dimensionado en prod: 1,177 ventas, 358 cambian, ~$911k a la baja, 4 con datos incompletos. Fórmula validada contra los 2 casos conocidos (JL 18,695 sin cambio; Eduardo 9,200→9,050). **Sprint 1 (código) hecho:** motor unificado + `precioAsignacion` expuesto + panel explícito (fórmulas inline + card de precio legacy + etiqueta de redondeo) + test que blinda la regla. Backfill pendiente OK de Beto.
+- **2026-06-26** — Promovida. Detonante: M12-L9 (escritura inflada) y M4-L29 (desglosado) mostraban comisión sobre escritura; Michelle/Ale la quieren sobre valor real. Universo dimensionado en prod: 1,177 ventas, 358 cambian, ~$911k a la baja, 4 con datos incompletos. Fórmula validada contra los 2 casos conocidos (JL 18,695 sin cambio; Eduardo 9,200→9,050). **Sprint 1 (código) — [PR #1053](https://github.com/beto-sudo/BSOP/pull/1053) (sin auto-merge, UI visible):** motor unificado + `precioAsignacion` expuesto + panel explícito (fórmulas inline + card de precio legacy + etiqueta de redondeo) + test que blinda la regla. 6/6 checks de CI verdes local. Backfill (Sprint 2) pendiente OK de Beto.
 
 ## Decisiones registradas
 
