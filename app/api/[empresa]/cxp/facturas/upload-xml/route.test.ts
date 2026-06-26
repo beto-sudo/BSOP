@@ -23,15 +23,20 @@ type Script = {
   personaByRfc?: Record<string, { id: string }>;
   rpcResult?: { data: string | null; error: { message: string } | null };
   auditInsertError?: { message: string } | null;
-  /** Facturas en espera (placeholders de destajo) para el auto-match (S4). */
+  /** Facturas en espera (placeholders de destajo u obra) para el auto-match. */
   placeholders?: {
     id: string;
     proveedor_id: string | null;
     total: number;
-    estimacion_id: string;
+    estimacion_id?: string | null;
+    obra_estimacion_id?: string | null;
   }[];
   /** dilesa.estimaciones para resolver el código del destajo. */
   estimaciones?: { id: string; codigo: string }[];
+  /** dilesa.obra_estimaciones para resolver el origen de obra (etiqueta + contrato). */
+  obraEstimaciones?: { id: string; etiqueta: string | null; contrato_id: string }[];
+  /** dilesa.contratos_construccion para resolver el código del contrato de obra. */
+  contratos?: { id: string; codigo: string | null }[];
   /** erp.personas de los contratistas de los placeholders (RFC + nombre). */
   placeholderPersonas?: {
     id: string;
@@ -58,18 +63,22 @@ function buildAdminMock(): any {
         from(tableName: string) {
           const key = `${schemaName}.${tableName}`;
           const filters: Record<string, unknown> = {};
-          let usedNot = false; // marca la query de placeholders (fetchDestajoPlaceholders)
+          let usedOr = false; // marca la query de placeholders (fetchDestajoPlaceholders)
           const builder: any = {
             select: () => builder,
             eq(col: string, val: unknown) {
               filters[col] = val;
               return builder;
             },
-            // fetchDestajoPlaceholders (S4): cadena .not().is() awaiteada directo.
-            // El mock devuelve vacío (sin placeholders) → carga normal, como antes.
             not(col: string, _op: string, val: unknown) {
               filters[col] = val;
-              usedNot = true;
+              return builder;
+            },
+            // fetchDestajoPlaceholders: `.or(estimacion_id|obra_estimacion_id no
+            // nulo)` awaiteado directo. El mock devuelve vacío (sin placeholders)
+            // → carga normal, como antes, salvo que el test los inyecte.
+            or(_expr: string) {
+              usedOr = true;
               return builder;
             },
             is(col: string, val: unknown) {
@@ -113,14 +122,17 @@ function buildAdminMock(): any {
               return { data: null, error: null };
             },
             // Awaiteado directo: update().eq() (data null), la query de
-            // placeholders (erp.facturas + .not) y el lookup de estimaciones.
+            // placeholders (erp.facturas + .or), el lookup de estimaciones y, para
+            // obra, obra_estimaciones + contratos_construccion (vacíos por defecto).
             then(
               onFulfilled: (r: { data: unknown; error: null }) => unknown,
               onRejected?: (reason: unknown) => unknown
             ) {
               let data: unknown = null;
-              if (key === 'erp.facturas' && usedNot) data = script.placeholders ?? [];
+              if (key === 'erp.facturas' && usedOr) data = script.placeholders ?? [];
               else if (key === 'dilesa.estimaciones') data = script.estimaciones ?? [];
+              else if (key === 'dilesa.obra_estimaciones') data = script.obraEstimaciones ?? [];
+              else if (key === 'dilesa.contratos_construccion') data = script.contratos ?? [];
               else if (key === 'erp.personas') data = script.placeholderPersonas ?? [];
               return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
             },
@@ -390,6 +402,25 @@ describe('POST /api/[empresa]/cxp/facturas/upload-xml', () => {
     const body = await res.json();
     expect(body.analisis[0].candidatos).toHaveLength(0);
     expect(body.analisis[0].sugerencia).toBe('normal');
+  });
+
+  it('analyze → reconoce también una estimación de obra en espera (obra_estimacion_id)', async () => {
+    // El placeholder cuelga de obra_estimacion_id (no estimacion_id); el código
+    // se arma "contrato · etiqueta". Mismo contratista (prov-1) que el CFDI.
+    script.placeholders = [
+      { id: 'ph-obra', proveedor_id: 'prov-1', total: 1200, obra_estimacion_id: 'obra-1' },
+    ];
+    script.obraEstimaciones = [{ id: 'obra-1', etiqueta: 'Estimación 2', contrato_id: 'ctr-1' }];
+    script.contratos = [{ id: 'ctr-1', codigo: 'OBRA-URB-001' }];
+    const res = await POST(makeReqRaw({ analyze: true }), params);
+    expect(res.status).toBe(200);
+    const a = (await res.json()).analisis[0];
+    expect(a.ok).toBe(true);
+    expect(a.candidatos).toHaveLength(1);
+    // CFDI total 1160, neto 1200 → Δ materiales 40.
+    expect(a.candidatos[0]).toMatchObject({ facturaId: 'ph-obra', neto: 1200, delta: 40 });
+    expect(a.sugerencia).toBe('ph-obra');
+    expect(calls.rpc).toHaveLength(0);
   });
 
   it('analyze → reconoce el destajo por nombre aunque la persona del destajo no tenga RFC (duplicado)', async () => {

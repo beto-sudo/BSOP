@@ -67,18 +67,21 @@ type CxpFacturaAltaArgs = Database['erp']['Functions']['cxp_factura_alta']['Args
   p_usuario_id?: string;
 };
 
-// ── Auto-match destajo → CxP (S4) ──────────────────────────────────────────
-// Una factura EN ESPERA (placeholder borrador con estimacion_id) por contratista.
+// ── Auto-match destajo/obra → CxP ──────────────────────────────────────────
+// Una factura EN ESPERA (placeholder borrador) por contratista. El origen puede
+// ser un destajo de vivienda (estimacion_id) o una estimación de obra
+// (obra_estimacion_id, iniciativa dilesa-obra-estimaciones-cxp · S1) — ambos se
+// reconocen igual por contratista (RFC/nombre).
 
 type DestajoPlaceholder = {
   facturaId: string;
   proveedorId: string | null;
-  /** RFC del contratista del destajo (puede faltar si la persona no lo tiene). */
+  /** RFC del contratista (puede faltar si la persona no lo tiene). */
   proveedorRfc: string | null;
-  /** Nombre del contratista del destajo, para el fallback por nombre. */
+  /** Nombre del contratista, para el fallback por nombre. */
   proveedorNombre: string | null;
   neto: number;
-  estimacionId: string;
+  /** Código de origen a mostrar: destajo (estimaciones.codigo) u obra (contrato · etiqueta). */
   codigo: string | null;
 };
 
@@ -161,7 +164,7 @@ function sugerirAccion(candidatos: DestajoCandidato[], total: number): string {
   return 'normal';
 }
 
-/** Carga las facturas en espera (placeholders de destajo) de la empresa, con código y neto. */
+/** Carga las facturas en espera (placeholders de destajo y de obra) de la empresa, con código y neto. */
 async function fetchDestajoPlaceholders(
   admin: ReturnType<typeof getSupabaseAdminClient>,
   empresaId: string
@@ -170,26 +173,70 @@ async function fetchDestajoPlaceholders(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: facs } = await (admin.schema('erp') as any)
     .from('facturas')
-    .select('id, proveedor_id, total, estimacion_id')
+    .select('id, proveedor_id, total, estimacion_id, obra_estimacion_id')
     .eq('empresa_id', empresaId)
     .eq('estado_cxp', 'borrador')
-    .not('estimacion_id', 'is', null)
+    .or('estimacion_id.not.is.null,obra_estimacion_id.not.is.null')
     .is('cancelada_at', null);
   const rows = (facs ?? []) as {
     id: string;
     proveedor_id: string | null;
     total: number | null;
-    estimacion_id: string;
+    estimacion_id: string | null;
+    obra_estimacion_id: string | null;
   }[];
-  const estIds = [...new Set(rows.map((r) => r.estimacion_id))];
-  const codigoPorEst = new Map<string, string>();
+
+  // Código de origen por factura (para la bandeja "en espera"). Destajo →
+  // dilesa.estimaciones.codigo; obra → "contrato · etiqueta" vía
+  // dilesa.obra_estimaciones → contratos_construccion.
+  const codigoPorFactura = new Map<string, string>();
+
+  const estIds = [...new Set(rows.map((r) => r.estimacion_id).filter((x): x is string => !!x))];
   if (estIds.length > 0) {
     const { data: ests } = await admin
       .schema('dilesa')
       .from('estimaciones')
       .select('id, codigo')
       .in('id', estIds);
+    const codigoPorEst = new Map<string, string>();
     for (const e of ests ?? []) codigoPorEst.set(e.id as string, (e.codigo as string | null) ?? '');
+    for (const r of rows) {
+      if (r.estimacion_id) codigoPorFactura.set(r.id, codigoPorEst.get(r.estimacion_id) ?? '');
+    }
+  }
+
+  const obraIds = [
+    ...new Set(rows.map((r) => r.obra_estimacion_id).filter((x): x is string => !!x)),
+  ];
+  if (obraIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: obras } = await (admin.schema('dilesa') as any)
+      .from('obra_estimaciones')
+      .select('id, etiqueta, contrato_id')
+      .in('id', obraIds);
+    const obraRows = (obras ?? []) as {
+      id: string;
+      etiqueta: string | null;
+      contrato_id: string;
+    }[];
+    const obraById = new Map(obraRows.map((o) => [o.id, o]));
+    const contratoIds = [...new Set(obraRows.map((o) => o.contrato_id))];
+    const codigoContrato = new Map<string, string>();
+    if (contratoIds.length > 0) {
+      const { data: ctrs } = await admin
+        .schema('dilesa')
+        .from('contratos_construccion')
+        .select('id, codigo')
+        .in('id', contratoIds);
+      for (const c of ctrs ?? [])
+        codigoContrato.set(c.id as string, (c.codigo as string | null) ?? '');
+    }
+    for (const r of rows) {
+      if (!r.obra_estimacion_id) continue;
+      const o = obraById.get(r.obra_estimacion_id);
+      const cod = o ? (codigoContrato.get(o.contrato_id) ?? '') : '';
+      codigoPorFactura.set(r.id, [cod, o?.etiqueta].filter(Boolean).join(' · '));
+    }
   }
 
   // RFC + nombre del contratista de cada placeholder, para reconocerlo aunque la
@@ -216,8 +263,7 @@ async function fetchDestajoPlaceholders(
     proveedorRfc: r.proveedor_id ? (persona.get(r.proveedor_id)?.rfc ?? null) : null,
     proveedorNombre: r.proveedor_id ? (persona.get(r.proveedor_id)?.nombre ?? null) : null,
     neto: Number(r.total ?? 0),
-    estimacionId: r.estimacion_id,
-    codigo: codigoPorEst.get(r.estimacion_id) ?? null,
+    codigo: codigoPorFactura.get(r.id) ?? null,
   }));
 }
 
@@ -338,14 +384,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // Regla del destajo: la factura nunca debe ser MAYOR que el neto (puede ser
-    // menor por materiales descontados). Si excede, es probable error de captura.
+    // Regla del placeholder: la factura nunca debe ser MAYOR que el neto (puede
+    // ser menor por materiales descontados). Si excede, es probable error de captura.
     const netoEsperado = Number(fac.total ?? 0);
     if (netoEsperado > 0 && cfdi.total > netoEsperado * NETO_EPS) {
       return NextResponse.json(
         {
           ok: false,
-          error: `La factura ($${cfdi.total.toLocaleString('es-MX')}) excede el neto del destajo ($${netoEsperado.toLocaleString('es-MX')}). La factura del contratista nunca debería ser mayor que el destajo — revisa el XML.`,
+          error: `La factura ($${cfdi.total.toLocaleString('es-MX')}) excede el neto en espera ($${netoEsperado.toLocaleString('es-MX')}). La factura del contratista nunca debería ser mayor — revisa el XML.`,
         },
         { status: 422 }
       );
@@ -408,7 +454,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const deltaMateriales = esperado - cfdi.total;
     const warning =
       esperado > 0 && deltaMateriales > Math.max(1, esperado * 0.005)
-        ? `Δ materiales $${deltaMateriales.toLocaleString('es-MX')} (neto del destajo $${esperado.toLocaleString('es-MX')}, facturado $${cfdi.total.toLocaleString('es-MX')}).`
+        ? `Δ materiales $${deltaMateriales.toLocaleString('es-MX')} (neto en espera $${esperado.toLocaleString('es-MX')}, facturado $${cfdi.total.toLocaleString('es-MX')}).`
         : null;
 
     await admin

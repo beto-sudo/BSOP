@@ -138,7 +138,11 @@ type Factura = {
   cuenta_contable_id: string | null;
   /** Destajo de origen (dilesa.estimaciones) si la factura nació de uno. */
   estimacion_id: string | null;
-  /** Código del destajo de origen (para la bandeja "en espera"). */
+  /** Estimación de obra de origen (dilesa.obra_estimaciones) si nació de una. */
+  obra_estimacion_id: string | null;
+  /** Contrato de la estimación de obra (para el link de la bandeja "en espera"). */
+  obra_contrato_id: string | null;
+  /** Código de origen (destajo: estimaciones.codigo; obra: contrato · etiqueta). */
   destajo_codigo: string | null;
   /** Σ aplicaciones en pagos vivos programado/aprobado (comprometido sin ejecutar). */
   comprometido: number;
@@ -498,6 +502,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         | 'proveedor_nombre'
         | 'oc_codigo'
         | 'estimacion_id'
+        | 'obra_estimacion_id'
+        | 'obra_contrato_id'
         | 'destajo_codigo'
         | 'comprometido'
         | 'porProgramar'
@@ -561,42 +567,80 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         }
       }
 
-      // Liga a destajo (facturas.estimacion_id, columna nueva aún no en types)
-      // + código del destajo — para la bandeja "en espera del XML". Solo se
-      // consulta para las facturas en borrador (las en espera).
+      // Liga a origen (destajo: facturas.estimacion_id; obra de avance:
+      // facturas.obra_estimacion_id) + su código — para la bandeja "en espera del
+      // XML". Solo se consulta para las facturas en borrador (las en espera).
       const borradorIds = rows.filter((r) => r.estado_cxp === 'borrador').map((r) => r.id);
       const estimacionPorFactura = new Map<string, string>();
-      const codigoPorEstimacion = new Map<string, string>();
+      const obraEstPorFactura = new Map<string, string>();
+      const obraContratoPorFactura = new Map<string, string>();
+      const codigoPorFactura = new Map<string, string>();
       if (borradorIds.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: facEst } = await (sb.schema('erp') as any)
           .from('facturas')
-          .select('id, estimacion_id')
+          .select('id, estimacion_id, obra_estimacion_id')
           .in('id', borradorIds);
-        const estIds = [
-          ...new Set(
-            ((facEst ?? []) as { id: string; estimacion_id: string | null }[])
-              .map((f) => f.estimacion_id)
-              .filter((x): x is string => !!x)
-          ),
-        ];
-        for (const f of (facEst ?? []) as { id: string; estimacion_id: string | null }[]) {
+        const facRows = (facEst ?? []) as {
+          id: string;
+          estimacion_id: string | null;
+          obra_estimacion_id: string | null;
+        }[];
+        for (const f of facRows) {
           if (f.estimacion_id) estimacionPorFactura.set(f.id, f.estimacion_id);
+          if (f.obra_estimacion_id) obraEstPorFactura.set(f.id, f.obra_estimacion_id);
         }
+
+        // Destajos → código (dilesa.estimaciones.codigo).
+        const estIds = [...new Set(estimacionPorFactura.values())];
         if (estIds.length > 0) {
           const { data: ests } = await sb
             .schema('dilesa')
             .from('estimaciones')
             .select('id, codigo')
             .in('id', estIds);
+          const codigoPorEst = new Map<string, string>();
           for (const e of ests ?? [])
-            codigoPorEstimacion.set(e.id as string, (e.codigo as string | null) ?? '');
+            codigoPorEst.set(e.id as string, (e.codigo as string | null) ?? '');
+          for (const [facId, estId] of estimacionPorFactura)
+            codigoPorFactura.set(facId, codigoPorEst.get(estId) ?? '');
+        }
+
+        // Obra de avance → "contrato · etiqueta" (obra_estimaciones → contrato).
+        const obraIds = [...new Set(obraEstPorFactura.values())];
+        if (obraIds.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: obras } = await (sb.schema('dilesa') as any)
+            .from('obra_estimaciones')
+            .select('id, etiqueta, contrato_id')
+            .in('id', obraIds);
+          const obraById = new Map(
+            ((obras ?? []) as { id: string; etiqueta: string | null; contrato_id: string }[]).map(
+              (o) => [o.id, o] as const
+            )
+          );
+          const contratoIds = [...new Set([...obraById.values()].map((o) => o.contrato_id))];
+          const codigoContrato = new Map<string, string>();
+          if (contratoIds.length > 0) {
+            const { data: ctrs } = await sb
+              .schema('dilesa')
+              .from('contratos_construccion')
+              .select('id, codigo')
+              .in('id', contratoIds);
+            for (const c of ctrs ?? [])
+              codigoContrato.set(c.id as string, (c.codigo as string | null) ?? '');
+          }
+          for (const [facId, obraId] of obraEstPorFactura) {
+            const o = obraById.get(obraId);
+            if (o) obraContratoPorFactura.set(facId, o.contrato_id);
+            const cod = o ? (codigoContrato.get(o.contrato_id) ?? '') : '';
+            codigoPorFactura.set(facId, [cod, o?.etiqueta].filter(Boolean).join(' · '));
+          }
         }
       }
 
       setFacturas(
         rows.map((r) => {
-          const estimacionId = estimacionPorFactura.get(r.id) ?? null;
           const comprometido = comprometidoPorFactura.get(r.id) ?? 0;
           const porProgramar = Math.round((Number(r.saldo ?? 0) - comprometido) * 100) / 100;
           return {
@@ -605,8 +649,10 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
               ? (nombrePorPersona.get(r.proveedor_id) ?? null)
               : null,
             oc_codigo: r.orden_compra_id ? (ocPorId.get(r.orden_compra_id) ?? null) : null,
-            estimacion_id: estimacionId,
-            destajo_codigo: estimacionId ? (codigoPorEstimacion.get(estimacionId) ?? null) : null,
+            estimacion_id: estimacionPorFactura.get(r.id) ?? null,
+            obra_estimacion_id: obraEstPorFactura.get(r.id) ?? null,
+            obra_contrato_id: obraContratoPorFactura.get(r.id) ?? null,
+            destajo_codigo: codigoPorFactura.get(r.id) ?? null,
             comprometido,
             porProgramar,
           };
@@ -748,11 +794,16 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
   const filtered = useMemo(() => {
     return facturas.filter((f) => {
-      // Las facturas en espera del destajo (borrador + estimacion_id) viven en
-      // su panel dedicado de arriba; no las dupliques en la tabla principal —
-      // salvo que se filtre explícito por "Borrador". Reaparecen como filas
-      // normales en cuanto reciben su XML (→ por pagar).
-      if (f.estado_cxp === 'borrador' && f.estimacion_id && estado !== 'borrador') return false;
+      // Las facturas en espera (borrador + destajo u obra) viven en su panel
+      // dedicado de arriba; no las dupliques en la tabla principal — salvo que se
+      // filtre explícito por "Borrador". Reaparecen como filas normales en cuanto
+      // reciben su XML (→ por pagar).
+      if (
+        f.estado_cxp === 'borrador' &&
+        (f.estimacion_id || f.obra_estimacion_id) &&
+        estado !== 'borrador'
+      )
+        return false;
       // Vista "por programar" (pipeline S1): solo lo que aún tiene monto pendiente
       // de programar; lo ya programado/pagado/cancelado sale de la pantalla.
       if (vista === 'por_programar') {
@@ -772,11 +823,15 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     });
   }, [facturas, search, estado, vista]);
 
-  // Facturas EN ESPERA del XML: destajos aprobados en construcción cuya
-  // factura nació en borrador. Administración sube aquí el XML del contratista
-  // (sin teclear folio). Iniciativa dilesa-estimaciones-cxp.
+  // Facturas EN ESPERA del XML: destajos de vivienda aprobados o estimaciones de
+  // obra autorizadas, cuya factura nació en borrador. Administración sube aquí el
+  // XML del contratista (sin teclear folio). Iniciativas dilesa-estimaciones-cxp
+  // (vivienda) + dilesa-obra-estimaciones-cxp (obra).
   const enEspera = useMemo(
-    () => facturas.filter((f) => f.estado_cxp === 'borrador' && !!f.estimacion_id),
+    () =>
+      facturas.filter(
+        (f) => f.estado_cxp === 'borrador' && (!!f.estimacion_id || !!f.obra_estimacion_id)
+      ),
     [facturas]
   );
 
@@ -796,8 +851,8 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
               Facturas en espera del XML · {enEspera.length}
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
-              Destajos aprobados en construcción. Sube el XML del contratista para pasarlas a por
-              pagar — sin teclear folio.
+              Destajos y estimaciones de obra aprobados en construcción. Sube el XML del contratista
+              para pasarlas a por pagar — sin teclear folio.
             </p>
             <ul className="space-y-1.5">
               {enEspera.map((f) => (
@@ -808,16 +863,24 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{proveedorLabel(f)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {f.destajo_codigo && f.estimacion_id ? (
-                        <a
-                          href={`/dilesa/construccion/estimaciones/${f.estimacion_id}`}
-                          className="font-mono hover:underline"
-                        >
-                          {f.destajo_codigo}
-                        </a>
-                      ) : (
-                        'Destajo'
-                      )}{' '}
+                      {(() => {
+                        // Destajo → detalle de la estimación; obra → detalle del
+                        // contrato (la estimación de obra vive dentro del contrato).
+                        const href = f.estimacion_id
+                          ? `/dilesa/construccion/estimaciones/${f.estimacion_id}`
+                          : f.obra_contrato_id
+                            ? `/dilesa/construccion/contratos/${f.obra_contrato_id}`
+                            : null;
+                        const label =
+                          f.destajo_codigo || (f.estimacion_id ? 'Destajo' : 'Estimación de obra');
+                        return href ? (
+                          <a href={href} className="font-mono hover:underline">
+                            {label}
+                          </a>
+                        ) : (
+                          <span className="font-mono">{label}</span>
+                        );
+                      })()}{' '}
                       · neto {formatCurrency(f.total)}
                     </div>
                   </div>
@@ -1931,8 +1994,9 @@ function UploadXmlDialog({
           <DialogTitle>Cargar facturas (XML CFDI)</DialogTitle>
           <DialogDescription>
             Sube uno o varios XML. Se valida que el receptor sea {empresaLabel}, se evita duplicar
-            por folio fiscal, y si el CFDI es de un <strong>destajo en espera</strong> se asocia
-            automáticamente (en vez de duplicar).
+            por folio fiscal, y si el CFDI es de un{' '}
+            <strong>destajo o estimación de obra en espera</strong> se asocia automáticamente (en
+            vez de duplicar).
           </DialogDescription>
         </DialogHeader>
 
@@ -1965,7 +2029,7 @@ function UploadXmlDialog({
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
               {procesables.length} factura{procesables.length !== 1 ? 's' : ''} ·{' '}
-              <span className="text-amber-600">{aDestajo} a destajo</span> ·{' '}
+              <span className="text-amber-600">{aDestajo} en espera</span> ·{' '}
               {procesables.length - aDestajo} normal
               {procesables.length - aDestajo !== 1 ? 'es' : ''}
               {omitidas > 0 ? ` · ${omitidas} omitida${omitidas !== 1 ? 's' : ''}` : ''}
@@ -1999,10 +2063,10 @@ function UploadXmlDialog({
                         }
                         className="h-8 w-full rounded-md border bg-background px-2 text-xs"
                       >
-                        <option value="normal">Factura normal (sin destajo)</option>
+                        <option value="normal">Factura normal (sin asociar)</option>
                         {a.candidatos.map((c) => (
                           <option key={c.facturaId} value={c.facturaId}>
-                            Destajo {c.codigo ?? '—'} · neto {formatCurrency(c.neto)}
+                            En espera: {c.codigo ?? '—'} · neto {formatCurrency(c.neto)}
                             {c.delta > 0 ? ` · Δ materiales ${formatCurrency(c.delta)}` : ''}
                           </option>
                         ))}
@@ -2061,7 +2125,7 @@ function UploadXmlDialog({
   );
 }
 
-// ── Dialog: recibir el XML sobre una factura en espera (destajo → CxP) ──────────
+// ── Dialog: recibir el XML sobre una factura en espera (destajo/obra → CxP) ─────
 
 function RecibirXmlDialog({
   empresa,

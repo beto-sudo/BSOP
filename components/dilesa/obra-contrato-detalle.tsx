@@ -22,8 +22,11 @@
  *      como ejercido en `v_partida_control`); `pagada` la marca el pago CxP.
  *   3. **Factura del contrato** (D5): factura TOTAL por adelantado (RPC
  *      `cxp_factura_total_contrato`) cuyos avances se pagan con pagos
- *      parciales, O facturas por estimación (`cxp_factura_desde_estimacion`,
- *      requiere estimación autorizada). Modos mutuamente excluyentes.
+ *      parciales, O facturas por estimación. En el modo por-estimación la
+ *      factura nace EN ESPERA del XML al autorizar (igual que los destajos de
+ *      vivienda, iniciativa dilesa-obra-estimaciones-cxp · S1): aparece en la
+ *      bandeja de CxP y administración sube el XML del contratista. Modos
+ *      mutuamente excluyentes.
  */
 
 import Link from 'next/link';
@@ -402,24 +405,29 @@ export function ObraContratoDetalle({
     void cargar();
   }
 
-  // Puente CxP (ADR-039): emite la estimación AUTORIZADA como factura de egreso.
+  // Puente CxP (S1 dilesa-obra-estimaciones-cxp): manda la estimación AUTORIZADA
+  // a CxP EN ESPERA del XML (no «por pagar»). Al autorizar ya nace el placeholder
+  // automáticamente; este botón cubre las autorizadas sin factura (históricas).
   async function emitir(estId: string) {
     if (emitiendo) return;
     setEmitiendo(estId);
-    const { error: e } = await sb
-      .schema('erp')
-      .rpc('cxp_factura_desde_estimacion', { p_estimacion_id: estId });
+    // RPC S1 aún no en types — mismo patrón de cast que las queries.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: e } = await (sb.schema('erp') as any).rpc(
+      'cxp_factura_desde_estimacion_obra_espera',
+      { p_estimacion_id: estId }
+    );
     if (e) {
       toast.add({
-        title: 'No se pudo emitir a CxP',
-        description: getSupabaseErrorMessage(e, 'Error al crear la factura de egreso.'),
+        title: 'No se pudo enviar a CxP',
+        description: getSupabaseErrorMessage(e, 'Error al crear la factura en espera.'),
         type: 'error',
       });
     } else {
       toast.add({
-        title: 'Emitida a CxP',
+        title: 'Enviada a CxP (en espera del XML)',
         description:
-          'Factura de egreso «por pagar» creada — programa el pago en Cuentas por Pagar.',
+          'Aparece en la bandeja de CxP — sube el XML del contratista allá para pasarla a por pagar.',
         type: 'success',
       });
       await cargar();
@@ -733,9 +741,11 @@ export function ObraContratoDetalle({
 }
 
 /**
- * Celda CxP por estimación: estado de su factura ligada, o el botón Emitir
- * (solo estimaciones autorizadas con monto > 0 y sin factura total del
- * contrato — en ese modo los avances se pagan contra la factura total, S3).
+ * Celda CxP por estimación: estado de su factura ligada, o el botón "Enviar a
+ * CxP" (solo estimaciones autorizadas con monto > 0 y sin factura total del
+ * contrato — en ese modo los avances se pagan contra la factura total, S3). Al
+ * autorizar ya nace el placeholder en espera; el botón cubre las autorizadas
+ * sin factura (históricas) y las manda a CxP en espera del XML (S1).
  */
 function CeldaCxP({
   est,
@@ -780,7 +790,7 @@ function CeldaCxP({
   }
   if (est.estado === 'borrador') {
     return (
-      <span title="Autoriza la estimación para poder emitirla" className="text-[var(--text)]/30">
+      <span title="Autoriza la estimación para enviarla a CxP" className="text-[var(--text)]/30">
         —
       </span>
     );
@@ -791,10 +801,11 @@ function CeldaCxP({
         type="button"
         onClick={onEmitir}
         disabled={emitiendo}
+        title="Enviar a CxP en espera del XML del contratista"
         className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text)]/70 hover:border-[var(--accent)] hover:text-[var(--text)] disabled:opacity-50"
       >
         {emitiendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-        Emitir
+        Enviar a CxP
       </button>
     );
   }
