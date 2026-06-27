@@ -76,19 +76,36 @@ jobs:
             exit 1
           }
 
-      - name: Regenerar SCHEMA_REF desde la shadow y comparar con el commiteado
+      - name: Regenerar SCHEMA_REF + types desde la shadow
         if: steps.changes.outputs.db_touched == 'true'
         env:
           SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: |
           npm run schema:ref
+          npm run db:types
+
+      # Sube los derivados regenerados desde la shadow para poder commitearlos si
+      # difieren (útil cuando Docker local no coopera). Corre antes del diff que
+      # puede fallar.
+      - name: Subir derivados regenerados (artifact)
+        if: steps.changes.outputs.db_touched == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: derivados-shadow
+          path: |
+            supabase/SCHEMA_REF.md
+            types/supabase.ts
+          retention-days: 3
+
+      - name: Comparar SCHEMA_REF con el commiteado
+        if: steps.changes.outputs.db_touched == 'true'
+        run: |
           # -I ignora la línea de timestamp `Last regenerated`.
           if git diff --exit-code -I '^  Last regenerated: ' supabase/SCHEMA_REF.md; then
             echo "✓ SCHEMA_REF.md coincide con lo que producen las migraciones."
           else
             echo "::error::SCHEMA_REF.md NO coincide con el schema de las migraciones."
-            echo "Regenerá localmente y commiteá:"
-            echo "  supabase start && SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm run schema:ref"
-            echo "(Ver GOVERNANCE.md §3.)"
+            echo "Descargá el artifact 'derivados-shadow' de este run y commitealo,"
+            echo "o regenerá local: supabase start && npm run db:regen (ver GOVERNANCE.md §3)."
             exit 1
           fi
