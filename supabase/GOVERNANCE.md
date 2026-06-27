@@ -97,54 +97,51 @@ reproduce desde cero → aplicá §1.
 Sin Docker local podés dejar que CI valide, pero **para regenerar los derivados
 necesitás Docker** — en el modelo nuevo ya no hay atajo contra prod.
 
-## §4 — Aplicar migrations: `db push`, no MCP
+## §4 — Aplicar migrations: AL MERGEAR (db push automático), no antes, no MCP
 
-**Regla dura:** las migrations se aplican vía `supabase db push` desde local
-o desde GH Action. **Nunca** vía `mcp__supabase__apply_migration` excepto
-emergencia.
+**Regla dura (modelo `derivados-sin-drift` S3):** las migraciones se aplican a
+prod **al mergear el PR a `main`**, automáticamente, vía el workflow
+`db-push-on-merge.yml` (`supabase db push`). **No** se aplican antes de mergear,
+**ni** por `mcp__supabase__apply_migration`, **ni** con `psql`/`db push` manual a
+prod. Una sola vía. Así prod nunca se adelanta a `main` (muere el drift de
+SCHEMA_REF que rompía PRs ajenos) y el ledger no deriva (`db push` registra con
+el timestamp del archivo; muere el baile de `migration repair`).
 
-### Por qué
+### Gate financiero (D5) — el gate es el MERGE
 
-`apply_migration` y `psql` directo no respetan el `version` del filename:
-registran la entry en `supabase_migrations.schema_migrations` con un timestamp
-generado al momento del apply. Resultado: el `version` en DB diverge del
-prefijo del filename y el Supabase CLI emite el warning
-`Applied out-of-order migrations: [...]` en cada `supabase db push` siguiente
-— ensucia el output del drift-check en cada PR de DB.
-
-`config.toml` debe tener `project_id`, `[db].major_version` y `[api].schemas`
-completos (ya está en este repo, ver el archivo). Si falta algo, `db push`
-no arranca sin flags y la gente se va al MCP por default — ahí empieza el
-drift.
+- **No-financieras** → auto-merge → al mergear, `db-push-on-merge.yml` las aplica.
+- **Financieras** (mueven dinero o permisos) → el check `financial-migration-guard`
+  las detecta y **bloquea el auto-merge**; las revisa y mergea **Dirección a mano**,
+  agregando el label `finanzas-ok` al PR. Ese merge ES la confirmación explícita
+  que exige el control financiero. Al mergear, se aplican igual vía el workflow.
 
 ### Procedimiento normal
 
-1. Editar archivo en `supabase/migrations/<timestamp>_<name>.sql`. El
-   `<timestamp>` debe ser estrictamente mayor al último aplicado en prod.
-   Para forzar el ordenamiento usá `date -u +%Y%m%d%H%M%S`.
-2. `supabase db push` (CLI valida sintaxis y aplica).
-3. `npm run schema:ref` (regenera `SCHEMA_REF.md`).
-4. Commit + PR.
+1. Crear el archivo con `npm run db:new "<slug>"` (timestamp anti-colisión).
+2. Regenerar los derivados **desde la shadow** (no prod): `supabase start &&
+npm run db:regen` (ver §3). Commitear `SCHEMA_REF.md` + `types/supabase.ts`.
+3. Abrir el PR. CI valida: `schema-check` (shadow) + `financial-migration-guard`.
+4. Mergear — no-financiera: auto-merge; financiera: Dirección con label `finanzas-ok`.
+5. `db-push-on-merge.yml` aplica a prod **al mergear**. NO hagas `db push` manual.
 
-### Procedimiento de emergencia (apply directo en prod sin push)
+### Por qué NO aplicar antes de mergear ni por MCP
 
-Solo si hay un fix urgente que no puede esperar al ciclo de PR:
+`apply_migration`/`psql` directo registran en `schema_migrations` con el timestamp
+del APPLY (≠ el del filename) → el `version` en DB diverge del archivo, `db push`
+emite `Applied out-of-order migrations` y termina rompiéndose para todas las
+sesiones. Aplicar antes de mergear adelanta prod a `main` → rompía el schema-check
+de PRs ajenos. El modelo nuevo elimina ambos males con una sola vía de aplicación
+(post-merge, `db push`, timestamp del archivo).
 
-1. Aplicar via MCP `apply_migration` o `psql` directo a prod.
-2. **Inmediatamente después**, identificar la `version` que registró
-   Supabase:
-   ```sql
-   SELECT version FROM supabase_migrations.schema_migrations
-   WHERE name = '<name>' ORDER BY version DESC LIMIT 1;
-   ```
-3. Crear/renombrar el archivo en `supabase/migrations/` con esa `version`
-   exacta como prefijo del filename. El SQL en disco debe matchear lo que
-   se aplicó (no la versión "limpia" que hubieras querido aplicar).
-4. Commit + PR para sincronizar el repo.
+### Procedimiento de emergencia (hotfix sin esperar al PR)
 
-Si saltás el paso 3, el siguiente PR de DB va a tener divergencia
-filename↔version, el drift-check va a flaggear, y el cleanup posterior
-es ~10x más caro que documentarlo bien al momento.
+Solo si un fix no puede esperar el ciclo de PR/merge:
+
+1. Aplicar vía `psql` directo a prod (preferido sobre MCP: no auto-registra huérfano).
+2. Crear el archivo en `supabase/migrations/` con un timestamp ≥ al último aplicado;
+   el SQL debe matchear lo aplicado.
+3. Abrir PR. Al mergear, `db-push-on-merge` re-aplica como no-op (ya está) y deja el
+   archivo registrado. Verificar `supabase migration list` 1:1 después.
 
 ### Bootstrap files (whitelist permanente)
 

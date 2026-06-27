@@ -1,0 +1,75 @@
+name: Financial Migration Guard
+
+# Gate D5 de la iniciativa `derivados-sin-drift` (Sprint 3). Con el modelo nuevo
+# las migraciones se aplican a prod AL MERGEAR (db-push-on-merge.yml). El control
+# financiero de Beto exige que nada que mueva dinero/permisos se aplique sin su
+# confirmación → las migraciones FINANCIERAS no se auto-mergean: las revisa y
+# mergea Dirección a mano (el merge ES la confirmación).
+#
+# Este check clasifica las migraciones nuevas del PR. Si alguna es financiera y
+# el PR NO tiene el label `finanzas-ok`, FALLA → el auto-merge no procede y el PR
+# queda esperando a Dirección. Dirección revisa, agrega el label `finanzas-ok`
+# (el check re-corre y pasa) y mergea. Migraciones no-financieras pasan directo.
+#
+# Required-safe: solo corre en PRs que tocan supabase/migrations/**; los demás ni
+# lo ven. Si se hace required en branch protection, no cuelga PRs sin migración.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'supabase/migrations/**'
+
+concurrency:
+  group: fin-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Gate de migraciones financieras
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Clasificar migraciones nuevas
+        id: classify
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          NEW=$(git diff --name-only --diff-filter=AM "$BASE" HEAD \
+            | grep -E '^supabase/migrations/.*\.sql$' || true)
+          if [ -z "$NEW" ]; then
+            echo "Sin migraciones nuevas en el PR."
+            echo "financial=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Migraciones nuevas:"; echo "$NEW" | sed 's/^/  /'
+          if npx tsx scripts/classify-financial-migration.ts $NEW; then
+            echo "financial=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "financial=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Gate financiero (bloquea auto-merge sin aprobación de Dirección)
+        if: steps.classify.outputs.financial == 'true'
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'finanzas-ok') }}" = "true" ]; then
+            echo "✓ Migración financiera con label 'finanzas-ok' — Dirección la aprobó."
+          else
+            echo "::error::Este PR trae una migración FINANCIERA (mueve dinero o permisos)."
+            echo "No se auto-mergea: la revisa y mergea Dirección a mano (el merge la aplica a prod)."
+            echo "Para aprobar: Dirección agrega el label 'finanzas-ok' al PR → este check pasa."
+            exit 1
+          fi

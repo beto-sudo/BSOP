@@ -218,6 +218,15 @@ db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
 
 > Norma 2026-06-17 (Beto): cortar de raíz el drift del historial de migraciones.
 
+> **⚠️ MODELO CAMBIADO (`derivados-sin-drift` S3).** El flujo normal ya **no** es
+> aplicar-por-MCP-y-reconciliar. Las migraciones se aplican a prod **al mergear**,
+> automáticamente, vía `db-push-on-merge.yml` (`supabase db push`) — **nunca por
+> MCP ni antes de mergear** (ver `supabase/GOVERNANCE.md` §4 + gate financiero D5:
+> financieras las mergea Dirección a mano con el label `finanzas-ok`). En operación
+> normal **no toques el ledger**: `db push` lo registra con el timestamp del
+> archivo. Lo de abajo aplica SOLO al **hotfix de emergencia por `psql` directo**
+> (raro) — ahí sí reconciliá el ledger en la misma sesión.
+
 `apply_migration` (MCP) / `execute_sql` / `psql` registran la migración en
 `supabase_migrations.schema_migrations` con el **timestamp de aplicación**, NO
 con el timestamp del nombre del archivo (`db:new`). El `name` sí se conserva.
