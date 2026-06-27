@@ -3,11 +3,11 @@
 **Slug:** `derivados-sin-drift`
 **Empresas:** todas (infraestructura del repo / proceso de DB)
 **Schemas afectados:** ninguno de aplicación. Toca el **proceso** de migraciones y el tooling/CI: `package.json`, `scripts/gen-schema-ref.ts`, `scripts/gen-initiatives.ts`, `.github/workflows/{ci,db-types,drift-check}.yml` (+ workflows nuevos), `supabase/GOVERNANCE.md`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`, `supabase/SCHEMA_REF.md`, `types/supabase.ts`.
-**Estado:** in_progress
-**Próximo hito:** S0/S0.5/S1/S2 en main (#1093, #1095, #1096). **Beto revisa y mergea el Sprint 3 ([#1097](https://github.com/beto-sudo/BSOP/pull/1097), sin auto-merge)**: el clasificador financiero + el cambio de hábito (migraciones se aplican al merge). Tras mergear, config de Beto (admin): crear label `finanzas-ok` + agregar `Gate de migraciones financieras` a required en branch protection (como se hizo con `schema-check` del S1). Con eso → iniciativa **done**.
+**Estado:** done
+**Próximo hito:** — (iniciativa cerrada 2026-06-27)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-27 (S1 + S2 mergeados a main; S3 en PR #1097 para revisión de Beto; OrbStack local reparado)
+**Última actualización:** 2026-06-27 (CERRADA — modelo completo en main: schema desde shadow + INITIATIVES fuera del PR + db push al merge con gate financiero D5; los 3 checks required en `main`; gate operativo con label `finanzas-ok`)
 
 ## Problema
 
@@ -212,3 +212,14 @@ NOT EXISTS ... REFERENCES/DEFAULT` (no reproducible). `SCHEMA_REF`/`types`
   de Supabase re-descargables; 0 datos) lo limpió. `supabase start` + `npm run db:regen`
   verificados local: reproducen el `SCHEMA_REF`/`types` exactos (242 tablas). Flujo
   local del modelo nuevo funcionando en la máquina de Beto.
+- **2026-06-27 — CERRADA.** Beto mergeó el Sprint 3 (#1097) + el fix required-safe del
+  guard (#1098); se agregaron los 3 checks a required en `main` (`Lint/Typecheck`,
+  `SCHEMA_REF vs migraciones (shadow)`, `Gate de migraciones financieras`) + el label
+  `finanzas-ok`. Modelo completo vivo: schema validado/regenerado desde la shadow (no
+  prod), INITIATIVES validado por headers (tabla regenerada en main), migraciones
+  aplicadas a prod **al mergear** (`db-push-on-merge`) con gate financiero D5. Decisión
+  de cierre: NO se montó el auto-regen de la tabla `## Activas` vía bot (requiere un PAT
+  por la protección classic + `enforce_admins`; la tabla es cosmética) — se regenera
+  local con `npm run initiatives:gen` cuando haga falta; el camino del PAT queda
+  documentado en `initiatives-regen.yml`. Memorias de migración actualizadas al modelo
+  nuevo.
