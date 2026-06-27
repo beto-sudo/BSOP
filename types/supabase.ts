@@ -13059,6 +13059,10 @@ export type Database = {
       }
     }
     Functions: {
+      arrendamiento_alta: {
+        Args: { p_empresa_id: string; p_lineas?: Json; p_master: Json }
+        Returns: string
+      }
       arrendamiento_pago_registrar: {
         Args: {
           p_arrendamiento_id: string
