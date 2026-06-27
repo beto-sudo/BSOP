@@ -1180,6 +1180,20 @@ export type Database = {
             referencedRelation: "modulos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "permisos_usuario_excepcion_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permisos_usuario_excepcion_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -1478,6 +1492,20 @@ export type Database = {
             columns: ["rol_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuarios_empresas_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuarios_empresas_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "v_usuarios_directorio"
             referencedColumns: ["id"]
           },
         ]
@@ -14273,116 +14301,6 @@ export type Database = {
   }
   rdb: {
     Tables: {
-      corte_conteo_denominaciones_archive_2026_04_17: {
-        Row: {
-          cantidad: number
-          corte_id: string
-          created_at: string
-          denominacion: number
-          id: string
-          subtotal: number | null
-          tipo: string
-          updated_at: string
-        }
-        Insert: {
-          cantidad?: number
-          corte_id: string
-          created_at?: string
-          denominacion: number
-          id?: string
-          subtotal?: number | null
-          tipo: string
-          updated_at?: string
-        }
-        Update: {
-          cantidad?: number
-          corte_id?: string
-          created_at?: string
-          denominacion?: number
-          id?: string
-          subtotal?: number | null
-          tipo?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      ordenes_compra_archive_2026_04_17: {
-        Row: {
-          created_at: string | null
-          estatus: string
-          fecha_emision: string | null
-          fecha_recepcion: string | null
-          folio: string
-          id: string
-          notas: string | null
-          proveedor_id: string | null
-          recibido_por: string | null
-          requisicion_id: string | null
-          total_estimado: number | null
-          total_real: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          estatus?: string
-          fecha_emision?: string | null
-          fecha_recepcion?: string | null
-          folio?: string
-          id?: string
-          notas?: string | null
-          proveedor_id?: string | null
-          recibido_por?: string | null
-          requisicion_id?: string | null
-          total_estimado?: number | null
-          total_real?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          estatus?: string
-          fecha_emision?: string | null
-          fecha_recepcion?: string | null
-          folio?: string
-          id?: string
-          notas?: string | null
-          proveedor_id?: string | null
-          recibido_por?: string | null
-          requisicion_id?: string | null
-          total_estimado?: number | null
-          total_real?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ordenes_compra_proveedor_id_fkey"
-            columns: ["proveedor_id"]
-            isOneToOne: false
-            referencedRelation: "proveedores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_proveedor_id_fkey"
-            columns: ["proveedor_id"]
-            isOneToOne: false
-            referencedRelation: "proveedores_archive_2026_04_17"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_requisicion_id_fkey"
-            columns: ["requisicion_id"]
-            isOneToOne: false
-            referencedRelation: "requisiciones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_requisicion_id_fkey"
-            columns: ["requisicion_id"]
-            isOneToOne: false
-            referencedRelation: "requisiciones_archive_2026_04_17"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       productos_waitry_map: {
         Row: {
           created_at: string | null
@@ -14404,87 +14322,6 @@ export type Database = {
           id?: string
           producto_id?: string | null
           waitry_nombre?: string
-        }
-        Relationships: []
-      }
-      proveedores_archive_2026_04_17: {
-        Row: {
-          activo: boolean
-          contacto: string | null
-          created_at: string | null
-          direccion: string | null
-          email: string | null
-          id: string
-          nombre: string
-          notas: string | null
-          rfc: string | null
-          telefono: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          activo?: boolean
-          contacto?: string | null
-          created_at?: string | null
-          direccion?: string | null
-          email?: string | null
-          id?: string
-          nombre: string
-          notas?: string | null
-          rfc?: string | null
-          telefono?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          activo?: boolean
-          contacto?: string | null
-          created_at?: string | null
-          direccion?: string | null
-          email?: string | null
-          id?: string
-          nombre?: string
-          notas?: string | null
-          rfc?: string | null
-          telefono?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      requisiciones_archive_2026_04_17: {
-        Row: {
-          aprobado_por: string | null
-          created_at: string | null
-          estatus: string
-          fecha_necesidad: string | null
-          fecha_solicitud: string | null
-          folio: string
-          id: string
-          notas: string | null
-          solicitado_por: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          aprobado_por?: string | null
-          created_at?: string | null
-          estatus?: string
-          fecha_necesidad?: string | null
-          fecha_solicitud?: string | null
-          folio?: string
-          id?: string
-          notas?: string | null
-          solicitado_por?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          aprobado_por?: string | null
-          created_at?: string | null
-          estatus?: string
-          fecha_necesidad?: string | null
-          fecha_solicitud?: string | null
-          folio?: string
-          id?: string
-          notas?: string | null
-          solicitado_por?: string | null
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -14785,197 +14622,6 @@ export type Database = {
       }
     }
     Views: {
-      corte_conteo_denominaciones: {
-        Row: {
-          cantidad: number | null
-          corte_id: string | null
-          created_at: string | null
-          denominacion: number | null
-          id: string | null
-          subtotal: number | null
-          tipo: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          cantidad?: number | null
-          corte_id?: string | null
-          created_at?: string | null
-          denominacion?: number | null
-          id?: string | null
-          subtotal?: number | null
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          cantidad?: number | null
-          corte_id?: string | null
-          created_at?: string | null
-          denominacion?: number | null
-          id?: string | null
-          subtotal?: number | null
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      ordenes_compra: {
-        Row: {
-          created_at: string | null
-          estatus: string | null
-          fecha_emision: string | null
-          fecha_recepcion: string | null
-          folio: string | null
-          id: string | null
-          notas: string | null
-          proveedor_id: string | null
-          recibido_por: string | null
-          requisicion_id: string | null
-          total_estimado: number | null
-          total_real: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          estatus?: string | null
-          fecha_emision?: string | null
-          fecha_recepcion?: string | null
-          folio?: string | null
-          id?: string | null
-          notas?: string | null
-          proveedor_id?: string | null
-          recibido_por?: string | null
-          requisicion_id?: string | null
-          total_estimado?: number | null
-          total_real?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          estatus?: string | null
-          fecha_emision?: string | null
-          fecha_recepcion?: string | null
-          folio?: string | null
-          id?: string | null
-          notas?: string | null
-          proveedor_id?: string | null
-          recibido_por?: string | null
-          requisicion_id?: string | null
-          total_estimado?: number | null
-          total_real?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ordenes_compra_proveedor_id_fkey"
-            columns: ["proveedor_id"]
-            isOneToOne: false
-            referencedRelation: "proveedores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_proveedor_id_fkey"
-            columns: ["proveedor_id"]
-            isOneToOne: false
-            referencedRelation: "proveedores_archive_2026_04_17"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_requisicion_id_fkey"
-            columns: ["requisicion_id"]
-            isOneToOne: false
-            referencedRelation: "requisiciones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ordenes_compra_requisicion_id_fkey"
-            columns: ["requisicion_id"]
-            isOneToOne: false
-            referencedRelation: "requisiciones_archive_2026_04_17"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      proveedores: {
-        Row: {
-          activo: boolean | null
-          contacto: string | null
-          created_at: string | null
-          direccion: string | null
-          email: string | null
-          id: string | null
-          nombre: string | null
-          notas: string | null
-          rfc: string | null
-          telefono: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          activo?: boolean | null
-          contacto?: string | null
-          created_at?: string | null
-          direccion?: string | null
-          email?: string | null
-          id?: string | null
-          nombre?: string | null
-          notas?: string | null
-          rfc?: string | null
-          telefono?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          activo?: boolean | null
-          contacto?: string | null
-          created_at?: string | null
-          direccion?: string | null
-          email?: string | null
-          id?: string | null
-          nombre?: string | null
-          notas?: string | null
-          rfc?: string | null
-          telefono?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      requisiciones: {
-        Row: {
-          aprobado_por: string | null
-          created_at: string | null
-          estatus: string | null
-          fecha_necesidad: string | null
-          fecha_solicitud: string | null
-          folio: string | null
-          id: string | null
-          notas: string | null
-          solicitado_por: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          aprobado_por?: string | null
-          created_at?: string | null
-          estatus?: string | null
-          fecha_necesidad?: string | null
-          fecha_solicitud?: string | null
-          folio?: string | null
-          id?: string | null
-          notas?: string | null
-          solicitado_por?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          aprobado_por?: string | null
-          created_at?: string | null
-          estatus?: string | null
-          fecha_necesidad?: string | null
-          fecha_solicitud?: string | null
-          folio?: string | null
-          id?: string | null
-          notas?: string | null
-          solicitado_por?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       v_categoria_resumen: {
         Row: {
           categoria: string | null
@@ -15463,31 +15109,6 @@ export type Database = {
             referencedColumns: ["corte_id"]
           },
         ]
-      }
-      v_waitry_pending_duplicates: {
-        Row: {
-          content_hash: string | null
-          detected_at: string | null
-          id: string | null
-          match_reason: string | null
-          order_a_notes: string | null
-          order_a_place_name: string | null
-          order_a_status: string | null
-          order_a_table_name: string | null
-          order_a_timestamp: string | null
-          order_a_total_amount: number | null
-          order_b_notes: string | null
-          order_b_place_name: string | null
-          order_b_status: string | null
-          order_b_table_name: string | null
-          order_b_timestamp: string | null
-          order_b_total_amount: number | null
-          order_id_a: string | null
-          order_id_b: string | null
-          seconds_apart: number | null
-          similarity_score: number | null
-        }
-        Relationships: []
       }
       v_waitry_productos_categoria: {
         Row: {

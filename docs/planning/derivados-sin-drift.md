@@ -1,0 +1,169 @@
+# Iniciativa — Derivados sin drift entre sesiones (migraciones = fuente de verdad)
+
+**Slug:** `derivados-sin-drift`
+**Empresas:** todas (infraestructura del repo / proceso de DB)
+**Schemas afectados:** ninguno de aplicación. Toca el **proceso** de migraciones y el tooling/CI: `package.json`, `scripts/gen-schema-ref.ts`, `scripts/gen-initiatives.ts`, `.github/workflows/{ci,db-types,drift-check}.yml` (+ workflows nuevos), `supabase/GOVERNANCE.md`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`, `supabase/SCHEMA_REF.md`, `types/supabase.ts`.
+**Estado:** in_progress
+**Próximo hito:** Sprint 0 (de-risking) en curso — job de CI `schema-shadow-derisk.yml` corriendo `supabase start` + diff shadow-vs-prod para confirmar que las migraciones reproducen prod. Ledger ya verificado 1:1 (cero `disk_only`). Si el diff es solo la migración foránea de obra-estimaciones → arranca Sprint 1.
+**Dueño:** Beto
+**Creada:** 2026-06-26
+**Última actualización:** 2026-06-26 (D5 cerrada con Beto = merge-as-gate; Sprint 0 arrancado — ledger 1:1, falta el gate db-reset==prod en CI)
+
+## Problema
+
+Con varias sesiones de Claude en paralelo, dos archivos **derivados** que se
+commitean en cada rama chocan a diario y nos cuestan horas:
+
+1. **`supabase/SCHEMA_REF.md`** — su check (`schema:check`) regenera el MD
+   **contra PROD** y compara. Como prod es estado compartido y móvil, en cuanto
+   una sesión aplica su migración a prod **antes de mergear** (norma actual), prod
+   queda adelantado a `main` y **cualquier PR falla, aunque no toque la DB**. Se
+   suma el flake de conectividad `:5432` y el `schema:ref` que se cuelga durante
+   rebuilds del Preview Branch.
+2. **`docs/strategy/INITIATIVES.md`** (tabla `## Activas`) — se auto-genera de los
+   headers de los planning docs (eso ya no choca), pero el **output** sigue
+   commiteándose en cada rama. Dos sesiones regeneran la tabla completa → conflicto
+   de merge en celdas-párrafo de 500+ caracteres, doloroso de resolver.
+
+La iniciativa `cross-session-coordination` (jun-7) resolvió el _input_ (1 planning
+doc por iniciativa; `db:new` para timestamps). Pero dejó los _outputs_ derivados
+dentro del control de cada PR — y un derivado versionado **siempre** choca entre
+ramas paralelas.
+
+**La raíz, más profunda que el síntoma:** el `SCHEMA_REF` rojo es síntoma de que
+**prod se adelanta a `main`**, porque las migraciones se aplican a prod antes de
+mergear, **a veces vía MCP `apply_migration`/`psql`** — lo que registra la entry en
+`supabase_migrations.schema_migrations` con el timestamp de aplicación (≠ el del
+filename), desincroniza el ledger y **rompe `supabase db push` para todas las
+sesiones** ("Remote migration versions not found"). `GOVERNANCE.md` §4 ya prescribe
+"db push, no MCP", pero la práctica real lo contradice y la memoria
+`reference_bsop_merge_flow_multisesion` es la crónica de curas repetidas a mano.
+
+## Outcome esperado
+
+1. **El schema lo dictan las migraciones, no prod.** `SCHEMA_REF.md` y
+   `types/supabase.ts` se generan aplicando `supabase/migrations/*` a una DB
+   efímera (shadow DB stack-Supabase). El check pasa a validar "tus migraciones
+   producen este derivado" — **determinista por rama, sin prod, sin secret, sin
+   flake**. Que prod esté adelantado deja de importar para el check.
+2. **Prod nunca se adelanta a `main`.** Las migraciones se aplican a prod **solo
+   post-merge** vía GH Action `supabase db push` (nunca MCP) → el ledger no deriva,
+   `db push` no se rompe, y se retira el baile de `migration repair` manual.
+3. **Los derivados dejan de mantenerse en las ramas.** La tabla `## Activas` se
+   regenera en `main` post-merge (PR automático, patrón `db-types.yml`); el check de
+   PR valida solo los _headers_. Cero conflictos de merge en `INITIATIVES.md`.
+
+Meta realista: los choques de `SCHEMA_REF`/`INITIATIVES` pasan de **diarios** a
+**inexistentes**; el drift del ledger, de **recurrente** a **estructuralmente
+imposible** mientras se respete el apply-post-merge.
+
+## Decisiones registradas
+
+> D1–D4, D6 cerradas con Beto en la sesión de promoción (2026-06-26). D5 abierta.
+
+- **D1 — `SCHEMA_REF` (y `types`) se derivan de las migraciones de la rama, no de
+  prod.** Una shadow DB construida desde `supabase/migrations/*` es la fuente. El
+  Preview Branch ya prueba que las 474 migraciones reconstruyen el schema desde cero
+  (`GOVERNANCE.md` §1/§3 lo mantienen como invariante).
+- **D2 — La shadow DB es stack Supabase** (`supabase db start` + `db reset
+--no-seed` en CI), **no Postgres vanilla**: 189 archivos referencian roles de
+  plataforma (`anon`/`authenticated`/`authenticator`/`service_role`) y 45 tocan
+  `auth.*`, y ningún archivo los crea. `GOVERNANCE.md` §3 ya recomienda `db reset`
+  local para validar.
+- **D3 — `SCHEMA_REF.md` y `types/supabase.ts` migran juntos en v1.** La misma
+  shadow DB genera ambos (`gen types --local`); coherencia total de fuente.
+- **D4 — INITIATIVES sale del camino del PR.** `initiatives:check` valida _headers_
+  (slugs únicos, estado válido, "Próximo hito" presente), no el diff de la tabla.
+  La tabla se regenera en `main` post-merge vía PR automático con auto-merge
+  (precedente: `db-types.yml`). Las ramas dejan de tocar la tabla.
+- **D5 — Raíz de proceso: aplicar a prod solo post-merge vía `db push`
+  (nunca MCP); el merge ES el gate.** Las migraciones se aplican **únicamente al
+  mergear** (GH Action `push:main` → `supabase db push`). Diferenciado por tipo, sin
+  click extra por migración: **no-financieras → auto-merge** (como hoy) → se aplican
+  solas, cero intervención de Beto; **financieras → sin auto-merge**, Beto las mergea
+  a mano (el mismo gesto que ya hace con los PRs de UI) y ese merge es la confirmación
+  explícita + auditable. Un **guard de CI** clasifica la migración (GRANT/REVOKE,
+  tablas financieras de `erp`, RPCs SECURITY DEFINER de dinero, gates de fase/PLD) y
+  **bloquea el auto-merge** si toca superficie financiera — así no depende solo del
+  criterio de CC. Reemplaza la propuesta previa del GitHub Environment (añadía un
+  click por merge, justo lo que Beto quiere evitar). Encaja con la regla "finanzas no
+  van autónomas" ([[feedback_autonomous_prod_migrations]]) sin reintroducir fricción.
+  **Cerrada con Beto (2026-06-26).**
+- **D6 — El nuevo `schema-check` corre con paths-filter `supabase/migrations/**`**
+(gratis para PRs de UI), como `drift-check.yml`. No carga el job `quality` de cada
+  PR con el boot de Docker.
+
+## Riesgos
+
+- **R1 — `supabase db reset` no reproduce prod por drift de _contenido_** (no solo
+  de version): algo aplicado a prod que ningún archivo produce. Síntoma: diff entre
+  el `SCHEMA_REF` shadow y el de prod. Mitigación: **Sprint 0 lo verifica y
+  reconcilia antes de automatizar nada**. El Preview Branch ya prueba que aplican
+  _sin error_; falta probar _igualdad de schema_ contra prod.
+- **R2 — `db push` post-merge falla** (out-of-order, error que el preview no
+  atrapó) → PR mergeado pero prod sin la migración (`main` adelantado a prod, el
+  problema inverso). Mitigación: el Environment-gated apply alerta y permite re-run;
+  el Preview Branch validó el SQL antes del merge; serializar migraciones sigue
+  siendo la red.
+- **R3 — Costo de CI**: boot de Docker + aplicar 474 migraciones en cada PR de DB.
+  Mitigación: paths-filter (solo PRs de DB), cache de imagen, medir. Si crece,
+  baseline-squash periódico de migraciones viejas (proyecto aparte).
+- **R4 — El gate por Environment añade un click manual de Beto por merge de DB.**
+  Aceptado como costo del control financiero.
+- **R5 — Outliers de naming/legacy** (`20260325_waitry_inbound_processing` + 14
+  no-op stubs whitelisted) podrían confundir a `db reset`/los generadores. Verificar
+  en S0; ya son stubs idempotentes.
+
+## Métricas de éxito
+
+- Cero `schema:check` rojo en PRs que no tocan `supabase/migrations/**`.
+- Cero conflictos de merge en `INITIATIVES.md` y `SCHEMA_REF.md`.
+- Cero "Remote migration versions not found" / `migration repair` manual tras
+  adoptar apply-post-merge.
+- **Gate de S0:** `supabase db reset --no-seed` + `schema:ref` contra la shadow DB
+  reproduce el `SCHEMA_REF.md` de prod byte-a-byte (ignorando la línea
+  `Last regenerated`).
+
+## Sprints / hitos
+
+- **Sprint 0 — De-risking (bloquea todo lo demás).** Reconciliar el ledger actual a
+  1:1 (curar huérfanas MCP vigentes). Correr `supabase db reset --no-seed` local/CI,
+  generar `SCHEMA_REF` desde la shadow DB y diff contra el de prod; resolver
+  cualquier drift de contenido (R1). **Entregable: prueba de que migraciones == prod.**
+- **Sprint 1 — `SCHEMA_REF` + `types` desde la shadow DB.** `gen-schema-ref` y
+  `db:types` apuntan a la shadow DB; nuevo job CI `schema-check` (`supabase db start`
+  - paths-filter D6); retirar `schema:check` del job `quality`. `npm run schema:ref`
+    local levanta la shadow DB (documentar en `GOVERNANCE.md` §3).
+- **Sprint 2 — INITIATIVES fuera del PR.** `initiatives:check` valida headers;
+  workflow `push:main` regenera la tabla y abre PR auto-merge; reescribir Regla 1 de
+  `CLAUDE.md`.
+- **Sprint 3 — db push al merge (raíz de proceso, D5).** GH Action post-merge corre
+  `supabase db push` gated por Environment (reviewer=Beto). Reescribir `GOVERNANCE.md`
+  §4 (de "db push local antes de mergear" a "db push automático al merge, nunca MCP")
+  - `CLAUDE.md` + memorias; retirar el flujo MCP+repair de la doc operativa.
+- **Sprint 4 — Closeout.** ADR ("Migraciones = fuente de verdad; derivados y prod se
+  sincronizan desde ahí, no al revés") — cruza varias iniciativas y cambia política
+  de proceso de DB, amerita ADR. Barrido de Reminders + cierre.
+
+## Bitácora
+
+- **2026-06-26** — Iniciativa promovida a `proposed`. Diagnóstico: ambos archivos
+  son derivados commiteados que chocan entre ramas; el `SCHEMA_REF` rojo es síntoma
+  de que prod se adelanta a `main` (apply pre-merge, a veces por MCP → ledger
+  divergente). Investigación confirmó: las 474 migraciones reconstruyen desde cero
+  (Preview Branch + `GOVERNANCE.md` §1/§3); la shadow DB debe ser stack Supabase
+  (189 archivos asumen roles de plataforma); `db-types.yml` ya es precedente del
+  patrón "regen fuera del PR". Alcance v1 cerrado con Beto: **check + raíz de
+  proceso**, **SCHEMA_REF + types juntos**. Pendiente para pasar a `planned`: OK de
+  Beto al gate financiero D5 + Sprint 0 de de-risking.
+- **2026-06-26** — **D5 cerrada** (Beto OK a merge-as-gate). **Sprint 0 arrancado.**
+  Diagnóstico del ledger de prod (MCP, read-only): `disk_only = 0` (las 473
+  migraciones de 14-díg de disco están todas registradas en prod) y `db_only = 2`,
+  ninguna problema — `20260325 waitry_inbound_processing` (falso positivo: stub
+  legacy alineado, GOVERNANCE §5) y `20260626222108 dilesa_obra_estimacion_cxp_espera`
+  (migración foránea de la sesión hermana `dilesa-obra-estimaciones-cxp`, aplicada a
+  prod sin mergear — no se toca). **El ledger ya está 1:1**; la mitad de
+  reconciliación del S0 es no-op (las curas anti-drift previas lo dejaron sano).
+  Resta el gate real: montado `schema-shadow-derisk.yml` (workflow throwaway) que
+  levanta una shadow DB con `supabase start`, genera el SCHEMA_REF desde migraciones
+  y desde prod, y los diffea — confirma R1 (que las migraciones reproducen prod).
