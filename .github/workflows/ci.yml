@@ -44,13 +44,14 @@ jobs:
       - name: Prettier — check
         run: npm run format:check
 
-      # Verifica que docs/strategy/INITIATIVES.md (tabla Activas) sigue en sync
-      # con los headers de docs/planning/*.md. Si alguien editó la tabla a mano,
-      # o promovió/cambió el estado de una iniciativa sin correr el generador,
-      # este step falla y pide correr `npm run initiatives:gen`. No necesita
-      # secrets — solo lee archivos del repo. Iniciativa cross-session-coordination.
-      - name: Initiatives index — drift check
-        run: npm run initiatives:check
+      # Valida los HEADERS de docs/planning/*.md (slug == archivo, y que cada
+      # iniciativa activa tenga nombre/Empresas/Schemas/Próximo hito/Última
+      # actualización). NO compara la tabla `## Activas` de INITIATIVES.md: esa
+      # se regenera en `main` post-merge (initiatives-regen.yml), no en las
+      # ramas — así INITIATIVES.md deja de ser hotspot de conflictos entre
+      # sesiones (iniciativa derivados-sin-drift, Sprint 2). Solo lee archivos.
+      - name: Initiatives headers — validate
+        run: npm run initiatives:validate
 
       # El drift de SCHEMA_REF se valida en el workflow `schema-check.yml`
       # (iniciativa derivados-sin-drift): regenera contra una shadow DB
