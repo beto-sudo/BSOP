@@ -4,7 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (pipeline de ventas: `venta_fases`, `ventas`, triggers de auto-cierre `fn_auto_preparada_entrega`/`tg_*`; posible columna de fecha de entrega física), `erp.adjuntos` (checklist pre-entrega ya existe como rol). UI: páginas de captura `app/dilesa/ventas/[id]/capturar/13-facturada`, `14-preparada-entrega`, `15-entregada`, `16-conformidad`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 3 — UI que distinga "pre-entrega/entrega registradas (fechadas) pendientes de factura" del estado de fase, sin renombrar fases (atiende DA-3 de ADR-052)
+**Próximo hito:** Sprint 3 — UI que distinga "pre-entrega/entrega registradas (fechadas) pendientes de factura" del estado de fase, sin renombrar fases (atiende DA-3 de ADR-053)
 **Dueño:** Beto
 **Creada:** 2026-06-26
 **Última actualización:** 2026-06-27 (Sprint 2 entregado: motor evento→fase + captura desacoplada — ver Bitácora)
@@ -44,7 +44,7 @@ al facturar, se pone al día de un salto a la fase que corresponde.
    - solo facturó → queda en **Facturada (13)**;
    - facturó + pre-entrega hecha → salta a **Preparada para Entrega (14)**;
    - facturó + ya entregada → salta a **Entregada (15)** (dispara la encuesta posventa).
-     > Corrige el off-by-one de la redacción original (decía 15/16). Detalle en ADR-052 D4.
+     > Corrige el off-by-one de la redacción original (decía 15/16). Detalle en ADR-053 D4.
 5. Las fechas de pre-entrega y entrega pueden ser **anteriores** a la de la
    factura (se respeta la fecha real de ejecución, no la de captura).
 
@@ -80,9 +80,9 @@ al facturar, se pone al día de un salto a la fase que corresponde.
 - **2026-06-27** — **Semántica del salto = último paso físico completado: 13 / 14
   / 15** (no 15/16). Confirmado por Beto y consistente con la convención de
   `fases.ts` ("fase = último paso completado") y con el auto-cierre ya en prod.
-  Corrige el off-by-one de la redacción inicial. (ADR-052 D4.)
+  Corrige el off-by-one de la redacción inicial. (ADR-053 D4.)
 - **2026-06-27** — **Modelo evento-vs-fase = columnas fechadas + motor único**
-  (ADR-052): `dilesa.ventas.fecha_pre_entrega` / `fecha_entrega` como eventos;
+  (ADR-053): `dilesa.ventas.fecha_pre_entrega` / `fecha_entrega` como eventos;
   `fn_avanzar_post_factura` (reemplaza a `fn_auto_preparada_entrega`) proyecta la
   posición y rellena `venta_fases` 14/15 con fechas reales. Disparado al facturar
   o al registrar el evento ya facturado.
@@ -99,8 +99,8 @@ al facturar, se pone al día de un salto a la fase que corresponde.
   factura (Julio César/M11-L4, Nancy/M22-L1, Christopher/M3-L16, Eduardo/M4-L29).
   Checklists conservados. Aplicado a prod por MCP + ledger reconciliado. Esto
   detuvo el síntoma; el rediseño (salto al facturar) queda pendiente.
-- **2026-06-27** — _Sprint 1 (diseño, sin código):_ **ADR-052** redactado
-  (`docs/adr/052_pipeline_eventos_fisicos_desacoplados.md`) — modelo evento-vs-fase,
+- **2026-06-27** — _Sprint 1 (diseño, sin código):_ **ADR-053** redactado
+  (`docs/adr/053_pipeline_eventos_fisicos_desacoplados.md`) — modelo evento-vs-fase,
   columnas `fecha_pre_entrega`/`fecha_entrega`, motor `fn_avanzar_post_factura`
   (14/15), disparadores, anti-redisparo vía `regresarAFase` (D7), side-effects de
   encuesta. **Off-by-one corregido** (14/15, no 15/16) tras confirmación de Beto.
@@ -125,7 +125,7 @@ al facturar, se pone al día de un salto a la fase que corresponde.
 
 ## Sprints / hitos
 
-- **Sprint 1 — ✅ hecho (2026-06-27):** ADR-052 (modelo evento-vs-fase + diseño
+- **Sprint 1 — ✅ hecho (2026-06-27):** ADR-053 (modelo evento-vs-fase + diseño
   del motor de salto al facturar, 13 → 14/15). Sin código de app.
 - **Sprint 2 — ✅ entregado (2026-06-27), pendiente de merge:** columnas
   `fecha_pre_entrega`/`fecha_entrega`; motor `fn_avanzar_post_factura` (14/15) +

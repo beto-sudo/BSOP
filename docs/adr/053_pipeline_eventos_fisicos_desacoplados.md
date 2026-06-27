@@ -1,10 +1,19 @@
-# ADR-052 — Pre-entrega y entrega como eventos físicos desacoplados de la posición de fase
+# ADR-053 — Pre-entrega y entrega como eventos físicos desacoplados de la posición de fase
 
-- **Status**: Proposed (Sprint 1 — pendiente del OK de Beto al mergear)
+- **Status**: Accepted (Sprint 1-2 en prod — #1102 + #1103)
 - **Date**: 2026-06-27
 - **Authors**: Beto, Claude Code
 - **Iniciativa**: [`dilesa-entrega-desacoplada`](../planning/dilesa-entrega-desacoplada.md)
 - **Relacionado**: [`dilesa-fases-venta-fuente-unica`] (convención "fase = último paso completado", `lib/dilesa/fases.ts`); ADR-051 (separación captura↔avance); hotfix `20260627010103` (revierte el gate F14 a Facturada(13))
+
+> **Nota de numeración (2026-06-27):** este ADR nació como **052** (#1102) pero
+> colisionó con el ADR-052 de la iniciativa `arrendamiento`, que mergeó el mismo
+> día con el mismo número. Se renumeró a **053**. Aunque este ADR mergeó primero,
+> el desempate lo paga él (no arrendamiento) por la regla "una iniciativa = una
+> sesión": renumerar el ADR de arrendamiento implicaría tocar archivos de otra
+> iniciativa activa. La migración ya aplicada `20260627203307` y los `COMMENT ON`
+> que dejó en la DB lo referencian por el número original (052) — son inmutables,
+> no se reescriben.
 
 ---
 

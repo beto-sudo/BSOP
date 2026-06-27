@@ -307,7 +307,7 @@ async function regresarAFaseInner(
     update.notif_hold_creado_at = null;
     update.notif_hold_4h_at = null;
   }
-  // ADR-052 D7: al deshacer una pre-entrega/entrega, borrar su fecha-evento. Si no,
+  // ADR-053 D7: al deshacer una pre-entrega/entrega, borrar su fecha-evento. Si no,
   // el motor `fn_avanzar_post_factura` la re-empujaría a 14/15 en cuanto se vuelva a
   // tocar la venta (es el loop "regresas de fase y se re-adelanta" del incidente).
   if (faseDestino < 15) update.fecha_entrega = null;

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Captura Fase 15 — Entregada (dilesa-ventas-expediente / ADR-052).
+ * Captura Fase 15 — Entregada (dilesa-ventas-expediente / ADR-053).
  *
  * Modelo evento-vs-fase: la entrega física al cliente es un EVENTO con fecha
  * real, NO un avance de fase. Se imprime el Checklist para Entrega de Vivienda
