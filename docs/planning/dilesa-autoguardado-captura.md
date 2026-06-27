@@ -3,11 +3,11 @@
 **Slug:** `dilesa-autoguardado-captura`
 **Empresas:** DILESA
 **Schemas afectados:** ninguno nuevo — escribe en las columnas/RPCs que ya existen (`dilesa.ventas`, `dilesa.venta_encuestas`, `fn_actualizar_descuentos_venta`, `fn_corregir_avaluo_venta`). Cambio de **momento** de escritura (al teclear, no al avanzar), no de modelo.
-**Estado:** in_progress
-**Próximo hito:** Mergear [#1085](https://github.com/beto-sudo/BSOP/pull/1085) (autoguardado fase 8) tras revisión en preview con una venta real (sin auto-merge por financiero). Luego **Parte B** del handoff: chequeo de persistencia E2E auto-limpiante con write al bot e2e (requiere decisión de aplicar el grant a prod).
+**Estado:** done
+**Próximo hito:** — (iniciativa cerrada 2026-06-26)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (Sprint 3b: autoguardado de la fase 8 en [#1085](https://github.com/beto-sudo/BSOP/pull/1085) — cierra el rollout de campos. **9/9 fases con campos cableadas** [9/4/7/11/3/5/6/12/8]; 15/16 fuera por diseño. Pendiente: merge de #1085 en preview + **Parte B** del handoff, chequeo de persistencia)
+**Última actualización:** 2026-06-26 (CERRADA. Parte A — autoguardado de la fase 8 en prod [#1085](https://github.com/beto-sudo/BSOP/pull/1085); Parte B — chequeo E2E de persistencia (mock del PATCH, cero escritura en prod) verde [#1090](https://github.com/beto-sudo/BSOP/pull/1090). **9/9 fases con campos cableadas y verificadas**; 15/16 fuera por diseño.)
 
 > Detonante: el barrido de las 17 fases (al arreglar la persistencia de **documentos** en
 > fases 2 y 8, PRs #1067/#1070/#1071) dejó ver que los **campos** siguen el patrón viejo:
@@ -120,6 +120,17 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   (`precioCambio`/`imprimirRefirma`/`confirmarRefirma`). **Sin auto-merge** (financiero → revisión en
   preview con venta real). Con esto, **9/9 fases con campos quedan cableadas**; 15/16 fuera por
   diseño. **Falta la Parte B**: chequeo de persistencia E2E auto-limpiante con write al bot e2e.
+- **2026-06-26 (Parte B — chequeo E2E, [PR #1090](https://github.com/beto-sudo/BSOP/pull/1090))** —
+  Test `tests/e2e/smoke/auth-dilesa-fase8-autoguardado.spec.ts`: teclear un campo del dictamen dispara
+  el UPDATE de los 6 campos a `dilesa.ventas`. **Cero escritura en prod (decisión Beto)**: el test
+  intercepta toda escritura a `dilesa.ventas` con `page.route` y la mockea (204) — el PATCH del
+  autoguardado nunca toca la DB; limpieza por diseño, no por restore. El bot (rol no-Dirección, como
+  Gerencia) ejercita el gate `!yaCerrada || esDireccion` en el form de cierre. Grant de write al bot en
+  `fase08_dictaminada` **temporal** (otorgar→correr→revertir; con el mock nunca se ejerce — solo monta
+  el form gated; SQL en el header del spec). **Verificado en prod**: test verde (2 passed), bot de
+  vuelta a 0 escritura en todas las fases, venta de prueba intacta (`credito_cotitular_ref` sigue
+  NULL). **Hallazgo**: las 11 ventas con el form de fase 8 abierto son reales/activas → se descartó
+  tocar una con restore (riesgo de colisión + basura si crashea) a favor del mock. **Iniciativa cerrada.**
 
 ## Decisiones registradas
 
@@ -136,6 +147,14 @@ Fases sin campos (no entran): 2 (solo archivos), 13 (derivados del XML), 14, 17.
   captura **atómica de una sola persona** sin separación de roles (F15 notas, F16 encuesta) — no hay
   pérdida cross-rol y la F16 escribe a `venta_encuestas` con estado, donde un guardado parcial es
   ambiguo. El autoguardado se reserva para campos con destino directo y/o riesgo de pérdida cross-rol.
+- **2026-06-26 (chequeo E2E = mock del PATCH, no escritura real)** — el harness corre contra prod y las
+  únicas ventas con el form de fase 8 abierto son reales/activas. En vez de tocar una con
+  leer→modificar→restaurar (riesgo de colisión con el equipo + basura si el browser crashea antes del
+  restore), el test intercepta el PATCH del autoguardado y lo mockea: verifica que dispara el UPDATE
+  correcto sin escribir. Cumple la condición dura de Beto (cero basura) **por diseño**, no por restore.
+  La persistencia física en Postgres no se ejercita (ya probada idéntica en 8 fases). El grant de write
+  al bot es **temporal** (mínimo privilegio): con el mock el bot nunca escribe, así que su estado seguro
+  es 0 escritura — no se deja un grant permanente.
 
 ## Handoff — Fase 8 (Dictaminada) + chequeo de persistencia (sesión limpia)
 
@@ -194,4 +213,9 @@ Plan (mismo patrón que las otras 8 fases):
 
 ## Done
 
-_(nada aún)_
+- **2026-06-26** — Iniciativa completa. Autoguardado de campos en las **9 fases con campos** (rollout
+  por sprints 1-3b); la fase 8 (financiera) con gate Gerencia-autoguarda / Dirección-cierra (ADR-051
+  D5 + ADR-048); + chequeo E2E de persistencia (mock del PATCH, cero escritura en prod). PRs
+  #1072/#1079/#1080/#1085 (autoguardado) + #1090 (E2E). Outcome: lo que se teclea en cualquier captura
+  de fase ya no se pierde al salir sin avanzar — paridad con los documentos. F15/F16 fuera por diseño
+  (captura atómica de una sola persona, sin pérdida cross-rol).
