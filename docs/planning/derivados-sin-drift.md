@@ -4,10 +4,10 @@
 **Empresas:** todas (infraestructura del repo / proceso de DB)
 **Schemas afectados:** ninguno de aplicación. Toca el **proceso** de migraciones y el tooling/CI: `package.json`, `scripts/gen-schema-ref.ts`, `scripts/gen-initiatives.ts`, `.github/workflows/{ci,db-types,drift-check}.yml` (+ workflows nuevos), `supabase/GOVERNANCE.md`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`, `supabase/SCHEMA_REF.md`, `types/supabase.ts`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 1 construido (modelo nuevo): workflow `schema-check.yml` valida `SCHEMA_REF` contra una shadow DB (no prod) + `types` desde shadow + retiro del `schema:check` viejo del job `quality`. En verificación: el `schema-check` del PR del S1 confirma shadow == prod (las 3 sesiones serializadas). Sigue: Sprint 2 (INITIATIVES fuera del PR) + Sprint 3 (db push al merge con gate financiero D5) + agregar `schema-check` a required en branch protection.
+**Próximo hito:** S0/S0.5/S1/S2 en main (#1093, #1095, #1096). **Beto revisa y mergea el Sprint 3 ([#1097](https://github.com/beto-sudo/BSOP/pull/1097), sin auto-merge)**: el clasificador financiero + el cambio de hábito (migraciones se aplican al merge). Tras mergear, config de Beto (admin): crear label `finanzas-ok` + agregar `Gate de migraciones financieras` a required en branch protection (como se hizo con `schema-check` del S1). Con eso → iniciativa **done**.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-27 (S0 + S0.5 cerrados — reconciliación en main vía #1093; Sprint 1 construido — modelo `SCHEMA_REF`/`types` desde shadow)
+**Última actualización:** 2026-06-27 (S1 + S2 mergeados a main; S3 en PR #1097 para revisión de Beto; OrbStack local reparado)
 
 ## Problema
 
@@ -187,3 +187,28 @@ NOT EXISTS ... REFERENCES/DEFAULT` (no reproducible). `SCHEMA_REF`/`types`
   las 3. Pendiente para cerrar la iniciativa: Sprint 2 (INITIATIVES fuera del PR),
   Sprint 3 (db push al merge con gate D5), y agregar `schema-check` a required en
   branch protection.
+- **2026-06-27** — **S1 mergeado** (#1095) + `schema-check` agregado a required en
+  branch protection (vía API, OK de Beto). El `schema-check` shadow del PR confirmó
+  shadow == prod (solo difería en comentarios; el `SCHEMA_REF`/`types` commiteado se
+  regeneró desde la shadow para reflejar las migraciones, no prod).
+- **2026-06-27** — **S2 mergeado** (#1096): `initiatives:validate` (valida headers)
+  reemplaza a `initiatives:check` en el job `quality`; la tabla `## Activas` se
+  regenera en `main` post-merge (`initiatives-regen.yml`); las ramas dejan de
+  tocarla → fin de los conflictos de merge en INITIATIVES. `CLAUDE.md` Regla 1
+  reescrita. (initiatives-regen requiere que Beto agregue `github-actions[bot]` a la
+  bypass list de branch protection para el commit directo; mientras, deja warning.)
+- **2026-06-27** — **S3 construido, en PR #1097 (SIN auto-merge — espera revisión de
+  Beto, toca aplicación a prod + control financiero).** `db-push-on-merge.yml` aplica
+  las migraciones a prod **al mergear** (`supabase db push`, nunca antes/MCP) → prod
+  no se adelanta a `main`, ledger no deriva. Gate D5: `financial-migration-guard` +
+  `classify-financial-migration.ts` bloquean el auto-merge de migraciones financieras
+  (clasificador heurístico amplio, probado) → las mergea Dirección con label
+  `finanzas-ok`. `GOVERNANCE.md` §4 + `CLAUDE.md` reescritos. Trabajo autónomo nocturno
+  (Beto durmiendo): S2 auto-mergeado por bajo riesgo; S3 dejado en PR por tocar
+  finanzas/prod.
+- **2026-06-27** — **OrbStack reparado** (fuera de la iniciativa, pero lo destapó el
+  S1): el `supabase start` del S1 dejó el overlayfs de containerd corrupto (snapshot
+  240 huérfano) tras un timeout de VM. `docker system prune -af` (solo borró imágenes
+  de Supabase re-descargables; 0 datos) lo limpió. `supabase start` + `npm run db:regen`
+  verificados local: reproducen el `SCHEMA_REF`/`types` exactos (242 tablas). Flujo
+  local del modelo nuevo funcionando en la máquina de Beto.
