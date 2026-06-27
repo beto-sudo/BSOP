@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (pipeline de ventas: `venta_fases`, `ventas`, triggers de auto-cierre `fn_auto_preparada_entrega`/`tg_*`; posible columna de fecha de entrega física), `erp.adjuntos` (checklist pre-entrega ya existe como rol). UI: páginas de captura `app/dilesa/ventas/[id]/capturar/13-facturada`, `14-preparada-entrega`, `15-entregada`, `16-conformidad`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — captura de pre-entrega (desde 11) y entrega (desde 12) como eventos con fecha editable, sin avanzar fase (columnas `fecha_pre_entrega`/`fecha_entrega` + action `registrarEventoEntrega`)
+**Próximo hito:** Sprint 3 — UI que distinga "pre-entrega/entrega registradas (fechadas) pendientes de factura" del estado de fase, sin renombrar fases (atiende DA-3 de ADR-052)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-27 (Sprint 1 cerrado: ADR-052 + off-by-one corregido — ver Bitácora)
+**Última actualización:** 2026-06-27 (Sprint 2 entregado: motor evento→fase + captura desacoplada — ver Bitácora)
 
 ## Problema
 
@@ -107,15 +107,32 @@ al facturar, se pone al día de un salto a la fase que corresponde.
   Mapeado el tramo 13→17 vivo (triggers en prod + código TS). Decisiones abiertas
   DA-1/DA-2/DA-3 anotadas en el ADR para revisión. Pendiente: OK de Beto al
   mergear → arranca Sprint 2.
+- **2026-06-27** — _Sprint 2 (backend + captura, atómico):_ migración
+  `20260627203307` — columnas `fecha_pre_entrega`/`fecha_entrega`, motor
+  `fn_avanzar_post_factura` (reemplaza `fn_auto_preparada_entrega`; cubre 14 y 15),
+  dos disparadores (al facturar / al fechar evento), backfill desde el historial,
+  `NOTIFY pgrst`. `regresarAFase` anula las fechas que deshace (D7). Páginas 14 y
+  15 reescritas: registran el evento con fecha editable (sin `marcarFase`); helper
+  `registrarEventoEntrega`. `GATE_PREVIA_OVERRIDE = {14:11, 15:12}` para habilitar
+  la captura adelantada (ya no avanza fase). El shadow-reset destapó un 2º gatillo
+  vivo en `erp.adjuntos` (`trg_auto_preparada_entrega_adjunto`) que también se
+  retira. **Decisión:** se fusionaron los S2+S3 originales (captura y motor son
+  interdependientes — desacoplar sin el motor dejaría las entregas sin avanzar);
+  la UI distintiva pasa a Sprint 3. Notas de entrega (campo opcional viejo)
+  omitidas en la captura nueva — menor, a reponer si Beto las pide. CI local verde
+  (typecheck/lint/test+cov/format/schema/initiatives). Migración **financiera** →
+  pendiente del "dale" de Beto para `finanzas-ok` + merge.
 
 ## Sprints / hitos
 
 - **Sprint 1 — ✅ hecho (2026-06-27):** ADR-052 (modelo evento-vs-fase + diseño
-  del motor de salto al facturar, 13 → 14/15). Sin código de app aún.
-- **Sprint 2 (siguiente):** columnas `fecha_pre_entrega`/`fecha_entrega` +
-  `registrarEventoEntrega`; captura de pre-entrega desde la 11 y entrega desde la
-  12 como eventos con fecha editable, sin avanzar fase.
-- **Sprint 3:** motor `fn_avanzar_post_factura` (reemplaza `fn_auto_preparada_entrega`)
-  - disparadores + anti-redisparo en `regresarAFase` + manejo de la encuesta.
-- **Sprint 4:** UI del listado/detalle que distinga "pre-entrega/entrega hechas,
-  pendiente de factura" del estado de fase (atiende DA-3, sin renombrar fases).
+  del motor de salto al facturar, 13 → 14/15). Sin código de app.
+- **Sprint 2 — ✅ entregado (2026-06-27), pendiente de merge:** columnas
+  `fecha_pre_entrega`/`fecha_entrega`; motor `fn_avanzar_post_factura` (14/15) +
+  disparadores + anti-redisparo en `regresarAFase`; páginas 14/15 como captura de
+  evento (`registrarEventoEntrega`); backfill. (Fusiona el S2+S3 originales: la
+  captura desacoplada y el motor son interdependientes.)
+- **Sprint 3 (siguiente):** UI del listado/detalle que distinga "pre-entrega/
+  entrega registradas (fechadas), pendiente de factura" del estado de fase
+  (atiende DA-3, sin renombrar fases). Incluye reflejar el evento en el pipeline
+  del provider antes de facturar (hoy se ve "no alcanzada" hasta el salto).

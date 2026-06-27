@@ -238,15 +238,20 @@ export const CAPTURA_MODULO_BY_POSICION: Record<number, string> = {
 /**
  * Gate de apertura por fase cuando NO es la inmediata anterior.
  *
- * Vacío a propósito (2026-06-25, Beto): el pipeline avanza estrictamente de 1
- * en 1 — ninguna fase "abre" brincándose las intermedias. La preparación de
- * entrega (14) puede *adelantar su documento* (el checklist se sube desde la
- * Escritura/11 en su page), pero eso NO avanza la fase: la 14 la cierra
- * AUTOMÁTICAMENTE el trigger `dilesa.fn_auto_preparada_entrega` cuando coinciden
- * Facturada (13) cerrada + checklist cargado. Habilitar la acción ≠ estar en la
- * fase. Antes existía `{ 14: 11 }` y dejaba que la 14 saltara 12/13.
+ * Modelo evento-vs-fase (ADR-052): la pre-entrega (14) y la entrega (15) son
+ * EVENTOS que se registran antes de facturar — la 14 desde la Escritura (11), la
+ * 15 desde el pago/Detonada (12). El override habilita su *captura* desde ahí,
+ * pero ya NO avanza la fase: las pantallas solo fechan el evento (no llaman
+ * `marcarFase`); el avance lo gobierna el motor `dilesa.fn_avanzar_post_factura`,
+ * que exige la Factura (13) como candado. Por eso re-habilitar `{14:11, 15:12}`
+ * no reintroduce el salto que motivó vaciarlo el 2026-06-25 (entonces la página
+ * SÍ avanzaba; ahora no). "Habilitar la acción ≠ estar en la fase", ahora cierto
+ * por diseño.
  */
-export const GATE_PREVIA_OVERRIDE: Record<number, number> = {};
+export const GATE_PREVIA_OVERRIDE: Record<number, number> = {
+  14: 11,
+  15: 12,
+};
 
 /**
  * Las 17 fases canónicas en orden — para mostrar incluso las no alcanzadas.
