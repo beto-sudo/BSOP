@@ -15,7 +15,7 @@ import { DEFAULT_CLAUDE_MODEL, DEFAULT_EMBEDDING_MODEL } from './models';
 
 export type AiProveedor = 'anthropic' | 'openai';
 export type AiEmpresa = 'cross' | 'dilesa' | 'rdb' | 'ansa' | 'coagan' | 'nigropetense' | 'sanren';
-export type AiModalidad = 'vision-extraccion' | 'embedding';
+export type AiModalidad = 'vision-extraccion' | 'embedding' | 'generacion-texto';
 /** alta = romper este uso detiene un flujo operativo crítico. */
 export type AiCriticidad = 'alta' | 'media' | 'baja';
 
@@ -156,6 +156,19 @@ export const AI_USOS = {
     descripcion:
       'Lee el PDF/imagen del recibo (CFE/SIMAS/Conagas) y extrae montos, lecturas, vencimiento, tarifa y desglose para prellenar la captura.',
     archivo: 'lib/sanren/recibo-extraccion.ts',
+  },
+  'daily-briefing': {
+    label: 'Briefing diario matutino (Beto)',
+    empresa: 'cross',
+    proveedor: 'anthropic',
+    modalidad: 'generacion-texto',
+    modeloDefault: DEFAULT_CLAUDE_MODEL,
+    envVar: 'ANTHROPIC_API_KEY',
+    criticidad: 'baja',
+    descripcion:
+      'Redacta el briefing diario (salud + tipo de cambio/noticias/IA/péptidos vía web search) que el cron manda por correo a las 7am.',
+    archivo: 'app/api/cron/daily-briefing/route.ts',
+    nota: 'Usa la web-search tool de Anthropic (server-side); su costo por búsqueda NO entra en el token-pricing de core.ai_invocaciones.',
   },
 } as const satisfies Record<string, AiUso>;
 

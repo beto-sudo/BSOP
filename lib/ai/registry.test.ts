@@ -21,6 +21,7 @@ const USOS_ESPERADOS = [
   'dilesa-pld-informe',
   'dilesa-pld-acuse',
   'sanren-recibo-extraccion',
+  'daily-briefing',
 ] as const;
 
 describe('registro-ia · registry', () => {
@@ -41,7 +42,7 @@ describe('registro-ia · registry', () => {
       if (u.proveedor === 'anthropic') {
         expect(u.modeloDefault, id).toBe(DEFAULT_CLAUDE_MODEL);
         expect(u.envVar, id).toBe('ANTHROPIC_API_KEY');
-        expect(u.modalidad, id).toBe('vision-extraccion');
+        expect(['vision-extraccion', 'generacion-texto'], id).toContain(u.modalidad);
       } else {
         expect(u.modeloDefault, id).toBe(DEFAULT_EMBEDDING_MODEL);
         expect(u.envVar, id).toBe('OPENAI_API_KEY');
