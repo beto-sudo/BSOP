@@ -81,6 +81,8 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // del primer tab (`.pagos`). ADR-030 SS2.
   '/dilesa/cobranza': 'dilesa.cobranza.pagos',
   '/dilesa/cobranza/aging': 'dilesa.cobranza.aging',
+  // Arrendamiento — módulo simple (iniciativa `arrendamiento` S1d).
+  '/dilesa/arrendamiento': 'dilesa.arrendamiento',
   // Saldos Bancos — hub con 2 tabs (iniciativa `conciliacion-bancaria` v0,
   // ADR-030). El padre `dilesa.saldos-bancos` queda como umbrella; la URL
   // default mapea al sub-slug del primer tab (`.saldos`).

@@ -323,6 +323,8 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.cobranza',
   'dilesa.cobranza.pagos',
   'dilesa.cobranza.aging',
+  // Arrendamiento — módulo simple (iniciativa `arrendamiento` S1d).
+  'dilesa.arrendamiento',
   // CxP (Cuentas por Pagar) — hub con 5 tabs (ADR-030). El padre `dilesa.cxp`
   // queda como umbrella; cada tab tiene su sub-slug. Migración base
   // 20260602010000_modulos_dilesa_cxp.sql; programacion/pagos (Sprint 4) en
