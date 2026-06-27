@@ -74,6 +74,29 @@ describe('deriveEstadoCuenta (contrato de obra — D4/D5)', () => {
   it('contratado en 0 no divide entre cero', () => {
     expect(deriveEstadoCuenta(0, [est({ monto_total: 100 })]).avancePct).toBe(0);
   });
+
+  it('la amortización automática (S3) reduce el devengado neto y baja el anticipo por amortizar', () => {
+    // Contrato 100, anticipo 30 + avance 100 que amortiza 30 → devengado neto 100.
+    const c = deriveEstadoCuenta(100, [
+      est({ monto_total: 30, es_anticipo: true }),
+      est({ monto_total: 100, amortizacion_aplicada: 30 }),
+    ]);
+    expect(c.devengado).toBe(100); // 30 + (100 − 30)
+    expect(c.anticipoEntregado).toBe(30);
+    expect(c.anticipoAmortizado).toBe(30);
+    expect(c.anticipoPorAmortizar).toBe(0);
+  });
+
+  it('suma amortización automática y manual (negativa) sin doble contar el devengado', () => {
+    const c = deriveEstadoCuenta(200, [
+      est({ monto_total: 60, es_anticipo: true }),
+      est({ monto_total: 100, amortizacion_aplicada: 30 }), // automática
+      est({ monto_total: -30 }), // negativa manual histórica
+    ]);
+    expect(c.devengado).toBe(100); // 60 + (100−30) + (−30)
+    expect(c.anticipoAmortizado).toBe(60); // 30 auto + 30 manual
+    expect(c.anticipoPorAmortizar).toBe(0); // 60 entregado − 60 amortizado
+  });
 });
 
 describe('findFacturaTotal', () => {

@@ -71,6 +71,8 @@ export type ObraEstimacion = {
   motivo_cancelacion: string | null;
   /** S2: motivo del override del tope vs contrato (obra extra). NULL = dentro del valor. */
   tope_override_motivo: string | null;
+  /** S3: anticipo amortizado en este avance (congelado al autorizar). */
+  amortizacion_aplicada: number;
 };
 
 type FacturaContrato = FacturaCuenta & { id: string; fecha_emision: string | null };
@@ -156,7 +158,7 @@ export function ObraContratoDetalle({
     const { data, error: e } = await (sb.schema('dilesa') as any)
       .from('obra_estimaciones')
       .select(
-        'id, orden, etiqueta, fecha, factura_ref, monto_total, retencion, es_anticipo, es_finiquito, nota_pago, estado, autorizada_at, cancelada_at, motivo_cancelacion, tope_override_motivo'
+        'id, orden, etiqueta, fecha, factura_ref, monto_total, retencion, es_anticipo, es_finiquito, nota_pago, estado, autorizada_at, cancelada_at, motivo_cancelacion, tope_override_motivo, amortizacion_aplicada'
       )
       .eq('empresa_id', DILESA_EMPRESA_ID)
       .eq('contrato_id', contratoId)
@@ -186,6 +188,7 @@ export function ObraContratoDetalle({
       cancelada_at: (r.cancelada_at as string | null) ?? null,
       motivo_cancelacion: (r.motivo_cancelacion as string | null) ?? null,
       tope_override_motivo: (r.tope_override_motivo as string | null) ?? null,
+      amortizacion_aplicada: Number(r.amortizacion_aplicada ?? 0),
     }));
     setEstimaciones(rows);
 
@@ -584,9 +587,10 @@ export function ObraContratoDetalle({
                 </div>
               </div>
               <p className="mt-2 text-[11px] text-[var(--text)]/50">
-                Nace en <strong>borrador</strong>; Dirección la autoriza para que cuente como
-                devengo. Las amortizaciones del anticipo se capturan como monto negativo (ej.
-                −68,500).
+                Captura el avance <strong>bruto</strong>. Nace en <strong>borrador</strong>;
+                Dirección la autoriza para que cuente como devengo. Al autorizar, el sistema{' '}
+                <strong>amortiza el anticipo automáticamente</strong> (anticipo % del avance) y la
+                factura/pago salen netos — ya no hace falta capturar la amortización a mano.
               </p>
               <div className="mt-3 flex items-center justify-end gap-2">
                 <Button
@@ -697,6 +701,14 @@ export function ObraContratoDetalle({
                       className={`py-1.5 pr-3 text-right tabular-nums ${e.monto_total < 0 ? 'text-destructive' : 'text-[var(--text)]'}`}
                     >
                       {formatCurrency(e.monto_total)}
+                      {e.amortizacion_aplicada > 0 ? (
+                        <div
+                          className="text-[10px] text-amber-600"
+                          title="Amortización del anticipo descontada del neto a CxP"
+                        >
+                          − amort {formatCurrency(e.amortizacion_aplicada)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="py-1.5 pr-3 text-[var(--text)]/60">{e.nota_pago ?? '—'}</td>
                     <td className="py-1.5 pr-3">
@@ -898,7 +910,9 @@ function CeldaPago({
       </Link>
     );
   }
-  const neto = (est.monto_total ?? 0) - (est.retencion ?? 0);
+  // Neto a pagar: monto − retención − amortización del anticipo (S3). Espejo del
+  // cálculo server-side en cxp_pago_desde_estimacion.
+  const neto = (est.monto_total ?? 0) - (est.retencion ?? 0) - (est.amortizacion_aplicada ?? 0);
   if (est.estado === 'autorizada' && neto > 0 && tieneFactura && puedeCrear) {
     return (
       <button

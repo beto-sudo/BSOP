@@ -20,6 +20,8 @@ export type EstimacionCuenta = {
   retencion: number;
   es_anticipo: boolean;
   estado: ObraEstimacionEstado;
+  /** S3: anticipo amortizado en este avance (congelado al autorizar). */
+  amortizacion_aplicada?: number;
 };
 
 export type FacturaCuenta = {
@@ -33,7 +35,7 @@ export type FacturaCuenta = {
 
 export type EstadoCuentaContrato = {
   contratado: number;
-  /** Σ estimaciones autorizadas+pagadas (neto: incluye amortizaciones negativas). */
+  /** Σ estimaciones autorizadas+pagadas, NETO: monto − amortización (negativas manuales + automática del anticipo, S3). */
   devengado: number;
   porDevengar: number;
   /** % de avance financiero (devengado / contratado). */
@@ -48,7 +50,7 @@ export type EstadoCuentaContrato = {
   retenciones: number;
   /** Σ estimaciones positivas marcadas anticipo (autorizadas+pagadas). */
   anticipoEntregado: number;
-  /** |Σ estimaciones negativas| (amortizaciones autorizadas+pagadas). */
+  /** Anticipo recuperado: |Σ negativas manuales| + Σ amortización automática (S3). */
   anticipoAmortizado: number;
   anticipoPorAmortizar: number;
 };
@@ -73,15 +75,21 @@ export function deriveEstadoCuenta(
 
   for (const e of estimaciones) {
     const monto = e.monto_total ?? 0;
+    const amort = e.amortizacion_aplicada ?? 0;
     if (e.estado === 'borrador') {
       pendienteAutorizar += monto;
       continue;
     }
     if (!ESTADOS_DEVENGO.includes(e.estado)) continue; // cancelada
-    devengado += monto;
+    // Devengado NETO (S3): el bruto del avance menos la amortización automática
+    // del anticipo congelada en la fila (espejo del tope server-side).
+    devengado += monto - amort;
     retenciones += e.retencion ?? 0;
     if (monto > 0 && e.es_anticipo) anticipoEntregado += monto;
+    // Anticipo recuperado: amortización manual (estimación negativa, histórico)
+    // + amortización automática del anticipo (S3).
     if (monto < 0) anticipoAmortizado += -monto;
+    anticipoAmortizado += amort;
   }
 
   let facturado = 0;

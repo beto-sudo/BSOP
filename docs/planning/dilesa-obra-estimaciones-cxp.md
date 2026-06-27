@@ -4,7 +4,7 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (`obra_estimaciones`, `contratos_construccion`: amortización de anticipo, retención acumulada, topes), `erp` (`facturas`/`cxp_pagos` ligas a obra; nuevo/ajuste de RPC de emisión en espera-del-XML), UI en `app/dilesa/construccion/contratos/**` y `components/cxp/**`
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 **en prod** (PR #1087 mergeado, migración `20260626232311` aplicada + ledger reconciliado). Arranca el **Sprint 3** — amortización **lineal** del anticipo (descontar `anticipo_pct` en cada estimación de avance al emitir a CxP; mostrar "anticipo por amortizar" en el estado de cuenta).
+**Próximo hito:** Sprint 3 **construido** (PR abierto, sin auto-merge por ser migración financiera) — falta aplicar la migración `20260627010241` a prod con OK de Beto + regenerar SCHEMA_REF/types; luego arranca el Sprint 4 (retención acumulada + liberación en finiquito).
 **Dueño:** Beto
 **Creada:** 2026-06-26
 **Última actualización:** 2026-06-26
@@ -36,7 +36,7 @@ El control presupuestal de los contratos de obra ya existe (compromiso por parti
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
 | 1   | **Estimación de obra → CxP "en espera del XML".** Al pasar a CxP, crear la factura en espera (borrador + `obra_estimacion_id`) por el neto, que aparezca en la bandeja de Facturas y se reciba con `cxp_factura_recibir_cfdi` (XML del contratista) igual que los destajos de vivienda. Unificar el auto-match de la bandeja para reconocer ambos orígenes (destajo y obra). | ✅ prod (#1083) |
 | 2   | **Tope duro vs valor del contrato.** Bloquear autorizar/emitir estimaciones cuyo acumulado supere el `valor_total` del contrato; override explícito de Dirección para obra extra, con motivo + audit.                                                                                                                                                                        | ✅ prod (#1087) |
-| 3   | **Amortización automática del anticipo.** Modelar el anticipo como saldo a recuperar; descontar la proporción (`anticipo_pct`) en cada estimación de avance al emitir a CxP; mostrar "anticipo por amortizar" en el estado de cuenta del contrato.                                                                                                                           | pending         |
+| 3   | **Amortización automática del anticipo.** Modelar el anticipo como saldo a recuperar; descontar la proporción (`anticipo_pct`) en cada estimación de avance al emitir a CxP; mostrar "anticipo por amortizar" en el estado de cuenta del contrato.                                                                                                                           | build ✓ (PR)    |
 | 4   | **Retención acumulada + liberación en finiquito.** Contador del fondo de garantía retenido por contrato; paso guiado de liberación en la estimación de finiquito, con su control y audit.                                                                                                                                                                                    | pending         |
 
 > S1 es independiente y de valor inmediato (unifica el flujo). S2-S4 son el endurecimiento del control y comparten las decisiones abiertas de abajo.
@@ -86,6 +86,16 @@ Migración financiera → archivo `db:new`, aplicar con OK de Beto. La amortizac
 
 **Técnico:** la firma de `obra_estimacion_autorizar` cambia `(uuid)` → `(uuid, text)` (DROP+CREATE, re-grant authenticated+service_role sin PUBLIC). Helper puro `excedeTopeContrato` (espejo del guard, testeado) para que el front pida el override antes de llamar; la RPC re-valida server-side.
 
+### 2026-06-26 — Decisión de Beto + plan técnico del Sprint 3 (amortización del anticipo)
+
+**Decisión de Beto (cierra el modelo de facturación):** el contratista factura el avance **NETO** del anticipo amortizado ("Neto en la factura"). El operador captura el avance **bruto**; el sistema calcula la amortización y la factura/pago nacen netas. (Se descartó "Bruto + descuento al pagar" — más fiel a obra pública pero exige un mecanismo de aplicar-anticipo-contra-saldo; los datos además mostraban captura bruto + negativa, que esto reemplaza.)
+
+**Fórmula (D-a, lineal):** `amortizacion = LEAST(round(anticipo_pct × monto, 2), anticipo_pendiente, monto)`, congelada en `dilesa.obra_estimaciones.amortizacion_aplicada` **al autorizar**. `anticipo_pendiente = anticipo_entregado − ya_amortizado`, donde `ya_amortizado` = amortización automática previa **+ negativas manuales históricas** (no duplica en los 2 contratos que las usan). Solo avances **positivos** que **no** sean el anticipo; contratos con `anticipo_pct > 0` y anticipo entregado. Validado en prod: 60%/50%/30% se aplican bien y el caso ya sobre-amortizado (I65) da 0.
+
+**Neto a CxP** (factura en espera + pago) = `monto − retención − amortizacion_aplicada`. El **tope del S2 se ajusta** a medir el **devengado neto** (`Σ monto − Σ amortizacion_aplicada`) para que siga cuadrando ≈ `valor_total` ahora que la amortización es columna y no estimación negativa. `deriveEstadoCuenta`: devengado neto + "anticipo por amortizar" baja con la automática.
+
+**Go-forward:** `amortizacion_aplicada` nace en 0 → lo histórico no cambia (el tope da idéntico a hoy); las negativas manuales se respetan y cuentan como ya-amortizado.
+
 ## Bitácora
 
 - **2026-06-26 — Promovida.** Origen: Beto pide unificar el paso de estimación de obra autorizada → CxP (como vivienda) y endurecer el control de anticipo/retención/tope que hoy es manual. Diagnóstico de gaps en la sesión de cierre del pipeline CxP (ver memoria `reference_dilesa_estimaciones_destajo_cxp`).
@@ -99,3 +109,7 @@ Migración financiera → archivo `db:new`, aplicar con OK de Beto. La amortizac
   - **Código:** helper puro `excedeTopeContrato` + 6 tests (`lib/dilesa/contratos-estado-cuenta`); `obra-contrato-detalle.tsx` (detecta el exceso → diálogo de override con motivo, badge "obra extra" en la fila); `cancelar-con-motivo-dialog.tsx` generalizado (`confirmVariant`/`submittingLabel`, defaults preservan cancelaciones) + su test actualizado.
   - **Datos (prod):** 33 contratos no-vivienda, 8 ya exceden (7 por anticipo no amortizado, 1 por `valor_total=0`). Go-forward. Pendiente aplicar la migración a prod con OK de Beto + regenerar SCHEMA_REF/types.
 - **2026-06-26 — Sprint 2 en prod (PR #1087 mergeado).** Beto dio OK; migración `20260626232311` aplicada por MCP — columna `tope_override_motivo` + `obra_estimacion_autorizar(uuid, text)` verificadas en prod (función sin PUBLIC; firma vieja `(uuid)` dropeada). Ledger reconciliado (`…232311` applied, huérfano del MCP `…234555` reverted; `migration list` 1:1). SCHEMA_REF (columna nueva) + `types/supabase.ts` (firma nueva) regenerados y commiteados. CI verde, auto-merge. **Siguiente: Sprint 3** (amortización lineal del anticipo).
+- **2026-06-27 — Sprint 3 construido (PR abierto, sin auto-merge).** Amortización lineal del anticipo (decisión Beto: contratista factura el avance NETO).
+  - **Migración financiera `20260627010241_dilesa_obra_amortizacion_anticipo.sql`**: columna `dilesa.obra_estimaciones.amortizacion_aplicada` + 3 funciones tocadas — `obra_estimacion_autorizar` (calcula la amortización al autorizar `LEAST(anticipo_pct×monto, pendiente, monto)` + tope ahora sobre el **devengado neto**), `cxp_factura_desde_estimacion_obra_espera` y `cxp_pago_desde_estimacion` (neto = `monto − retención − amortización`).
+  - **Código:** `deriveEstadoCuenta` cuenta la amortización automática (devengado neto + anticipo por amortizar) + 2 tests; `obra-contrato-detalle.tsx` (carga/muestra la amortización en la fila, neto del botón "Programar pago", nota del form actualizada — ya no se captura negativa a mano).
+  - **Validado en prod (read-only, antes de aplicar):** la fórmula da 60%/50%/30% correcto y **0 para el contrato ya sobre-amortizado** (I65) — el tope al pendiente evita doble amortización. Solo 2 contratos usan negativas manuales (se respetan). Go-forward: `amortizacion_aplicada=0` en lo histórico → el tope da idéntico a hoy. Pendiente aplicar a prod con OK de Beto + regenerar SCHEMA_REF/types.
