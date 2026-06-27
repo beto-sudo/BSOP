@@ -296,6 +296,8 @@ async function regresarAFaseInner(
     notas: string;
     notif_hold_creado_at?: string | null;
     notif_hold_4h_at?: string | null;
+    fecha_pre_entrega?: string | null;
+    fecha_entrega?: string | null;
   } = {
     fase_actual: faseNombre,
     fase_posicion: faseDestino,
@@ -305,6 +307,11 @@ async function regresarAFaseInner(
     update.notif_hold_creado_at = null;
     update.notif_hold_4h_at = null;
   }
+  // ADR-052 D7: al deshacer una pre-entrega/entrega, borrar su fecha-evento. Si no,
+  // el motor `fn_avanzar_post_factura` la re-empujaría a 14/15 en cuanto se vuelva a
+  // tocar la venta (es el loop "regresas de fase y se re-adelanta" del incidente).
+  if (faseDestino < 15) update.fecha_entrega = null;
+  if (faseDestino < 14) update.fecha_pre_entrega = null;
   const { error: upErr } = await admin
     .schema('dilesa')
     .from('ventas')

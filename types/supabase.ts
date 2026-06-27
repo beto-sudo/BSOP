@@ -5676,8 +5676,10 @@ export type Database = {
           fecha_desasignacion: string | null
           fecha_detonacion: string | null
           fecha_dictaminada: string | null
+          fecha_entrega: string | null
           fecha_escritura: string | null
           fecha_firma_programada: string | null
+          fecha_pre_entrega: string | null
           fecha_solicitud_avaluo: string | null
           fecha_solicitud_dictamen: string | null
           fecha_validacion_patronal: string | null
@@ -5781,8 +5783,10 @@ export type Database = {
           fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
+          fecha_entrega?: string | null
           fecha_escritura?: string | null
           fecha_firma_programada?: string | null
+          fecha_pre_entrega?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
@@ -5886,8 +5890,10 @@ export type Database = {
           fecha_desasignacion?: string | null
           fecha_detonacion?: string | null
           fecha_dictaminada?: string | null
+          fecha_entrega?: string | null
           fecha_escritura?: string | null
           fecha_firma_programada?: string | null
+          fecha_pre_entrega?: string | null
           fecha_solicitud_avaluo?: string | null
           fecha_solicitud_dictamen?: string | null
           fecha_validacion_patronal?: string | null
@@ -6538,7 +6544,7 @@ export type Database = {
         }
         Returns: string
       }
-      fn_auto_preparada_entrega: {
+      fn_avanzar_post_factura: {
         Args: { p_venta_id: string }
         Returns: undefined
       }
