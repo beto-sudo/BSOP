@@ -1,0 +1,60 @@
+name: DB Push on Merge
+
+# Raíz de proceso de la iniciativa `derivados-sin-drift` (Sprint 3). Aplica las
+# migraciones a prod AL MERGEAR a `main`, vía `supabase db push` — NUNCA antes de
+# mergear, NUNCA por MCP. Así:
+#   - prod no se adelanta a `main` (muere el drift de SCHEMA_REF que rompía PRs),
+#   - `db push` registra con el timestamp del archivo → el ledger no deriva
+#     (muere el baile de `migration repair`),
+#   - el gate financiero D5 es el MERGE: no-financieras se auto-mergean (y se
+#     aplican solas aquí); financieras las mergea Dirección a mano tras el
+#     `financial-migration-guard` (el merge es la confirmación explícita).
+#
+# Si `db push` falla (out-of-order, SQL inválido que el schema-check no atrapó),
+# main quedó mergeado pero prod atrás → falla ruidoso para re-correr/arreglar.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+concurrency:
+  group: db-push-main
+  cancel-in-progress: false
+
+jobs:
+  db-push:
+    name: supabase db push a prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Aplicar migraciones pendientes a prod
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL no configurado — no puedo aplicar a prod."
+            exit 1
+          fi
+          echo "Migraciones pendientes según el ledger de prod:"
+          supabase migration list --db-url "$SUPABASE_DB_URL" 2>&1 | tail -20 || true
+          echo "── db push ──"
+          if supabase db push --db-url "$SUPABASE_DB_URL"; then
+            echo "✓ Migraciones aplicadas a prod. Ledger registrado con el timestamp del archivo."
+          else
+            echo "::error::supabase db push FALLÓ. Prod puede haber quedado atrás de main."
+            echo "Revisar el log (out-of-order / SQL / drift de ledger) y re-correr este workflow"
+            echo "(workflow_dispatch) o aplicar manualmente. NO uses MCP (genera huérfanas)."
+            exit 1
+          fi
