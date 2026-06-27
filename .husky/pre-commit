@@ -1,21 +1,12 @@
 npx lint-staged
 
-# Si se modificó algo que afecta el schema (migrations o SCHEMA_REF.md), y
-# SUPABASE_DB_URL está disponible localmente, verifica que SCHEMA_REF.md
-# esté al día. Se salta silenciosamente si falta la variable (ej. en un
-# checkout fresco sin credenciales).
-if git diff --cached --name-only | grep -qE '^(supabase/migrations/|supabase/SCHEMA_REF\.md$)'; then
-  if [ -n "$SUPABASE_DB_URL" ]; then
-    echo "→ schema:check (migrations tocadas)"
-    npm run schema:check --silent || {
-      echo ""
-      echo "⚠️  supabase/SCHEMA_REF.md está desactualizado."
-      echo "   Corre: npm run schema:ref && git add supabase/SCHEMA_REF.md"
-      exit 1
-    }
-  else
-    echo "⚠️  Saltando schema:check — SUPABASE_DB_URL no definida."
-    echo "   Agrégala a .env.local (ver .env.local.example) para validar"
-    echo "   que SCHEMA_REF.md coincide con la DB antes de commit."
-  fi
+# La validación de SCHEMA_REF vs migraciones vive en CI
+# (.github/workflows/schema-check.yml): regenera contra una shadow DB construida
+# desde las migraciones, NO contra prod. El pre-commit ya no corre `schema:check`
+# (el viejo, contra prod, fallaría aquí porque SCHEMA_REF ahora refleja la shadow).
+# Tras tocar migraciones, regenerá local con `supabase start && npm run db:regen`
+# y commiteá SCHEMA_REF.md + types/supabase.ts (ver supabase/GOVERNANCE.md §3).
+if git diff --cached --name-only | grep -qE '^supabase/migrations/'; then
+  echo "→ tocaste migraciones: regenerá los derivados con 'supabase start && npm run db:regen'"
+  echo "  y commiteá supabase/SCHEMA_REF.md + types/supabase.ts (CI valida con schema-check)."
 fi
