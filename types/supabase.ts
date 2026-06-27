@@ -1550,6 +1550,59 @@ export type Database = {
   }
   dilesa: {
     Tables: {
+      activo_cara: {
+        Row: {
+          activo_id: string
+          alto_m: number | null
+          ancho_m: number | null
+          created_at: string
+          empresa_id: string
+          iluminado: boolean | null
+          notas: string | null
+          orientacion: string | null
+          scoring: number | null
+          trafico_estimado_diario: number | null
+          updated_at: string
+          vialidad: string | null
+        }
+        Insert: {
+          activo_id: string
+          alto_m?: number | null
+          ancho_m?: number | null
+          created_at?: string
+          empresa_id: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          scoring?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Update: {
+          activo_id?: string
+          alto_m?: number | null
+          ancho_m?: number | null
+          created_at?: string
+          empresa_id?: string
+          iluminado?: boolean | null
+          notas?: string | null
+          orientacion?: string | null
+          scoring?: number | null
+          trafico_estimado_diario?: number | null
+          updated_at?: string
+          vialidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_cara_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: true
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activo_casa: {
         Row: {
           activo_id: string
@@ -6971,6 +7024,424 @@ export type Database = {
         }
         Relationships: []
       }
+      arrendamiento_cfdis: {
+        Row: {
+          adjunto_id: string | null
+          arrendamiento_id: string
+          created_at: string
+          cxc_cargo_id: string | null
+          empresa_id: string
+          fecha: string | null
+          id: string
+          linea_id: string | null
+          monto: number | null
+          periodo: string | null
+          tipo: string
+          uuid_sat: string
+        }
+        Insert: {
+          adjunto_id?: string | null
+          arrendamiento_id: string
+          created_at?: string
+          cxc_cargo_id?: string | null
+          empresa_id: string
+          fecha?: string | null
+          id?: string
+          linea_id?: string | null
+          monto?: number | null
+          periodo?: string | null
+          tipo: string
+          uuid_sat: string
+        }
+        Update: {
+          adjunto_id?: string | null
+          arrendamiento_id?: string
+          created_at?: string
+          cxc_cargo_id?: string | null
+          empresa_id?: string
+          fecha?: string | null
+          id?: string
+          linea_id?: string | null
+          monto?: number | null
+          periodo?: string | null
+          tipo?: string
+          uuid_sat?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrendamiento_cfdis_arrendamiento_id_fkey"
+            columns: ["arrendamiento_id"]
+            isOneToOne: false
+            referencedRelation: "arrendamientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamiento_cfdis_cxc_cargo_id_fkey"
+            columns: ["cxc_cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cxc_cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamiento_cfdis_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "arrendamiento_lineas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arrendamiento_depositos: {
+        Row: {
+          aplicable_a_renta_desde: string | null
+          arrendamiento_id: string
+          cfdi_requerido_en_recepcion: boolean
+          created_at: string
+          deposito_naturaleza: string
+          empresa_id: string
+          estado: string
+          fecha_devuelto: string | null
+          fecha_recibido: string | null
+          id: string
+          monto: number
+          movimiento_bancario_id: string | null
+          notas: string | null
+          plazo_devolucion_dias: number
+          updated_at: string
+        }
+        Insert: {
+          aplicable_a_renta_desde?: string | null
+          arrendamiento_id: string
+          cfdi_requerido_en_recepcion?: boolean
+          created_at?: string
+          deposito_naturaleza?: string
+          empresa_id: string
+          estado?: string
+          fecha_devuelto?: string | null
+          fecha_recibido?: string | null
+          id?: string
+          monto: number
+          movimiento_bancario_id?: string | null
+          notas?: string | null
+          plazo_devolucion_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          aplicable_a_renta_desde?: string | null
+          arrendamiento_id?: string
+          cfdi_requerido_en_recepcion?: boolean
+          created_at?: string
+          deposito_naturaleza?: string
+          empresa_id?: string
+          estado?: string
+          fecha_devuelto?: string | null
+          fecha_recibido?: string | null
+          id?: string
+          monto?: number
+          movimiento_bancario_id?: string | null
+          notas?: string | null
+          plazo_devolucion_dias?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrendamiento_depositos_arrendamiento_id_fkey"
+            columns: ["arrendamiento_id"]
+            isOneToOne: false
+            referencedRelation: "arrendamientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamiento_depositos_movimiento_bancario_id_fkey"
+            columns: ["movimiento_bancario_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos_bancarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arrendamiento_lineas: {
+        Row: {
+          activo_id: string
+          arrendamiento_id: string
+          created_at: string
+          empresa_id: string
+          estado: string
+          id: string
+          iva_fundamento: string | null
+          iva_tasa_pct: number
+          iva_validado_at: string | null
+          iva_validado_por: string | null
+          lugar_expedicion: string | null
+          notas: string | null
+          regimen_iva: string
+          renta_subtotal: number
+          retencion_isr_pct: number
+          retencion_iva_pct: number
+          sujeto_retencion: boolean
+          tipo_operacion_fiscal: string
+          updated_at: string
+          vigencia_fin: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          activo_id: string
+          arrendamiento_id: string
+          created_at?: string
+          empresa_id: string
+          estado?: string
+          id?: string
+          iva_fundamento?: string | null
+          iva_tasa_pct?: number
+          iva_validado_at?: string | null
+          iva_validado_por?: string | null
+          lugar_expedicion?: string | null
+          notas?: string | null
+          regimen_iva?: string
+          renta_subtotal: number
+          retencion_isr_pct?: number
+          retencion_iva_pct?: number
+          sujeto_retencion?: boolean
+          tipo_operacion_fiscal?: string
+          updated_at?: string
+          vigencia_fin?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          activo_id?: string
+          arrendamiento_id?: string
+          created_at?: string
+          empresa_id?: string
+          estado?: string
+          id?: string
+          iva_fundamento?: string | null
+          iva_tasa_pct?: number
+          iva_validado_at?: string | null
+          iva_validado_por?: string | null
+          lugar_expedicion?: string | null
+          notas?: string | null
+          regimen_iva?: string
+          renta_subtotal?: number
+          retencion_isr_pct?: number
+          retencion_iva_pct?: number
+          sujeto_retencion?: boolean
+          tipo_operacion_fiscal?: string
+          updated_at?: string
+          vigencia_fin?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrendamiento_lineas_arrendamiento_id_fkey"
+            columns: ["arrendamiento_id"]
+            isOneToOne: false
+            referencedRelation: "arrendamientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arrendamiento_renta_periodos: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          inpc_aplicado: number | null
+          linea_id: string
+          monto: number
+          pct_aplicado: number | null
+          vigencia_fin: string | null
+          vigencia_inicio: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          inpc_aplicado?: number | null
+          linea_id: string
+          monto: number
+          pct_aplicado?: number | null
+          vigencia_fin?: string | null
+          vigencia_inicio: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          inpc_aplicado?: number | null
+          linea_id?: string
+          monto?: number
+          pct_aplicado?: number | null
+          vigencia_fin?: string | null
+          vigencia_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrendamiento_renta_periodos_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "arrendamiento_lineas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arrendamientos: {
+        Row: {
+          arrendador_persona_id: string | null
+          arrendatario_persona_id: string
+          created_at: string
+          deleted_at: string | null
+          deposito_meses: number
+          dia_corte: number | null
+          empresa_id: string
+          esquema_incremento: string
+          estado: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          fiador_persona_id: string | null
+          folio: string | null
+          id: string
+          inpc_base_anio: number | null
+          inpc_base_mes: number | null
+          moneda: string
+          notas: string | null
+          pagador_persona_id: string | null
+          pct_adicional: number
+          penalizacion_terminacion_meses: number
+          receptor_fiscal_persona_id: string | null
+          requiere_fiador: boolean
+          tipo_plazo: string
+          tipo_renovacion: string
+          updated_at: string
+        }
+        Insert: {
+          arrendador_persona_id?: string | null
+          arrendatario_persona_id: string
+          created_at?: string
+          deleted_at?: string | null
+          deposito_meses?: number
+          dia_corte?: number | null
+          empresa_id: string
+          esquema_incremento?: string
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fiador_persona_id?: string | null
+          folio?: string | null
+          id?: string
+          inpc_base_anio?: number | null
+          inpc_base_mes?: number | null
+          moneda?: string
+          notas?: string | null
+          pagador_persona_id?: string | null
+          pct_adicional?: number
+          penalizacion_terminacion_meses?: number
+          receptor_fiscal_persona_id?: string | null
+          requiere_fiador?: boolean
+          tipo_plazo?: string
+          tipo_renovacion?: string
+          updated_at?: string
+        }
+        Update: {
+          arrendador_persona_id?: string | null
+          arrendatario_persona_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          deposito_meses?: number
+          dia_corte?: number | null
+          empresa_id?: string
+          esquema_incremento?: string
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fiador_persona_id?: string | null
+          folio?: string | null
+          id?: string
+          inpc_base_anio?: number | null
+          inpc_base_mes?: number | null
+          moneda?: string
+          notas?: string | null
+          pagador_persona_id?: string | null
+          pct_adicional?: number
+          penalizacion_terminacion_meses?: number
+          receptor_fiscal_persona_id?: string | null
+          requiere_fiador?: boolean
+          tipo_plazo?: string
+          tipo_renovacion?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arrendamientos_arrendador_persona_id_fkey"
+            columns: ["arrendador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_arrendador_persona_id_fkey"
+            columns: ["arrendador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_arrendatario_persona_id_fkey"
+            columns: ["arrendatario_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_arrendatario_persona_id_fkey"
+            columns: ["arrendatario_persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_fiador_persona_id_fkey"
+            columns: ["fiador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_fiador_persona_id_fkey"
+            columns: ["fiador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_pagador_persona_id_fkey"
+            columns: ["pagador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_pagador_persona_id_fkey"
+            columns: ["pagador_persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_receptor_fiscal_persona_id_fkey"
+            columns: ["receptor_fiscal_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arrendamientos_receptor_fiscal_persona_id_fkey"
+            columns: ["receptor_fiscal_persona_id"]
+            isOneToOne: false
+            referencedRelation: "v_empleados_full"
+            referencedColumns: ["persona_id"]
+          },
+        ]
+      }
       cajas: {
         Row: {
           activo: boolean
@@ -8047,6 +8518,7 @@ export type Database = {
           numero: number
           origen_id: string | null
           origen_tipo: string
+          periodo: string | null
           persona_id: string
           saldo: number | null
           tipo_cargo: string
@@ -8067,6 +8539,7 @@ export type Database = {
           numero?: number
           origen_id?: string | null
           origen_tipo?: string
+          periodo?: string | null
           persona_id: string
           saldo?: number | null
           tipo_cargo: string
@@ -8087,6 +8560,7 @@ export type Database = {
           numero?: number
           origen_id?: string | null
           origen_tipo?: string
+          periodo?: string | null
           persona_id?: string
           saldo?: number | null
           tipo_cargo?: string
@@ -9448,6 +9922,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inpc_indices: {
+        Row: {
+          anio: number
+          aprobado_por: string | null
+          capturado_por: string | null
+          created_at: string
+          estado: string
+          fecha_publicacion: string | null
+          fuente: string
+          id: string
+          mes: number
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          anio: number
+          aprobado_por?: string | null
+          capturado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_publicacion?: string | null
+          fuente?: string
+          id?: string
+          mes: number
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          anio?: number
+          aprobado_por?: string | null
+          capturado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_publicacion?: string | null
+          fuente?: string
+          id?: string
+          mes?: number
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
       }
       inventario: {
         Row: {
@@ -12549,6 +13065,28 @@ export type Database = {
       }
     }
     Functions: {
+      arrendamiento_alta: {
+        Args: { p_empresa_id: string; p_lineas?: Json; p_master: Json }
+        Returns: string
+      }
+      arrendamiento_pago_registrar: {
+        Args: {
+          p_arrendamiento_id: string
+          p_auto_aplicar?: boolean
+          p_comprobante_adjunto_id?: string
+          p_cuenta_bancaria_id?: string
+          p_empresa_id: string
+          p_fecha?: string
+          p_forma_pago?: string
+          p_monto: number
+          p_notas?: string
+          p_periodo?: string
+          p_persona_id: string
+          p_referencia?: string
+          p_uuid_sat?: string
+        }
+        Returns: string
+      }
       cxc_cargo_ajustar: {
         Args: { p_cargo_id: string; p_motivo?: string; p_nuevo_monto: number }
         Returns: undefined
