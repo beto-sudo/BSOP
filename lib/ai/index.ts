@@ -20,5 +20,5 @@ export {
   type AiCriticidad,
 } from './registry';
 export { resolveModel } from './config';
-export { runGenerateObject, runEmbed } from './run';
+export { runGenerateObject, runGenerateText, runEmbed } from './run';
 export { PRICING, estimarCostoUsd, type Precio } from './pricing';
