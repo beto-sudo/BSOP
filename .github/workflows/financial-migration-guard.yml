@@ -82,7 +82,8 @@ jobs:
             echo "✓ Migración financiera con label 'finanzas-ok' — Dirección la aprobó."
           else
             echo "::error::Este PR trae una migración FINANCIERA (mueve dinero o permisos)."
-            echo "No se auto-mergea: la revisa y mergea Dirección a mano (el merge la aplica a prod)."
-            echo "Para aprobar: Dirección agrega el label 'finanzas-ok' al PR → este check pasa."
+            echo "No se auto-mergea. Flujo: CC avisa a Beto en el chat con el resumen + riesgos;"
+            echo "tras su OK explícito ('dale'), CC pone el label 'finanzas-ok' y mergea (este check"
+            echo "pasa y db-push-on-merge la aplica a prod). Sin ese OK no se aplica."
             exit 1
           fi

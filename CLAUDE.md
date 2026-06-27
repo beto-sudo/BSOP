@@ -222,7 +222,8 @@ db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
 > aplicar-por-MCP-y-reconciliar. Las migraciones se aplican a prod **al mergear**,
 > automáticamente, vía `db-push-on-merge.yml` (`supabase db push`) — **nunca por
 > MCP ni antes de mergear** (ver `supabase/GOVERNANCE.md` §4 + gate financiero D5:
-> financieras las mergea Dirección a mano con el label `finanzas-ok`). En operación
+> en financieras CC avisa a Beto en el chat con resumen+riesgos y, tras su **"dale"**,
+> CC pone el label `finanzas-ok` y mergea — nunca sin ese OK). En operación
 > normal **no toques el ledger**: `db push` lo registra con el timestamp del
 > archivo. Lo de abajo aplica SOLO al **hotfix de emergencia por `psql` directo**
 > (raro) — ahí sí reconciliá el ledger en la misma sesión.

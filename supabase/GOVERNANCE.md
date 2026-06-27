@@ -107,13 +107,21 @@ prod. Una sola vía. Así prod nunca se adelanta a `main` (muere el drift de
 SCHEMA_REF que rompía PRs ajenos) y el ledger no deriva (`db push` registra con
 el timestamp del archivo; muere el baile de `migration repair`).
 
-### Gate financiero (D5) — el gate es el MERGE
+### Gate financiero (D5) — confirmación explícita de Dirección en el chat
 
 - **No-financieras** → auto-merge → al mergear, `db-push-on-merge.yml` las aplica.
+  CC hace todo de punta a punta; Beto no interviene ni tiene que acordarse de nada.
 - **Financieras** (mueven dinero o permisos) → el check `financial-migration-guard`
-  las detecta y **bloquea el auto-merge**; las revisa y mergea **Dirección a mano**,
-  agregando el label `finanzas-ok` al PR. Ese merge ES la confirmación explícita
-  que exige el control financiero. Al mergear, se aplican igual vía el workflow.
+  las detecta y **bloquea el auto-merge**. Flujo (norma Beto 2026-06-27):
+  1. CC corre el clasificador al crear la migración; si es financiera, **avisa a Beto
+     en el chat** con el resumen + riesgos (no espera a que él se acuerde).
+  2. Beto da el **OK verbal explícito** para ESA migración ("dale").
+  3. Recién entonces CC pone el label `finanzas-ok` y mergea (lo que la aplica a prod).
+
+  **CC NUNCA pone `finanzas-ok` sin el "dale" de Beto para esa migración específica.**
+  El "dale" en el chat es la confirmación explícita que exige el control financiero; el
+  bloqueo técnico (sin label no hay auto-merge) es la red de seguridad que evita que una
+  financiera se cuele a prod sin pasar por ese OK.
 
 ### Procedimiento normal
 
