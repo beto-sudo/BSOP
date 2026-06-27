@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, RefreshCw } from 'lucide-react';
+import { FileText, Plus, RefreshCw } from 'lucide-react';
 
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+
+import { ArrendamientoCaptureDialog } from './arrendamiento-capture-dialog';
 
 /**
  * Módulo Arrendamiento (DILESA) — lista de contratos + KPIs. Iniciativa
@@ -59,6 +61,7 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
   const [nombres, setNombres] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // fetchData RETORNA el resultado (no setea estado). El setState vive en
   // aplicar(), llamado dentro del .then — así el efecto no dispara setState de
@@ -140,16 +143,25 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
             Contratos de renta de activos del portafolio.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setLoading(true);
-            void fetchData().then(aplicar);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-        >
-          <RefreshCw className="size-4" /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              void fetchData().then(aplicar);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            <RefreshCw className="size-4" /> Actualizar
+          </button>
+          <button
+            type="button"
+            onClick={() => setDialogOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="size-4" /> Nuevo contrato
+          </button>
+        </div>
       </div>
 
       <ModuleKpiStrip stats={kpis} />
@@ -209,6 +221,13 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
           </table>
         </div>
       )}
+
+      <ArrendamientoCaptureDialog
+        empresaId={empresaId}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={() => void fetchData().then(aplicar)}
+      />
     </div>
   );
 }
