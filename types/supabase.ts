@@ -8512,6 +8512,7 @@ export type Database = {
           numero: number
           origen_id: string | null
           origen_tipo: string
+          periodo: string | null
           persona_id: string
           saldo: number | null
           tipo_cargo: string
@@ -8532,6 +8533,7 @@ export type Database = {
           numero?: number
           origen_id?: string | null
           origen_tipo?: string
+          periodo?: string | null
           persona_id: string
           saldo?: number | null
           tipo_cargo: string
@@ -8552,6 +8554,7 @@ export type Database = {
           numero?: number
           origen_id?: string | null
           origen_tipo?: string
+          periodo?: string | null
           persona_id?: string
           saldo?: number | null
           tipo_cargo?: string
@@ -13056,6 +13059,24 @@ export type Database = {
       }
     }
     Functions: {
+      arrendamiento_pago_registrar: {
+        Args: {
+          p_arrendamiento_id: string
+          p_auto_aplicar?: boolean
+          p_comprobante_adjunto_id?: string
+          p_cuenta_bancaria_id?: string
+          p_empresa_id: string
+          p_fecha?: string
+          p_forma_pago?: string
+          p_monto: number
+          p_notas?: string
+          p_periodo?: string
+          p_persona_id: string
+          p_referencia?: string
+          p_uuid_sat?: string
+        }
+        Returns: string
+      }
       cxc_cargo_ajustar: {
         Args: { p_cargo_id: string; p_motivo?: string; p_nuevo_monto: number }
         Returns: undefined

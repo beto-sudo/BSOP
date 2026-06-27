@@ -65,6 +65,9 @@ function AgingBody() {
         .schema('erp')
         .from('cxc_cargos')
         .select('persona_id, saldo, fecha_vencimiento')
+        // Solo cartera de ventas: la renta (origen_tipo='arrendamiento') tiene
+        // su propio aging en el módulo de arrendamiento (no se mezcla aquí).
+        .eq('origen_tipo', 'venta_dilesa')
         .gt('saldo', 0)
         .neq('estado', 'cancelado')
         .is('deleted_at', null);
