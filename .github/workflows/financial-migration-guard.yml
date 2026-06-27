@@ -6,16 +6,25 @@ name: Financial Migration Guard
 # confirmación → las migraciones FINANCIERAS no se auto-mergean: las revisa y
 # mergea Dirección a mano (el merge ES la confirmación).
 #
-# Este check clasifica las migraciones nuevas del PR. Si alguna es financiera y
-# el PR NO tiene el label `finanzas-ok`, FALLA → el auto-merge no procede y el PR
-# queda esperando a Dirección. Dirección revisa, agrega el label `finanzas-ok`
-# (el check re-corre y pasa) y mergea. Migraciones no-financieras pasan directo.
+# Este check clasifica las migraciones nuevas del PR y publica el commit-status
+# `finanzas-gate` (required en branch protection):
+#   - PR sin migración financiera ............... success (no bloquea)
+#   - financiera CON label `finanzas-ok` ........ success (Dirección aprobó)
+#   - financiera SIN label ...................... pending (bloquea el auto-merge)
 #
-# REQUIRED-SAFE: corre en TODO PR (sin paths-filter en el trigger) y sale en
-# success al instante si el PR no toca supabase/migrations/**. Esto es a
-# propósito: un required check con paths-filter NUNCA reporta status en los PRs
-# que no matchean y los deja colgados en "Expected — waiting for status". El skip
-# va DENTRO del job (como schema-check.yml), no en el trigger.
+# BLOQUEO SILENCIOSO (norma 2026-06-27): el job SIEMPRE termina en success, así
+# que GitHub no manda el correo "workflow run failed". El freno del auto-merge lo
+# hace el status `pending` (un required check pendiente bloquea el merge igual que
+# uno rojo, pero NO genera correo). Cuando Dirección agrega `finanzas-ok`, el
+# evento `labeled` re-corre el job, el status pasa a success y db-push-on-merge
+# aplica la migración a prod. Fail-closed: si la clasificación no llega a
+# completarse (p.ej. falla `npm ci`), se publica `pending`, nunca success.
+#
+# REQUIRED-SAFE: corre en TODO PR (sin paths-filter en el trigger) y publica
+# `finanzas-gate=success` al instante si el PR no toca supabase/migrations/**.
+# Esto es a propósito: un required check con paths-filter NUNCA reporta status en
+# los PRs que no matchean y los deja colgados en "Expected — waiting for status".
+# El skip va DENTRO del job, no en el trigger.
 
 on:
   pull_request:
@@ -24,6 +33,10 @@ on:
 concurrency:
   group: fin-guard-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  statuses: write
 
 jobs:
   guard:
@@ -75,15 +88,35 @@ jobs:
             echo "financial=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Gate financiero (bloquea auto-merge sin aprobación de Dirección)
-        if: steps.classify.outputs.financial == 'true'
+      # Publica el status `finanzas-gate`. Siempre corre (incluso si un paso
+      # previo falló) para no dejar el required check colgado, y el job no falla:
+      # el bloqueo lo hace el estado `pending`, no un exit 1.
+      - name: Publicar finanzas-gate (bloqueo silencioso)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          HAS: ${{ steps.detect.outputs.has }}
+          FINANCIAL: ${{ steps.classify.outputs.financial }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'finanzas-ok') }}
         run: |
-          if [ "${{ contains(github.event.pull_request.labels.*.name, 'finanzas-ok') }}" = "true" ]; then
-            echo "✓ Migración financiera con label 'finanzas-ok' — Dirección la aprobó."
-          else
-            echo "::error::Este PR trae una migración FINANCIERA (mueve dinero o permisos)."
-            echo "No se auto-mergea. Flujo: CC avisa a Beto en el chat con el resumen + riesgos;"
-            echo "tras su OK explícito ('dale'), CC pone el label 'finanzas-ok' y mergea (este check"
-            echo "pasa y db-push-on-merge la aplica a prod). Sin ese OK no se aplica."
-            exit 1
+          STATE=success
+          DESC="Sin migración financiera — OK"
+          # Fail-closed: financiera (true) O clasificación incompleta (vacío) con
+          # migraciones presentes ⇒ exigir aprobación.
+          if [ "$HAS" = "true" ] && [ "$FINANCIAL" != "false" ]; then
+            if [ "$LABELED" = "true" ]; then
+              STATE=success
+              DESC="Migración financiera aprobada por Dirección (finanzas-ok)"
+            else
+              STATE=pending
+              DESC="Migración financiera: espera label finanzas-ok de Dirección"
+            fi
           fi
+          echo "finanzas-gate → $STATE — $DESC"
+          gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
+            -f state="$STATE" \
+            -f context="finanzas-gate" \
+            -f description="$DESC" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            >/dev/null
