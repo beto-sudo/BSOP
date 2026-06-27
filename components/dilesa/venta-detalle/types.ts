@@ -238,7 +238,7 @@ export const CAPTURA_MODULO_BY_POSICION: Record<number, string> = {
 /**
  * Gate de apertura por fase cuando NO es la inmediata anterior.
  *
- * Modelo evento-vs-fase (ADR-052): la pre-entrega (14) y la entrega (15) son
+ * Modelo evento-vs-fase (ADR-053): la pre-entrega (14) y la entrega (15) son
  * EVENTOS que se registran antes de facturar — la 14 desde la Escritura (11), la
  * 15 desde el pago/Detonada (12). El override habilita su *captura* desde ahí,
  * pero ya NO avanza la fase: las pantallas solo fechan el evento (no llaman

@@ -3,7 +3,7 @@
 /**
  * Captura Fase 14 — Preparada para Entrega (dilesa-ventas).
  *
- * Modelo evento-vs-fase (ADR-052): la revisión de pre-entrega es un EVENTO con
+ * Modelo evento-vs-fase (ADR-053): la revisión de pre-entrega es un EVENTO con
  * fecha real, NO un avance de fase. Calidad / Atención a Clientes imprime el
  * Checklist Pre-Entrega (PDF prellenado), recorre la casa palomeando, firma,
  * escanea, sube el PDF y registra la fecha real de la revisión. Eso NO mueve la

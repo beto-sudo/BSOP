@@ -1,5 +1,5 @@
 /**
- * Registra un EVENTO físico del tramo de entrega (ADR-052): la revisión de
+ * Registra un EVENTO físico del tramo de entrega (ADR-053): la revisión de
  * pre-entrega o la entrega de la vivienda. A diferencia de `marcarFase`, NO
  * inserta en `dilesa.venta_fases` ni avanza la posición — solo persiste la
  * FECHA REAL del evento en `dilesa.ventas`. El avance de fase lo decide el motor
