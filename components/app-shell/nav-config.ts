@@ -101,6 +101,7 @@ export const NAV_ITEMS: NavItem[] = [
         label: 'Inmobiliario',
         children: [
           { label: 'Portafolio', href: '/dilesa/portafolio' },
+          { label: 'Arrendamiento', href: '/dilesa/arrendamiento' },
           { label: 'Proyectos', href: '/dilesa/proyectos' },
           // Ventas ahora es un hub con 5 tabs (Ventas / Inventario / Fases /
           // Clientes / Vendedores) — el sidebar muestra solo la entry del
