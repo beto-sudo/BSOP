@@ -200,11 +200,15 @@ header — restaurar antes de mergear.
 
 - Consultar `supabase/SCHEMA_REF.md` para nombres exactos de tablas/columnas.
   Las columnas date/timestamp vienen en UTC → parsear con timezone.
-- **Tras aplicar CUALQUIER migración** (MCP, `psql`, dashboard, o archivo en
-  `supabase/migrations/`), regenerar antes de commitear: `npm run schema:ref`
-  (+ `types/supabase.ts`). El pre-commit hook y CI lo enforzan cuando
-  `SUPABASE_DB_URL` está set. Drift entre `SCHEMA_REF.md` y la DB viva confunde
-  a sesiones futuras.
+- **Tras tocar `supabase/migrations/`**, regenerar los derivados **desde la
+  shadow DB** (no contra prod) antes de commitear: `supabase start && npm run
+db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
+  requiere Docker). CI lo valida con el workflow `schema-check.yml` (levanta la
+  shadow, regenera y compara) — determinista por rama, sin depender de prod ni
+  del secret `SUPABASE_DB_URL`, y que prod esté adelantado deja de romper PRs
+  ajenos. Ver `supabase/GOVERNANCE.md` §3. (Modelo `derivados-sin-drift`: las
+  migraciones son la fuente de verdad del schema; el `schema:check` viejo contra
+  prod se retiró del job `quality`.)
 
 ### Aplicar migración por MCP → registrar de una vez (anti-drift del ledger)
 

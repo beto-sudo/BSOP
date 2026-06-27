@@ -4,10 +4,10 @@
 **Empresas:** todas (infraestructura del repo / proceso de DB)
 **Schemas afectados:** ninguno de aplicación. Toca el **proceso** de migraciones y el tooling/CI: `package.json`, `scripts/gen-schema-ref.ts`, `scripts/gen-initiatives.ts`, `.github/workflows/{ci,db-types,drift-check}.yml` (+ workflows nuevos), `supabase/GOVERNANCE.md`, `CLAUDE.md`, `docs/strategy/INITIATIVES.md`, `supabase/SCHEMA_REF.md`, `types/supabase.ts`.
 **Estado:** in_progress
-**Próximo hito:** Sprint 0 (de-risking) en curso — job de CI `schema-shadow-derisk.yml` corriendo `supabase start` + diff shadow-vs-prod para confirmar que las migraciones reproducen prod. Ledger ya verificado 1:1 (cero `disk_only`). Si el diff es solo la migración foránea de obra-estimaciones → arranca Sprint 1.
+**Próximo hito:** Sprint 1 construido (modelo nuevo): workflow `schema-check.yml` valida `SCHEMA_REF` contra una shadow DB (no prod) + `types` desde shadow + retiro del `schema:check` viejo del job `quality`. En verificación: el `schema-check` del PR del S1 confirma shadow == prod (las 3 sesiones serializadas). Sigue: Sprint 2 (INITIATIVES fuera del PR) + Sprint 3 (db push al merge con gate financiero D5) + agregar `schema-check` a required en branch protection.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (D5 cerrada con Beto = merge-as-gate; Sprint 0 arrancado — ledger 1:1, falta el gate db-reset==prod en CI)
+**Última actualización:** 2026-06-27 (S0 + S0.5 cerrados — reconciliación en main vía #1093; Sprint 1 construido — modelo `SCHEMA_REF`/`types` desde shadow)
 
 ## Problema
 
@@ -167,3 +167,23 @@ imposible** mientras se respete el apply-post-merge.
   Resta el gate real: montado `schema-shadow-derisk.yml` (workflow throwaway) que
   levanta una shadow DB con `supabase start`, genera el SCHEMA_REF desde migraciones
   y desde prod, y los diffea — confirma R1 (que las migraciones reproducen prod).
+- **2026-06-27** — **Sprint 0 + 0.5 CERRADOS** (#1093). El de-risk confirmó que las
+  migraciones reconstruyen el schema sin error, pero destapó drift de contenido
+  preexistente prod↔migraciones. Sprint 0.5 lo reconcilió con 4 migraciones
+  (aplicadas a prod + ledger 1:1 + backup en `_predrop_backup`): FK `junta_activa`
+  reproducible, +2 FKs `usuario_id→core.usuarios`, −9 objetos legacy rdb de abril,
+  −columna `core.empresas.tipo` fantasma. Raíz hallada: anti-patrón `ADD COLUMN IF
+NOT EXISTS ... REFERENCES/DEFAULT` (no reproducible). `SCHEMA_REF`/`types`
+  regenerados (diff exacto). Se serializaron las 3 sesiones paralelas (Beto cortó el
+  paralelismo): mi reconciliación aterrizó primero (#1093) y desbloqueó a #1091/#1092,
+  que siguieron una por una.
+- **2026-06-27** — **Sprint 1 construido** (este PR): modelo nuevo. `schema-check.yml`
+  valida `SCHEMA_REF` contra una shadow DB (`supabase start` + regen + diff), solo en
+  PRs que tocan DB (required-safe: skip rápido si no). Retirado el `schema:check`
+  viejo (contra prod) del job `quality` de `ci.yml`. `db:types` + `db-types.yml`
+  pasan a `--local` (shadow). Nuevos scripts `db:shadow`/`db:regen`. Docs:
+  `GOVERNANCE.md` §3 + `CLAUDE.md` Reglas DB reescritos al flujo shadow. El
+  `schema-check` de este PR verifica de paso shadow == prod tras la serialización de
+  las 3. Pendiente para cerrar la iniciativa: Sprint 2 (INITIATIVES fuera del PR),
+  Sprint 3 (db push al merge con gate D5), y agregar `schema-check` a required en
+  branch protection.

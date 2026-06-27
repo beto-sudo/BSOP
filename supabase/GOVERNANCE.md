@@ -71,18 +71,31 @@ sólo entornos nuevos (Preview, DR, local).
   `supabase/scripts/drift-check.sql` en cada PR a `supabase/migrations/`,
   schedule semanal y manual dispatch.
 
-## §3 — Validar antes de mergear
+## §3 — Regenerar y validar el schema (desde la shadow, no prod)
 
-Si tenés Docker + Supabase CLI:
+Las migraciones son la fuente de verdad. `SCHEMA_REF.md` y `types/supabase.ts`
+se regeneran desde una **shadow DB** construida con las migraciones del repo —
+**no desde prod** (iniciativa `derivados-sin-drift`). Así el schema es función
+pura de la rama: determinista, sin secret de prod, sin flakes, y que prod esté
+adelantado/atrasado deja de importar.
+
+Tras tocar `supabase/migrations/`, regenerá los derivados (requiere Docker):
 
 ```sh
-supabase db reset --no-seed
+supabase start        # levanta la shadow y aplica todas las migraciones
+npm run db:regen      # SCHEMA_REF.md + types/supabase.ts desde la shadow local
+supabase stop         # opcional
 ```
 
-Sin Docker: dejarlo en manos de Supabase Preview Branch. Si el PR
-levanta una DB fresca y aplica migraciones limpias, está bien.
-Si aparece "relation X does not exist" en el primer apply de un PR que
-no creó X, hay drift nuevo — tratar como bloqueante y aplicar §1.
+Commiteá `SCHEMA_REF.md` + `types/supabase.ts` junto con la migración.
+
+**CI lo valida** con el workflow `schema-check.yml`: levanta la shadow, regenera
+`SCHEMA_REF` y falla si no coincide con el commiteado (solo corre el trabajo
+pesado en PRs que tocan DB). Si `supabase start` falla ahí, alguna migración no
+reproduce desde cero → aplicá §1.
+
+Sin Docker local podés dejar que CI valide, pero **para regenerar los derivados
+necesitás Docker** — en el modelo nuevo ya no hay atajo contra prod.
 
 ## §4 — Aplicar migrations: `db push`, no MCP
 

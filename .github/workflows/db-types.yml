@@ -1,17 +1,13 @@
 name: DB Types
 
-# Regenera `types/supabase.ts` a partir del esquema real de Supabase.
+# Regenera `types/supabase.ts` desde las MIGRACIONES del repo (shadow DB), no
+# contra prod (iniciativa derivados-sin-drift). Determinista y sin secrets de prod.
 #
 # Se ejecuta:
 #   - Manualmente desde la pestaña Actions (workflow_dispatch)
 #   - Automáticamente cada lunes a las 07:00 UTC (como red de seguridad)
 #
-# Cuando detecta cambios en los tipos, abre un PR automático a `main`.
-#
-# Requisitos:
-#   - Secret SUPABASE_ACCESS_TOKEN (Personal Access Token de Supabase)
-#     Generar en: https://supabase.com/dashboard/account/tokens
-#     Configurar en: Settings -> Secrets and variables -> Actions
+# Cuando detecta cambios en los tipos vs las migraciones, abre un PR automático a `main`.
 
 on:
   workflow_dispatch:
@@ -31,10 +27,6 @@ jobs:
       contents: write
       pull-requests: write
 
-    env:
-      SUPABASE_PROJECT_REF: ybklderteyhuugzfmxbi
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -49,10 +41,18 @@ jobs:
         with:
           version: latest
 
-      - name: Generate TypeScript types (all schemas)
+      - name: Levantar shadow DB (aplica las migraciones desde cero)
         run: |
-          supabase gen types typescript \
-            --project-id "$SUPABASE_PROJECT_REF" \
+          # Modelo derivados-sin-drift: los types se generan desde las migraciones
+          # del repo (shadow), NO contra prod. Determinista y sin secrets de prod.
+          supabase start || {
+            echo "::error::supabase start falló — alguna migración no reproduce desde cero. Ver GOVERNANCE.md §1/§3."
+            exit 1
+          }
+
+      - name: Generate TypeScript types (all schemas, desde la shadow)
+        run: |
+          supabase gen types typescript --local \
             --schema public \
             --schema core \
             --schema erp \
@@ -70,12 +70,12 @@ jobs:
             echo "// =============================================================================="
             echo "// Auto-generated Supabase database types."
             echo "// Last regenerated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            echo "// Project ref: $SUPABASE_PROJECT_REF"
-            echo "// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides"
+            echo "// Fuente: migraciones del repo (shadow DB), no prod."
+            echo "// Schemas: public, core, erp, rdb, health, playtomic, dilesa, maquinaria, peptides, sanren"
             echo "//"
             echo "// DO NOT EDIT BY HAND. Regenerate via:"
             echo "//   - GitHub Actions: trigger 'DB Types' workflow manually"
-            echo "//   - Local: npm run db:types (requiere supabase CLI + SUPABASE_ACCESS_TOKEN)"
+            echo "//   - Local: supabase start && npm run db:types  (ver GOVERNANCE.md §3)"
             echo "// =============================================================================="
             echo ""
             cat types/supabase.ts.new

@@ -1,0 +1,94 @@
+name: Schema Check (shadow)
+
+# Valida que `supabase/SCHEMA_REF.md` coincide con el schema que producen las
+# MIGRACIONES del repo, reconstruido desde cero en una shadow DB — NO contra prod.
+#
+# Modelo (iniciativa `derivados-sin-drift`): las migraciones son la fuente de verdad
+# del schema. El check es determinista por rama, sin depender de prod ni de secrets,
+# y que prod esté adelantado/atrasado deja de importar. Reemplaza al `schema:check`
+# viejo del job `quality` (que regeneraba contra prod y rompía PRs ajenos cuando una
+# sesión aplicaba a prod antes de mergear).
+#
+# Corre SIEMPRE (para poder ser un required check sin colgar PRs que no tocan DB),
+# pero solo hace el trabajo pesado (levantar la shadow) cuando el PR toca migraciones,
+# SCHEMA_REF, el generador o este workflow. Los demás PRs pasan al instante.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: schema-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-check:
+    name: SCHEMA_REF vs migraciones (shadow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: ¿El PR toca la DB?
+        id: changes
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD~1"; fi
+          if git diff --name-only "$BASE" HEAD \
+            | grep -qE '^supabase/migrations/|^supabase/SCHEMA_REF\.md|^\.github/workflows/schema-check\.yml|^scripts/gen-schema-ref\.ts'; then
+            echo "db_touched=true" >> "$GITHUB_OUTPUT"
+            echo "El PR toca DB/schema → se valida contra la shadow."
+          else
+            echo "db_touched=false" >> "$GITHUB_OUTPUT"
+            echo "El PR no toca DB → skip (success inmediato, sin Docker)."
+          fi
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.db_touched == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.changes.outputs.db_touched == 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Setup Supabase CLI
+        if: steps.changes.outputs.db_touched == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Levantar shadow DB (aplica todas las migraciones desde cero)
+        if: steps.changes.outputs.db_touched == 'true'
+        run: |
+          # Si una migración no reproduce desde una DB limpia, `supabase start`
+          # falla aquí (drift estructural — ver GOVERNANCE.md §1/§3).
+          supabase start || {
+            echo "::error::supabase start falló — alguna migración no reproduce desde cero. Ver GOVERNANCE.md §1/§3."
+            exit 1
+          }
+
+      - name: Regenerar SCHEMA_REF desde la shadow y comparar con el commiteado
+        if: steps.changes.outputs.db_touched == 'true'
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          npm run schema:ref
+          # -I ignora la línea de timestamp `Last regenerated`.
+          if git diff --exit-code -I '^  Last regenerated: ' supabase/SCHEMA_REF.md; then
+            echo "✓ SCHEMA_REF.md coincide con lo que producen las migraciones."
+          else
+            echo "::error::SCHEMA_REF.md NO coincide con el schema de las migraciones."
+            echo "Regenerá localmente y commiteá:"
+            echo "  supabase start && SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm run schema:ref"
+            echo "(Ver GOVERNANCE.md §3.)"
+            exit 1
+          fi
