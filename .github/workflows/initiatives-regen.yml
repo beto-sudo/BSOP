@@ -1,0 +1,70 @@
+name: Initiatives Index Regen
+
+# Regenera la tabla `## Activas` de docs/strategy/INITIATIVES.md desde los
+# headers de docs/planning/*.md, en `main` post-merge (iniciativa
+# `derivados-sin-drift`, Sprint 2).
+#
+# Por qué: la tabla es un DERIVADO. Antes las ramas la regeneraban y commiteaban
+# (`initiatives:check`), volviéndola un hotspot de conflictos de merge entre
+# sesiones paralelas. Ahora las ramas solo editan el header de su planning doc
+# (el check de PR es `initiatives:validate`, que valida headers sin tocar la
+# tabla) y ESTE workflow la regenera en `main`. Las ramas dejan de chocar.
+#
+# Hace commit directo a `main` con `[skip ci]`. Si branch protection bloquea el
+# push del bot, lo deja en ::warning:: con la config necesaria (no falla rojo).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/planning/**'
+      - 'scripts/gen-initiatives.ts'
+      - 'scripts/lib/initiatives.ts'
+  workflow_dispatch:
+
+concurrency:
+  group: initiatives-regen
+  cancel-in-progress: false
+
+jobs:
+  regen:
+    name: Regenerar tabla Activas en main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Regenerar la tabla Activas
+        run: npm run initiatives:gen
+
+      - name: Commitear si la tabla cambió
+        run: |
+          if git diff --quiet -- docs/strategy/INITIATIVES.md; then
+            echo "Tabla Activas ya al día — nada que commitear."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/strategy/INITIATIVES.md
+          git commit -m "chore(initiatives): regenera la tabla Activas desde los headers [skip ci]"
+          if git push; then
+            echo "✓ Tabla Activas actualizada en main."
+          else
+            echo "::warning::No pude pushear la tabla regenerada a main (branch protection)."
+            echo "Para habilitar el auto-regen: agregá 'github-actions[bot]' a la bypass list"
+            echo "de la regla de protección de main, o configurá un PAT. Mientras tanto, la"
+            echo "tabla se puede regenerar local con 'npm run initiatives:gen' (es solo cosmética)."
+          fi

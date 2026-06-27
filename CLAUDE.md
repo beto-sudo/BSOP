@@ -146,15 +146,19 @@ al arrancar (no hay candado global):
   timestamp mayor que toda migración existente, local **y en los PRs abiertos de
   otras sesiones** (las ve vía `gh`). Residual: dos sesiones en el mismo segundo
   antes de abrir su PR → **abre tu PR pronto**.
-- **Regla 1 — la tabla `## Activas` se auto-genera; NO la edites a mano.** Editá
-  solo el header de tu planning doc (`Estado`/`Próximo hito`/`Última
-actualización`), corré `npm run initiatives:gen`, y commiteá el `INITIATIVES.md`
-  regenerado junto con tu cambio. La región entre `<!-- initiatives:activas:start
--->` y `<!-- …:end -->` la sobrescribe el generador. Toda iniciativa activa
-  debe tener `**Próximo hito:**` o `initiatives:check` falla en CI. La sección
-  `## Done` y el resto del archivo se mantienen a mano. Promover = crear el
-  planning doc con header completo + correr el generador (ya no se agrega fila a
-  mano).
+- **Regla 1 — la tabla `## Activas` se regenera en `main`, NO en tu rama**
+  (modelo `derivados-sin-drift` S2). Editá **solo el header** de tu planning doc
+  (`Estado`/`Próximo hito`/`Última actualización`). **No corras `initiatives:gen`
+  ni commitees la tabla de `INITIATIVES.md` en tu rama** — la regenera el workflow
+  `initiatives-regen.yml` post-merge. El check de PR es **`initiatives:validate`**:
+  valida los headers (slug == archivo; toda activa con `**Próximo hito:**` /
+  `**Empresas:**` / `**Schemas afectados:**` / `**Última actualización:**`) **sin
+  comparar la tabla** — por eso `INITIATIVES.md` ya no choca entre sesiones.
+  Promover = crear el planning doc con header completo (la fila aparece al
+  regenerar en main). **`## Done`** sí se edita a mano en tu PR al cerrar una
+  iniciativa (es append-only, sección distinta de la tabla; rara vez choca). Si
+  querés ver la tabla al día localmente, `npm run initiatives:gen` (no la
+  commitees).
 - **Regla 2 — rebase preventivo** antes de cada `git push` que toca
   `docs/strategy/*` o migraciones: `git fetch origin && git rebase origin/main`.
   Si conflictúa la tabla `## Activas` (auto-generada), **no la resuelvas a mano**:
