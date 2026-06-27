@@ -3158,6 +3158,7 @@ export type Database = {
       }
       obra_estimaciones: {
         Row: {
+          amortizacion_aplicada: number
           autorizada_at: string | null
           autorizada_por: string | null
           cancelada_at: string | null
@@ -3188,6 +3189,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amortizacion_aplicada?: number
           autorizada_at?: string | null
           autorizada_por?: string | null
           cancelada_at?: string | null
@@ -3218,6 +3220,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amortizacion_aplicada?: number
           autorizada_at?: string | null
           autorizada_por?: string | null
           cancelada_at?: string | null
