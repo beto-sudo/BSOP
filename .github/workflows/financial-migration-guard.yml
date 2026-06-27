@@ -11,14 +11,15 @@ name: Financial Migration Guard
 # queda esperando a Dirección. Dirección revisa, agrega el label `finanzas-ok`
 # (el check re-corre y pasa) y mergea. Migraciones no-financieras pasan directo.
 #
-# Required-safe: solo corre en PRs que tocan supabase/migrations/**; los demás ni
-# lo ven. Si se hace required en branch protection, no cuelga PRs sin migración.
+# REQUIRED-SAFE: corre en TODO PR (sin paths-filter en el trigger) y sale en
+# success al instante si el PR no toca supabase/migrations/**. Esto es a
+# propósito: un required check con paths-filter NUNCA reporta status en los PRs
+# que no matchean y los deja colgados en "Expected — waiting for status". El skip
+# va DENTRO del job (como schema-check.yml), no en el trigger.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths:
-      - 'supabase/migrations/**'
 
 concurrency:
   group: fin-guard-${{ github.ref }}
@@ -35,27 +36,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Detecta migraciones nuevas ANTES de instalar nada. Si no hay, el job
+      # termina en success sin gastar setup — required-safe y barato.
+      - name: Detectar migraciones nuevas
+        id: detect
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          NEW=$(git diff --name-only --diff-filter=AM "$BASE" HEAD \
+            | grep -E '^supabase/migrations/.*\.sql$' || true)
+          if [ -z "$NEW" ]; then
+            echo "Sin migraciones nuevas en el PR — gate N/A (pass)."
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Migraciones nuevas:"; echo "$NEW" | sed 's/^/  /'
+            echo "has=true" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "$NEW" > /tmp/new_migrations.txt
+          fi
+
       - name: Setup Node.js
+        if: steps.detect.outputs.has == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.detect.outputs.has == 'true'
         run: npm ci --prefer-offline --no-audit
 
       - name: Clasificar migraciones nuevas
         id: classify
+        if: steps.detect.outputs.has == 'true'
         run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          NEW=$(git diff --name-only --diff-filter=AM "$BASE" HEAD \
-            | grep -E '^supabase/migrations/.*\.sql$' || true)
-          if [ -z "$NEW" ]; then
-            echo "Sin migraciones nuevas en el PR."
-            echo "financial=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Migraciones nuevas:"; echo "$NEW" | sed 's/^/  /'
+          NEW=$(cat /tmp/new_migrations.txt)
           if npx tsx scripts/classify-financial-migration.ts $NEW; then
             echo "financial=false" >> "$GITHUB_OUTPUT"
           else
