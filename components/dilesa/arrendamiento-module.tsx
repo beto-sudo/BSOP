@@ -1,13 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, Plus, RefreshCw } from 'lucide-react';
+import { CalendarPlus, FileText, Plus, RefreshCw } from 'lucide-react';
 
 import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 import { ArrendamientoCaptureDialog } from './arrendamiento-capture-dialog';
+import {
+  ArrendamientoEstadoCuentaDrawer,
+  type ContratoSel,
+} from './arrendamiento-estado-cuenta-drawer';
+import { ArrendamientoGenerarCargosDialog } from './arrendamiento-generar-cargos-dialog';
 
 /**
  * Módulo Arrendamiento (DILESA) — lista de contratos + KPIs. Iniciativa
@@ -62,6 +67,9 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [generarOpen, setGenerarOpen] = useState(false);
+  const [contratoSel, setContratoSel] = useState<ContratoSel | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // fetchData RETORNA el resultado (no setea estado). El setState vive en
   // aplicar(), llamado dentro del .then — así el efecto no dispara setState de
@@ -140,7 +148,8 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
         <div>
           <h1 className="text-xl font-semibold">Arrendamiento</h1>
           <p className="text-sm text-muted-foreground">
-            Contratos de renta de activos del portafolio.
+            Contratos de renta de activos del portafolio. Haz clic en un contrato para ver su estado
+            de cuenta y registrar pagos.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -153,6 +162,13 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
             className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
           >
             <RefreshCw className="size-4" /> Actualizar
+          </button>
+          <button
+            type="button"
+            onClick={() => setGenerarOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            <CalendarPlus className="size-4" /> Generar cargos del mes
           </button>
           <button
             type="button"
@@ -197,7 +213,19 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                <tr
+                  key={r.id}
+                  onClick={() => {
+                    setContratoSel({
+                      id: r.id,
+                      folio: r.folio,
+                      arrendatario_persona_id: r.arrendatario_persona_id,
+                      arrendatario_nombre: nombres[r.arrendatario_persona_id] ?? '—',
+                    });
+                    setDrawerOpen(true);
+                  }}
+                  className="cursor-pointer border-b last:border-0 hover:bg-muted/30"
+                >
                   <td className="px-3 py-2 font-mono text-xs">{r.folio ?? '—'}</td>
                   <td className="px-3 py-2">{nombres[r.arrendatario_persona_id] ?? '…'}</td>
                   <td className="px-3 py-2 capitalize">
@@ -227,6 +255,19 @@ export function ArrendamientoModule({ empresaId }: { empresaId: string }) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={() => void fetchData().then(aplicar)}
+      />
+
+      <ArrendamientoGenerarCargosDialog
+        open={generarOpen}
+        onOpenChange={setGenerarOpen}
+        onGenerated={() => void fetchData().then(aplicar)}
+      />
+
+      <ArrendamientoEstadoCuentaDrawer
+        empresaId={empresaId}
+        contrato={contratoSel}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
       />
     </div>
   );
