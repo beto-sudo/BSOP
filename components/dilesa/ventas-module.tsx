@@ -17,6 +17,7 @@ import { useScopeVendedorDilesa } from '@/lib/dilesa/use-scope-vendedor';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
 import { proximaFase } from '@/lib/dilesa/fases';
+import { colorDiasFase } from '@/lib/dilesa/dias-en-fase';
 import { VENTA_ESTADO_CONFIG, VENTA_ESTADOS } from '@/lib/status-tokens';
 import { Input } from '@/components/ui/input';
 import {
@@ -54,6 +55,11 @@ export type VentaListaRow = VentaRow & {
   prototipo: string | null;
   /** Precio efectivo: `valor_escrituracion ?? valor_comercial`. */
   precio: number | null;
+  /**
+   * Días en la fase actual (de `v_ventas_lista_antiguedad`). `null` para ventas
+   * fuera del pipeline vivo (terminadas/desasignadas no traen fila en la vista).
+   */
+  diasEnFase: number | null;
 };
 
 /**
@@ -283,6 +289,20 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       }
     }
 
+    // Días en fase actual (iniciativa dilesa-fluidez-pipeline S1): la vista
+    // `v_ventas_lista_antiguedad` lo calcula en la base (CURRENT_DATE - fecha de
+    // entrada a la fase) para no traer las ~14k filas de venta_fases. Solo trae
+    // las activas (pipeline vivo); las demás quedan sin dato (null → "—").
+    const diasMap = new Map<string, number>();
+    const { data: antiguedad } = await sb
+      .schema('dilesa')
+      .from('v_ventas_lista_antiguedad')
+      .select('venta_id, dias_en_fase')
+      .eq('empresa_id', empresaId);
+    for (const a of antiguedad ?? []) {
+      if (a.dias_en_fase != null) diasMap.set(a.venta_id as string, a.dias_en_fase as number);
+    }
+
     return {
       data: ventasArr.map((v) => {
         const u = v.unidad_id ? unidadMap.get(v.unidad_id) : null;
@@ -301,6 +321,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           // `Valor de Escrituración` es el precio correcto de venta (Beto);
           // fallback a `Valor Comercial` para las que aún no escrituran.
           precio: v.valor_escrituracion ?? v.valor_comercial,
+          diasEnFase: diasMap.get(v.id) ?? null,
         };
       }),
     };
@@ -418,7 +439,17 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         const sig = proximaFase(v.fase_posicion);
         return (
           <div className="flex flex-col gap-0.5">
-            <Badge tone="neutral">{v.fase_actual}</Badge>
+            <div className="flex items-center gap-2">
+              <Badge tone="neutral">{v.fase_actual}</Badge>
+              {v.diasEnFase != null ? (
+                <span
+                  className={`text-xs font-medium tabular-nums ${colorDiasFase(v.diasEnFase)}`}
+                  title={`${v.diasEnFase} día${v.diasEnFase === 1 ? '' : 's'} en esta fase`}
+                >
+                  {v.diasEnFase} d
+                </span>
+              ) : null}
+            </div>
             {sig ? <span className="text-[10px] text-[var(--text)]/50">→ {sig.accion}</span> : null}
           </div>
         );
