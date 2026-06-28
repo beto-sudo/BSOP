@@ -13105,6 +13105,10 @@ export type Database = {
         Args: { p_empresa_id: string; p_lineas?: Json; p_master: Json }
         Returns: string
       }
+      arrendamiento_generar_cargos: {
+        Args: { p_empresa_id: string; p_periodo: string }
+        Returns: number
+      }
       arrendamiento_pago_registrar: {
         Args: {
           p_arrendamiento_id: string
