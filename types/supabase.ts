@@ -2732,6 +2732,7 @@ export type Database = {
           motivo_cancelacion: string | null
           notas: string | null
           objeto: string | null
+          orden_compra_id: string | null
           partida_id: string | null
           periodicidad_estimaciones_dias: number | null
           personal_a_disposicion: boolean
@@ -2773,6 +2774,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
+          orden_compra_id?: string | null
           partida_id?: string | null
           periodicidad_estimaciones_dias?: number | null
           personal_a_disposicion?: boolean
@@ -2814,6 +2816,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
+          orden_compra_id?: string | null
           partida_id?: string | null
           periodicidad_estimaciones_dias?: number | null
           personal_a_disposicion?: boolean
