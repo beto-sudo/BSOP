@@ -12157,6 +12157,7 @@ export type Database = {
           deleted_at: string | null
           departamento_id: string | null
           empresa_id: string
+          es_mano_obra: boolean
           estado_id: string | null
           fecha_requerida: string | null
           id: string
@@ -12165,6 +12166,7 @@ export type Database = {
           prioridad_id: string | null
           solicitante_id: string | null
           subtipo: string | null
+          terminos_ofrecidos: string | null
           updated_at: string | null
         }
         Insert: {
@@ -12176,6 +12178,7 @@ export type Database = {
           deleted_at?: string | null
           departamento_id?: string | null
           empresa_id: string
+          es_mano_obra?: boolean
           estado_id?: string | null
           fecha_requerida?: string | null
           id?: string
@@ -12184,6 +12187,7 @@ export type Database = {
           prioridad_id?: string | null
           solicitante_id?: string | null
           subtipo?: string | null
+          terminos_ofrecidos?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -12195,6 +12199,7 @@ export type Database = {
           deleted_at?: string | null
           departamento_id?: string | null
           empresa_id?: string
+          es_mano_obra?: boolean
           estado_id?: string | null
           fecha_requerida?: string | null
           id?: string
@@ -12203,6 +12208,7 @@ export type Database = {
           prioridad_id?: string | null
           solicitante_id?: string | null
           subtipo?: string | null
+          terminos_ofrecidos?: string | null
           updated_at?: string | null
         }
         Relationships: [

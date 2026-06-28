@@ -147,6 +147,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [justificacion, setJustificacion] = useState('');
+  const [esManoObra, setEsManoObra] = useState(false);
+  const [terminosOfrecidos, setTerminosOfrecidos] = useState('');
   const [lineas, setLineas] = useState<DraftLinea[]>([emptyLinea()]);
   const [submitting, setSubmitting] = useState(false);
   const [accionId, setAccionId] = useState<string | null>(null);
@@ -172,7 +174,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       (sb.schema('erp') as any)
         .from('requisiciones')
         .select(
-          'id, codigo, solicitante_id, autorizada_at, created_at, justificacion, requisiciones_detalle(id, partida_id, descripcion, unidad, cantidad, precio_estimado)'
+          'id, codigo, solicitante_id, autorizada_at, created_at, justificacion, es_mano_obra, terminos_ofrecidos, requisiciones_detalle(id, partida_id, descripcion, unidad, cantidad, precio_estimado)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null),
@@ -249,6 +251,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       autorizada_at: string | null;
       created_at: string;
       justificacion: string | null;
+      es_mano_obra: boolean | null;
+      terminos_ofrecidos: string | null;
       requisiciones_detalle: Array<{
         id: string;
         partida_id: string | null;
@@ -283,6 +287,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         ocCodigo: ocByReq.get(r.id) ?? null,
         fecha: r.created_at?.slice(0, 10) ?? null,
         justificacion: r.justificacion,
+        esManoObra: r.es_mano_obra ?? false,
+        terminosOfrecidos: r.terminos_ofrecidos ?? null,
         lineas,
       };
     });
@@ -404,6 +410,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
 
   function abrirAlta() {
     setJustificacion('');
+    setEsManoObra(false);
+    setTerminosOfrecidos('');
     setLineas([emptyLinea()]);
     setFormOpen(true);
   }
@@ -439,6 +447,8 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         codigo: folio,
         solicitante_id: auth?.user?.id ?? null,
         justificacion: justificacion.trim() || null,
+        es_mano_obra: esManoObra,
+        terminos_ofrecidos: terminosOfrecidos.trim() || null,
         autorizada_at: null,
       })
       .select('id')
@@ -654,7 +664,9 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
         .from('cotizaciones')
         .insert({
           empresa_id: empresaId,
-          tipo: 'compra',
+          // El tipo de la RFQ decide el artefacto al adjudicar: 'obra' → Contrato,
+          // 'compra' → OC. Lo hereda de la requisición (es_mano_obra), ya no hardcodeado.
+          tipo: req.esManoObra ? 'obra' : 'compra',
           requisicion_id: req.id,
           descripcion: `Cotización de ${req.codigo}`,
           estado: 'abierta',
@@ -926,6 +938,31 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
               placeholder="Justificación (opcional)"
               className="w-80"
             />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-[var(--text)]/80">
+              <input
+                type="checkbox"
+                checked={esManoObra}
+                onChange={(e) => setEsManoObra(e.target.checked)}
+                className="size-4 accent-[var(--accent)]"
+              />
+              Mano de obra / servicio contratado
+            </label>
+            {esManoObra ? (
+              <Input
+                value={terminosOfrecidos}
+                onChange={(e) => setTerminosOfrecidos(e.target.value)}
+                placeholder="Términos ofrecidos (anticipo/plazo, opcional)"
+                className="min-w-[280px] flex-1"
+              />
+            ) : null}
+            <span className="text-xs text-[var(--text)]/50">
+              {esManoObra
+                ? 'La RFQ irá a contrato de obra (no a OC).'
+                : 'Compra de material → orden de compra.'}
+            </span>
           </div>
 
           <div className="space-y-2">

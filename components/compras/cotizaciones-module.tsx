@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Award,
   ClipboardList,
@@ -990,6 +991,7 @@ function CapturaPrecios({
   onCancelarCotizacion: () => void;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   // Matriz local: `${cotProveedorId}|${lineaId}` → precio (string). Solo los
   // precios YA guardados por proveedor — la matriz arranca en blanco para que
@@ -1272,48 +1274,21 @@ function CapturaPrecios({
           );
         }
       } else {
-        // Contrato de obra: resolver la persona del proveedor + partida/proyecto.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: provRow } = await (sb.schema('erp') as any)
-          .from('proveedores')
-          .select('persona_id')
-          .eq('id', prov.proveedorId)
-          .maybeSingle();
-        const personaId = provRow?.persona_id as string | undefined;
-        if (!personaId) throw new Error('El proveedor elegido no tiene persona asociada.');
-        const partidaId = cotizacion.lineas.map((l) => l.partidaId).find(Boolean) ?? null;
-        let proyectoId: string | null = null;
-        if (partidaId) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: partRow } = await (sb.schema('erp') as any)
-            .from('presupuesto_partidas')
-            .select('proyecto_id')
-            .eq('id', partidaId)
-            .maybeSingle();
-          proyectoId = (partRow?.proyecto_id as string | null) ?? null;
-        }
-        const folio = `CO-${Date.now().toString(36).toUpperCase()}`;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const coResp = await (sb.schema('dilesa') as any)
-          .from('contratos_construccion')
-          .insert({
-            empresa_id: empresaId,
-            codigo: folio,
-            fecha_contrato: new Date().toISOString().slice(0, 10),
-            contratista_id: personaId,
-            proyecto_id: proyectoId,
-            tipo: 'urbanizacion',
-            valor_total: total,
-            partida_id: partidaId,
-            cotizacion_id: cotizacion.id,
-          })
-          .select('id')
-          .single();
-        if (coResp.error || !coResp.data) {
-          throw new Error(
-            getSupabaseErrorMessage(coResp.error, 'No se pudo crear el contrato de obra.')
-          );
-        }
+        // Obra: NO se crea el contrato en silencio. Se rutea a la pantalla de
+        // condiciones, que pre-llena desde la cotización (contratista, partida,
+        // proyecto, valor) y, al guardar, crea el contrato CON sus condiciones
+        // (anticipo, retención de garantía, forma de pago…) y cierra la
+        // adjudicación (marca la cotización adjudicada + proveedores). Sustituye
+        // el insert mudo con `tipo='urbanizacion'` hardcodeado sin condiciones.
+        const partidaPrellenado = cotizacion.lineas.map((l) => l.partidaId).find(Boolean) ?? '';
+        const params = new URLSearchParams({
+          cotizacion: cotizacion.id,
+          proveedor: prov.proveedorId,
+          total: String(total),
+          ...(partidaPrellenado ? { partida: partidaPrellenado } : {}),
+        });
+        router.push(`/dilesa/construccion/contratos/nuevo-obra?${params.toString()}`);
+        return;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (sb.schema('erp') as any)
