@@ -33,6 +33,8 @@ function req(over: Partial<ReqRow>): ReqRow {
     ocCodigo: null,
     fecha: null,
     justificacion: null,
+    esManoObra: false,
+    terminosOfrecidos: null,
     lineas: [],
     ...over,
   };

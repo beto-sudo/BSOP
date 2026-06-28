@@ -17,8 +17,8 @@
  */
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -56,7 +56,9 @@ const TIPO_ABREV: Record<string, string> = {
 export default function Page() {
   return (
     <RequireAccess empresa="dilesa" modulo="dilesa.construccion.contratos" write>
-      <NuevoContratoObraBody />
+      <Suspense fallback={null}>
+        <NuevoContratoObraBody />
+      </Suspense>
     </RequireAccess>
   );
 }
@@ -95,6 +97,49 @@ function NuevoContratoObraBody() {
   const [codigoOverride, setCodigoOverride] = useState('');
   const [notas, setNotas] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Pre-llenado desde la adjudicación de una cotización de obra (Sprint 1) ──
+  // La adjudicación de obra rutea aquí con ?cotizacion&proveedor&total&partida en
+  // vez de crear el contrato en silencio. Pre-llenamos contratista/valor/partida/
+  // proyecto y, al guardar, además de crear el contrato cerramos la adjudicación.
+  // Si el usuario abandona, la cotización queda abierta (sin contrato huérfano).
+  const searchParams = useSearchParams();
+  const cotizacionId = searchParams.get('cotizacion');
+  const proveedorParam = searchParams.get('proveedor');
+  const totalParam = searchParams.get('total');
+  const partidaParam = searchParams.get('partida');
+  const desdeAdjudicacion = Boolean(cotizacionId && proveedorParam);
+
+  useEffect(() => {
+    if (!desdeAdjudicacion || loadingMeta) return;
+    let cancelado = false;
+    void (async () => {
+      if (totalParam) setValorTotal((v) => v || totalParam);
+      if (partidaParam) setPartidaId(partidaParam);
+      // proveedor → persona (el contratista del contrato).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: provRow } = await (sb.schema('erp') as any)
+        .from('proveedores')
+        .select('persona_id')
+        .eq('id', proveedorParam)
+        .maybeSingle();
+      if (!cancelado && provRow?.persona_id) setContratistaId(provRow.persona_id as string);
+      // partida → proyecto (para que el selector de partida muestre la opción).
+      if (partidaParam) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: partRow } = await (sb.schema('erp') as any)
+          .from('presupuesto_partidas')
+          .select('proyecto_id')
+          .eq('id', partidaParam)
+          .maybeSingle();
+        if (!cancelado && partRow?.proyecto_id) setProyectoId(partRow.proyecto_id as string);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desdeAdjudicacion, loadingMeta]);
 
   // ── Catálogos ────────────────────────────────────────────────────────────
   const loadMeta = useCallback(async () => {
@@ -246,11 +291,38 @@ function NuevoContratoObraBody() {
           fecha_inicio: fechaInicio || null,
           fecha_fin: fechaFin || null,
           notas: notas.trim() || null,
+          cotizacion_id: cotizacionId || null,
         })
         .select('id')
         .single();
       if (error || !data) {
         throw new Error(getSupabaseErrorMessage(error, 'No se pudo crear el contrato de obra.'));
+      }
+      // Cierre de la adjudicación (sólo si venimos de una cotización): la
+      // cotización pasa a adjudicada y sus proveedores a elegida/descartada. Se
+      // hace aquí, no en la adjudicación, para no dejarla adjudicada a medias si
+      // el usuario abandona la captura de condiciones.
+      if (desdeAdjudicacion && cotizacionId && proveedorParam) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const erp = sb.schema('erp') as any;
+        await erp
+          .from('cotizaciones')
+          .update({
+            estado: 'adjudicada',
+            adjudicado_proveedor_id: proveedorParam,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', cotizacionId);
+        const { data: provs } = await erp
+          .from('cotizacion_proveedores')
+          .select('id, proveedor_id')
+          .eq('cotizacion_id', cotizacionId);
+        for (const p of (provs ?? []) as Array<{ id: string; proveedor_id: string }>) {
+          await erp
+            .from('cotizacion_proveedores')
+            .update({ estado: p.proveedor_id === proveedorParam ? 'elegida' : 'descartada' })
+            .eq('id', p.id);
+        }
       }
       toast.add({ title: 'Contrato de obra creado', description: codigoFinal, type: 'success' });
       router.push(`/dilesa/construccion/contratos/${data.id as string}`);

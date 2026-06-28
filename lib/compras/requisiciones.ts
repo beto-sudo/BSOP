@@ -44,6 +44,10 @@ export type ReqRow = {
   ocCodigo: string | null;
   fecha: string | null;
   justificacion: string | null;
+  /** La requisición es mano de obra / servicio contratado → la RFQ nace tipo=obra (adjudica a Contrato, no a OC). */
+  esManoObra: boolean;
+  /** Términos suaves que el solicitante propone (anticipo/plazo). Informativo; se formalizan al adjudicar. */
+  terminosOfrecidos: string | null;
   lineas: ReqLinea[];
 };
 
