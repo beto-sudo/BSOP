@@ -70,6 +70,16 @@ type Contrato = {
   periodicidad_estimaciones_dias: number | null;
   cancelada_at: string | null;
   motivo_cancelacion: string | null;
+  // Sprint 2 · condiciones de pago + fiscales + REPSE
+  forma_pago: string | null;
+  modalidad_precio: string | null;
+  es_mano_obra: boolean | null;
+  personal_a_disposicion: boolean | null;
+  retencion_fiscal_isr_pct: number | null;
+  retencion_fiscal_iva_pct: number | null;
+  repse_override_at: string | null;
+  repse_override_por: string | null;
+  repse_override_motivo: string | null;
 };
 
 type Lote = {
@@ -439,6 +449,50 @@ function DetailInner() {
           anticipoPct={contrato.anticipo_pct ?? 0}
           retencionPct={contrato.retencion_pct ?? 0}
         />
+      ) : null}
+
+      {contrato.tipo !== 'vivienda' ? (
+        <Section title="Condiciones de pago y fiscales">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+            {(
+              [
+                ['Forma de pago', contrato.forma_pago || '—'],
+                [
+                  'Modalidad de precio',
+                  contrato.modalidad_precio === 'alzado'
+                    ? 'Precio alzado'
+                    : contrato.modalidad_precio === 'unitarios'
+                      ? 'Precios unitarios'
+                      : contrato.modalidad_precio === 'administracion'
+                        ? 'Administración'
+                        : '—',
+                ],
+                [
+                  'Mano de obra',
+                  contrato.es_mano_obra
+                    ? contrato.personal_a_disposicion
+                      ? 'Sí · personal a disposición'
+                      : 'Sí · a resultado'
+                    : 'No',
+                ],
+                ['Ret. garantía (civil)', `${contrato.retencion_pct ?? 0}%`],
+                ['Ret. ISR fiscal (SAT)', `${contrato.retencion_fiscal_isr_pct ?? 0}%`],
+                ['Ret. IVA fiscal (SAT)', `${contrato.retencion_fiscal_iva_pct ?? 0}%`],
+              ] as [string, string][]
+            ).map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs uppercase tracking-wide text-[var(--text)]/50">{label}</dt>
+                <dd className="mt-0.5 text-[var(--text)]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          {contrato.repse_override_at ? (
+            <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              ⚠ Contratado sin REPSE vigente con override de Dirección.
+              {contrato.repse_override_motivo ? ` Motivo: ${contrato.repse_override_motivo}` : ''}
+            </p>
+          ) : null}
+        </Section>
       ) : null}
 
       {contrato.tipo === 'vivienda' ? (
