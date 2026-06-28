@@ -7,15 +7,18 @@
  *     modelo NO recalcula ni inventa — los transcribe y narra la correlación.
  *   - FX / Noticias / Tech&IA / Péptidos: el modelo los investiga con la
  *     web-search tool de Anthropic (habilitada en `runGenerateText`).
- *   - Pendientes (Apple Reminders), Cumpleaños (Calendar) y Correo (Gmail) NO
- *     existen en el v1 (Reminders no tiene API en nube; Gmail/Calendar esperan
- *     el service account de Google de la fase 2). El modelo los omite limpio.
+ *   - Cumpleaños (Calendar) y Correo (Gmail): datos DADOS (fase 2, service
+ *     account de Google impersonando a Beto, solo lectura) — el modelo cura, no
+ *     inventa.
+ *   - Pendientes (Apple Reminders) NO existen aún (Apple no tiene API en nube).
+ *     El modelo omite esa sección limpio.
  *
  * `buildBriefingPrompt` es PURA (testeable). El system prompt es estable; lo que
- * cambia por día es el bloque de fecha + salud del user prompt.
+ * cambia por día es el bloque de fecha + salud + calendar/gmail del user prompt.
  */
 
 import type { HealthBriefing } from './health';
+import type { CalendarBriefing, GmailBriefing } from './google';
 
 export const BRIEFING_SYSTEM = `Eres el asistente que arma el briefing matutino de Beto (Adalberto Santos), operador de 5 empresas en Piedras Negras, Coahuila (ANSA/Stellantis, DILESA/inmobiliaria, COAGAN/agro, RDB/deportivo, Nigropetense/holding). Beto es post-triple-bypass (jul-2024): la salud cardiovascular es contexto permanente.
 
@@ -29,13 +32,19 @@ ORDEN DEL OUTPUT (respétalo):
 Máximo 3 bullets. Solo lo que no puede pasar desapercibido hoy (hallazgo de salud más fuerte, dato de mercado/noticia que toca operaciones). Lo que pongas aquí NO se vuelve a desglosar con el mismo detalle abajo.
 
 ## 🩺 Estado de las fuentes
-Reporta SOLO las fuentes con problema (ej. una métrica de salud con sync gap, o una sección que no pudiste investigar). Si todo respondió, una línea: "Todas las fuentes respondiendo." Nota fija al final de esta sección: "Pendientes (Reminders), cumpleaños (Calendar) y correo (Gmail) llegan en una fase próxima — aún no están en este briefing automático."
+Reporta SOLO las fuentes con problema (ej. una métrica de salud con sync gap, o una sección que no pudiste investigar). Si todo respondió, una línea: "Todas las fuentes respondiendo." Nota fija al final de esta sección: "Pendientes (Apple Reminders) llega en una fase próxima — aún no está en este briefing automático."
+
+## 🎂 Cumpleaños
+De los datos de Calendar DADOS abajo. **HOY:** resáltalo si hay alguno. **Próximos 7 días:** fecha + nombre (look-ahead para tener tiempo de mensaje/regalo). Si no hay ninguno, omite la sección o una línea "Sin cumpleaños esta semana." NO inventes.
 
 ## ❤️ Salud
 VA ANTES de noticias (prioridad post-bypass). Los números vienen DADOS abajo y son AUTORITATIVOS: transcríbelos tal cual en una tabla comparativa 7d vs 23d previos (RHR, HRV, sueño). NO los recalcules ni inventes. Usa la serie por-día de 14 días para anclar UNA correlación concreta cuando algo resalte (ej. "la noche de 1.2h del 13-jun coincide con HRV baja al día siguiente"). Si hay métricas marcadas como stale/sync gap, dilo y sugiere la acción (reconectar permiso en Apple Health → Fuentes). Interpreta con sesgo cardiovascular: HRV a la baja + RHR al alza = peor recuperación.
 
 ## 💱 Tipo de cambio MXN/USD
 Investiga con web search el FIX de Banxico de hoy. Una línea con dirección (peso fuerte/débil esta semana).
+
+## 📧 Correo
+De los mensajes de Gmail DADOS abajo (ya filtrados a las últimas 24h, sin promociones/social). Resume SOLO lo operativo: cotizaciones/leads (ANSA, DILESA), facturas CFDI que requieran acción, correspondencia personal o que pida respuesta. Ignora notificaciones rutinarias (reportes recurrentes, boletines, market updates, bots de GitHub). Si no hay nada operativo, una línea "Sin correo que requiera acción." NO inventes remitentes ni asuntos.
 
 ## 🌎 Noticias
 Mundo / México / EE.UU. — 2-3 por región, vía web search. SESGO a lo que toca operaciones: tipo de cambio, aranceles USMCA, Banxico/Fed, Pemex/energía (COAGAN/ANSA), política Coahuila / frontera norte / seguridad NE, Stellantis/automotriz (ANSA), agricultura/clima Coahuila (COAGAN).
@@ -90,18 +99,56 @@ export function renderHealthBlock(health: HealthBriefing): string {
   return lines.join('\n');
 }
 
+/** Renderiza cumpleaños + agenda de Calendar como bloque autoritativo. */
+export function renderCalendarBlock(cal: CalendarBriefing): string {
+  if (!cal.available) {
+    return `CALENDAR (cumpleaños/agenda): NO DISPONIBLE (${cal.error}). Repórtalo como gap en §2 y omite Cumpleaños.`;
+  }
+  const lines: string[] = ['CALENDAR (autoritativo — no inventes):'];
+  lines.push(
+    cal.cumples.length > 0
+      ? `- Cumpleaños próx. 7d: ${cal.cumples.map((c) => `${c.fecha} ${c.quien}`).join('; ')}`
+      : '- Cumpleaños próx. 7d: ninguno'
+  );
+  lines.push(
+    cal.hoy.length > 0
+      ? `- Agenda de hoy: ${cal.hoy.map((e) => `${e.cuando} ${e.titulo}`).join('; ')}`
+      : '- Agenda de hoy: sin eventos'
+  );
+  return lines.join('\n');
+}
+
+/** Renderiza el correo de Gmail como bloque autoritativo (el modelo cura). */
+export function renderGmailBlock(gmail: GmailBriefing): string {
+  if (!gmail.available) {
+    return `GMAIL: NO DISPONIBLE (${gmail.error}). Repórtalo como gap en §2 y omite Correo.`;
+  }
+  if (gmail.mensajes.length === 0) return 'GMAIL (autoritativo): sin correos en las últimas 24h.';
+  const lines = ['GMAIL (autoritativo — últimas 24h, cura solo lo operativo, no inventes):'];
+  for (const m of gmail.mensajes) {
+    lines.push(`- De: ${m.de} | Asunto: ${m.asunto} | ${m.snippet}`);
+  }
+  return lines.join('\n');
+}
+
 /** Arma el (system, user) prompt del briefing del día. Pura. */
 export function buildBriefingPrompt(
   health: HealthBriefing,
+  calendar: CalendarBriefing,
+  gmail: GmailBriefing,
   fecha: { iso: string; diaSemana: string; larga: string }
 ): { system: string; prompt: string } {
   const prompt = [
     `Hoy es ${fecha.larga} (${fecha.iso}). Arma el briefing matutino de Beto siguiendo el orden y las reglas del system prompt.`,
     '',
+    renderCalendarBlock(calendar),
+    '',
     renderHealthBlock(health),
     '',
+    renderGmailBlock(gmail),
+    '',
     'Para tipo de cambio, noticias, tecnología & IA y péptidos: investiga con web search fuentes serias y recientes (de hoy o ayer). Marca explícitamente lo anecdótico/no revisado por pares.',
-    'No incluyas secciones de pendientes, cumpleaños ni correo (no están disponibles en esta fase).',
+    'No incluyas sección de pendientes (Apple Reminders no está disponible en esta fase).',
     'Devuelve SOLO el markdown del briefing.',
   ].join('\n');
   return { system: BRIEFING_SYSTEM, prompt };

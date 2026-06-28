@@ -7,15 +7,18 @@
 import { runGenerateText } from '@/lib/ai';
 import { buildBriefingPrompt } from './prompt';
 import type { HealthBriefing } from './health';
+import type { CalendarBriefing, GmailBriefing } from './google';
 
 /** Tope de búsquedas web del modelo por corrida (FX + noticias + tech + péptidos). */
 export const WEB_SEARCH_MAX_USES = 8;
 
 export async function generateBriefingMarkdown(
   health: HealthBriefing,
+  calendar: CalendarBriefing,
+  gmail: GmailBriefing,
   fecha: { iso: string; diaSemana: string; larga: string }
 ): Promise<string> {
-  const { system, prompt } = buildBriefingPrompt(health, fecha);
+  const { system, prompt } = buildBriefingPrompt(health, calendar, gmail, fecha);
   return runGenerateText({
     usoId: 'daily-briefing',
     system,
