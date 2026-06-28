@@ -21,6 +21,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
+import { usePermissions } from '@/components/providers';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,12 @@ import {
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { OBJETOS_COMUNES } from '@/lib/dilesa/objetos-obra';
 
-type Contratista = { id: string; nombre: string; abreviacion: string | null };
+type Contratista = {
+  id: string;
+  nombre: string;
+  abreviacion: string | null;
+  repse: string | null;
+};
 
 /** Tipos de obra no-vivienda (ADR-038). `vivienda` se captura en /nuevo. */
 const TIPOS_OBRA = [
@@ -97,6 +103,15 @@ function NuevoContratoObraBody() {
   const [codigoOverride, setCodigoOverride] = useState('');
   const [notas, setNotas] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Sprint 2: condiciones de pago + retención fiscal + REPSE ──────────────
+  const [formaPago, setFormaPago] = useState('');
+  const [modalidadPrecio, setModalidadPrecio] = useState('');
+  const [esManoObra, setEsManoObra] = useState(false);
+  const [personalADisposicion, setPersonalADisposicion] = useState(false);
+  const [retencionFiscalIsr, setRetencionFiscalIsr] = useState('0');
+  const [retencionFiscalIva, setRetencionFiscalIva] = useState('0');
+  const [repseOverrideMotivo, setRepseOverrideMotivo] = useState('');
 
   // ── Pre-llenado desde la adjudicación de una cotización de obra (Sprint 1) ──
   // La adjudicación de obra rutea aquí con ?cotizacion&proveedor&total&partida en
@@ -158,7 +173,7 @@ function NuevoContratoObraBody() {
         sb
           .schema('dilesa')
           .from('contratistas_datos')
-          .select('persona_id, abreviacion')
+          .select('persona_id, abreviacion, repse')
           .eq('empresa_id', DILESA_EMPRESA_ID)
           .is('deleted_at', null),
         sb
@@ -204,8 +219,13 @@ function NuevoContratoObraBody() {
     }
 
     const abrevMap = new Map<string, string | null>();
+    const repseMap = new Map<string, string | null>();
     for (const d of datosRes.data ?? []) {
       abrevMap.set(d.persona_id as string, (d.abreviacion as string | null) ?? null);
+      repseMap.set(
+        d.persona_id as string,
+        ((d as { repse?: string | null }).repse ?? null) || null
+      );
     }
     setContratistas(
       (contratistasRes.data ?? [])
@@ -215,6 +235,7 @@ function NuevoContratoObraBody() {
             [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ') ||
             '(sin nombre)',
           abreviacion: abrevMap.get(p.id as string) ?? null,
+          repse: repseMap.get(p.id as string) ?? null,
         }))
         .sort((a, b) => a.nombre.localeCompare(b.nombre))
     );
@@ -248,6 +269,14 @@ function NuevoContratoObraBody() {
   );
   const valorNum = useMemo(() => Number(valorTotal) || 0, [valorTotal]);
 
+  // REPSE (Sprint 2): mano de obra a disposición sin REPSE vigente del contratista
+  // → alerta fuerte; sólo Dirección continúa, con motivo auditado (admin-nunca-bloqueado).
+  const { permissions } = usePermissions();
+  const repseVigente = Boolean(contratistaSel?.repse && contratistaSel.repse.trim());
+  const repseRequerido = esManoObra && personalADisposicion;
+  const repseAlerta = repseRequerido && !repseVigente;
+  const repseBloqueado = repseAlerta && (!permissions.isAdmin || repseOverrideMotivo.trim() === '');
+
   const codigoSugerido = useMemo(() => {
     if (!contratistaSel) return '';
     const year = (fechaContrato || new Date().toISOString().slice(0, 10)).slice(0, 4);
@@ -265,12 +294,24 @@ function NuevoContratoObraBody() {
     !!fechaContrato &&
     !!codigoFinal &&
     valorNum > 0 &&
-    !!objeto.trim();
+    !!objeto.trim() &&
+    !repseBloqueado;
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     try {
+      // REPSE override (Sprint 2): si se continúa con mano de obra a disposición sin
+      // REPSE, registramos quién/cuándo/por qué (canSubmit ya exige admin + motivo).
+      let repseOverride: { at: string; por: string | null; motivo: string } | null = null;
+      if (repseAlerta) {
+        const { data: auth } = await sb.auth.getUser();
+        repseOverride = {
+          at: new Date().toISOString(),
+          por: auth?.user?.id ?? null,
+          motivo: repseOverrideMotivo.trim(),
+        };
+      }
       const { data, error } = await sb
         .schema('dilesa')
         .from('contratos_construccion')
@@ -291,6 +332,15 @@ function NuevoContratoObraBody() {
           fecha_inicio: fechaInicio || null,
           fecha_fin: fechaFin || null,
           notas: notas.trim() || null,
+          forma_pago: formaPago.trim() || null,
+          modalidad_precio: modalidadPrecio || null,
+          es_mano_obra: esManoObra,
+          personal_a_disposicion: personalADisposicion,
+          retencion_fiscal_isr_pct: retencionFiscalIsr.trim() ? Number(retencionFiscalIsr) : 0,
+          retencion_fiscal_iva_pct: retencionFiscalIva.trim() ? Number(retencionFiscalIva) : 0,
+          repse_override_at: repseOverride?.at ?? null,
+          repse_override_por: repseOverride?.por ?? null,
+          repse_override_motivo: repseOverride?.motivo ?? null,
           cotizacion_id: cotizacionId || null,
         })
         .select('id')
@@ -571,6 +621,114 @@ function NuevoContratoObraBody() {
               />
             </Field>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Condiciones de pago y fiscales">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Forma de pago">
+            <Input
+              value={formaPago}
+              onChange={(e) => setFormaPago(e.target.value)}
+              placeholder="Ej. Transferencia a 15 días contra estimación"
+            />
+          </Field>
+          <Field label="Modalidad de precio">
+            <select
+              className={selectCls}
+              value={modalidadPrecio}
+              onChange={(e) => setModalidadPrecio(e.target.value)}
+            >
+              <option value="">— sin especificar —</option>
+              <option value="alzado">Precio alzado (fijo)</option>
+              <option value="unitarios">Precios unitarios</option>
+              <option value="administracion">Administración (costo + honorario)</option>
+            </select>
+          </Field>
+          <div className="flex flex-wrap items-center gap-5 sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={esManoObra}
+                onChange={(e) => {
+                  setEsManoObra(e.target.checked);
+                  if (!e.target.checked) setPersonalADisposicion(false);
+                }}
+                className="size-4 accent-[var(--accent)]"
+              />
+              Es mano de obra / servicio
+            </label>
+            {esManoObra ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={personalADisposicion}
+                  onChange={(e) => setPersonalADisposicion(e.target.checked)}
+                  className="size-4 accent-[var(--accent)]"
+                />
+                Personal a disposición de DILESA
+              </label>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Ret. ISR fiscal % (al SAT)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={retencionFiscalIsr}
+                onChange={(e) => setRetencionFiscalIsr(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Ret. IVA fiscal % (al SAT)">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={retencionFiscalIva}
+                onChange={(e) => setRetencionFiscalIva(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          </div>
+          <p className="text-[11px] text-muted-foreground sm:col-span-2">
+            La <strong>retención de garantía</strong> ({retencionPct || '0'}%) se captura arriba en
+            «Datos del contrato»: es civil y se regresa en el finiquito. Las dos de aquí son
+            fiscales: DILESA las retiene y las entera al SAT. La de IVA 6% aplica solo a servicios
+            especializados REPSE con personal a disposición.
+          </p>
+          {repseRequerido ? (
+            repseVigente ? (
+              <p className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 sm:col-span-2">
+                REPSE del contratista en registro: <strong>{contratistaSel?.repse}</strong>.
+              </p>
+            ) : (
+              <div className="rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:col-span-2">
+                <p className="font-medium">
+                  ⚠ Mano de obra a disposición sin REPSE vigente del contratista.
+                </p>
+                <p className="mt-1">
+                  Riesgo fiscal: gasto no deducible, IVA no acreditable y responsabilidad solidaria
+                  IMSS. Considera estructurarlo como obra a resultado o exigir el REPSE.
+                </p>
+                {permissions.isAdmin ? (
+                  <Input
+                    className="mt-2 bg-white"
+                    value={repseOverrideMotivo}
+                    onChange={(e) => setRepseOverrideMotivo(e.target.value)}
+                    placeholder="Motivo para continuar sin REPSE (queda auditado)"
+                  />
+                ) : (
+                  <p className="mt-1 font-medium">
+                    Solo Dirección puede continuar sin REPSE. Pide el registro al contratista.
+                  </p>
+                )}
+              </div>
+            )
+          ) : null}
         </div>
       </Section>
 

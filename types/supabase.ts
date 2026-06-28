@@ -2719,19 +2719,28 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           empresa_id: string
+          es_mano_obra: boolean
           fecha_contrato: string
           fecha_fin: string | null
           fecha_inicio: string | null
           fianza_pct: number | null
           fianzas_url: string | null
+          forma_pago: string | null
           id: string
           iva_tasa: number | null
+          modalidad_precio: string | null
           motivo_cancelacion: string | null
           notas: string | null
           objeto: string | null
           partida_id: string | null
           periodicidad_estimaciones_dias: number | null
+          personal_a_disposicion: boolean
           proyecto_id: string | null
+          repse_override_at: string | null
+          repse_override_motivo: string | null
+          repse_override_por: string | null
+          retencion_fiscal_isr_pct: number
+          retencion_fiscal_iva_pct: number
           retencion_pct: number
           tipo: string
           updated_at: string
@@ -2751,19 +2760,28 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
+          es_mano_obra?: boolean
           fecha_contrato: string
           fecha_fin?: string | null
           fecha_inicio?: string | null
           fianza_pct?: number | null
           fianzas_url?: string | null
+          forma_pago?: string | null
           id?: string
           iva_tasa?: number | null
+          modalidad_precio?: string | null
           motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
           periodicidad_estimaciones_dias?: number | null
+          personal_a_disposicion?: boolean
           proyecto_id?: string | null
+          repse_override_at?: string | null
+          repse_override_motivo?: string | null
+          repse_override_por?: string | null
+          retencion_fiscal_isr_pct?: number
+          retencion_fiscal_iva_pct?: number
           retencion_pct?: number
           tipo?: string
           updated_at?: string
@@ -2783,19 +2801,28 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
+          es_mano_obra?: boolean
           fecha_contrato?: string
           fecha_fin?: string | null
           fecha_inicio?: string | null
           fianza_pct?: number | null
           fianzas_url?: string | null
+          forma_pago?: string | null
           id?: string
           iva_tasa?: number | null
+          modalidad_precio?: string | null
           motivo_cancelacion?: string | null
           notas?: string | null
           objeto?: string | null
           partida_id?: string | null
           periodicidad_estimaciones_dias?: number | null
+          personal_a_disposicion?: boolean
           proyecto_id?: string | null
+          repse_override_at?: string | null
+          repse_override_motivo?: string | null
+          repse_override_por?: string | null
+          retencion_fiscal_isr_pct?: number
+          retencion_fiscal_iva_pct?: number
           retencion_pct?: number
           tipo?: string
           updated_at?: string
