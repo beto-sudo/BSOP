@@ -7,7 +7,7 @@
 **Próximo hito:** **S2** — radar de cuellos por fase (reporte «Calificación por fase») + score simple por banda + filtros temporales. Define el ancla temporal del reporte (R5) y el motor puro `lib/dilesa/fluidez.ts`. (S1 entregado: días-en-fase en chip de lista + expediente.)
 **Dueño:** Beto
 **Creada:** 2026-06-28
-**Última actualización:** 2026-06-28 (S1 en PR: días-en-fase en lista + expediente)
+**Última actualización:** 2026-06-28 (S1 + S1b en prod: días-en-fase en lista/expediente, filtro de antigüedad, estancadas ampliado a todo el pipeline activo)
 
 > Detonante: Beto quiere ver, en cada venta, **cuántos días lleva en su fase actual** (en el chip de la lista y en el reporte), y una **puntuación de fluidez del proceso** por venta basada en los tiempos por fase. Y, de fondo, **calificar cada una de las 17 fases** del pipeline (medianas, tendencia) para detectar dónde se atora el proceso —filtrable por mes/trimestre/semestre/año/solo-activas— y así dirigir mejoras a las fases lentas.
 
@@ -124,6 +124,7 @@ Beto eligió, sobre tres ejes:
 - **2026-06-28** — Revisión de Codex (2º modelo, independiente). Convergió con el ángulo adversarial: liderar con el **radar de cuellos por fase** + reglas simples; subordinar el score por venta; vender como diagnóstico de proceso, no de personas (el fracaso más probable = desconfianza/percepción de evaluación individual). Aportes nuevos: definir el **ancla temporal** del reporte (R5), segmentación más rica que `tipo_credito`, y que la **semántica del evento** (`UNIQUE` por fase, no por transición) es la fragilidad de raíz. Integrado como R4/R5 y en Riesgos.
 - **2026-06-28** — Beto confirmó R1–R5 "como están". Alcance v1 cerrado → `planned`. Listo para arrancar S1.
 - **2026-06-28** — **S1 entregado.** Días-en-fase visible en el chip de la lista de ventas (texto inline coloreado junto al badge de fase) y en el expediente (header + bloque Comercial de `OperacionResumen`). Vista nueva `dilesa.v_ventas_lista_antiguedad` (migración `20260628203638`; hermana de `v_ventas_pipeline_antiguedad`, sin el filtro `numero_escritura IS NULL` → cubre todo el pipeline vivo, solo excluye no-activas). Helper puro `lib/dilesa/dias-en-fase.ts` (cálculo UTC para empatar con `CURRENT_DATE` de la vista; umbrales fijos provisionales ámbar 15 d / rojo 30 d = `UMBRAL_ESTANCADA_DEFAULT`, los reemplaza el benchmark en S2). El expediente computa días desde las `venta_fases` ya cargadas por el provider (sin query extra). Tests: `dias-en-fase.test.ts`.
+- **2026-06-28** — **S1b (ajustes de feedback de Beto).** (1) Filtro de **antigüedad en fase** en la lista de ventas (select ≥7/15/30/60/90 días) — el dato vive inline en el chip de Fase, el filtro va aparte para aislar lo que se enfría. (2) **Reporte «Ventas estancadas» ampliado a todo el pipeline activo** (migración `20260628213133`: se quita el filtro `numero_escritura IS NULL` de `v_ventas_pipeline_antiguedad`). Diagnóstico de prod: el reporte mostraba solo 16 ventas (máx 11 d) porque excluía las 75 activas ya escrituradas, que son las realmente atoradas — hasta 328 días en fases post-escritura (Detonada/Facturada/Entregada esperando cierre). Se mantiene `estado='activa'` (terminadas/desasignadas fuera).
 
 ## Decisiones registradas
 
