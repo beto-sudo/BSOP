@@ -16,15 +16,17 @@
  * dos horas UTC candidatas y el guard de hora local deja pasar solo la que cae a
  * las 07:00 de Matamoros → llega a las 7am todo el año sin editar el cron.
  *
- * v1: NO incluye Pendientes (Apple Reminders no tiene API en nube), Cumpleaños
- * (Calendar) ni Correo (Gmail) — esos esperan el service account de Google de la
- * fase 2. El briefing lo nota en §2.
+ * Fuentes: Salud (Supabase), Cumpleaños + agenda (Calendar) y Correo (Gmail) vía
+ * service account de Google con domain-wide delegation (solo lectura). NO incluye
+ * Pendientes (Apple Reminders no tiene API en nube). Cada fuente es fail-open: si
+ * falla, el briefing lo nota en §2 y sigue.
  *
  * Security: requiere `Authorization: Bearer ${CRON_SECRET}` (lo manda Vercel).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getHealthBriefing } from '@/lib/briefing/health';
+import { getGoogleBriefing } from '@/lib/briefing/google';
 import { generateBriefingMarkdown } from '@/lib/briefing/build';
 import { mdToEmailHtml } from '@/lib/briefing/markdown';
 import { sendBriefingEmail } from '@/lib/briefing/email';
@@ -70,14 +72,14 @@ export async function GET(req: NextRequest) {
 
   const fecha = matamorosFecha(now);
 
-  // Salud (fail-open: si falla, el briefing reporta el gap en §2).
-  const health = await getHealthBriefing();
+  // Fuentes en paralelo (cada una fail-open: si falla, el briefing lo nota en §2).
+  const [health, google] = await Promise.all([getHealthBriefing(), getGoogleBriefing()]);
 
   // Redacción con Claude + web search. Si el modelo truena, no hay correo que
   // mandar — devolvemos 500 para que el log/alerta de Vercel lo capte.
   let markdown: string;
   try {
-    markdown = await generateBriefingMarkdown(health, fecha);
+    markdown = await generateBriefingMarkdown(health, google.calendar, google.gmail, fecha);
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     console.error('[daily-briefing] generación falló:', error);
