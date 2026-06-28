@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
 **Estado:** in_progress
-**Próximo hito:** Contabilidad registra los 2 abonos de la venta Ahumada (con XML y comprobante c/u — ya con FIFO sin fuente, saldan ambos cargos y los comprobantes caen al expediente). Luego: limpieza de ~$2.0M en saldos a favor históricos (185 ventas — requiere regla + OK de Beto), Sprint 4 (recordatorios de vencimiento) + Sprint 5 (retiro del módulo Coda "Depositos Clientes")
+**Próximo hito:** Aplicar la migración de limpieza de saldos a favor (`20260628190355`, requiere `finanzas-ok` de Beto) + retiro del módulo Coda "Depositos Clientes" → cierre v1. Sprint 4 (recordatorios de vencimiento + forecast) **descopeado** a follow-up proposed (`dilesa-cobranza-recordatorios`).
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-17 (auto-generación del plan de pagos en el ciclo de vida de la venta: trigger en `dilesa.ventas` que genera el plan al alistarse — fase 2-11 + valor>0 + sin plan previo, create-once, fail-open — + backfill de 6 ventas vivas. Elimina el paso manual que dejó flotar el abono de Arizpe Luna)
+**Última actualización:** 2026-06-28 (cierre v1: Ahumada ✅ resuelto en prod; migración de limpieza de los $2.0M de saldos a favor de Coda — 186 pagos / 185 ventas / $2,015,311.81, todas terminada, corregidas a $0 como artefacto de captura; Sprint 4 descopeado a follow-up)
 
 ## Problema
 
@@ -211,6 +211,30 @@ cxc_cargos.saldo = precio − Σ aplicaciones`, y la suma de buckets de
 
 ## Decisiones registradas
 
+### 2026-06-28 — Cierre v1: limpieza de saldos a favor de Coda como artefacto + descope de Sprint 4
+
+Beto en chat, tras la radiografía de prod (read-only):
+
+- **Ahumada ya está resuelto** — Contabilidad registró los 2 abonos; ambos
+  cargos liquidados, saldo $0 (enganche $9,200 + disposición Infonavit
+  $930,800). El pendiente operativo del "Próximo hito" desaparece.
+- **Saldos a favor = artefacto de captura de Coda, se corrigen (todo).**
+  Radiografía 2026-06-28: **186 pagos / 185 ventas / $2,015,311.81** de saldo
+  a favor, **todas `terminada`**, **todas de origen Coda** ($1.94M institución
+  - $73.6K cliente). Ninguna es cartera viva. Regla aprobada: reducir cada
+    abono de Coda a lo realmente aplicado (saldo a favor → $0). NO mueve dinero
+    (no es CFDI ni movimiento bancario): corrige el monto sobre-capturado del
+    depósito. Mismo espíritu que el LIQ-HIST. Migración `20260628190355`
+    data-only, self-verificante, idempotente, con rastro en `core.audit_log` +
+    `notas`. Se aplica con `finanzas-ok` de Beto.
+- **EXCLUIDOS del barrido masivo**: 3 pagos nativos BSOP ($64,341.01, incl.
+  Nancy Villarreal $33,076) → conciliación individual; LIQ-HIST sintéticos
+  (sin saldo a favor); cualquier venta no-terminada.
+- **Sprint 4 (recordatorios de vencimiento + forecast) se descopa** a una
+  sub-iniciativa follow-up `proposed` (`dilesa-cobranza-recordatorios`). CxC
+  v1 cierra con: schema + UI + módulo Cobranza + aging + printables (Sprints
+  1-3, en prod) + limpieza de datos + retiro de Coda.
+
 ### 2026-06-12 — El XML del recibo manda; F12 manual solo Dirección; FIFO sin fuente es canon
 
 Del caso Ahumada Castillo (F12 cerrada a mano sin abono en CxC) y la
@@ -329,6 +353,30 @@ reubicados cuya fase "Entregada" venía heredada del lote en Coda.
   queda `proposed` hasta que CxC+CxP emitan movimientos.
 
 ## Bitácora
+
+### 2026-06-28 — Cierre v1: Ahumada resuelto + limpieza de $2.0M de saldos a favor + descope Sprint 4
+
+Sesión de destrabe pedida por Beto ("no sé qué falta, ayúdame a cerrarla").
+Radiografía de prod (read-only) que actualiza el diagnóstico viejo del doc:
+
+- **Ahumada — ✅ resuelto.** La venta (JESUS SANTIAGO AHUMADA **Carrillo**, el
+  doc decía "Castillo" por error) está detonada (10-jun, $940,000) y en
+  "Preparada para Entrega"; sus 2 cargos liquidados, saldo $0. Contabilidad
+  ya registró los abonos. Pendiente cerrado.
+- **Saldos a favor — caracterizados y migración lista (sin aplicar).** Medición
+  actual: **188 ventas / $2,079,652.82** total. Desglose: $1.94M institución +
+  $73.6K cliente de **origen Coda** en ventas **terminada** (artefacto), +
+  $64.3K en **3 pagos nativos BSOP** (revisión individual, excluidos). Se
+  descartó la hipótesis "doble enganche" del doc (0 casos donde favor =
+  enganche). Migración `20260628190355_cxc_limpieza_saldos_favor_coda.sql`:
+  congela el set 186 pagos / 185 ventas / $2,015,311.81, lo verifica contra lo
+  aprobado y reduce cada abono a lo aplicado; rastro en `core.audit_log` +
+  `notas`. Sin tocar aplicaciones/cargos → ningún trigger de saldo se dispara;
+  el de comprobante (`AFTER UPDATE OF comprobante_adjunto_id`) tampoco.
+  **Construida en este PR; se aplica con `finanzas-ok` de Beto** (crea/edita
+  datos financieros).
+- **Sprint 4 descopeado** a follow-up `proposed`; v1 cierra tras aplicar la
+  migración + retirar Coda. Ver Decisiones registradas 2026-06-28.
 
 ### 2026-06-17 — Auto-generación del plan de pagos en el ciclo de vida de la venta
 
