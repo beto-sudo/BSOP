@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -187,19 +188,16 @@ export function ArrendamientoCaptureDialog({
               <FieldLabel htmlFor="arr-arrendatario" required>
                 Arrendatario
               </FieldLabel>
-              <select
+              <Combobox
                 id="arr-arrendatario"
-                className={selectCls}
                 value={arrendatario}
-                onChange={(e) => setArrendatario(e.target.value)}
-              >
-                <option value="">Selecciona…</option>
-                {personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={setArrendatario}
+                options={personas.map((p) => ({ value: p.id, label: p.nombre }))}
+                placeholder="Selecciona arrendatario…"
+                searchPlaceholder="Buscar por nombre…"
+                emptyText="Sin coincidencias"
+                allowClear
+              />
             </div>
             <div>
               <FieldLabel htmlFor="arr-plazo">Tipo</FieldLabel>
@@ -285,18 +283,19 @@ export function ArrendamientoCaptureDialog({
                 <div className="grid grid-cols-2 gap-2">
                   <div className="col-span-2">
                     <FieldLabel required>Activo</FieldLabel>
-                    <select
-                      className={selectCls}
+                    <Combobox
                       value={l.activo_id}
-                      onChange={(e) => actualizarLinea(i, { activo_id: e.target.value })}
-                    >
-                      <option value="">Selecciona un activo rentable…</option>
-                      {activos.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.nombre} ({a.tipo})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => actualizarLinea(i, { activo_id: v })}
+                      options={activos.map((a) => ({
+                        value: a.id,
+                        label: a.nombre,
+                        sub: a.tipo,
+                      }))}
+                      placeholder="Selecciona un activo rentable…"
+                      searchPlaceholder="Buscar activo o cara…"
+                      emptyText="Sin coincidencias"
+                      allowClear
+                    />
                   </div>
                   <div>
                     <FieldLabel required>Renta mensual (subtotal)</FieldLabel>
