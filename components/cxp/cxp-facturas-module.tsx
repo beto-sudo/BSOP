@@ -71,7 +71,7 @@ import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
 import { hrefDoc } from '@/lib/gasto/hilo';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { buildProyectoOptions, type ProyectoSelectorRow } from '@/lib/dilesa/proyectos-selector';
-import type { AplicacionViva } from './cxp-programacion-module';
+import type { AplicacionViva } from '@/lib/cxp/pendientes-programar';
 
 const TZ = 'America/Matamoros';
 

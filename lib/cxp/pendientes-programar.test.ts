@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pendientesDeProgramar, type AplicacionViva } from './cxp-programacion-module';
+import { pendientesDeProgramar, type AplicacionViva } from './pendientes-programar';
 
 type F = { id: string; saldo: number };
 

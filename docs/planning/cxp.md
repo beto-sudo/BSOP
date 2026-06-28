@@ -4,10 +4,10 @@
 **Empresas:** todas (golden: RDB; rollout DILESA/COAGAN/ANSA en Sprint 6)
 **Schemas afectados:** `erp` (extiende `facturas`; nuevas `cxp_pagos`, `cxp_pago_aplicaciones`; absorbe `gastos`; extiende `movimientos_bancarios` con referencia polimórfica, ADR-037)
 **Estado:** in_progress
-**Próximo hito:** Sprint 7 (rediseño del flujo en 3 etapas, una pantalla por etapa: Facturas = por programar + programar; Programación = ejecutar pago + comprobante; Pagos = pagadas) — Sprint 1 (pantalla Facturas) en curso. Pendientes previos: Sprint 5 (pago efectivo + cortes), Sprint 6 (migrar gastos + rollout)
+**Próximo hito:** Sprint 5 — conciliación de `cxp_pagos` contra el estado de cuenta. CxP ya hace su parte (emite los movimientos bancarios); el casamiento movimiento↔banco es **v1 de `conciliacion-bancaria`** (hermana, hoy desbloqueada porque CxP ya emite). Decidir con Beto si esa iniciativa lo absorbe o se hace un puente mínimo acá. Sprints 6 y 7 **cerrados**.
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-26 (rediseño del flujo en 3 etapas promovido como Sprint 7; fix de auto-match de destajo por persona duplicada, PR #1062; reconciliación del caso David en prod con OK de Beto)
+**Última actualización:** 2026-06-28 (higiene + cierre honesto: Sprint 7 confirmado en prod; Sprint 6 cerrado por decisión —gastos vacía=no-op, COAGAN/ANSA diferido sin datos—; código muerto `CxpProgramacionModule` eliminado y bug `cxc_pago_registrar` verificado ya corregido en prod. Único pendiente sustantivo = Sprint 5 conciliación, que es de la hermana `conciliacion-bancaria`)
 
 ## Problema
 
@@ -140,16 +140,96 @@ Resultado operativo: doble captura entre la realidad bancaria y la contable, rie
 
 ## Sprints / hitos
 
-| #   | Scope                                                                                                                                                                                                                                                                           | Estado           | PR        |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------- |
-| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                                                                                    | _este PR_        | —         |
-| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF                                                            | aplicado         | _este PR_ |
-| 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                                                                            | en PR            | _este PR_ |
-| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                                                                                  | en PR            | _este PR_ |
-| 4   | UI programación + aprobación (RDB + DILESA, componentes compartidos). Email de notificación diferido a follow-up                                                                                                                                                                | en PR            | _este PR_ |
-| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion`)                                                                                                                                                                                                 | pending          | —         |
-| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa (DILESA, COAGAN, ANSA)                                                                                                                                                                                                  | pending          | —         |
-| 7   | Rediseño del flujo en 3 etapas (pipeline por pestaña). S1: pantalla Facturas absorbe la programación (filtro "por programar" + acción programar gateada a Dirección, programar=autoriza). S2: pantalla Programación ejecuta el pago + comprobante. S3: pantalla Pagos = pagadas | in_progress (S1) | —         |
+| #   | Scope                                                                                                                                                                                                                                                                                                                | Estado              | PR          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ----------- |
+| 0   | Promoción: este doc + fila en INITIATIVES.md                                                                                                                                                                                                                                                                         | _este PR_           | —           |
+| 1   | DB: extender `erp.facturas` + crear `cxp_pagos` + `cxp_pago_aplicaciones` + RPCs (alta, cancelar, programar, aprobar, marcar_pagado, cancelar_pago) + helper `es_comite_ejecutivo` + backfill + regenerar SCHEMA_REF                                                                                                 | aplicado            | _este PR_   |
+| 2   | Parser CFDI determinista (`lib/cxp`) + endpoint `upload-xml` (bulk + dedup `uuid_sat` + validación receptor + sugerencia de proveedor). Match-OC automático y PDF-LLM diferidos a Sprint 3/follow-up                                                                                                                 | en PR               | _este PR_   |
+| 3   | UI RDB facturas (lista + drawer) + aging + vista por proveedor                                                                                                                                                                                                                                                       | en PR               | _este PR_   |
+| 4   | UI programación + aprobación (RDB + DILESA, componentes compartidos). Email de notificación diferido a follow-up                                                                                                                                                                                                     | en PR               | _este PR_   |
+| 5   | Pago efectivo + conciliación contra cortes (engancha con `cortes-conciliacion` / `conciliacion-bancaria`). **Parcial**: emit de `movimientos_bancarios` (Sprint 1 RPC) + comprobante de pago (#847) ✅; **falta** el casamiento de `cxp_pago` ↔ cargo bancario en cortes + vista "pendientes de conciliar"           | parcial             | #847        |
+| 6   | Migración de `erp.gastos` a CxP + rollout multi-empresa. **Cerrado por decisión (2026-06-28)**: rollout RDB+DILESA ✅ (#633); migración de gastos = no-op (`erp.gastos` vacía, se conserva por FK de `conciliaciones`); rollout COAGAN/ANSA **diferido** (0 datos ERP, 0 Dirección hoy)                              | **done** (decisión) | #633        |
+| 7   | Rediseño del flujo en 3 etapas (pipeline por pestaña). S1: pantalla Facturas absorbe la programación (filtro "por programar" + programar gateado a Dirección, programar=autoriza). S2: pantalla Programación ejecuta pago + comprobante. S3: pantalla Pagos = pagadas (absorbido en S2 vía `estadoInicial="pagado"`) | **done** (prod)     | #1068/#1069 |
+
+## Pendientes (estado a 2026-06-28)
+
+Lo que falta para cerrar la iniciativa v1, en orden sugerido. El núcleo del módulo
+(captura, 3-way match, programación=autoriza, ejecución de pago + comprobante,
+aging) **ya está vivo en RDB y DILESA**.
+
+### Sprint 5 — conciliación de pagos contra cortes (parcial)
+
+- [x] `cxp_pago_marcar_pagado` emite `erp.movimientos_bancarios` (`tipo='cargo'`,
+      `referencia_tipo='cxp_pago'`, `referencia_id`) — entregado en Sprint 1.
+- [x] Comprobante de pago adjuntable al marcar pagado (#847).
+- [ ] **Casamiento `cxp_pago` ↔ cargo bancario en cortes**: al conciliar un cargo
+      contra un `cxp_pago`, marcarlo conciliado. **No integrado** (grep `cxp_pago`
+      en código de cortes = vacío).
+- [ ] **Vista "pendientes de conciliar"** (`cxp_pagos` pagados sin conciliar) en
+      `/rdb/cortes` (o donde viva hoy el flujo).
+- ⚠️ **Cruza con la hermana `conciliacion-bancaria`** (in_progress): decidir si la
+  conciliación de CxP la absorbe esa iniciativa (3er vértice del triángulo de
+  tesorería, ADR-037 D-conciliación) o se hace acá un puente mínimo. Alinear
+  antes de codear para no duplicar.
+
+### Sprint 6 — migración de gastos + rollout COAGAN/ANSA — **cerrado por decisión (2026-06-28)**
+
+Revisión contra prod (2026-06-28): los dos entregables que faltaban resultaron
+**no-op** o **prematuros**, así que el sprint se cierra por decisión, no por código.
+
+- [x] Rollout RDB + DILESA con componentes compartidos (ADR-011) — #633.
+- [x] **Migración de datos `erp.gastos` → no aplica**: `erp.gastos` está **vacía
+      (0 filas en todo el sistema)**. No hay nada que migrar — la métrica de
+      no-pérdida se cumple trivialmente. **`erp.gastos` se conserva** (NO se dropea):
+      `erp.conciliaciones` (legacy) la referencia por FK, y esa tabla pertenece al
+      mundo de `conciliacion-bancaria`. Su deprecación/limpieza es decisión de esa
+      iniciativa hermana, no de CxP.
+- [x] **Rollout COAGAN + ANSA → diferido (sin valor hoy)**: ambas tienen **0
+      facturas, 0 OC, 0 gastos y 0 usuarios con rol Dirección** en prod. Liberar el
+      módulo ahí sería una pantalla vacía que nadie puede autorizar. Se difiere hasta
+      que esas empresas (a) onboarden actividad ERP de compras/egresos y (b) tengan
+      al menos un usuario con rol Dirección. Cuando llegue, es mecánico: 5 lugares
+      RBAC (`NAV_ITEMS`, `ROUTE_TO_MODULE`, `EXPECTED_DB_MODULE_SLUGS`, `MODULE_DEPS`,
+      migración INSERT módulos + backfill) + pages delgadas con `<CxpFacturasModule>`
+      etc. + revisar CSF (COAGAN AGAPES tasa 0%, ANSA) para el motor de retenciones.
+
+### Follow-ups técnicos (transversales, no bloquean v1)
+
+- [ ] **Email al aprobador** cuando hay pagos en estado «programado» — diferido
+      desde Sprint 4; sin implementar (reusaría `lib/juntas/email.ts` para branding
+      por empresa). Con el rediseño S7 (programar = autoriza en un paso) **puede que
+      ya no aplique** para la autorización; reevaluar si sigue teniendo sentido como
+      aviso de "hay pagos por ejecutar" en Programación.
+- [x] **Código muerto `CxpProgramacionModule` — resuelto (2026-06-28).** El
+      componente de programación en lote quedó sin renderizar tras S7. Se eliminó
+      (`components/cxp/cxp-programacion-module.tsx`); el helper puro
+      `pendientesDeProgramar` + tipo `AplicacionViva` (vivos: los usa la bandeja
+      «Te toca») se extrajeron a `lib/cxp/pendientes-programar.ts` con su test.
+- [x] **`erp.cxc_pago_registrar` `tipo='ingreso'` — ya corregido en prod.** La
+      definición viva inserta `tipo='abono'` (con comentario sobre el CHECK
+      `cargo`/`abono`); el hallazgo latente de Sprint 1 se resolvió en algún PR
+      posterior. Sin acción pendiente.
+- [ ] **Email al aprobador** cuando hay pagos en estado «programado» — diferido
+      desde Sprint 4; sin implementar (reusaría `lib/juntas/email.ts` para branding
+      por empresa). Con el rediseño S7 (programar = autoriza en un paso) **puede que
+      ya no aplique** para la autorización; reevaluar si sigue teniendo sentido como
+      aviso de "hay pagos por ejecutar" en Programación.
+- [ ] **"Comprometido en pagos" en la vista "Todas" de facturas**: nota de #807
+      (facturas con pagos programados se ven `por_pagar` con saldo completo). La
+      vista "Por programar" de S7 ya descuenta el comprometido; evaluar si falta
+      exponerlo también en la vista "Todas". Cosmético.
+- [ ] **Limpieza de catálogo**: 4 contratistas con persona duplicada (RFC vs
+      sin-RFC) — detectado en #1062. No bloquea, pero ensucia el auto-match de
+      destajos.
+
+### Iniciativas hermanas que consumen/extienden CxP (separadas, no son sprints de acá)
+
+- `dilesa-estimaciones-cxp` (destajos semanales → CxP) — **cerrada/prod**.
+- `dilesa-obra-estimaciones-cxp` (estimación de obra → CxP «en espera del XML») —
+  in_progress, Sprint 4.
+- `dilesa-catalogo-contable` (cuenta contable + partida en la factura) — Sprint 3
+  en prod; alimenta la clasificación de la pantalla Facturas.
+- `conciliacion-bancaria` — in_progress; 3er vértice de tesorería (ver Sprint 5).
 
 ## Decisiones registradas
 
@@ -241,6 +321,50 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+- **2026-06-28 — Higiene + cierre honesto de Sprint 6 (diagnóstico contra prod).**
+  Beto pidió arrancar pendientes. El diagnóstico contra prod desinfló dos de los
+  tres "sprints grandes" del backlog:
+  - **`erp.gastos` está vacía (0 filas en todo el sistema)** → la "migración de
+    gastos" del Sprint 6 es no-op. **No se dropea** la tabla: `erp.conciliaciones`
+    (legacy) la referencia por FK; su destino es de `conciliacion-bancaria`.
+  - **COAGAN y ANSA: 0 facturas, 0 OC, 0 gastos, 0 usuarios Dirección** → rollout
+    prematuro (pantalla vacía, nadie autoriza). **Diferido** hasta que onboarden ERP
+    - tengan rol Dirección. Sprint 6 se cierra por decisión.
+  - **Bug latente `erp.cxc_pago_registrar` `tipo='ingreso'`** (flageado en Sprint 1):
+    la definición viva en prod ya inserta `tipo='abono'`. Ya corregido — sin acción.
+  - **Código muerto eliminado**: `components/cxp/cxp-programacion-module.tsx` (el
+    componente de programación en lote dejó de renderizarse tras S7, #1069). El
+    helper puro `pendientesDeProgramar` + tipo `AplicacionViva` —vivos, los usa la
+    bandeja «Te toca» (`components/gasto/te-toca-strip.tsx`)— se extrajeron a
+    `lib/cxp/pendientes-programar.ts` con su test. ~600 líneas de JSX muerto fuera.
+  - Saldo: **CxP v1 queda esencialmente completo** para quien lo usa (RDB/DILESA).
+    El único pendiente sustantivo es la conciliación movimiento↔banco (Sprint 5),
+    que pertenece a la hermana `conciliacion-bancaria` (in_progress, ahora
+    desbloqueada porque CxP ya emite los movimientos).
+
+- **2026-06-28 — Revisión de estado: Sprint 7 cerrado en prod, doc reconciliado.**
+  Auditoría a pedido de Beto ("creo avanzamos más de lo registrado"). Hallazgo:
+  el **Sprint 7 (rediseño del flujo en 3 etapas) está completo en prod** y el doc
+  seguía marcándolo "in_progress (S1)".
+  - **S1 (#1068, mergeado 2026-06-26):** la pantalla **Facturas** se vuelve la 1ª
+    etapa del pipeline. Vista "Por programar" (`porProgramar = saldo − comprometido`,
+    comprometido = pagos vivos programado/aprobado) + selector "Por programar | Todas".
+    En el drawer, **Dirección** ve "Programar pago" que crea el `cxp_pago` y lo
+    **aprueba en el mismo paso** (programar = autoriza). Gate cliente: admin O
+    `direccionEmpresaIds`, espejo del gate server de `cxp_pago_aprobar` (sin
+    migración — el RPC ya gateaba Dirección).
+  - **S2 (#1069, mergeado 2026-06-26):** **cierra el rediseño**. Programación y
+    Pagos reusan `<CxpPagosModule>` con prop nuevo **`estadoInicial`**: Programación
+    = `"pendientes"` (programado+aprobado → marcar pagado + comprobante), Pagos =
+    `"pagado"` (histórico). **S3 quedó absorbido aquí** (Pagos = histórico sale del
+    filtro). RDB y DILESA ambas con el flujo nuevo.
+  - **Deuda técnica que dejó el rediseño:** `components/cxp/cxp-programacion-module.tsx`
+    (`CxpProgramacionModule`, programar en lote por proveedor) **ya no se renderiza**
+    — solo aporta el helper `pendientesDeProgramar` + su test. Decidir: borrar el
+    JSX muerto o re-exponer el lote como acción secundaria en Programación.
+  - Sin cambios de código en esta entrada (solo doc). Promoción del Sprint 7 fue
+    #1064.
 
 - **2026-06-26 — Fix auto-match de destajo por persona duplicada + reconciliación + promoción del Sprint 7.**
   Síntoma: facturas de destajo con XML ya cargado seguían en "en espera del
