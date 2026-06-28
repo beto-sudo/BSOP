@@ -262,12 +262,13 @@ borde en la memoria `reference_bsop_merge_flow_multisesion`.
 ### Liberación de módulo nuevo (RBAC sync) — ADR-014
 
 Al liberar un módulo (page nuevo bajo `app/<empresa>/` con URL en sidebar, o
-habilitar un módulo existente para otra empresa), **4 lugares en el mismo PR**:
+habilitar un módulo existente para otra empresa), **5 lugares en el mismo PR**:
 
 1. **`NAV_ITEMS`** ([components/app-shell/nav-config.ts](components/app-shell/nav-config.ts)) — entrada en la sección de ADR-014.
 2. **`ROUTE_TO_MODULE`** ([lib/permissions.ts](lib/permissions.ts)) — URL → slug.
 3. **`EXPECTED_DB_MODULE_SLUGS`** ([lib/permissions.test.ts](lib/permissions.test.ts)) — el slug (el test de sync falla si lo olvidás).
-4. **Migración SQL**: `INSERT INTO core.modulos (...)` con `ON CONFLICT
+4. **`MODULE_DEPS`** ([lib/permissions-deps.ts](lib/permissions-deps.ts)) — el slug de toda página con `RequireAccess`, **aunque sea `[]`** (sin dependencias de navegación). El test `permissions-deps.test.ts` lo exige; **solo aparece al correr la suite completa** (`test:run`), no en `permissions.test.ts` — fácil de olvidar y romper CI (caso `arrendamiento` S1d, 2026-06-27).
+5. **Migración SQL**: `INSERT INTO core.modulos (...)` con `ON CONFLICT
 (empresa_id, slug) DO NOTHING` + **backfill defensivo de permisos** (por cada
    rol × módulo nuevo, `INSERT INTO core.permisos_rol …`) + `NOTIFY pgrst,
 'reload schema'`. Sin el backfill, agregar el slug **esconde** el módulo a
