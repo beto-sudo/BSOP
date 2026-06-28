@@ -123,6 +123,8 @@ function NuevoContratoObraBody() {
   const proveedorParam = searchParams.get('proveedor');
   const totalParam = searchParams.get('total');
   const partidaParam = searchParams.get('partida');
+  // Sprint 3: si la adjudicación generó "OC + Contrato", llega la OC a ligar.
+  const ordenCompraParam = searchParams.get('oc');
   const desdeAdjudicacion = Boolean(cotizacionId && proveedorParam);
 
   useEffect(() => {
@@ -342,6 +344,7 @@ function NuevoContratoObraBody() {
           repse_override_por: repseOverride?.por ?? null,
           repse_override_motivo: repseOverride?.motivo ?? null,
           cotizacion_id: cotizacionId || null,
+          orden_compra_id: ordenCompraParam || null,
         })
         .select('id')
         .single();
@@ -351,8 +354,9 @@ function NuevoContratoObraBody() {
       // Cierre de la adjudicación (sólo si venimos de una cotización): la
       // cotización pasa a adjudicada y sus proveedores a elegida/descartada. Se
       // hace aquí, no en la adjudicación, para no dejarla adjudicada a medias si
-      // el usuario abandona la captura de condiciones.
-      if (desdeAdjudicacion && cotizacionId && proveedorParam) {
+      // el usuario abandona la captura de condiciones. En "OC + Contrato" (viene
+      // `oc`) la adjudicación ya se cerró al emitir la OC → no re-cerrar aquí.
+      if (desdeAdjudicacion && cotizacionId && proveedorParam && !ordenCompraParam) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const erp = sb.schema('erp') as any;
         await erp

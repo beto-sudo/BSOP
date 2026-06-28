@@ -3,11 +3,11 @@
 **Slug:** `dilesa-adjudicacion-contrato-obra`
 **Empresas:** DILESA
 **Schemas afectados:** `erp` (`requisiciones`: flag `es_mano_obra` + términos ofrecidos; lectura de `cotizaciones`/`ordenes_compra`), `dilesa` (`contratos_construccion`: condiciones capturadas — `forma_pago`, `modalidad_precio`, retención fiscal ISR/IVA aparte de la garantía, `es_mano_obra`/`repse_requerido`, FK `orden_compra_id`), `core` (lectura `contratistas_datos.repse` para el warning). UI en `components/compras/**` y `app/dilesa/construccion/contratos/**`. **Línea roja:** NO toca el runtime de CxP de obra (amortización de anticipo / retención acumulada / tope) — eso es de [`dilesa-obra-estimaciones-cxp`](dilesa-obra-estimaciones-cxp.md).
-**Estado:** in_progress
-**Próximo hito:** Sprint 1 — la requisición declara mano de obra (dispara RFQ `tipo='obra'`) y la adjudicación de obra abre la pantalla de condiciones en vez del insert silencioso (`tipo='urbanizacion'` hardcodeado). Sprint 0 (confirmación antes de cerrar OC) entregado en el PR de promoción.
+**Estado:** done
+**Próximo hito:** — (cerrada; Sprints 0-3 en prod: #1088 S0 · #1117 S1 · #1119 S2 · S3 en este PR)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26
+**Última actualización:** 2026-06-28
 
 > **Origen:** Beto cerró sin querer la OC-2026-0001 (el botón "Cerrar orden" no pedía
 > confirmación y, sin nada recibido, la dejó Cancelada). Al revisar el flujo surgió la
@@ -83,12 +83,12 @@ Y el detonante operativo: cerrar/cancelar una OC no tenía red de seguridad (un 
 
 ## Alcance / Sprints
 
-| #   | Scope                                                                                                                                                                                                                                                                                                                                                           | Estado  |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 0   | **Prevención (detonante).** Confirmación adaptativa antes de cerrar una OC: con algo recibido = cierre normal; **sin nada recibido = se trata como cancelación** (pide motivo y usa `cancelar()`, que reabre la cotización — ya no la deja huérfana). Reusa `<ConfirmDialog>`.                                                                                  | done    |
-| 1   | **Wiring requisición → contrato.** `erp.requisiciones.es_mano_obra` (+ términos ofrecidos suaves); el spawn de RFQ deja de hardcodear `tipo='compra'` y usa `'obra'` cuando es mano de obra; la adjudicación de obra **rutea a la pantalla de condiciones** (pre-llenada con cotización/proveedor/partida/valor) en vez del insert silencioso.                  | pending |
-| 2   | **Condiciones completas + REPSE.** Agregar a la pantalla y a `contratos_construccion`: `forma_pago`, `modalidad_precio` (alzado/unitarios/administración), **retención fiscal ISR/IVA separada** de la garantía, `es_mano_obra`/`repse_requerido`. Warning REPSE (lee `contratistas_datos.repse`) con override admin auditado. Campos materiales fluyen al PDF. | pending |
-| 3   | **Liga OC↔Contrato + opt-in "ambos".** FK `dilesa.contratos_construccion.orden_compra_id` (→ `erp.ordenes_compra`, `ON DELETE SET NULL`, índice único parcial). Opción explícita de generar OC **y** Contrato para labor + material.                                                                                                                            | pending |
+| #   | Scope                                                                                                                                                                                                                                                                                                                                                           | Estado |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 0   | **Prevención (detonante).** Confirmación adaptativa antes de cerrar una OC: con algo recibido = cierre normal; **sin nada recibido = se trata como cancelación** (pide motivo y usa `cancelar()`, que reabre la cotización — ya no la deja huérfana). Reusa `<ConfirmDialog>`.                                                                                  | done   |
+| 1   | **Wiring requisición → contrato.** `erp.requisiciones.es_mano_obra` (+ términos ofrecidos suaves); el spawn de RFQ deja de hardcodear `tipo='compra'` y usa `'obra'` cuando es mano de obra; la adjudicación de obra **rutea a la pantalla de condiciones** (pre-llenada con cotización/proveedor/partida/valor) en vez del insert silencioso.                  | done   |
+| 2   | **Condiciones completas + REPSE.** Agregar a la pantalla y a `contratos_construccion`: `forma_pago`, `modalidad_precio` (alzado/unitarios/administración), **retención fiscal ISR/IVA separada** de la garantía, `es_mano_obra`/`repse_requerido`. Warning REPSE (lee `contratistas_datos.repse`) con override admin auditado. Campos materiales fluyen al PDF. | done   |
+| 3   | **Liga OC↔Contrato + opt-in "ambos".** FK `dilesa.contratos_construccion.orden_compra_id` (→ `erp.ordenes_compra`, `ON DELETE SET NULL`, índice único parcial). Opción explícita de generar OC **y** Contrato para labor + material.                                                                                                                            | done   |
 
 > El **runtime de CxP de obra** (estimación autorizada → factura en espera del XML,
 > amortización lineal del anticipo, retención acumulada + liberación en finiquito, tope vs
@@ -157,3 +157,16 @@ Y el detonante operativo: cerrar/cancelar una OC no tenía red de seguridad (un 
   RFQ-MQSADDFP intacta, audit `oc_reabrir_correccion`). Stress-test con 5 agentes; estructura
   cerrada con las 4 decisiones de Beto. **Sprint 0** (confirmación adaptativa antes de cerrar
   OC, con ruteo a `cancelar()` cuando no hay nada recibido) entregado en el PR de promoción.
+- **2026-06-28 — Sprints 1-3 (iniciativa completa).** **S1** ([#1117](https://github.com/beto-sudo/BSOP/pull/1117)):
+  `erp.requisiciones.es_mano_obra` → la RFQ nace `tipo='obra'` → la adjudicación de obra rutea
+  a la pantalla de condiciones pre-llenada (en vez del insert mudo `tipo='urbanizacion'`); al
+  guardar crea el contrato + cierra la adjudicación (sin huérfanos). **S2**
+  ([#1119](https://github.com/beto-sudo/BSOP/pull/1119)): `forma_pago`, `modalidad_precio`,
+  **retención fiscal ISR/IVA separada** de la garantía civil, `es_mano_obra`/`personal_a_disposicion`,
+  y warning REPSE (lee `contratistas_datos.repse`) con override de Dirección auditado
+  (`repse_override_*`). **S3** (este PR): FK `contratos_construccion.orden_compra_id` (liga
+  OC↔Contrato, `ON DELETE SET NULL` + índice único parcial) + opt-in "OC + Contrato" (checkbox
+  +OC en la adjudicación) para labor + material; helpers `crearOcEmitida`/`cerrarAdjudicacion`.
+  Migraciones additivas aplicadas a prod **al mergear** (db-push-on-merge, label `finanzas-ok`).
+  Nota de proceso: el modelo de migraciones había cambiado a `derivados-sin-drift` (validación
+  vs shadow, no prod); se corrigió a mitad de camino (regen desde shadow, sin `db push` manual).

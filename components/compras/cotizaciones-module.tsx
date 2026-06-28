@@ -1024,6 +1024,8 @@ function CapturaPrecios({
   const [enviandoId, setEnviandoId] = useState<string | null>(null);
   // Confirmación + estado de adjudicación (genera OC o contrato).
   const [confirmAdjId, setConfirmAdjId] = useState<string | null>(null);
+  // Opt-in "OC + Contrato" (Sprint 3): para una cotización de obra con material.
+  const [adjAmbos, setAdjAmbos] = useState(false);
   const [adjudicandoId, setAdjudicandoId] = useState<string | null>(null);
 
   const setCelda = (cotProvId: string, lineaId: string, val: string) =>
@@ -1213,7 +1215,80 @@ function CapturaPrecios({
 
   // Adjudicar la RFQ a un proveedor: genera OC (compra) o contrato de obra (obra),
   // marca la cotización 'adjudicada' y a los proveedores elegida/descartada.
-  async function adjudicar(cotProveedorId: string) {
+  // Crea la OC emitida (enviada) + su detalle desde la cotización; devuelve su id.
+  // Reutilizado por la adjudicación a OC y por el opt-in "OC + Contrato" (Sprint 3).
+  async function crearOcEmitida(
+    sb: ReturnType<typeof createSupabaseBrowserClient>,
+    cotProveedorId: string,
+    proveedorId: string,
+    total: number
+  ): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ocResp = await (sb.schema('erp') as any)
+      .from('ordenes_compra')
+      .insert({
+        empresa_id: empresaId,
+        cotizacion_id: cotizacion.id,
+        proveedor_id: proveedorId,
+        estado: 'enviada',
+        autorizada_at: new Date().toISOString(),
+        total,
+      })
+      .select('id')
+      .single();
+    if (ocResp.error || !ocResp.data) {
+      throw new Error(
+        getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la orden de compra.')
+      );
+    }
+    const ocId = ocResp.data.id as string;
+    const detalle = cotizacion.lineas.map((l) => {
+      const precio = precioCelda(cotizacion.precios, cotProveedorId, l.id);
+      return {
+        empresa_id: empresaId,
+        orden_compra_id: ocId,
+        partida_id: l.partidaId,
+        producto_id: null,
+        descripcion: l.descripcion.trim() || null,
+        unidad: l.unidad,
+        cantidad: l.cantidad,
+        precio_unitario: precio,
+        subtotal: (l.cantidad ?? 0) * precio,
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const detResp = await (sb.schema('erp') as any).from('ordenes_compra_detalle').insert(detalle);
+    if (detResp.error) {
+      throw new Error(getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.'));
+    }
+    return ocId;
+  }
+
+  // Marca la cotización adjudicada + sus proveedores elegida/descartada.
+  async function cerrarAdjudicacion(
+    sb: ReturnType<typeof createSupabaseBrowserClient>,
+    cotProveedorId: string,
+    proveedorId: string
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (sb.schema('erp') as any)
+      .from('cotizaciones')
+      .update({
+        estado: 'adjudicada',
+        adjudicado_proveedor_id: proveedorId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', cotizacion.id);
+    for (const p of cotizacion.proveedores) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sb.schema('erp') as any)
+        .from('cotizacion_proveedores')
+        .update({ estado: p.id === cotProveedorId ? 'elegida' : 'descartada' })
+        .eq('id', p.id);
+    }
+  }
+
+  async function adjudicar(cotProveedorId: string, tambienOc = false) {
     setConfirmAdjId(null);
     // Candado de dinero (D1): solo Dirección/admin adjudica. Guard defensivo
     // además del gate visual — la adjudicación emite la OC y compromete.
@@ -1228,90 +1303,36 @@ function CapturaPrecios({
     const total = totalProveedor(cotizacion, cotProveedorId);
     try {
       if (adjudicaA(cotizacion.tipo) === 'oc') {
-        // El folio (OC-{año}-{NNNN}) lo asigna el trigger erp.fn_oc_asignar_folio.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ocResp = await (sb.schema('erp') as any)
-          .from('ordenes_compra')
-          .insert({
-            empresa_id: empresaId,
-            cotizacion_id: cotizacion.id,
-            proveedor_id: prov.proveedorId,
-            // Adjudicar = autorizar = emitir en un acto (D2): la OC nace
-            // `enviada` (compromete presupuesto), sin paso de re-autorización.
-            estado: 'enviada',
-            autorizada_at: new Date().toISOString(),
-            total,
-          })
-          .select('id')
-          .single();
-        if (ocResp.error || !ocResp.data) {
-          throw new Error(
-            getSupabaseErrorMessage(ocResp.error, 'No se pudo crear la orden de compra.')
-          );
-        }
-        const ocId = ocResp.data.id as string;
-        const detalle = cotizacion.lineas.map((l) => {
-          const precio = precioCelda(cotizacion.precios, cotProveedorId, l.id);
-          return {
-            empresa_id: empresaId,
-            orden_compra_id: ocId,
-            partida_id: l.partidaId,
-            producto_id: null,
-            descripcion: l.descripcion.trim() || null,
-            unidad: l.unidad,
-            cantidad: l.cantidad,
-            precio_unitario: precio,
-            subtotal: (l.cantidad ?? 0) * precio,
-          };
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detResp = await (sb.schema('erp') as any)
-          .from('ordenes_compra_detalle')
-          .insert(detalle);
-        if (detResp.error) {
-          throw new Error(
-            getSupabaseErrorMessage(detResp.error, 'OC creada pero faltaron líneas.')
-          );
-        }
+        await crearOcEmitida(sb, cotProveedorId, prov.proveedorId, total);
       } else {
         // Obra: NO se crea el contrato en silencio. Se rutea a la pantalla de
-        // condiciones, que pre-llena desde la cotización (contratista, partida,
-        // proyecto, valor) y, al guardar, crea el contrato CON sus condiciones
-        // (anticipo, retención de garantía, forma de pago…) y cierra la
-        // adjudicación (marca la cotización adjudicada + proveedores). Sustituye
-        // el insert mudo con `tipo='urbanizacion'` hardcodeado sin condiciones.
+        // condiciones, que pre-llena desde la cotización y, al guardar, crea el
+        // contrato CON sus condiciones y cierra la adjudicación.
+        //
+        // Opt-in "ambos" (Sprint 3): si es labor + material, además emitimos la OC
+        // (material) y la ligamos al contrato vía la pantalla (?oc=). En ese caso la
+        // cotización se cierra AQUÍ (la OC ya se emitió); en obra puro la cierra la
+        // pantalla al guardar (evita una adjudicación sin contrato si se abandona).
+        let ocLigada: string | null = null;
+        if (tambienOc) {
+          ocLigada = await crearOcEmitida(sb, cotProveedorId, prov.proveedorId, total);
+          await cerrarAdjudicacion(sb, cotProveedorId, prov.proveedorId);
+        }
         const partidaPrellenado = cotizacion.lineas.map((l) => l.partidaId).find(Boolean) ?? '';
         const params = new URLSearchParams({
           cotizacion: cotizacion.id,
           proveedor: prov.proveedorId,
           total: String(total),
           ...(partidaPrellenado ? { partida: partidaPrellenado } : {}),
+          ...(ocLigada ? { oc: ocLigada } : {}),
         });
         router.push(`/dilesa/construccion/contratos/nuevo-obra?${params.toString()}`);
         return;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (sb.schema('erp') as any)
-        .from('cotizaciones')
-        .update({
-          estado: 'adjudicada',
-          adjudicado_proveedor_id: prov.proveedorId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', cotizacion.id);
-      for (const p of cotizacion.proveedores) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (sb.schema('erp') as any)
-          .from('cotizacion_proveedores')
-          .update({ estado: p.id === cotProveedorId ? 'elegida' : 'descartada' })
-          .eq('id', p.id);
-      }
+      await cerrarAdjudicacion(sb, cotProveedorId, prov.proveedorId);
       toast.add({
         title: 'Cotización adjudicada',
-        description:
-          adjudicaA(cotizacion.tipo) === 'oc'
-            ? 'Orden de compra emitida'
-            : 'Contrato de obra generado',
+        description: 'Orden de compra emitida',
         type: 'success',
       });
       onSaved();
@@ -1601,18 +1622,35 @@ function CapturaPrecios({
                 </span>
                 {puedeEscribir ? (
                   confirmAdjId === r.cotProveedorId ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-[var(--text)]/70">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text)]/70">
+                      {adjudicaA(cotizacion.tipo) !== 'oc' ? (
+                        <label
+                          className="inline-flex items-center gap-1"
+                          title="Genera además una OC para el material (labor + material)"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={adjAmbos}
+                            onChange={(e) => setAdjAmbos(e.target.checked)}
+                            className="size-3.5"
+                          />
+                          +OC
+                        </label>
+                      ) : null}
                       ¿Adjudicar a este?
                       <button
                         type="button"
-                        onClick={() => void adjudicar(r.cotProveedorId)}
+                        onClick={() => void adjudicar(r.cotProveedorId, adjAmbos)}
                         className="rounded bg-[var(--accent)] px-1.5 py-0.5 text-white"
                       >
                         Sí
                       </button>
                       <button
                         type="button"
-                        onClick={() => setConfirmAdjId(null)}
+                        onClick={() => {
+                          setConfirmAdjId(null);
+                          setAdjAmbos(false);
+                        }}
                         className="rounded border border-[var(--border)] px-1.5 py-0.5"
                       >
                         No
