@@ -3,11 +3,11 @@
 **Slug:** `cxc`
 **Empresas:** todas (golden: DILESA; rollout RDB/COAGAN/ANSA en sub-iniciativas posteriores)
 **Schemas afectados:** `erp` (nuevas `cxc_cargos`, `cxc_pagos`, `cxc_pago_aplicaciones`; extiende `movimientos_bancarios` con referencia polimórfica), `dilesa` (originación `fn_generar_plan_pagos`; absorbe `venta_pagos`), `core` (helper de roles)
-**Estado:** in_progress
-**Próximo hito:** Aplicar la migración de limpieza de saldos a favor (`20260628190355`, requiere `finanzas-ok` de Beto) + retiro del módulo Coda "Depositos Clientes" → cierre v1. Sprint 4 (recordatorios de vencimiento + forecast) **descopeado** a follow-up proposed (`dilesa-cobranza-recordatorios`).
+**Estado:** done
+**Próximo hito:** — (CxC v1 cerrada 2026-06-28)
 **Dueño:** Beto
 **Creada:** 2026-06-01
-**Última actualización:** 2026-06-28 (cierre v1: Ahumada ✅ resuelto en prod; migración de limpieza de los $2.0M de saldos a favor de Coda — 186 pagos / 185 ventas / $2,015,311.81, todas terminada, corregidas a $0 como artefacto de captura; Sprint 4 descopeado a follow-up)
+**Última actualización:** 2026-06-28 (CERRADA — v1 completa: Ahumada ✅ resuelto en prod; limpieza de los $2.0M de saldos a favor de Coda aplicada y verificada en prod (#1124 abortó por el CHECK, #1125 lo corrigió: 183 reduce + 3 soft-delete = 0 saldos a favor de Coda vivos, 186 filas de audit); Coda "Depositos Clientes" pausado; Sprint 4 descopeado a follow-up proposed `dilesa-cobranza-recordatorios`)
 
 ## Problema
 
