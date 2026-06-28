@@ -90,3 +90,93 @@ export async function crearArrendamiento(
   revalidatePath('/dilesa/arrendamiento');
   return { ok: true, id: data as string };
 }
+
+type GenerarResult = { ok: true; creados: number } | { ok: false; error: string };
+
+/**
+ * Genera los cargos de renta de un periodo (formato 'YYYYMM') para todos los
+ * contratos vigentes vía la RPC `erp.arrendamiento_generar_cargos` (S2a). Es
+ * idempotente: re-correr el mismo periodo no duplica cargos. Devuelve cuántos
+ * cargos nuevos creó.
+ */
+export async function generarCargosDelMes(periodo: string): Promise<GenerarResult> {
+  const p = (periodo ?? '').trim();
+  if (!/^\d{6}$/.test(p)) {
+    return { ok: false, error: 'El periodo debe tener formato YYYYMM (ej. 202606).' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede generar cargos.' };
+  }
+
+  const { data, error } = await supabase.schema('erp').rpc('arrendamiento_generar_cargos', {
+    p_empresa_id: DILESA_EMPRESA_ID,
+    p_periodo: p,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: getSupabaseErrorMessage(error, 'No se pudieron generar los cargos.'),
+    };
+  }
+
+  revalidatePath('/dilesa/arrendamiento');
+  return { ok: true, creados: (data as number | null) ?? 0 };
+}
+
+export type RegistrarPagoInput = {
+  persona_id: string;
+  arrendamiento_id: string;
+  monto: number;
+  periodo?: string | null;
+  fecha?: string | null;
+  forma_pago?: string | null;
+  referencia?: string | null;
+  uuid_sat?: string | null;
+  notas?: string | null;
+};
+
+type PagoResult = { ok: true; id: string } | { ok: false; error: string };
+
+/**
+ * Registra un abono de renta vía `erp.arrendamiento_pago_registrar` (S2a). Con
+ * `periodo` aplica dirigido a ese cargo; sin él, aplica al saldo más antiguo
+ * (auto-aplicar). Devuelve el id del pago creado.
+ */
+export async function registrarPagoRenta(input: RegistrarPagoInput): Promise<PagoResult> {
+  if (!input.persona_id || !input.arrendamiento_id) {
+    return { ok: false, error: 'Falta el contrato o el arrendatario del pago.' };
+  }
+  if (!(input.monto > 0)) {
+    return { ok: false, error: 'El monto del pago debe ser mayor a 0.' };
+  }
+  const periodo = (input.periodo ?? '').trim();
+  if (periodo && !/^\d{6}$/.test(periodo)) {
+    return { ok: false, error: 'El periodo debe tener formato YYYYMM (ej. 202606).' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede registrar pagos.' };
+  }
+
+  const { data, error } = await supabase.schema('erp').rpc('arrendamiento_pago_registrar', {
+    p_empresa_id: DILESA_EMPRESA_ID,
+    p_persona_id: input.persona_id,
+    p_arrendamiento_id: input.arrendamiento_id,
+    p_monto: input.monto,
+    p_periodo: periodo || undefined,
+    p_fecha: input.fecha?.trim() || undefined,
+    p_forma_pago: input.forma_pago?.trim() || undefined,
+    p_referencia: input.referencia?.trim() || undefined,
+    p_uuid_sat: input.uuid_sat?.trim() || undefined,
+    p_notas: input.notas?.trim() || undefined,
+  });
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo registrar el pago.') };
+  }
+
+  revalidatePath('/dilesa/arrendamiento');
+  return { ok: true, id: data as string };
+}
