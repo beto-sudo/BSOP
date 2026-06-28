@@ -26,6 +26,12 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
  */
 
 type Persona = { id: string; nombre: string };
+type RawPersona = {
+  id: string;
+  nombre: string;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
+};
 type ActivoRentable = { id: string; nombre: string; tipo: string };
 
 type LineaForm = {
@@ -77,7 +83,17 @@ export function ArrendamientoCaptureDialog({
   const cargarCatalogos = useCallback(async () => {
     const sb = createSupabaseBrowserClient();
     const [{ data: per }, { data: dest }] = await Promise.all([
-      sb.schema('erp').from('personas').select('id, nombre').order('nombre'),
+      sb
+        .schema('erp')
+        .from('personas')
+        // Solo personas de esta empresa y activas; nombre completo (con
+        // apellidos) — antes traía las ~1900 de todas las empresas, solo `nombre`.
+        .select('id, nombre, apellido_paterno, apellido_materno')
+        .eq('empresa_id', empresaId)
+        .eq('activo', true)
+        .is('deleted_at', null)
+        .order('apellido_paterno', { nullsFirst: false })
+        .order('nombre'),
       sb.schema('dilesa').from('portafolio_destinos').select('id').eq('cuenta_renta', true),
     ]);
     const destinoIds = (dest ?? []).map((d) => (d as { id: string }).id);
@@ -89,14 +105,18 @@ export function ArrendamientoCaptureDialog({
         .select('id, nombre, tipo')
         .eq('empresa_id', empresaId)
         .in('destino_id', destinoIds)
+        // Excluye el espectacular/unipolar PADRE: se renta por cara (tipo='cara',
+        // activo hijo). El dropdown muestra las caras + el resto de hojas rentables.
+        .not('tipo', 'in', '(espectacular,unipolar)')
         .is('deleted_at', null)
         .order('nombre');
       act = (activosData ?? []) as ActivoRentable[];
     }
-    return {
-      personas: (per ?? []) as Persona[],
-      activos: act,
-    };
+    const personas: Persona[] = ((per ?? []) as RawPersona[]).map((p) => ({
+      id: p.id,
+      nombre: [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' '),
+    }));
+    return { personas, activos: act };
   }, [empresaId]);
 
   useEffect(() => {
