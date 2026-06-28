@@ -21,10 +21,7 @@ import { useEffect, useState } from 'react';
 import { ListChecks } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { usePermissions, useEffectiveUser } from '@/components/providers';
-import {
-  pendientesDeProgramar,
-  type AplicacionViva,
-} from '@/components/cxp/cxp-programacion-module';
+import { pendientesDeProgramar, type AplicacionViva } from '@/lib/cxp/pendientes-programar';
 
 type Chip = {
   key: string;
