@@ -21,6 +21,7 @@ function row(overrides: Partial<VentaListaRow>): VentaListaRow {
     proyectoNombre: '',
     prototipo: null,
     precio: null,
+    diasEnFase: null,
     ...overrides,
   };
 }

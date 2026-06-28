@@ -25,6 +25,7 @@ import { BackLink, HoldBanner } from './ui';
 import { VentaExpedienteTabs } from './tabs';
 import { BotonSiguienteFase } from './boton-siguiente-fase';
 import { FASES_ORDEN } from './types';
+import { diasEnFase, colorDiasFase } from '@/lib/dilesa/dias-en-fase';
 
 export function VentaExpedienteShell({ children }: { children: ReactNode }) {
   const d = useVentaDetalle();
@@ -80,6 +81,16 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
     holdSnapshot,
   } = d;
 
+  // Días en la fase actual (S1 dilesa-fluidez-pipeline): se computa desde la
+  // fecha de entrada a la fase actual (la fila de venta_fases con la posición
+  // vigente, ya cargada por el provider) — sin query extra. Solo para ventas en
+  // pipeline vivo (no desasignadas).
+  const fechaFaseActual =
+    venta.estado !== 'desasignada' && venta.fase_posicion != null
+      ? (d.fases.find((f) => f.posicion === venta.fase_posicion)?.fecha ?? null)
+      : null;
+  const diasFaseActual = diasEnFase(fechaFaseActual);
+
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <BackLink />
@@ -118,6 +129,14 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
                 {venta.fase_posicion ? `${venta.fase_posicion}. ` : ''}
                 {venta.fase_actual}
               </Badge>
+            ) : null}
+            {diasFaseActual != null ? (
+              <span
+                className={`text-xs font-medium tabular-nums ${colorDiasFase(diasFaseActual)}`}
+                title={`${diasFaseActual} día${diasFaseActual === 1 ? '' : 's'} en esta fase`}
+              >
+                {diasFaseActual} d en fase
+              </span>
             ) : null}
             <Badge
               tone={
@@ -161,6 +180,7 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
         faseActual={venta.fase_actual}
         fasePosicion={venta.fase_posicion}
         totalFases={FASES_ORDEN.length}
+        diasEnFase={diasFaseActual}
         cuadratura={cuadratura}
       />
 

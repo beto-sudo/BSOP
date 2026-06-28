@@ -14,6 +14,7 @@
 
 import type { Cuadratura } from '@/lib/dilesa/cuadratura';
 import { proximaFase } from '@/lib/dilesa/fases';
+import { colorDiasFase } from '@/lib/dilesa/dias-en-fase';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -38,6 +39,8 @@ export type OperacionResumenProps = {
   faseActual: string | null;
   fasePosicion: number | null;
   totalFases: number;
+  /** Días en la fase actual (S1 dilesa-fluidez-pipeline); `null` = sin dato. */
+  diasEnFase?: number | null;
   cuadratura: Cuadratura;
 };
 
@@ -50,6 +53,7 @@ export function OperacionResumen({
   faseActual,
   fasePosicion,
   totalFases,
+  diasEnFase,
   cuadratura,
 }: OperacionResumenProps) {
   const pct =
@@ -90,8 +94,15 @@ export function OperacionResumen({
             <div className="mt-1.5">
               <div className="flex items-center justify-between text-[11px] text-[var(--text)]/60">
                 <span className="font-medium text-[var(--text)]/80">{faseActual}</span>
-                <span>
-                  {fasePosicion ?? 0}/{totalFases}
+                <span className="flex items-center gap-2">
+                  {diasEnFase != null ? (
+                    <span className={`font-medium tabular-nums ${colorDiasFase(diasEnFase)}`}>
+                      {diasEnFase} d en fase
+                    </span>
+                  ) : null}
+                  <span>
+                    {fasePosicion ?? 0}/{totalFases}
+                  </span>
                 </span>
               </div>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg)]">

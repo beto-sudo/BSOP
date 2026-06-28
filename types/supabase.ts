@@ -5446,6 +5446,13 @@ export type Database = {
             foreignKeyName: "venta_encuestas_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: true
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
             referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
@@ -5562,6 +5569,13 @@ export type Database = {
             foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fase_revisiones_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
@@ -5633,6 +5647,13 @@ export type Database = {
             foreignKeyName: "venta_fases_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
             referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
@@ -5698,6 +5719,13 @@ export type Database = {
             columns: ["venta_id"]
             isOneToOne: false
             referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_lista_antiguedad"
             referencedColumns: ["venta_id"]
           },
           {
@@ -6087,6 +6115,13 @@ export type Database = {
             foreignKeyName: "venta_encuestas_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: true
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
             referencedRelation: "v_ventas_pipeline_antiguedad"
             referencedColumns: ["venta_id"]
           },
@@ -6130,6 +6165,13 @@ export type Database = {
             columns: ["venta_id"]
             isOneToOne: true
             referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_encuestas_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: true
+            referencedRelation: "v_ventas_lista_antiguedad"
             referencedColumns: ["venta_id"]
           },
           {
@@ -6522,6 +6564,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_ventas_lista_antiguedad: {
+        Row: {
+          dias_en_fase: number | null
+          empresa_id: string | null
+          fase_actual: string | null
+          fase_posicion: number | null
+          fecha_fase_actual: string | null
+          venta_id: string | null
+        }
+        Relationships: []
       }
       v_ventas_pipeline_antiguedad: {
         Row: {

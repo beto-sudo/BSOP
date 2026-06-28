@@ -3,11 +3,11 @@
 **Slug:** `dilesa-fluidez-pipeline`
 **Empresas:** DILESA (módulo Ventas; el patrón de "tiempo por fase + calificación de proceso" es replicable a otros pipelines por fases)
 **Schemas afectados:** Lectura + objetos derivados en `dilesa`. Vistas nuevas sobre `dilesa.venta_fases` / `dilesa.ventas` / `dilesa.venta_fase_catalogo` (duraciones limpias, benchmark por fase, antigüedad para toda la lista). Tabla nueva `dilesa.fase_metas` (metas editables, S3). Sin tocar `core`/`erp` salvo RBAC ya existente. PDF vía `@react-pdf/renderer`. Reusa la capa de reportes ([[dilesa-reportes]], ADR-047).
-**Estado:** planned
-**Próximo hito:** Arrancar **S1** — días-en-fase en el chip de la lista de ventas (generalizar `v_ventas_pipeline_antiguedad` a `v_ventas_lista_antiguedad` sin filtro de estado) + render inline en `ventas-module.tsx` y en el expediente. Es el sprint sin dependencia de benchmark.
+**Estado:** in_progress
+**Próximo hito:** **S2** — radar de cuellos por fase (reporte «Calificación por fase») + score simple por banda + filtros temporales. Define el ancla temporal del reporte (R5) y el motor puro `lib/dilesa/fluidez.ts`. (S1 entregado: días-en-fase en chip de lista + expediente.)
 **Dueño:** Beto
 **Creada:** 2026-06-28
-**Última actualización:** 2026-06-28 (Beto confirmó R1–R5; alcance v1 cerrado → `planned`)
+**Última actualización:** 2026-06-28 (S1 en PR: días-en-fase en lista + expediente)
 
 > Detonante: Beto quiere ver, en cada venta, **cuántos días lleva en su fase actual** (en el chip de la lista y en el reporte), y una **puntuación de fluidez del proceso** por venta basada en los tiempos por fase. Y, de fondo, **calificar cada una de las 17 fases** del pipeline (medianas, tendencia) para detectar dónde se atora el proceso —filtrable por mes/trimestre/semestre/año/solo-activas— y así dirigir mejoras a las fases lentas.
 
@@ -123,6 +123,7 @@ Beto eligió, sobre tres ejes:
 - **2026-06-28** — Promoción. Reconocimiento de datos de prod (1,459 ventas; 82% con timeline real, 18% colapsado; medianas negativas en fase 1, fase 15 inflada). Diseño multi-ángulo (estadístico / data-eng / UX / adversarial). Doc creado en `proposed`.
 - **2026-06-28** — Revisión de Codex (2º modelo, independiente). Convergió con el ángulo adversarial: liderar con el **radar de cuellos por fase** + reglas simples; subordinar el score por venta; vender como diagnóstico de proceso, no de personas (el fracaso más probable = desconfianza/percepción de evaluación individual). Aportes nuevos: definir el **ancla temporal** del reporte (R5), segmentación más rica que `tipo_credito`, y que la **semántica del evento** (`UNIQUE` por fase, no por transición) es la fragilidad de raíz. Integrado como R4/R5 y en Riesgos.
 - **2026-06-28** — Beto confirmó R1–R5 "como están". Alcance v1 cerrado → `planned`. Listo para arrancar S1.
+- **2026-06-28** — **S1 entregado.** Días-en-fase visible en el chip de la lista de ventas (texto inline coloreado junto al badge de fase) y en el expediente (header + bloque Comercial de `OperacionResumen`). Vista nueva `dilesa.v_ventas_lista_antiguedad` (migración `20260628203638`; hermana de `v_ventas_pipeline_antiguedad`, sin el filtro `numero_escritura IS NULL` → cubre todo el pipeline vivo, solo excluye no-activas). Helper puro `lib/dilesa/dias-en-fase.ts` (cálculo UTC para empatar con `CURRENT_DATE` de la vista; umbrales fijos provisionales ámbar 15 d / rojo 30 d = `UMBRAL_ESTANCADA_DEFAULT`, los reemplaza el benchmark en S2). El expediente computa días desde las `venta_fases` ya cargadas por el provider (sin query extra). Tests: `dias-en-fase.test.ts`.
 
 ## Decisiones registradas
 
