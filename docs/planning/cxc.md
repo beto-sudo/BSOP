@@ -377,6 +377,14 @@ Radiografía de prod (read-only) que actualiza el diagnóstico viejo del doc:
   datos financieros).
 - **Sprint 4 descopeado** a follow-up `proposed`; v1 cierra tras aplicar la
   migración + retirar Coda. Ver Decisiones registradas 2026-06-28.
+- **Fix de aplicación (mismo día):** el primer `db push` (#1124) abortó por
+  `cxc_pagos_monto_total_check` (`monto_total > 0`): 3 de los 186 pagos son
+  **fantasma** (aplicaron $0, monto = puro saldo a favor, $34,757.10) y no
+  pueden ir a `monto_total = 0`. La transacción hizo rollback completo —
+  **prod quedó intacta** (0 filas de audit, 186 saldos a favor vivos). La
+  migración se corrigió para partir el set: **183 parciales** → reduce a lo
+  aplicado; **3 fantasma** → soft-delete (sin aplicaciones huérfanas ni
+  movimiento bancario). Reaplicada vía nuevo PR + `finanzas-ok`.
 
 ### 2026-06-17 — Auto-generación del plan de pagos en el ciclo de vida de la venta
 
