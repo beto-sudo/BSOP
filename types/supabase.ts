@@ -14981,28 +14981,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "waitry_pagos_order_fk"
+            foreignKeyName: "waitry_pagos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_pagos_order_fk"
+            foreignKeyName: "waitry_pagos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_con_fantasmas"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_pagos_order_fk"
+            foreignKeyName: "waitry_pagos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_pagos_order_fk"
+            foreignKeyName: "waitry_pagos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "waitry_pedidos"
@@ -15139,28 +15139,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_con_fantasmas"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "waitry_pedidos"
@@ -15676,28 +15676,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_con_fantasmas"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_waitry_pedidos_reversa_sospechosa"
             referencedColumns: ["order_id"]
           },
           {
-            foreignKeyName: "waitry_productos_order_fk"
+            foreignKeyName: "waitry_productos_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "waitry_pedidos"
@@ -15708,10 +15708,6 @@ export type Database = {
     }
     Functions: {
       check_duplicates: { Args: { p_order_id: string }; Returns: number }
-      compute_content_hash: {
-        Args: { p_products: Json; p_table_name: string; p_total_amount: number }
-        Returns: string
-      }
       detect_waitry_fantasma: { Args: { p_order_id: string }; Returns: string }
       fn_inventario_al_corte: {
         Args: { p_fecha: string }
