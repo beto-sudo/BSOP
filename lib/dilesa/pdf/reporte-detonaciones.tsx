@@ -25,9 +25,9 @@ export function ReporteDetonacionesPDF({
   meta: DetonacionesPdfMeta;
 }) {
   return (
-    <Document title="Detonaciones / Depósitos — DILESA">
+    <Document title="Depósitos del periodo — DILESA">
       <Page size="LETTER" orientation="landscape" style={styles.page}>
-        <HeaderBand title="DETONACIONES / DEPÓSITOS" fecha={meta.fechaTexto} />
+        <HeaderBand title="DEPÓSITOS DEL PERIODO" fecha={meta.fechaTexto} />
         <Text style={s.subtitle}>Depósitos recibidos · {meta.filtrosTexto}</Text>
 
         <View style={s.resumenRow}>

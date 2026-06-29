@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="detonaciones-depositos.pdf"',
+      'Content-Disposition': 'inline; filename="depositos-periodo.pdf"',
       'Cache-Control': 'no-store',
     },
   });

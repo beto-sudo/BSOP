@@ -17,6 +17,7 @@ import {
   Clock,
   CreditCard,
   GitBranch,
+  Layers,
   Trophy,
   UserMinus,
 } from 'lucide-react';
@@ -51,13 +52,24 @@ export const REPORTES: readonly ReporteDef[] = [
     pdf: true,
   },
   {
-    id: 'detonaciones',
-    nombre: 'Detonaciones / Depósitos',
+    id: 'depositos-periodo',
+    nombre: 'Depósitos del periodo',
     descripcion:
-      'Depósitos recibidos en el periodo (cobranza de ventas) con desglose por mes y por origen: liberación de crédito de institución (la detonación) vs abono directo del cliente. El insumo del cierre contable, exportable a PDF y CSV.',
+      'Depósitos recibidos en el periodo (cobranza de ventas) con desglose por mes y por origen: liberación de crédito de institución (la detonación) vs abono directo del cliente. Abre en el mes corriente. El insumo del cierre contable, exportable a PDF y CSV.',
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
-    href: '/dilesa/ventas/reportes/detonaciones',
+    href: '/dilesa/ventas/reportes/depositos-periodo',
     icon: Banknote,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'ventas-por-fase',
+    nombre: 'Ventas por fase',
+    descripcion:
+      'Cuántas ventas registraron una fase del proceso en un periodo, por la fecha en que se registró la terminación de la fase. Elegí la fase (las 17) y el rango: 17 reportes en uno. Abre en Detonada del mes corriente. Exportable a PDF y CSV.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/ventas-por-fase',
+    icon: Layers,
     tipo: 'modulo',
     pdf: true,
   },
