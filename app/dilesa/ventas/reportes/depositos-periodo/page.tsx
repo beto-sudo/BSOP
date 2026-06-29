@@ -1,12 +1,15 @@
 'use client';
 
 /**
- * @module Ventas · Reporte Detonaciones / Depósitos (DILESA)
+ * @module Ventas · Reporte Depósitos del periodo (DILESA)
  * @responsive desktop-only
  *
  * Patrón ADR-047 (preset + vista + PDF + CSV). `'use client'` (como
  * `ventas-periodo/page.tsx`): el cuerpo usa `useUrlFilters` (useSearchParams),
- * separado en `<DetonacionesView>` bajo Suspense.
+ * separado en `<DetonacionesView>` bajo Suspense. (Los archivos de la vista/lib
+ * conservan el nombre interno `detonaciones`: el dato núcleo sigue siendo el
+ * abono de institución = la detonación; aquí solo cambió la etiqueta de cara
+ * al usuario a «Depósitos del periodo».)
  *
  * Gate: sub-slug `dilesa.ventas.reportes` (ADR-030 SS5).
  */

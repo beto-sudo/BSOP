@@ -13,6 +13,7 @@ import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { formatCurrency } from '@/lib/format';
+import { inicioMesMatamoros } from '@/lib/fecha-mx';
 import { getReporte } from '@/lib/dilesa/reportes/registry';
 import {
   etiquetaFuente,
@@ -23,9 +24,12 @@ import { construirDetonaciones } from '@/lib/dilesa/reportes/detonaciones';
 import { useDetonacionesReporte } from './use-detonaciones-reporte';
 import { ReporteShell } from './reporte-shell';
 
-const REPORTE = getReporte('detonaciones')!;
+const REPORTE = getReporte('depositos-periodo')!;
 const VOLVER_HREF = '/dilesa/ventas/reportes';
-const DEFAULT_FILTERS = { desde: '', hasta: '', fuente: '', proyecto: '' };
+// Abre mostrando «lo que va del mes»: default `desde` = inicio del mes corriente
+// (Matamoros). Estable (se evalúa una vez al cargar el módulo), como exige
+// `useUrlFilters`. Limpiar filtros regresa al mes en curso, no a histórico total.
+const DEFAULT_FILTERS = { desde: inicioMesMatamoros(), hasta: '', fuente: '', proyecto: '' };
 
 const inputCls =
   'h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 text-sm text-[var(--text)]';
@@ -96,8 +100,8 @@ export function DetonacionesView() {
     return p.toString();
   }, [filters]);
 
-  const pdfHref = `/api/dilesa/reportes/detonaciones/pdf${queryString ? `?${queryString}` : ''}`;
-  const csvHref = `/api/dilesa/reportes/detonaciones/csv${queryString ? `?${queryString}` : ''}`;
+  const pdfHref = `/api/dilesa/reportes/depositos-periodo/pdf${queryString ? `?${queryString}` : ''}`;
+  const csvHref = `/api/dilesa/reportes/depositos-periodo/csv${queryString ? `?${queryString}` : ''}`;
 
   const filtros = (
     <>

@@ -21,3 +21,13 @@ export function fechaISOMatamoros(d: Date): string {
     day: '2-digit',
   }).format(d);
 }
+
+/**
+ * Primer día (`YYYY-MM-01`) del mes calendario ACTUAL en horario de Matamoros.
+ * Default de los filtros de reportes que abren mostrando «lo que va del mes»
+ * (depósitos del periodo, ventas por fase). Se deriva de `fechaISOMatamoros`
+ * para respetar el corte de medianoche local y el DST fronterizo.
+ */
+export function inicioMesMatamoros(d: Date = new Date()): string {
+  return `${fechaISOMatamoros(d).slice(0, 7)}-01`;
+}
