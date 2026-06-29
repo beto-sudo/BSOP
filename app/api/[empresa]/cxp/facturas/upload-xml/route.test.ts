@@ -64,10 +64,22 @@ function buildAdminMock(): any {
           const key = `${schemaName}.${tableName}`;
           const filters: Record<string, unknown> = {};
           let usedOr = false; // marca la query de placeholders (fetchDestajoPlaceholders)
+          let usedIlike = false; // marca el match de proveedor (matchProveedorId)
           const builder: any = {
             select: () => builder,
             eq(col: string, val: unknown) {
               filters[col] = val;
+              return builder;
+            },
+            ilike(col: string, val: unknown) {
+              filters[col] = val;
+              usedIlike = true;
+              return builder;
+            },
+            order() {
+              return builder;
+            },
+            limit() {
               return builder;
             },
             not(col: string, _op: string, val: unknown) {
@@ -133,7 +145,16 @@ function buildAdminMock(): any {
               else if (key === 'dilesa.estimaciones') data = script.estimaciones ?? [];
               else if (key === 'dilesa.obra_estimaciones') data = script.obraEstimaciones ?? [];
               else if (key === 'dilesa.contratos_construccion') data = script.contratos ?? [];
-              else if (key === 'erp.personas') data = script.placeholderPersonas ?? [];
+              else if (key === 'erp.personas')
+                // matchProveedorId (empresa-scoped, `.ilike` + `.limit(1)`) reusa
+                // el fixture personaByRfc; el otro uso (placeholders, `.in`) trae
+                // las personas de los contratistas.
+                data = usedIlike
+                  ? (() => {
+                      const hit = script.personaByRfc?.[String(filters.rfc)];
+                      return hit ? [hit] : [];
+                    })()
+                  : (script.placeholderPersonas ?? []);
               return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
             },
           };
