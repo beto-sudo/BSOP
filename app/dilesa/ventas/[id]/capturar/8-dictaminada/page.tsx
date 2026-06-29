@@ -70,6 +70,7 @@ import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import {
   calcularGastosNotariales,
   cargarConfigVigente,
+  type CategoriaNotarial,
   type GastosNotarialesConfig,
 } from '@/lib/dilesa/gastos-notariales';
 import { GastosNotarialesPanel } from '@/components/dilesa/gastos-notariales-panel';
@@ -149,6 +150,7 @@ type VentaCtx = {
   valor_escrituracion: number | null;
   // Gastos notariales (iniciativa dilesa-gastos-notariales).
   tiene_propiedad: boolean | null;
+  valor_catastral: number | null;
   // Re-firma de documentos (ADR-048 D5): si el precio dictaminado difiere del que
   // tienen los documentos firmados vigentes, hay que re-firmar Solicitud + Promesa.
   precio_asignacion: number | null;
@@ -280,19 +282,39 @@ function CapturarFase8Body() {
   // flag de propiedad previa (elige la columna del tabulador de compraventa).
   const [tienePropiedad, setTienePropiedad] = useState<boolean>(false);
   const [configGN, setConfigGN] = useState<GastosNotarialesConfig | null>(null);
+  const [valorCatastral, setValorCatastral] = useState<string>('');
 
-  // Carga la config de gastos notariales vigente de la empresa de la venta.
+  // Carga la config de gastos notariales de la CATEGORÍA del proyecto de la venta
+  // (interés social / residencial medio), resolviendo unidad → proyecto.
   const empresaIdVenta = venta?.empresa_id ?? null;
+  const unidadIdVenta = venta?.unidad_id ?? null;
   useEffect(() => {
-    if (!empresaIdVenta) return;
+    if (!empresaIdVenta || !unidadIdVenta) return;
     let activo = true;
-    cargarConfigVigente(sb, empresaIdVenta).then((cfg) => {
+    (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sbd = sb.schema('dilesa') as any;
+      const { data: uni } = await sbd
+        .from('unidades')
+        .select('proyecto_id')
+        .eq('id', unidadIdVenta)
+        .maybeSingle();
+      let categoria: CategoriaNotarial = 'interes_social';
+      if (uni?.proyecto_id) {
+        const { data: proy } = await sbd
+          .from('proyectos')
+          .select('categoria_notarial')
+          .eq('id', uni.proyecto_id)
+          .maybeSingle();
+        if (proy?.categoria_notarial === 'residencial_medio') categoria = 'residencial_medio';
+      }
+      const cfg = await cargarConfigVigente(sb, empresaIdVenta, categoria);
       if (activo) setConfigGN(cfg);
-    });
+    })();
     return () => {
       activo = false;
     };
-  }, [sb, empresaIdVenta]);
+  }, [sb, empresaIdVenta, unidadIdVenta]);
 
   // Desglose calculado reactivo: precarga el campo de gastos y alimenta el panel.
   const desgloseGastosNotariales = useMemo(() => {
@@ -301,13 +323,14 @@ function CapturarFase8Body() {
     return calcularGastosNotariales(
       {
         valorEscrituracion: valor,
+        valorCatastral: Number(valorCatastral) || undefined,
         montoCreditoTitular: Number(montoTitular) || 0,
         montoCreditoCotitular: Number(montoCotitular) || 0,
         tienePropiedad,
       },
       configGN
     );
-  }, [configGN, valorEscrituracion, montoTitular, montoCotitular, tienePropiedad]);
+  }, [configGN, valorEscrituracion, valorCatastral, montoTitular, montoCotitular, tienePropiedad]);
 
   // Precarga suave: si el cálculo está listo y el campo de gastos sigue vacío, lo
   // llena con el total (Dirección lo confirma o ajusta contra el notario).
@@ -436,7 +459,7 @@ function CapturarFase8Body() {
         .schema('dilesa')
         .from('ventas')
         .select(
-          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio, saldo_residual_resolucion, saldo_residual_monto, saldo_residual_autorizado_por, saldo_residual_at, tiene_propiedad'
+          'id, empresa_id, persona_id, unidad_id, notario_id, tipo_credito, credito_titular_ref, credito_cotitular_ref, monto_credito_titular, monto_credito_cotitular, gastos_escrituracion, valor_escrituracion, precio_asignacion, precio_documentos_firmados, monto_credito_directo, cd_plan_pagos, cd_tiie28_pct, cd_spread_ordinario_pct, cd_fecha_suscripcion, cd_aval_nombre, cd_aval_domicilio, saldo_residual_resolucion, saldo_residual_monto, saldo_residual_autorizado_por, saldo_residual_at, tiene_propiedad, valor_catastral'
         )
         .eq('id', ventaId)
         .is('deleted_at', null)
@@ -461,6 +484,7 @@ function CapturarFase8Body() {
       if (v.gastos_escrituracion != null) setGastosEscrituracion(String(v.gastos_escrituracion));
       if (v.valor_escrituracion != null) setValorEscrituracion(String(v.valor_escrituracion));
       setTienePropiedad(v.tiene_propiedad ?? false);
+      if (v.valor_catastral != null) setValorCatastral(String(v.valor_catastral));
       // Firma inicial del autoguardado = lo que vino de la venta (no dispara guardado
       // hasta que algo cambie de verdad respecto a lo persistido).
       setGuardado({
@@ -628,6 +652,7 @@ function CapturarFase8Body() {
           gastos_escrituracion: gastosNum,
           valor_escrituracion: valorEscrituracion.trim() ? Number(valorEscrituracion) : null,
           tiene_propiedad: tienePropiedad,
+          valor_catastral: valorCatastral.trim() ? Number(valorCatastral) : null,
           gastos_notariales_desglose: desgloseGastosNotariales ?? null,
         },
         notas: null,
@@ -659,6 +684,7 @@ function CapturarFase8Body() {
       creditoCotitularRef,
       gastosEscrituracion,
       valorEscrituracion,
+      valorCatastral,
       tienePropiedad,
       desgloseGastosNotariales,
       cdGuardado,
@@ -1009,6 +1035,8 @@ function CapturarFase8Body() {
         gastosCapturado={gastosEscrituracion.trim() ? Number(gastosEscrituracion) : null}
         tienePropiedad={tienePropiedad}
         onTienePropiedadChange={setTienePropiedad}
+        valorCatastral={valorCatastral}
+        onValorCatastralChange={setValorCatastral}
         onUsarCalculo={() => setGastosEscrituracion(String(desgloseGastosNotariales.total))}
         editable={esDireccion}
       />

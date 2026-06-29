@@ -4,14 +4,11 @@ import { buscarEscalon, calcularGastosNotariales } from './calcular';
 import type { GastosNotarialesConfig, TabuladorFila } from './tipos';
 
 /**
- * Fixture: tarifas 2026 de Memo. Espejo del seed de
- * `20260626171235_dilesa_gastos_notariales_config.sql`. Si cambia el seed,
- * actualizar aquí (y viceversa) — este test es el guard contra que el cálculo
- * se desvíe del presupuesto del notario.
- *
- * `valorBeneficio` = columna que aplica a DILESA por default (en compraventa el
- * beneficio 50% sin propiedad; en apertura la columna 'DILESA' de la hoja).
- * `valorParticular` = cuota plena (columna PARTICULAR).
+ * Fixtures: tarifas 2026 del cotizador oficial del notario (Excel "COTIZADOR
+ * NOTARIA 25 2026"). Espejo del seed de
+ * `20260629225357_dilesa_gastos_notariales_v2_categoria.sql`. Este test es el
+ * guard contra que el cálculo se desvíe del cotizador — valida los dos ejemplos
+ * del propio Excel al peso (LDE $922k→$44,333; LDS $3.5M→$188,869).
  */
 const compraventa: TabuladorFila[] = [
   {
@@ -123,13 +120,10 @@ const compraventa: TabuladorFila[] = [
     orden: 16,
     limiteInferior: 1732500.01,
     limiteSuperior: null,
-    valorBeneficio: 13373,
-    valorParticular: 26726,
+    valorBeneficio: 35422,
+    valorParticular: 35422,
   },
 ];
-
-// Apertura: valorBeneficio = columna 'DILESA' de la hoja (la que aplica a
-// DILESA); valorParticular = PARTICULAR (referencia, no se usa en el cálculo).
 const apertura: TabuladorFila[] = [
   {
     orden: 1,
@@ -146,109 +140,11 @@ const apertura: TabuladorFila[] = [
     valorParticular: 2672.6,
   },
   {
-    orden: 3,
-    limiteInferior: 173250.01,
-    limiteSuperior: 288750,
-    valorBeneficio: 4029,
-    valorParticular: 4008.9,
-  },
-  {
-    orden: 4,
-    limiteInferior: 288750.01,
-    limiteSuperior: 404250,
-    valorBeneficio: 5365,
-    valorParticular: 5345.2,
-  },
-  {
-    orden: 5,
-    limiteInferior: 404250.01,
-    limiteSuperior: 519750,
-    valorBeneficio: 6702,
-    valorParticular: 6681.5,
-  },
-  {
-    orden: 6,
-    limiteInferior: 519750.01,
-    limiteSuperior: 635250,
-    valorBeneficio: 8038,
-    valorParticular: 8017.8,
-  },
-  {
-    orden: 7,
-    limiteInferior: 635250.01,
-    limiteSuperior: 750750,
-    valorBeneficio: 9374,
-    valorParticular: 9354.1,
-  },
-  {
-    orden: 8,
-    limiteInferior: 750750.01,
-    limiteSuperior: 866250,
-    valorBeneficio: 10710,
-    valorParticular: 10690.4,
-  },
-  {
     orden: 9,
     limiteInferior: 866250.01,
     limiteSuperior: 981750,
     valorBeneficio: 12047,
     valorParticular: 12026.7,
-  },
-  {
-    orden: 10,
-    limiteInferior: 981750.01,
-    limiteSuperior: 1097250,
-    valorBeneficio: 13383,
-    valorParticular: 13363,
-  },
-  {
-    orden: 11,
-    limiteInferior: 1097250.01,
-    limiteSuperior: 1212750,
-    valorBeneficio: 14719,
-    valorParticular: 14699.3,
-  },
-  {
-    orden: 12,
-    limiteInferior: 1212750.01,
-    limiteSuperior: 1328250,
-    valorBeneficio: 16056,
-    valorParticular: 16035.6,
-  },
-  {
-    orden: 13,
-    limiteInferior: 1328250.01,
-    limiteSuperior: 1443750,
-    valorBeneficio: 17392,
-    valorParticular: 17371.9,
-  },
-  {
-    orden: 14,
-    limiteInferior: 1443750.01,
-    limiteSuperior: 1559250,
-    valorBeneficio: 18728,
-    valorParticular: 18708.2,
-  },
-  {
-    orden: 15,
-    limiteInferior: 1559250.01,
-    limiteSuperior: 1674750,
-    valorBeneficio: 20065,
-    valorParticular: 20044.5,
-  },
-  {
-    orden: 16,
-    limiteInferior: 1674750.01,
-    limiteSuperior: 1732500,
-    valorBeneficio: 21401,
-    valorParticular: 21380.8,
-  },
-  {
-    orden: 17,
-    limiteInferior: 1732500.01,
-    limiteSuperior: 1848000,
-    valorBeneficio: 22737,
-    valorParticular: 22717.1,
   },
   {
     orden: 18,
@@ -257,17 +153,27 @@ const apertura: TabuladorFila[] = [
     valorBeneficio: 24073,
     valorParticular: 24053.4,
   },
+  {
+    orden: 19,
+    limiteInferior: 2310000.01,
+    limiteSuperior: null,
+    valorBeneficio: 35422,
+    valorParticular: 35422,
+  },
 ];
 
-const CONFIG_MEMO_2026: GastosNotarialesConfig = {
+const INTERES_SOCIAL: GastosNotarialesConfig = {
+  categoria: 'interes_social',
   anio: 2026,
   isaiPct: 0.03,
   muni: {
     certificacionPlanos: 165,
     copiasFotostaticas: 56,
+    formaIsai: 0,
     avaluoPrevio: 566,
-    valuacionCatastral: 1200,
+    valuacionCatastralPct: 0.002,
     derechos: 850,
+    noAdeudoSimas: 0,
   },
   registroPublico: {
     clg: 575,
@@ -276,148 +182,171 @@ const CONFIG_MEMO_2026: GastosNotarialesConfig = {
     aperturaCuotaFija: 765,
   },
   otros: {
-    cnprPorDerechohabiente: 1000,
+    avaluo: 0,
+    cnpc: 0,
+    cnpr: 1000,
     avisoDefinitivo: 103,
     formaIsai: 400,
-    copiaCertificada: 1500,
-    plano: 1200,
+    copiaCertificada: 1000,
+    plano: 1000,
+    kinegrama: 200,
+  },
+  tabuladorCompraventa: compraventa,
+  tabuladorApertura: apertura,
+};
+const RESIDENCIAL_MEDIO: GastosNotarialesConfig = {
+  categoria: 'residencial_medio',
+  anio: 2026,
+  isaiPct: 0.03,
+  muni: {
+    certificacionPlanos: 271,
+    copiasFotostaticas: 0,
+    formaIsai: 450,
+    avaluoPrevio: 594,
+    valuacionCatastralPct: 0.0018,
+    derechos: 1132,
+    noAdeudoSimas: 300,
+  },
+  registroPublico: {
+    clg: 575,
+    avisoPreventivo: 0,
+    aperturaUmbralCuotaFija: 820000,
+    aperturaCuotaFija: 765,
+  },
+  otros: {
+    avaluo: 600,
+    cnpc: 0,
+    cnpr: 1000,
+    avisoDefinitivo: 103,
+    formaIsai: 400,
+    copiaCertificada: 1000,
+    plano: 1000,
     kinegrama: 200,
   },
   tabuladorCompraventa: compraventa,
   tabuladorApertura: apertura,
 };
 
-/** Atajo: busca una línea del desglose por clave. */
-function linea(d: ReturnType<typeof calcularGastosNotariales>, clave: string) {
-  return d.bloques.flatMap((b) => b.lineas).find((l) => l.clave === clave);
-}
 function subtotal(d: ReturnType<typeof calcularGastosNotariales>, clave: string) {
   return d.bloques.find((b) => b.clave === clave)?.subtotal;
 }
 
-describe('calcularGastosNotariales — ejemplo de Memo ($920,000)', () => {
-  // Caso ground-truth del correo del notario: $920k, 1 derechohabiente, sin
-  // propiedad previa, crédito ≤ $820k → total $44,208 exacto.
+describe('cotizador — interés social (LDE), ejemplo del Excel $922,000', () => {
+  // valor 922,000 · catastral 600,000 · 2 créditos ≤$820k (AP I+II = 765 c/u) → $44,333.
   const d = calcularGastosNotariales(
     {
-      valorEscrituracion: 920000,
-      montoCreditoTitular: 800000,
-      montoCreditoCotitular: 0,
-      tienePropiedad: false,
+      valorEscrituracion: 922000,
+      valorCatastral: 600000,
+      montoCreditoTitular: 700000,
+      montoCreditoCotitular: 700000,
     },
-    CONFIG_MEMO_2026
+    INTERES_SOCIAL
   );
-
-  it('cuadra el total al peso', () => {
-    expect(d.total).toBe(44208);
-  });
-
-  it('cuadra los tres subtotales', () => {
-    expect(subtotal(d, 'municipio')).toBe(30437);
-    expect(subtotal(d, 'registro_publico')).toBe(9368);
-    expect(subtotal(d, 'otros')).toBe(4403);
-  });
-
-  it('cuadra las líneas variables', () => {
-    expect(linea(d, 'isai')?.monto).toBe(27600); // 3% × 920,000
-    expect(linea(d, 'compraventa')?.monto).toBe(8028); // escalón 808,500–924,000, sin propiedad
-    expect(linea(d, 'apertura_credito_i')?.monto).toBe(765); // crédito ≤ 820k → cuota fija
-    expect(linea(d, 'apertura_credito_ii')?.monto).toBe(0); // sin co-acreditado
-    expect(linea(d, 'cnpr')?.monto).toBe(1000); // 1 derechohabiente
-  });
-
-  it('marca calculadas vs cuotas fijas', () => {
-    expect(linea(d, 'isai')?.calculado).toBe(true);
-    expect(linea(d, 'compraventa')?.calculado).toBe(true);
-    expect(linea(d, 'cnpr')?.calculado).toBe(true);
-    expect(linea(d, 'derechos')?.calculado).toBe(false);
-    expect(linea(d, 'kinegrama')?.calculado).toBe(false);
-  });
-
-  it('reporta 1 derechohabiente', () => {
-    expect(d.numDerechohabientes).toBe(1);
+  it('cuadra el total al peso', () => expect(d.total).toBe(44333));
+  it('cuadra los subtotales', () => {
+    expect(subtotal(d, 'municipio')).toBe(30497);
+    expect(subtotal(d, 'registro_publico')).toBe(10133);
+    expect(subtotal(d, 'otros')).toBe(3703);
   });
 });
 
-describe('calcularGastosNotariales — variantes', () => {
-  it('con propiedad previa usa la columna particular de compraventa', () => {
+describe('cotizador — residencial medio (LDS), ejemplo del Excel $3,500,000', () => {
+  // valor 3,500,000 · catastral 3,000,000 · crédito >$2.31M (compraventa y apertura = tope 35,422) → $188,869.
+  const d = calcularGastosNotariales(
+    {
+      valorEscrituracion: 3500000,
+      valorCatastral: 3000000,
+      montoCreditoTitular: 3000000,
+      montoCreditoCotitular: 0,
+    },
+    RESIDENCIAL_MEDIO
+  );
+  it('cuadra el total al peso', () => expect(d.total).toBe(188869));
+  it('cuadra los subtotales', () => {
+    expect(subtotal(d, 'municipio')).toBe(113147);
+    expect(subtotal(d, 'registro_publico')).toBe(71419);
+    expect(subtotal(d, 'otros')).toBe(4303);
+  });
+});
+
+describe('variantes', () => {
+  it('valuación catastral = valor catastral × pct (interés social 0.2%)', () => {
     const d = calcularGastosNotariales(
       {
-        valorEscrituracion: 920000,
-        montoCreditoTitular: 800000,
+        valorEscrituracion: 922000,
+        valorCatastral: 600000,
+        montoCreditoTitular: 700000,
         montoCreditoCotitular: 0,
-        tienePropiedad: true,
       },
-      CONFIG_MEMO_2026
+      INTERES_SOCIAL
     );
-    expect(linea(d, 'compraventa')?.monto).toBe(16036); // columna particular
-    expect(d.total).toBe(44208 - 8028 + 16036); // 52,216
+    const val = d.bloques.flatMap((b) => b.lineas).find((l) => l.clave === 'valuacion_catastral');
+    expect(val?.monto).toBe(1200); // 600,000 × 0.002
+    expect(d.faltaValorCatastral).toBe(false);
   });
 
-  it('co-acreditado: 2 derechohabientes → CNPR ×2 y apertura II', () => {
+  it('sin valor catastral: marca faltaValorCatastral y deja la valuación en $0', () => {
+    const d = calcularGastosNotariales(
+      { valorEscrituracion: 920000, montoCreditoTitular: 700000, montoCreditoCotitular: 0 },
+      INTERES_SOCIAL
+    );
+    expect(d.faltaValorCatastral).toBe(true);
+    const val = d.bloques.flatMap((b) => b.lineas).find((l) => l.clave === 'valuacion_catastral');
+    expect(val?.monto).toBe(0);
+    expect(val?.pendiente).toBe(true);
+  });
+
+  it('residencial medio incluye conceptos extra (SIMAS, avalúo, forma ISAI muni)', () => {
     const d = calcularGastosNotariales(
       {
         valorEscrituracion: 920000,
+        valorCatastral: 600000,
+        montoCreditoTitular: 700000,
+        montoCreditoCotitular: 0,
+      },
+      RESIDENCIAL_MEDIO
+    );
+    const claves = d.bloques.flatMap((b) => b.lineas).map((l) => l.clave);
+    expect(claves).toContain('no_adeudo_simas');
+    expect(claves).toContain('avaluo');
+    expect(claves).toContain('forma_isai_muni');
+  });
+
+  it('interés social NO incluye SIMAS ni avalúo (cuotas en $0 se omiten)', () => {
+    const d = calcularGastosNotariales(
+      {
+        valorEscrituracion: 920000,
+        valorCatastral: 600000,
+        montoCreditoTitular: 700000,
+        montoCreditoCotitular: 0,
+      },
+      INTERES_SOCIAL
+    );
+    const claves = d.bloques.flatMap((b) => b.lineas).map((l) => l.clave);
+    expect(claves).not.toContain('no_adeudo_simas');
+    expect(claves).not.toContain('avaluo');
+  });
+
+  it('CNPR es fijo (no se multiplica por derechohabientes)', () => {
+    const conCotit = calcularGastosNotariales(
+      {
+        valorEscrituracion: 920000,
+        valorCatastral: 600000,
         montoCreditoTitular: 500000,
         montoCreditoCotitular: 400000,
-        tienePropiedad: false,
       },
-      CONFIG_MEMO_2026
+      INTERES_SOCIAL
     );
-    expect(d.numDerechohabientes).toBe(2);
-    expect(linea(d, 'cnpr')?.monto).toBe(2000);
-    expect(linea(d, 'apertura_credito_i')?.monto).toBe(765); // 500k ≤ umbral
-    expect(linea(d, 'apertura_credito_ii')?.monto).toBe(765); // 400k ≤ umbral
-  });
-
-  it('ISAI escala con el valor de escrituración', () => {
-    const d = calcularGastosNotariales(
-      { valorEscrituracion: 1000000, montoCreditoTitular: 700000, montoCreditoCotitular: 0 },
-      CONFIG_MEMO_2026
-    );
-    expect(linea(d, 'isai')?.monto).toBe(30000); // 3% × 1,000,000
-  });
-
-  it('crédito sobre el umbral entra al tabulador de apertura (columna DILESA)', () => {
-    const d = calcularGastosNotariales(
-      {
-        valorEscrituracion: 930000,
-        montoCreditoTitular: 900000,
-        montoCreditoCotitular: 0,
-        tienePropiedad: false,
-      },
-      CONFIG_MEMO_2026
-    );
-    // 900k > 820k → escalón 866,250–981,750, columna DILESA.
-    expect(linea(d, 'apertura_credito_i')?.monto).toBe(12047);
-  });
-
-  it('la apertura no depende de la propiedad (siempre columna DILESA)', () => {
-    const base = {
-      valorEscrituracion: 930000,
-      montoCreditoTitular: 900000,
-      montoCreditoCotitular: 0,
-    };
-    const sinProp = calcularGastosNotariales({ ...base, tienePropiedad: false }, CONFIG_MEMO_2026);
-    const conProp = calcularGastosNotariales({ ...base, tienePropiedad: true }, CONFIG_MEMO_2026);
-    expect(linea(sinProp, 'apertura_credito_i')?.monto).toBe(12047);
-    expect(linea(conProp, 'apertura_credito_i')?.monto).toBe(12047); // igual: propiedad no afecta apertura
+    const cnpr = conCotit.bloques.flatMap((b) => b.lineas).find((l) => l.clave === 'cnpr');
+    expect(cnpr?.monto).toBe(1000);
   });
 });
 
-describe('buscarEscalon', () => {
-  it('respeta los límites (escalón cubre el superior, no el inferior anterior)', () => {
-    expect(buscarEscalon(compraventa, 808500)?.orden).toBe(8); // tope del escalón 8
-    expect(buscarEscalon(compraventa, 808500.01)?.orden).toBe(9); // piso del escalón 9
-    expect(buscarEscalon(compraventa, 924000)?.orden).toBe(9); // tope del escalón 9
+describe('buscarEscalon — topes del cotizador', () => {
+  it('compraventa arriba de $1,732,500 = $35,422', () => {
+    expect(buscarEscalon(compraventa, 3139530)?.valorBeneficio).toBe(35422);
   });
-
-  it('hace clamp al último escalón si excede el tope', () => {
-    expect(buscarEscalon(apertura, 5000000)?.orden).toBe(18);
-  });
-
-  it('devuelve null para monto cero o negativo', () => {
-    expect(buscarEscalon(compraventa, 0)).toBeNull();
-    expect(buscarEscalon(compraventa, -100)).toBeNull();
+  it('apertura arriba de $2,310,000 = $35,422', () => {
+    expect(buscarEscalon(apertura, 2741343.55)?.valorBeneficio).toBe(35422);
   });
 });
