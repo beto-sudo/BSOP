@@ -15,6 +15,10 @@
  *     `cxp_pago_autorizar_y_pagar`. El RPC gatea rol "Dirección"; el botón NO
  *     se esconde por rol en cliente — defensa: manda el RPC. **Confirmación
  *     fuerte** (egreso real).
+ *   - Pagar juntos (Fase 2): selección múltiple de pagos del mismo proveedor →
+ *     `cxp_pago_consolidar` los funde en uno (mueve aplicaciones, saldo-neutral)
+ *     y abre el diálogo de pago sobre el sobreviviente — una transferencia, un
+ *     comprobante. Solo en la pestaña Programación.
  *   - Cancelar (si no pagado): `cxp_pago_cancelar` con motivo.
  *
  * Filtro default `'pendientes'` = programados + aprobados: lo vivo que aún
@@ -359,6 +363,12 @@ export function CxpPagosModule({
   const [cancelarPago, setCancelarPago] = useState<Pago | null>(null);
   const [pagarPago, setPagarPago] = useState<Pago | null>(null);
 
+  // Selección múltiple para CONSOLIDAR varios pagos del mismo proveedor en uno
+  // (Fase 2). Solo en la pestaña Programación. `pendingPayId` abre el diálogo de
+  // pago sobre el sobreviviente apenas se refresca la lista tras consolidar.
+  const [selectedPagoIds, setSelectedPagoIds] = useState<string[]>([]);
+  const [pendingPayId, setPendingPayId] = useState<string | null>(null);
+
   const fetchPagos = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -463,6 +473,36 @@ export function CxpPagosModule({
     setDrawerOpen(true);
   }, []);
 
+  // ── Selección múltiple para consolidar (Fase 2) ─────────────────────────────
+  const selectedPagos = useMemo(
+    () => pagos.filter((p) => selectedPagoIds.includes(p.id)),
+    [pagos, selectedPagoIds]
+  );
+  const selProveedorId = selectedPagos[0]?.proveedor_id ?? null;
+  const selTotal = selectedPagos.reduce((s, p) => s + p.monto_total, 0);
+  const togglePagoSel = useCallback((p: Pago) => {
+    setSelectedPagoIds((prev) =>
+      prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+    );
+  }, []);
+  const limpiarPagoSel = useCallback(() => setSelectedPagoIds([]), []);
+
+  // La selección se limpia al cambiar de filtro/horizonte (la lista cambia).
+  useEffect(() => {
+    setSelectedPagoIds([]);
+  }, [estado, horizonte]);
+
+  // Tras consolidar, abre el diálogo de pago sobre el sobreviviente cuando la
+  // lista refrescada ya lo contiene.
+  useEffect(() => {
+    if (!pendingPayId) return;
+    const p = pagos.find((x) => x.id === pendingPayId);
+    if (p) {
+      setPagarPago(p);
+      setPendingPayId(null);
+    }
+  }, [pendingPayId, pagos]);
+
   // ── Acciones ───────────────────────────────────────────────────────────────
 
   const doCancelar = useCallback(
@@ -482,6 +522,28 @@ export function CxpPagosModule({
     },
     [feedback, fetchPagos]
   );
+
+  // Consolida los pagos seleccionados (mismo proveedor) en uno y abre el diálogo
+  // para autorizarlo y registrarlo con un solo comprobante.
+  const doConsolidarYPagar = useCallback(async () => {
+    if (selectedPagoIds.length < 2) return;
+    const sb = createSupabaseBrowserClient();
+    const { data: survivorId, error } = await sb
+      .schema('erp')
+      .rpc('cxp_pago_consolidar', { p_pago_ids: selectedPagoIds });
+    if (error || !survivorId) {
+      feedback.error(getSupabaseErrorMessage(error, 'No se pudieron consolidar los pagos.'), {
+        title: 'No se pudo consolidar',
+      });
+      return;
+    }
+    feedback.success(`${selectedPagoIds.length} pagos consolidados en uno`, {
+      description: 'Autorízalo y regístralo con un solo comprobante.',
+    });
+    setSelectedPagoIds([]);
+    await fetchPagos();
+    setPendingPayId(survivorId as string);
+  }, [selectedPagoIds, feedback, fetchPagos]);
 
   return (
     <>
@@ -525,6 +587,30 @@ export function CxpPagosModule({
 
         {error && <ErrorBanner error={error} onRetry={() => void fetchPagos()} />}
 
+        {esProgramacion && selectedPagos.length >= 2 && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-2.5">
+            <div className="text-sm">
+              <span className="font-semibold">{selectedPagos.length}</span> pagos de{' '}
+              <span className="font-medium">
+                {selectedPagos[0].proveedor_nombre ?? '(sin proveedor)'}
+              </span>{' '}
+              ·{' '}
+              <span className="font-semibold tabular-nums text-amber-600">
+                {formatCurrency(selTotal)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={limpiarPagoSel}>
+                Limpiar
+              </Button>
+              <Button size="sm" className="gap-2" onClick={() => void doConsolidarYPagar()}>
+                <Wallet className="h-3.5 w-3.5" />
+                Pagar juntos
+              </Button>
+            </div>
+          </div>
+        )}
+
         <ModuleContent>
           {loading ? (
             <p className="px-4 py-6 text-sm text-muted-foreground sm:px-6">Cargando…</p>
@@ -541,6 +627,7 @@ export function CxpPagosModule({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    {esProgramacion && <th className="w-8 py-2 pl-3 pr-0" />}
                     <th className="py-2 pl-3 pr-2 font-medium">Proveedor</th>
                     <th className="py-2 pr-2 font-medium">Estado</th>
                     <th className="py-2 pr-2 font-medium">Método</th>
@@ -559,6 +646,27 @@ export function CxpPagosModule({
                         className="cursor-pointer border-b last:border-0 hover:bg-muted/40"
                         onClick={() => openDetail(p)}
                       >
+                        {esProgramacion && (
+                          <td className="py-2 pl-3 pr-0" onClick={(e) => e.stopPropagation()}>
+                            {(() => {
+                              const checked = selectedPagoIds.includes(p.id);
+                              const elegible = p.estado === 'programado' || p.estado === 'aprobado';
+                              const otroProv =
+                                !!selProveedorId && p.proveedor_id !== selProveedorId;
+                              const disabled = !elegible || (!checked && otroProv);
+                              return (
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onChange={() => togglePagoSel(p)}
+                                  aria-label="Seleccionar pago para consolidar"
+                                  className="h-4 w-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                                />
+                              );
+                            })()}
+                          </td>
+                        )}
                         <td className="py-2 pl-3 pr-2">
                           <div className="truncate font-medium">
                             {p.proveedor_nombre ?? '(sin proveedor)'}

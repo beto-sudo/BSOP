@@ -13296,6 +13296,7 @@ export type Database = {
         Args: { p_motivo?: string; p_pago_id: string }
         Returns: undefined
       }
+      cxp_pago_consolidar: { Args: { p_pago_ids: string[] }; Returns: string }
       cxp_pago_desde_estimacion: {
         Args: {
           p_cuenta_bancaria_id?: string

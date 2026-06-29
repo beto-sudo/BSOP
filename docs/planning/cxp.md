@@ -352,6 +352,18 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-29 — Agrupar pagos · Fase 2 (consolidar pagos ya fragmentados al pagar).**
+  Para los pagos sueltos que ya existen del mismo proveedor, en la pestaña
+  **Programación** se seleccionan varios (mismo proveedor, programado/aprobado) y
+  "Pagar juntos" los **consolida en uno** vía RPC nueva `cxp_pago_consolidar`
+  (migración `20260629191202`): elige el más antiguo como sobreviviente, mueve a él
+  las aplicaciones de los demás (sumando si coinciden en factura, por el UNIQUE
+  (pago_id,factura_id)), recalcula su `monto_total` y cancela los demás. Es
+  **saldo-neutral** (el conjunto de aplicaciones vivas no cambia, solo se reagrupa)
+  y no hay triggers en `cxp_pagos`/aplicaciones que reviertan. Tras consolidar se
+  abre el diálogo de "Autorizar y registrar" sobre el sobreviviente → una
+  transferencia, un comprobante, un movimiento bancario. Gate Dirección.
+
 - **2026-06-29 — Agrupar facturas en un solo pago · Fase 1 (consolidar al programar).**
   Varias facturas del mismo proveedor que vencen el mismo día generaban N pagos
   sueltos. La RPC `cxp_pago_programar` ya soporta N aplicaciones; lo que faltaba
