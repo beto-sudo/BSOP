@@ -389,6 +389,20 @@ const columns: Column<Factura>[] = [
   },
 ];
 
+/**
+ * Una factura es elegible para programar (sola o en grupo) si tiene saldo por
+ * programar, proveedor enlazado y cuenta contable clasificada — mismas
+ * condiciones que el botón individual del drawer.
+ */
+export function esElegibleProgramar(f: Factura): boolean {
+  return (
+    (f.estado_cxp === 'por_pagar' || f.estado_cxp === 'parcial') &&
+    f.porProgramar > 0 &&
+    !!f.proveedor_id &&
+    !!f.cuenta_contable_id
+  );
+}
+
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 
 export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps) {
@@ -402,6 +416,11 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
   const [selected, setSelected] = useState<Factura | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Selección múltiple para programar un PAGO que cubre varias facturas del mismo
+  // proveedor (Fase 1 de agrupación de pagos). Solo en la vista "Por programar".
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkProgramarOpen, setBulkProgramarOpen] = useState(false);
 
   // Drill-down (?focus=<factura_id>) desde el hilo del gasto de otros módulos.
   useFocusDrilldown(
@@ -823,6 +842,59 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
     });
   }, [facturas, search, estado, vista]);
 
+  // ── Selección múltiple (programar un pago por varias facturas) ──────────────
+  const selectedFacturas = useMemo(
+    () => facturas.filter((f) => selectedIds.includes(f.id)),
+    [facturas, selectedIds]
+  );
+  // Proveedor "ancla" de la selección: un pago = una transferencia a un solo
+  // proveedor, así que mientras haya selección los demás proveedores se bloquean.
+  const selProveedorId = selectedFacturas[0]?.proveedor_id ?? null;
+  const selTotal = selectedFacturas.reduce((s, f) => s + f.porProgramar, 0);
+
+  const toggleSeleccion = useCallback((f: Factura) => {
+    setSelectedIds((prev) =>
+      prev.includes(f.id) ? prev.filter((id) => id !== f.id) : [...prev, f.id]
+    );
+  }, []);
+  const limpiarSeleccion = useCallback(() => setSelectedIds([]), []);
+
+  // La selección solo vive en la vista "Por programar"; al cambiar de vista o
+  // buscar, se limpia para no arrastrar facturas que ya no se ven.
+  useEffect(() => {
+    if (vista !== 'por_programar') setSelectedIds([]);
+  }, [vista]);
+
+  // Columna de selección (checkbox) al frente, solo en "Por programar". Bloquea
+  // las no elegibles y las de otro proveedor mientras haya selección activa.
+  const columnsConSeleccion = useMemo<Column<Factura>[]>(() => {
+    if (vista !== 'por_programar') return columnsConPartida;
+    const selCol: Column<Factura> = {
+      key: '_sel',
+      label: '',
+      sortable: false,
+      width: 'w-8',
+      render: (f) => {
+        const checked = selectedIds.includes(f.id);
+        const otroProveedor = !!selProveedorId && f.proveedor_id !== selProveedorId;
+        const disabled = !esElegibleProgramar(f) || (!checked && otroProveedor);
+        return (
+          <span onClick={(e) => e.stopPropagation()} className="flex">
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={disabled}
+              onChange={() => toggleSeleccion(f)}
+              aria-label="Seleccionar factura para pago agrupado"
+              className="h-4 w-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
+            />
+          </span>
+        );
+      },
+    };
+    return [selCol, ...columnsConPartida];
+  }, [vista, columnsConPartida, selectedIds, selProveedorId, toggleSeleccion]);
+
   // Facturas EN ESPERA del XML: destajos de vivienda aprobados o estimaciones de
   // obra autorizadas, cuya factura nació en borrador. Administración sube aquí el
   // XML del contratista (sin teclear folio). Iniciativas dilesa-estimaciones-cxp
@@ -954,10 +1026,32 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
 
         {error && <ErrorBanner error={error} onRetry={() => void fetchFacturas()} />}
 
+        {vista === 'por_programar' && selectedFacturas.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-2.5">
+            <div className="text-sm">
+              <span className="font-semibold">{selectedFacturas.length}</span> factura
+              {selectedFacturas.length !== 1 ? 's' : ''} de{' '}
+              <span className="font-medium">{proveedorLabel(selectedFacturas[0])}</span> ·{' '}
+              <span className="font-semibold tabular-nums text-amber-600">
+                {formatCurrency(selTotal)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={limpiarSeleccion}>
+                Limpiar
+              </Button>
+              <Button size="sm" className="gap-2" onClick={() => setBulkProgramarOpen(true)}>
+                <CalendarClock className="h-3.5 w-3.5" />
+                Programar pago
+              </Button>
+            </div>
+          </div>
+        )}
+
         <ModuleContent>
           <DataTable<Factura>
             data={filtered}
-            columns={columnsConPartida}
+            columns={columnsConSeleccion}
             rowKey="id"
             loading={loading}
             onRowClick={openDetail}
@@ -1007,6 +1101,20 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
           void fetchFacturas();
         }}
       />
+
+      {/* Programar un pago que cubre varias facturas del mismo proveedor (Fase 1). */}
+      {bulkProgramarOpen && selectedFacturas.length > 0 && (
+        <ProgramarFacturaDialog
+          facturas={selectedFacturas}
+          empresaId={empresaId}
+          onClose={() => setBulkProgramarOpen(false)}
+          onDone={() => {
+            setBulkProgramarOpen(false);
+            limpiarSeleccion();
+            void fetchFacturas();
+          }}
+        />
+      )}
 
       <UploadXmlDialog
         empresa={empresa}
@@ -1783,7 +1891,7 @@ function FacturaDrawer({
 
       {programarOpen && factura && (
         <ProgramarFacturaDialog
-          factura={factura}
+          facturas={[factura]}
           empresaId={empresaId}
           onClose={() => setProgramarOpen(false)}
           onDone={() => {
@@ -2258,12 +2366,13 @@ function RecibirXmlDialog({
 // Programación (decisión 2026-06-29) — aquí NO se autoriza.
 
 function ProgramarFacturaDialog({
-  factura,
+  facturas,
   empresaId,
   onClose,
   onDone,
 }: {
-  factura: Factura;
+  /** 1..N facturas del MISMO proveedor a cubrir con un solo pago. */
+  facturas: Factura[];
   empresaId: string;
   onClose: () => void;
   onDone: () => void;
@@ -2277,6 +2386,10 @@ function ProgramarFacturaDialog({
   const [fecha, setFecha] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const proveedorId = facturas[0]?.proveedor_id ?? null;
+  const total = facturas.reduce((s, f) => s + f.porProgramar, 0);
+  const esGrupo = facturas.length > 1;
 
   useEffect(() => {
     let activo = true;
@@ -2298,17 +2411,20 @@ function ProgramarFacturaDialog({
   }, [empresaId]);
 
   const handleSubmit = async () => {
-    if (!factura.proveedor_id) return;
+    if (!proveedorId || facturas.length === 0) return;
     setSubmitting(true);
     setError(null);
     const sb = createSupabaseBrowserClient();
-    // Programar deja el cxp_pago en 'programado' + la aplicación. La autorización
-    // y el registro del pago son de Dirección, en la pestaña Programación
-    // (decisión 2026-06-29). Aquí NO se autoriza.
+    // Un solo cxp_pago cubre las N facturas (la RPC recibe N aplicaciones).
+    // Programar deja el pago en 'programado'; la autorización y el registro los
+    // hace Dirección en la pestaña Programación (decisión 2026-06-29).
     const { data: pagoId, error: progErr } = await sb.schema('erp').rpc('cxp_pago_programar', {
       p_empresa_id: empresaId,
-      p_proveedor_id: factura.proveedor_id,
-      p_aplicaciones: [{ factura_id: factura.id, monto: factura.porProgramar }] as unknown as Json,
+      p_proveedor_id: proveedorId,
+      p_aplicaciones: facturas.map((f) => ({
+        factura_id: f.id,
+        monto: f.porProgramar,
+      })) as unknown as Json,
       p_metodo_pago: metodo || undefined,
       p_fecha_programada: fecha || undefined,
       p_cuenta_bancaria_id: cuentaId || undefined,
@@ -2318,9 +2434,12 @@ function ProgramarFacturaDialog({
       setError(getSupabaseErrorMessage(progErr, 'No se pudo programar el pago.'));
       return;
     }
-    feedback.success('Pago programado', {
-      description: 'Dirección lo autoriza y registra el pago en la pestaña Programación.',
-    });
+    feedback.success(
+      esGrupo ? `Pago programado · ${facturas.length} facturas` : 'Pago programado',
+      {
+        description: 'Dirección lo autoriza y registra el pago en la pestaña Programación.',
+      }
+    );
     onDone();
   };
 
@@ -2335,12 +2454,28 @@ function ProgramarFacturaDialog({
         <DialogHeader>
           <DialogTitle>Programar pago</DialogTitle>
           <DialogDescription>
-            {proveedorLabel(factura)} · {formatCurrency(factura.porProgramar)}. Queda programado;
-            Dirección lo autoriza y registra el pago en la pestaña Programación.
+            {esGrupo
+              ? `${facturas.length} facturas de ${proveedorLabel(facturas[0])} · ${formatCurrency(total)}`
+              : `${proveedorLabel(facturas[0])} · ${formatCurrency(total)}`}
+            . Un solo pago las cubre. Queda programado; Dirección lo autoriza y registra en la
+            pestaña Programación.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {esGrupo && (
+            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2 text-xs">
+              {facturas.map((f) => (
+                <li key={f.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-muted-foreground">
+                    {f.uuid_sat ? `${f.uuid_sat.slice(0, 8)}…` : 'Sin folio'} ·{' '}
+                    {formatDate(f.fecha_pago_programada ?? f.fecha_vencimiento)}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(f.porProgramar)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
               <span className="text-xs text-muted-foreground">Método de pago</span>

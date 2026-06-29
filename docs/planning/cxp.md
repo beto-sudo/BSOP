@@ -352,6 +352,18 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-29 — Agrupar facturas en un solo pago · Fase 1 (consolidar al programar).**
+  Varias facturas del mismo proveedor que vencen el mismo día generaban N pagos
+  sueltos. La RPC `cxp_pago_programar` ya soporta N aplicaciones; lo que faltaba
+  era la UI. En la pestaña **Facturas**, vista "Por programar": multi-selección
+  (checkbox por fila) **restringida al mismo proveedor** (se bloquean los demás
+  mientras hay selección) y solo facturas elegibles (`esElegibleProgramar`:
+  saldo + proveedor + cuenta contable). Una barra muestra "N facturas de
+  [Proveedor] · $Total" → un diálogo → **un** `cxp_pago` que las cubre. El diálogo
+  `ProgramarFacturaDialog` se generalizó a `facturas: Factura[]` (lo reusa el botón
+  individual del drawer con `[factura]`). Sin migración (solo UI). Fase 2 (pagar
+  juntos pagos ya fragmentados, en Programación) viene en PR aparte.
+
 - **2026-06-29 — Nuevo reparto de responsabilidades de pago (reunión Michelle + Admin).**
   Se separa "programar" de "autorizar": **Contabilidad** carga facturas, clasifica
   partida/cuenta y **programa** los pagos (y los carga al banco ellos mismos);
