@@ -157,6 +157,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   const [estadoFiltro, setEstadoFiltro] = useState('activa');
   const [vendedorFiltro, setVendedorFiltro] = useState('');
   const [creditoFiltro, setCreditoFiltro] = useState('');
+  // Antigüedad en fase: mínimo de días en la fase actual (vacío = sin filtro).
+  // El dato vive en el chip de Fase, pero el filtro va aparte para poder aislar
+  // lo que se está enfriando sin saturar la columna.
+  const [antiguedadFiltro, setAntiguedadFiltro] = useState('');
   const [rangoEscritura, setRangoEscritura] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // `faseFiltro` se deriva del query param (single source of truth: el URL).
@@ -393,6 +397,10 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       if (estadoFiltro && v.estado !== estadoFiltro) return false;
       if (vendedorFiltro && v.vendedor !== vendedorFiltro) return false;
       if (creditoFiltro && v.tipo_credito !== creditoFiltro) return false;
+      if (antiguedadFiltro) {
+        const min = Number(antiguedadFiltro);
+        if (v.diasEnFase == null || v.diasEnFase < min) return false;
+      }
       if (!isInDateRange(v.fecha_escritura, rangoEscritura)) return false;
       if (!matchVentaSearch(v, search)) return false;
       return true;
@@ -405,6 +413,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     estadoFiltro,
     vendedorFiltro,
     creditoFiltro,
+    antiguedadFiltro,
     rangoEscritura,
   ]);
 
@@ -572,6 +581,20 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
               {c}
             </option>
           ))}
+        </select>
+        <select
+          value={antiguedadFiltro}
+          onChange={(e) => setAntiguedadFiltro(e.target.value)}
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          aria-label="Antigüedad en fase"
+          title="Filtrar por días en la fase actual"
+        >
+          <option value="">Cualquier antigüedad</option>
+          <option value="7">≥ 7 días en fase</option>
+          <option value="15">≥ 15 días en fase</option>
+          <option value="30">≥ 30 días en fase</option>
+          <option value="60">≥ 60 días en fase</option>
+          <option value="90">≥ 90 días en fase</option>
         </select>
         <DateRangeFilter
           label="Escritura"
