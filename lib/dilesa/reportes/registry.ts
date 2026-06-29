@@ -10,6 +10,7 @@
  * los siguientes sprints calcando este molde.
  */
 import {
+  Banknote,
   Boxes,
   CalendarClock,
   CalendarRange,
@@ -46,6 +47,17 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/ventas-periodo',
     icon: CalendarRange,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'detonaciones',
+    nombre: 'Detonaciones / Depósitos',
+    descripcion:
+      'Depósitos recibidos en el periodo (cobranza de ventas) con desglose por mes y por origen: liberación de crédito de institución (la detonación) vs abono directo del cliente. El insumo del cierre contable, exportable a PDF y CSV.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/detonaciones',
+    icon: Banknote,
     tipo: 'modulo',
     pdf: true,
   },
