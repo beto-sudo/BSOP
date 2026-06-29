@@ -1,41 +1,48 @@
 /**
- * Gastos notariales de DILESA — tipos del modelo de cálculo.
+ * Gastos notariales de DILESA — tipos del modelo de cálculo (v2, cotizador oficial).
  *
- * Reconstruido del correo del notario (Memo — Lic. Guillermo Nicolás López
- * Elizondo) del 25-jun-2026: el monto NO sale del Anexo B ni de ningún documento
- * oficial; el notario lo calcula a mano en sus tablas. Este modelo lo replica
- * para precargarlo en la fase de dictaminar y solo confirmarlo. Las tarifas
- * vivas (cuotas fijas + 2 tabuladores) viven en `dilesa.gastos_notariales_*` y
- * se editan cada enero — ver iniciativa `dilesa-gastos-notariales`.
+ * Reconstruido del cotizador del notario (Excel "COTIZADOR NOTARIA 25 2026"):
+ * las tarifas dependen del **tipo de vivienda** (interés social vs residencial
+ * medio), no de un set único. El cálculo precarga el campo de gastos en la fase
+ * de dictaminar y solo se confirma. Las tarifas viven en
+ * `dilesa.gastos_notariales_config` (una fila por categoría/año) +
+ * `dilesa.gastos_notariales_tabulador`. Ver iniciativa `dilesa-gastos-notariales`.
  */
+
+export type CategoriaNotarial = 'interes_social' | 'residencial_medio';
 
 /** Una fila de un tabulador escalonado (compraventa o apertura de crédito). */
 export type TabuladorFila = {
   orden: number;
   limiteInferior: number;
-  /** `null` = último escalón sin tope. */
+  /** `null` = último escalón sin tope (el tope superior del cotizador). */
   limiteSuperior: number | null;
-  /** Ningún derechohabiente con propiedad previa (beneficio 50%). */
+  /** Columna que aplica a DILESA (compraventa: beneficio 50%; apertura: col DILESA). */
   valorBeneficio: number;
-  /** Algún derechohabiente con propiedad previa (cuota plena). */
+  /** Cuota plena (columna PARTICULAR); en compraventa aplica con propiedad previa. */
   valorParticular: number;
 };
 
 /**
- * Config vigente de gastos notariales: cuotas fijas + parámetros + los 2
- * tabuladores. Espejo en camelCase de `dilesa.gastos_notariales_config` +
- * `dilesa.gastos_notariales_tabulador` (el mapeo desde DB se hace al cargar).
+ * Config vigente de una categoría: cuotas fijas + parámetros + tabuladores.
+ * Espejo en camelCase de `dilesa.gastos_notariales_config` (+ tabulador).
  */
 export type GastosNotarialesConfig = {
+  categoria: CategoriaNotarial;
   anio: number;
   /** ISAI = isaiPct × valor de escrituración (0.03 = 3%). */
   isaiPct: number;
   muni: {
     certificacionPlanos: number;
     copiasFotostaticas: number;
+    /** Forma ISAI municipal (solo residencial medio; 0 si no aplica). */
+    formaIsai: number;
     avaluoPrevio: number;
-    valuacionCatastral: number;
+    /** Valuación catastral = valor catastral × este pct (0.002 / 0.0018). */
+    valuacionCatastralPct: number;
     derechos: number;
+    /** No adeudo SIMAS (solo residencial medio; 0 si no aplica). */
+    noAdeudoSimas: number;
   };
   registroPublico: {
     clg: number;
@@ -45,7 +52,10 @@ export type GastosNotarialesConfig = {
     aperturaCuotaFija: number;
   };
   otros: {
-    cnprPorDerechohabiente: number;
+    avaluo: number;
+    cnpc: number;
+    /** CNPR: cuota fija (el cotizador la cobra fija, no por derechohabiente). */
+    cnpr: number;
     avisoDefinitivo: number;
     formaIsai: number;
     copiaCertificada: number;
@@ -59,6 +69,8 @@ export type GastosNotarialesConfig = {
 /** Inputs por operación (salen de `dilesa.ventas` + el flag de propiedad). */
 export type GastosNotarialesInput = {
   valorEscrituracion: number;
+  /** Valor catastral (del predial/CLG). Si falta, la valuación catastral = 0. */
+  valorCatastral?: number;
   montoCreditoTitular: number;
   /** 0 si no hay co-acreditado. */
   montoCreditoCotitular: number;
@@ -73,6 +85,8 @@ export type GastoLinea = {
   monto: number;
   /** `true` = depende de la operación; `false` = cuota fija de config. */
   calculado: boolean;
+  /** `true` = no se pudo calcular por falta de dato (ej. valor catastral). */
+  pendiente?: boolean;
 };
 
 export type GastoBloque = {
@@ -83,8 +97,11 @@ export type GastoBloque = {
 };
 
 export type GastosNotarialesDesglose = {
+  categoria: CategoriaNotarial;
   bloques: GastoBloque[];
   total: number;
   /** Derechohabientes considerados (1 titular + co-acreditado si lo hay). */
   numDerechohabientes: number;
+  /** `true` si falta el valor catastral (la valuación catastral quedó en $0). */
+  faltaValorCatastral: boolean;
 };

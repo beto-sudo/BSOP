@@ -3064,6 +3064,7 @@ export type Database = {
           anio: number
           apertura_cuota_fija: number
           apertura_umbral_cuota_fija: number
+          categoria: string
           created_at: string
           deleted_at: string | null
           empresa_id: string
@@ -3073,9 +3074,14 @@ export type Database = {
           muni_certificacion_planos: number
           muni_copias_fotostaticas: number
           muni_derechos: number
+          muni_forma_isai: number
+          muni_no_adeudo_simas: number
           muni_valuacion_catastral: number
+          muni_valuacion_catastral_pct: number
           notas: string | null
+          otros_avaluo: number
           otros_aviso_definitivo: number
+          otros_cnpc: number
           otros_cnpr_por_derechohabiente: number
           otros_copia_certificada: number
           otros_forma_isai: number
@@ -3090,6 +3096,7 @@ export type Database = {
           anio: number
           apertura_cuota_fija?: number
           apertura_umbral_cuota_fija?: number
+          categoria: string
           created_at?: string
           deleted_at?: string | null
           empresa_id: string
@@ -3099,9 +3106,14 @@ export type Database = {
           muni_certificacion_planos?: number
           muni_copias_fotostaticas?: number
           muni_derechos?: number
+          muni_forma_isai?: number
+          muni_no_adeudo_simas?: number
           muni_valuacion_catastral?: number
+          muni_valuacion_catastral_pct?: number
           notas?: string | null
+          otros_avaluo?: number
           otros_aviso_definitivo?: number
+          otros_cnpc?: number
           otros_cnpr_por_derechohabiente?: number
           otros_copia_certificada?: number
           otros_forma_isai?: number
@@ -3116,6 +3128,7 @@ export type Database = {
           anio?: number
           apertura_cuota_fija?: number
           apertura_umbral_cuota_fija?: number
+          categoria?: string
           created_at?: string
           deleted_at?: string | null
           empresa_id?: string
@@ -3125,9 +3138,14 @@ export type Database = {
           muni_certificacion_planos?: number
           muni_copias_fotostaticas?: number
           muni_derechos?: number
+          muni_forma_isai?: number
+          muni_no_adeudo_simas?: number
           muni_valuacion_catastral?: number
+          muni_valuacion_catastral_pct?: number
           notas?: string | null
+          otros_avaluo?: number
           otros_aviso_definitivo?: number
+          otros_cnpc?: number
           otros_cnpr_por_derechohabiente?: number
           otros_copia_certificada?: number
           otros_forma_isai?: number
@@ -4570,6 +4588,7 @@ export type Database = {
           area_vendible_m2: number | null
           area_vialidades_m2: number | null
           areas_verdes_m2: number | null
+          categoria_notarial: string | null
           clasificacion_inmobiliaria: string | null
           clasificaciones_inmobiliarias: string[]
           clave_interna: string | null
@@ -4626,6 +4645,7 @@ export type Database = {
           area_vendible_m2?: number | null
           area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
+          categoria_notarial?: string | null
           clasificacion_inmobiliaria?: string | null
           clasificaciones_inmobiliarias?: string[]
           clave_interna?: string | null
@@ -4682,6 +4702,7 @@ export type Database = {
           area_vendible_m2?: number | null
           area_vialidades_m2?: number | null
           areas_verdes_m2?: number | null
+          categoria_notarial?: string | null
           clasificacion_inmobiliaria?: string | null
           clasificaciones_inmobiliarias?: string[]
           clave_interna?: string | null
@@ -5840,6 +5861,7 @@ export type Database = {
           unidad_id: string | null
           updated_at: string
           uso_efectivo: string | null
+          valor_catastral: number | null
           valor_comercial: number | null
           valor_escrituracion: number | null
           valor_esquina: number | null
@@ -5947,6 +5969,7 @@ export type Database = {
           unidad_id?: string | null
           updated_at?: string
           uso_efectivo?: string | null
+          valor_catastral?: number | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
           valor_esquina?: number | null
@@ -6054,6 +6077,7 @@ export type Database = {
           unidad_id?: string | null
           updated_at?: string
           uso_efectivo?: string | null
+          valor_catastral?: number | null
           valor_comercial?: number | null
           valor_escrituracion?: number | null
           valor_esquina?: number | null
