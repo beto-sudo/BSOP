@@ -878,8 +878,22 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
         const checked = selectedIds.includes(f.id);
         const otroProveedor = !!selProveedorId && f.proveedor_id !== selProveedorId;
         const disabled = !esElegibleProgramar(f) || (!checked && otroProveedor);
+        // Motivo del bloqueo (tooltip), para que Conta sepa qué falta sin adivinar.
+        let motivo: string | undefined;
+        if (disabled && !checked) {
+          if (!f.proveedor_id) motivo = 'Enlaza un proveedor para programar';
+          else if (!f.cuenta_contable_id) motivo = 'Clasifica la cuenta contable para programar';
+          else if (f.porProgramar <= 0) motivo = 'Sin saldo por programar';
+          else if (otroProveedor)
+            motivo = `Selección limitada a ${proveedorLabel(selectedFacturas[0])}`;
+        }
         return (
-          <span onClick={(e) => e.stopPropagation()} className="flex">
+          <span
+            onClick={(e) => e.stopPropagation()}
+            className="flex"
+            title={motivo}
+            aria-label={motivo}
+          >
             <input
               type="checkbox"
               checked={checked}
@@ -893,7 +907,7 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
       },
     };
     return [selCol, ...columnsConPartida];
-  }, [vista, columnsConPartida, selectedIds, selProveedorId, toggleSeleccion]);
+  }, [vista, columnsConPartida, selectedIds, selProveedorId, selectedFacturas, toggleSeleccion]);
 
   // Facturas EN ESPERA del XML: destajos de vivienda aprobados o estimaciones de
   // obra autorizadas, cuya factura nació en borrador. Administración sube aquí el
