@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 — conciliación de `cxp_pagos` contra el estado de cuenta. CxP ya hace su parte (emite los movimientos bancarios); el casamiento movimiento↔banco es **v1 de `conciliacion-bancaria`** (hermana, hoy desbloqueada porque CxP ya emite). Decidir con Beto si esa iniciativa lo absorbe o se hace un puente mínimo acá. Sprints 6 y 7 **cerrados**.
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-28 (higiene + cierre honesto: Sprint 7 confirmado en prod; Sprint 6 cerrado por decisión —gastos vacía=no-op, COAGAN/ANSA diferido sin datos—; código muerto `CxpProgramacionModule` eliminado y bug `cxc_pago_registrar` verificado ya corregido en prod. Único pendiente sustantivo = Sprint 5 conciliación, que es de la hermana `conciliacion-bancaria`)
+**Última actualización:** 2026-06-29 (fix: facturas de egreso sin proveedor enlazado no mostraban "Programar pago" — match emisor→proveedor del importador no filtraba por empresa; agregado scoping + trigger DB de auto-enlace + backfill, migración `20260629174922`)
 
 ## Problema
 
@@ -233,6 +233,19 @@ Revisión contra prod (2026-06-28): los dos entregables que faltaban resultaron
 
 ## Decisiones registradas
 
+### 2026-06-29 — El enlace factura→proveedor se resuelve por RFC scoped a empresa (+ trigger DB)
+
+El match emisor→proveedor **siempre** debe filtrar por `empresa_id`: un mismo RFC
+existe como persona en varias empresas del portafolio, y un match global rompe
+(`maybeSingle` con 2 filas) dejando la factura sin proveedor. Además del fix en el
+importador, el invariante se garantiza a nivel DB con
+`erp.fn_cxp_factura_autolink_proveedor` (trigger BEFORE INSERT/UPDATE): cualquier
+factura de egreso con `proveedor_id` NULL y `emisor_rfc` conocido se auto-enlaza a
+la persona de su empresa. El trigger no pisa enlaces explícitos (solo actúa cuando
+`proveedor_id IS NULL`). Razón: el botón "Programar pago" depende de
+`factura.proveedor_id`; sin proveedor, el operador queda atorado sin recurso (hoy
+no hay UI para enlazar manualmente — pendiente como mejora aparte).
+
 ### 2026-06-26 — Rediseño del flujo de CxP en 3 etapas (pipeline por pestaña)
 
 Beto rediseña la navegación del módulo para que cada pestaña sea una etapa del
@@ -321,6 +334,26 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+- **2026-06-29 — Fix: facturas sin botón "Programar pago" (proveedor sin enlazar).**
+  Beto reportó facturas de egreso en DILESA donde no aparecía el botón. Causa raíz:
+  el importador de XML (`app/api/[empresa]/cxp/facturas/upload-xml/route.ts`)
+  matcheaba el emisor → proveedor con `.eq('rfc', …).maybeSingle()` **sin filtrar
+  por empresa**. Para los RFCs que viven como persona en dos empresas del portafolio
+  (HOME DEPOT, IMSS, RIPSA, GOBIERNO EDO., JORGE AMIN — duplicados en DILESA y RDB),
+  `maybeSingle()` recibía 2 filas → error silencioso → `proveedor_id` NULL → sin
+  proveedor el botón no se muestra (gate `factura.proveedor_id`). 10 de 12 facturas
+  afectadas por esto; las otras 2 (AUTO SERVICIOS DE PIEDRAS NEGRAS, SOPORTE DE
+  SUPERVISIÓN EN CONSTRUCCIÓN) simplemente no tenían proveedor en el catálogo.
+  - **Fix raíz (código):** helper `matchProveedorId` scoped a `empresa_id`, robusto
+    a duplicados intra-empresa (`order created_at + limit(1)`, no lanza). Reemplaza
+    las 2 búsquedas del importador (analyze + commit).
+  - **Backstop DB:** migración `20260629174922_cxp_factura_autolink_proveedor` —
+    trigger `BEFORE INSERT/UPDATE` en `erp.facturas` que auto-enlaza
+    `proveedor_id`+`persona_id` desde el RFC del emisor dentro de la misma empresa
+    cuando viene NULL. Cubre **cualquier** vía de alta, no solo el importador.
+  - **Datos:** la misma migración crea los 2 proveedores faltantes (morales) y
+    backfillea las 12 facturas. Aplica a prod al mergear con label `finanzas-ok`.
 
 - **2026-06-28 — Higiene + cierre honesto de Sprint 6 (diagnóstico contra prod).**
   Beto pidió arrancar pendientes. El diagnóstico contra prod desinfló dos de los

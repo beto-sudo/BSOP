@@ -85,6 +85,33 @@ type DestajoPlaceholder = {
   codigo: string | null;
 };
 
+/**
+ * Resuelve el proveedor (persona) por RFC del emisor, SCOPED a la empresa. El
+ * scope es clave: un mismo RFC vive como persona en varias empresas del
+ * portafolio (DILESA y RDB comparten HOME DEPOT, IMSS, RIPSA…), así que sin
+ * `empresa_id` el match traía 2 filas y el `.maybeSingle()` reventaba dejando la
+ * factura sin proveedor. `order + limit(1)` además es robusto a duplicados
+ * intra-empresa (no lanza). Espejo de erp.fn_cxp_factura_autolink_proveedor.
+ */
+async function matchProveedorId(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  empresaId: string,
+  emisorRfc: string | null
+): Promise<string | null> {
+  const rfc = (emisorRfc ?? '').trim();
+  if (!rfc) return null;
+  const { data } = await admin
+    .schema('erp')
+    .from('personas')
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .ilike('rfc', rfc)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  return data?.[0]?.id ?? null;
+}
+
 /** Normaliza un nombre para comparar: sin acentos, mayúsculas, espacios colapsados. */
 function normNombre(s: string | null | undefined): string {
   if (!s) return '';
@@ -513,13 +540,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             continue;
           }
         }
-        const { data: prov } = await admin
-          .schema('erp')
-          .from('personas')
-          .select('id')
-          .eq('rfc', cfdi.emisorRfc)
-          .maybeSingle();
-        a.proveedorId = prov?.id ?? null;
+        a.proveedorId = await matchProveedorId(admin, emp.id, cfdi.emisorRfc);
         a.candidatos = candidatosParaCfdi(
           placeholders,
           a.proveedorId,
@@ -704,14 +725,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         continue;
       }
 
-      // Emisor → proveedor (persona por RFC).
-      const { data: prov } = await admin
-        .schema('erp')
-        .from('personas')
-        .select('id')
-        .eq('rfc', cfdi.emisorRfc)
-        .maybeSingle();
-      const proveedorId: string | null = prov?.id ?? null;
+      // Emisor → proveedor (persona por RFC, scoped a esta empresa).
+      const proveedorId = await matchProveedorId(admin, emp.id, cfdi.emisorRfc);
 
       // Alta de la factura (RPC SECURITY DEFINER).
       const rpcArgs: CxpFacturaAltaArgs = {
