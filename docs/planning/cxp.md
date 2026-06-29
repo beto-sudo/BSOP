@@ -352,6 +352,16 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-29 — Doble-programación: error legible + copy del reparto de deberes.**
+  Maribel veía un error rojo crudo (UUID de factura + montos) al "Programar pago":
+  su 1er intento sí creó el pago (servidor OK), pero la vista del drawer no reflejó
+  el comprometido y reofreció el botón → el 2º intento lo rechaza la RPC ("excede lo
+  disponible / ya comprometido"). Fix: `ProgramarFacturaDialog` detecta ese caso y
+  muestra "Ya estaba programada" + refresca/cierra (la factura sale de la bandeja),
+  en vez del error técnico. Además se reescribió el copy (diálogo, hint del drawer,
+  toast) para no implicar que Dirección programa: "Aquí solo lo programas; la
+  autorización y el registro los hace Dirección en la pestaña Programación". Solo UI.
+
 - **2026-06-29 — Tooltip en checkbox de selección bloqueado (claridad).**
   Conta no veía _por qué_ algunas facturas/pagos no se podían seleccionar para
   agrupar. Se agrega `title`/`aria-label` al checkbox deshabilitado con el motivo:
