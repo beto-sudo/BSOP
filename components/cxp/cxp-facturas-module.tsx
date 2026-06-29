@@ -1495,8 +1495,8 @@ function FacturaDrawer({
                         </Button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Queda programado. Dirección lo autoriza y registra el pago (con comprobante)
-                        en la pestaña Programación.
+                        Aquí solo lo programas. La autorización y el registro del pago (con
+                        comprobante) los hace Dirección en la pestaña Programación.
                       </p>
                     </>
                   )}
@@ -2445,13 +2445,31 @@ function ProgramarFacturaDialog({
     });
     setSubmitting(false);
     if (progErr || !pagoId) {
+      // La RPC valida contra lo ya comprometido (pagos vivos). Si rechaza por
+      // "excede lo disponible / ya comprometido", la(s) factura(s) YA tienen un
+      // pago que las cubre: doble envío o vista desactualizada (el primer intento
+      // sí pasó del lado servidor). No es error del operador — mensaje claro +
+      // refrescar para que la factura salga de la bandeja "Por programar".
+      const yaComprometido = /excede lo disponible por programar|ya comprometido/i.test(
+        progErr?.message ?? ''
+      );
+      if (yaComprometido) {
+        feedback.info(esGrupo ? 'Ya estaban programadas' : 'Ya estaba programada', {
+          description: esGrupo
+            ? 'Una o más de estas facturas ya tienen un pago programado que las cubre. Actualicé la vista.'
+            : 'Esta factura ya tiene un pago programado que la cubre. Actualicé la vista.',
+        });
+        onDone();
+        return;
+      }
       setError(getSupabaseErrorMessage(progErr, 'No se pudo programar el pago.'));
       return;
     }
     feedback.success(
       esGrupo ? `Pago programado · ${facturas.length} facturas` : 'Pago programado',
       {
-        description: 'Dirección lo autoriza y registra el pago en la pestaña Programación.',
+        description:
+          'La autorización y el registro del pago los hace Dirección en la pestaña Programación.',
       }
     );
     onDone();
@@ -2471,8 +2489,8 @@ function ProgramarFacturaDialog({
             {esGrupo
               ? `${facturas.length} facturas de ${proveedorLabel(facturas[0])} · ${formatCurrency(total)}`
               : `${proveedorLabel(facturas[0])} · ${formatCurrency(total)}`}
-            . Un solo pago las cubre. Queda programado; Dirección lo autoriza y registra en la
-            pestaña Programación.
+            . Un solo pago las cubre. Aquí solo lo programas; la autorización y el registro del pago
+            los hace Dirección en la pestaña Programación.
           </DialogDescription>
         </DialogHeader>
 
