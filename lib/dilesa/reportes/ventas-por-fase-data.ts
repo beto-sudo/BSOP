@@ -36,7 +36,11 @@ export type VentaFaseReporteRow = {
   /** Fase actual de la venta hoy (puede ser > la del registro). */
   faseActualVenta: string | null;
   estadoVenta: string | null;
-  /** Valor comercial de la venta (precio de asignación, o comercial de respaldo). */
+  /**
+   * Valor de la venta = valor de escrituración (con valor comercial de respaldo).
+   * MISMA base que «Ventas del periodo» (`construirVentasPeriodo`) para que ambos
+   * reportes cuadren peso a peso en la fase Escriturada.
+   */
   valor: number;
 };
 
@@ -56,7 +60,7 @@ export type VentaFaseVentaRaw = {
   fase_actual: string | null;
   estado: string | null;
   valor_comercial: number | null;
-  precio_asignacion: number | null;
+  valor_escrituracion: number | null;
 };
 
 export type VentasPorFaseRawBundle = {
@@ -77,7 +81,7 @@ export const VENTA_FASES_SELECT = 'id, venta_id, posicion, fecha';
 
 /** SELECT de ventas para el reporte de fases (mantener en sync con VentaFaseVentaRaw). */
 export const VENTAS_FASE_SELECT =
-  'id, persona_id, unidad_id, tipo_credito, vendedor, fase_actual, estado, valor_comercial, precio_asignacion';
+  'id, persona_id, unidad_id, tipo_credito, vendedor, fase_actual, estado, valor_comercial, valor_escrituracion';
 
 /**
  * Normaliza el bundle crudo a filas de reporte. Pura: la usan tanto el fetch
@@ -120,7 +124,7 @@ export function normalizarVentasPorFase(b: VentasPorFaseRawBundle): VentaFaseRep
       vendedor: venta.vendedor,
       faseActualVenta: venta.fase_actual,
       estadoVenta: venta.estado,
-      valor: venta.precio_asignacion ?? venta.valor_comercial ?? 0,
+      valor: venta.valor_escrituracion ?? venta.valor_comercial ?? 0,
     });
   }
   return filas;

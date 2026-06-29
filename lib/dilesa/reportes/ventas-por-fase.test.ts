@@ -49,7 +49,7 @@ describe('normalizarVentasPorFase', () => {
         fase_actual: 'Detonada',
         estado: 'activa',
         valor_comercial: 800000,
-        precio_asignacion: 950000,
+        valor_escrituracion: 950000,
       },
     ],
     unidades: [{ id: 'u1', identificador: 'MZ1-L2', proyecto_id: 'p1' }],
@@ -59,7 +59,7 @@ describe('normalizarVentasPorFase', () => {
     ],
   };
 
-  it('descarta sin fecha y sin venta; usa precio_asignacion como valor', () => {
+  it('descarta sin fecha y sin venta; usa valor_escrituracion como valor', () => {
     const filas = normalizarVentasPorFase(bundle);
     expect(filas).toHaveLength(2);
     const det = filas.find((f) => f.posicion === 12)!;
@@ -70,10 +70,10 @@ describe('normalizarVentasPorFase', () => {
     expect(det.faseNombre).toBe('Detonada');
   });
 
-  it('cae a valor_comercial si no hay precio_asignacion', () => {
+  it('cae a valor_comercial si no hay valor_escrituracion', () => {
     const filas = normalizarVentasPorFase({
       ...bundle,
-      ventas: [{ ...bundle.ventas[0], precio_asignacion: null }],
+      ventas: [{ ...bundle.ventas[0], valor_escrituracion: null }],
     });
     expect(filas.find((f) => f.posicion === 12)!.valor).toBe(800000);
   });

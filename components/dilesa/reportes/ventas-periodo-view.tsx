@@ -11,6 +11,7 @@ import { ModuleKpiStrip, type ModuleKpi } from '@/components/module-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { formatCurrency } from '@/lib/format';
+import { inicioMesMatamoros } from '@/lib/fecha-mx';
 import { getReporte } from '@/lib/dilesa/reportes/registry';
 import { proyectosPresentes, vendedoresPresentes } from '@/lib/dilesa/reportes/ventas-data';
 import { construirVentasPeriodo } from '@/lib/dilesa/reportes/ventas-periodo';
@@ -19,7 +20,10 @@ import { ReporteShell } from './reporte-shell';
 
 const REPORTE = getReporte('ventas-periodo')!;
 const VOLVER_HREF = '/dilesa/ventas/reportes';
-const DEFAULT_FILTERS = { desde: '', hasta: '', proyecto: '', vendedor: '' };
+// Abre mostrando «lo que va del mes»: default `desde` = inicio del mes corriente
+// (Matamoros). Estable (se evalúa una vez al cargar el módulo), como exige
+// `useUrlFilters`. Limpiar filtros regresa al mes en curso.
+const DEFAULT_FILTERS = { desde: inicioMesMatamoros(), hasta: '', proyecto: '', vendedor: '' };
 
 export function VentasPeriodoView() {
   const { filters, setFilter, clearAll, activeCount } = useUrlFilters(DEFAULT_FILTERS);
