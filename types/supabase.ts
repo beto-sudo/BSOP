@@ -13284,6 +13284,14 @@ export type Database = {
         Returns: string
       }
       cxp_pago_aprobar: { Args: { p_pago_id: string }; Returns: undefined }
+      cxp_pago_autorizar_y_pagar: {
+        Args: {
+          p_fecha_pago?: string
+          p_pago_id: string
+          p_referencia?: string
+        }
+        Returns: undefined
+      }
       cxp_pago_cancelar: {
         Args: { p_motivo?: string; p_pago_id: string }
         Returns: undefined

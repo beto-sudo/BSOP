@@ -141,3 +141,71 @@ describe('armarControlPorPartida (CxP · drawer del pago)', () => {
     expect(cards.map((c) => c.partida_id)).toEqual(['muro']);
   });
 });
+
+// ── filtrarPagosPorHorizonte (pestaña Programación) ───────────────────────────
+
+import { filtrarPagosPorHorizonte } from './cxp-pagos-module';
+
+const HOY = '2026-06-29';
+const POR_FECHA = [
+  { id: 'vencido', fecha_programada: '2026-06-20' }, // pasado
+  { id: 'hoy', fecha_programada: '2026-06-29' }, // hoy
+  { id: 'en5', fecha_programada: '2026-07-04' }, // +5 días
+  { id: 'en12', fecha_programada: '2026-07-11' }, // +12 días
+  { id: 'en25', fecha_programada: '2026-07-24' }, // +25 días
+  { id: 'lejos', fecha_programada: '2026-09-01' }, // > mes
+  { id: 'sinfecha', fecha_programada: null }, // siempre visible
+];
+
+describe('filtrarPagosPorHorizonte (CxP · Programación)', () => {
+  it("'hoy_vencidos' (default) = vencidos + hoy + los sin fecha", () => {
+    expect(filtrarPagosPorHorizonte(POR_FECHA, 'hoy_vencidos', HOY).map((p) => p.id)).toEqual([
+      'vencido',
+      'hoy',
+      'sinfecha',
+    ]);
+  });
+
+  it("'semana' incluye hasta +7 días (acumulativo con lo vencido)", () => {
+    expect(filtrarPagosPorHorizonte(POR_FECHA, 'semana', HOY).map((p) => p.id)).toEqual([
+      'vencido',
+      'hoy',
+      'en5',
+      'sinfecha',
+    ]);
+  });
+
+  it("'quincena' incluye hasta +15 días", () => {
+    expect(filtrarPagosPorHorizonte(POR_FECHA, 'quincena', HOY).map((p) => p.id)).toEqual([
+      'vencido',
+      'hoy',
+      'en5',
+      'en12',
+      'sinfecha',
+    ]);
+  });
+
+  it("'mes' incluye hasta +30 días", () => {
+    expect(filtrarPagosPorHorizonte(POR_FECHA, 'mes', HOY).map((p) => p.id)).toEqual([
+      'vencido',
+      'hoy',
+      'en5',
+      'en12',
+      'en25',
+      'sinfecha',
+    ]);
+  });
+
+  it("'todos' (y cadena vacía) no filtra por fecha", () => {
+    expect(filtrarPagosPorHorizonte(POR_FECHA, 'todos', HOY)).toHaveLength(POR_FECHA.length);
+    expect(filtrarPagosPorHorizonte(POR_FECHA, '', HOY)).toHaveLength(POR_FECHA.length);
+  });
+
+  it('los pagos sin fecha programada nunca se esconden', () => {
+    for (const h of ['hoy_vencidos', 'semana', 'quincena', 'mes']) {
+      expect(filtrarPagosPorHorizonte(POR_FECHA, h, HOY).some((p) => p.id === 'sinfecha')).toBe(
+        true
+      );
+    }
+  });
+});

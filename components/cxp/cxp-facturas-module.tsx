@@ -45,7 +45,7 @@ import {
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
-import { usePermissions, useEffectiveUser } from '@/components/providers';
+import { usePermissions } from '@/components/providers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1079,7 +1079,6 @@ function FacturaDrawer({
   onProgramado: () => void;
 }) {
   const { permissions } = usePermissions();
-  const { data: effectiveUser } = useEffectiveUser();
   const feedback = useActionFeedback();
   const [programarOpen, setProgramarOpen] = useState(false);
   const [mostrarCancelar, setMostrarCancelar] = useState(false);
@@ -1209,13 +1208,12 @@ function FacturaDrawer({
     factura != null &&
     (factura.estado_cxp === 'borrador' || factura.estado_cxp === 'por_pagar');
 
-  // Programar pago (= autoriza, S1 corte 2). Espejo en cliente del gate server
-  // de cxp_pago_aprobar (core.fn_is_admin() OR rol Dirección en la empresa).
-  // Solo aparece si la factura tiene monto por programar y hay proveedor enlazado.
-  const esDireccion =
-    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(empresaId);
+  // Programar pago — lo hace Contabilidad (cualquiera con acceso al módulo; el
+  // gate de pantalla ya lo da <RequireAccess>). Programar solo deja el pago en
+  // 'programado'; quien AUTORIZA y registra el pago es Dirección, en la pestaña
+  // Programación (decisión 2026-06-29). Aparece si la factura tiene monto por
+  // programar y hay proveedor enlazado.
   const puedeProgramar =
-    esDireccion &&
     factura != null &&
     (factura.estado_cxp === 'por_pagar' || factura.estado_cxp === 'parcial') &&
     factura.porProgramar > 0;
@@ -1342,8 +1340,9 @@ function FacturaDrawer({
               </dl>
             </section>
 
-            {/* Programar pago (= autoriza, solo Dirección). Pone la acción en la
-                misma pantalla donde se clasifica partida/cuenta (pipeline S1). */}
+            {/* Programar pago — Contabilidad (mismo lugar donde clasifica
+                partida/cuenta). Deja el pago en 'programado'; la autorización y
+                el registro del pago son de Dirección, en la pestaña Programación. */}
             {puedeProgramar && (
               <>
                 <Separator />
@@ -1365,8 +1364,8 @@ function FacturaDrawer({
                         </Button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Programar autoriza el pago (rol Dirección). Luego se ejecuta y se sube el
-                        comprobante en la pestaña Programación.
+                        Queda programado. Dirección lo autoriza y registra el pago (con comprobante)
+                        en la pestaña Programación.
                       </p>
                     </>
                   ) : (
@@ -2248,10 +2247,10 @@ function RecibirXmlDialog({
   );
 }
 
-// ── Dialog: programar (= autorizar) el pago de UNA factura desde el drawer ──────
-// Pipeline S1 corte 2: la pantalla Facturas absorbe la acción de programar.
-// "Programar = autoriza" → tras crear el pago (programado) se aprueba de
-// inmediato; el gate real lo impone el RPC server-side (admin O rol Dirección).
+// ── Dialog: programar el pago de UNA factura desde el drawer ───────────────────
+// La pantalla Facturas (Contabilidad) crea el pago en 'programado'. La
+// autorización y el registro del pago los hace Dirección en la pestaña
+// Programación (decisión 2026-06-29) — aquí NO se autoriza.
 
 function ProgramarFacturaDialog({
   factura,
@@ -2298,7 +2297,9 @@ function ProgramarFacturaDialog({
     setSubmitting(true);
     setError(null);
     const sb = createSupabaseBrowserClient();
-    // 1) Programar: crea el cxp_pago en estado 'programado' + la aplicación.
+    // Programar deja el cxp_pago en 'programado' + la aplicación. La autorización
+    // y el registro del pago son de Dirección, en la pestaña Programación
+    // (decisión 2026-06-29). Aquí NO se autoriza.
     const { data: pagoId, error: progErr } = await sb.schema('erp').rpc('cxp_pago_programar', {
       p_empresa_id: empresaId,
       p_proveedor_id: factura.proveedor_id,
@@ -2307,27 +2308,13 @@ function ProgramarFacturaDialog({
       p_fecha_programada: fecha || undefined,
       p_cuenta_bancaria_id: cuentaId || undefined,
     });
+    setSubmitting(false);
     if (progErr || !pagoId) {
       setError(getSupabaseErrorMessage(progErr, 'No se pudo programar el pago.'));
-      setSubmitting(false);
       return;
     }
-    // 2) Programar = autoriza: aprobar de inmediato. El RPC valida Dirección/admin.
-    const { error: aprErr } = await sb
-      .schema('erp')
-      .rpc('cxp_pago_aprobar', { p_pago_id: pagoId as string });
-    setSubmitting(false);
-    if (aprErr) {
-      // Quedó programado pero no autorizado (no debería pasar: el botón ya gatea
-      // Dirección). Avisar sin bloquear — el pago existe y puede aprobarse aparte.
-      feedback.error(getSupabaseErrorMessage(aprErr, 'Se programó, pero no se pudo autorizar.'), {
-        title: 'Programado · falta autorizar',
-      });
-      onDone();
-      return;
-    }
-    feedback.success('Pago programado y autorizado', {
-      description: 'Pasa a la pestaña Programación para ejecutarlo y subir el comprobante.',
+    feedback.success('Pago programado', {
+      description: 'Dirección lo autoriza y registra el pago en la pestaña Programación.',
     });
     onDone();
   };
@@ -2343,8 +2330,8 @@ function ProgramarFacturaDialog({
         <DialogHeader>
           <DialogTitle>Programar pago</DialogTitle>
           <DialogDescription>
-            {proveedorLabel(factura)} · {formatCurrency(factura.porProgramar)}. Al programar, el
-            pago queda autorizado (rol Dirección); no sale dinero hasta ejecutarlo.
+            {proveedorLabel(factura)} · {formatCurrency(factura.porProgramar)}. Queda programado;
+            Dirección lo autoriza y registra el pago en la pestaña Programación.
           </DialogDescription>
         </DialogHeader>
 
@@ -2395,7 +2382,7 @@ function ProgramarFacturaDialog({
             Cancelar
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={submitting}>
-            {submitting ? 'Programando…' : 'Programar y autorizar'}
+            {submitting ? 'Programando…' : 'Programar pago'}
           </Button>
         </DialogFooter>
       </DialogContent>

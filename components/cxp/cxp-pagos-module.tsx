@@ -8,18 +8,19 @@
  * Acciones por pago según su estado, todas cableadas a las RPCs que ya
  * validan server-side (ADR-037):
  *
- *   - Aprobar (programado → aprobado): `cxp_pago_aprobar`. El RPC gatea
- *     rol "Dirección"; si el caller no lo es, se muestra el error del RPC
- *     con un toast claro. El botón NO se esconde por rol en cliente —
- *     defensa: manda el RPC.
- *   - Marcar pagado (aprobado → pagado): dialog con fecha + referencia +
- *     comprobante (imagen/PDF de la transferencia, `<FileAttachments>`
- *     sobre `erp.adjuntos`), `cxp_pago_marcar_pagado`. **Confirmación
+ *   - Autorizar y registrar pago (programado|aprobado → pagado): un solo paso
+ *     (decisión 2026-06-29) — Contabilidad programa en la pestaña Facturas y
+ *     **Dirección** autoriza+registra aquí. Dialog con fecha + referencia +
+ *     comprobante (imagen/PDF, `<FileAttachments>` sobre `erp.adjuntos`),
+ *     `cxp_pago_autorizar_y_pagar`. El RPC gatea rol "Dirección"; el botón NO
+ *     se esconde por rol en cliente — defensa: manda el RPC. **Confirmación
  *     fuerte** (egreso real).
  *   - Cancelar (si no pagado): `cxp_pago_cancelar` con motivo.
  *
  * Filtro default `'pendientes'` = programados + aprobados: lo vivo que aún
- * no se ejecuta nunca sale de la vista hasta estar pagado.
+ * no se ejecuta nunca sale de la vista hasta estar pagado. La pestaña
+ * Programación añade un filtro por **horizonte de vencimiento** (default
+ * "hoy + vencidos"; presets semana/15 días/mes/todos).
  *
  * El drawer de detalle muestra las facturas aplicadas
  * (`cxp_pago_aplicaciones` → `facturas`), montos, quién aprobó/pagó, los
@@ -35,12 +36,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, RefreshCw, Wallet, XCircle } from 'lucide-react';
+import { RefreshCw, Wallet, XCircle } from 'lucide-react';
 
 import { ModuleFilters, ModuleContent, ErrorBanner } from '@/components/module-page';
 import { DesktopOnlyNotice } from '@/components/responsive';
 import { DetailDrawer, DetailDrawerContent } from '@/components/detail-page';
-import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { CancelarConMotivoDialog } from '@/components/shared/cancelar-con-motivo-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -278,6 +278,47 @@ export function filtrarPagosPorEstado<T extends { estado: EstadoPago }>(
   return pagos.filter((p) => p.estado === estado);
 }
 
+// ── Filtro por horizonte de vencimiento (pestaña Programación) ────────────────
+// Cada preset es acumulativo "vence dentro de N días" e INCLUYE lo vencido
+// (fecha ≤ hoy). Default 'hoy_vencidos' = solo lo que toca hoy o ya se pasó; el
+// resto se esconde hasta cambiar el filtro. Los pagos SIN fecha programada
+// siempre se muestran (necesitan atención, no deben desaparecer).
+const HORIZONTE_DIAS: Record<string, number> = {
+  hoy_vencidos: 0,
+  semana: 7,
+  quincena: 15,
+  mes: 30,
+};
+
+export const HORIZONTE_OPTIONS = [
+  { value: 'hoy_vencidos', label: 'Hoy + vencidos' },
+  { value: 'semana', label: 'Próxima semana' },
+  { value: 'quincena', label: 'Próximos 15 días' },
+  { value: 'mes', label: 'Próximo mes' },
+  { value: 'todos', label: 'Todos' },
+];
+
+/** Suma `dias` a una fecha ISO `YYYY-MM-DD` sin arrastre de zona horaria. */
+function sumarDiasISO(iso: string, dias: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + dias);
+  return dt.toISOString().slice(0, 10);
+}
+
+export function filtrarPagosPorHorizonte<T extends { fecha_programada: string | null }>(
+  pagos: T[],
+  horizonte: string,
+  hoyISO: string
+): T[] {
+  if (!horizonte || horizonte === 'todos') return pagos;
+  const dias = HORIZONTE_DIAS[horizonte];
+  if (dias == null) return pagos;
+  const limite = sumarDiasISO(hoyISO, dias);
+  // Sin fecha → siempre visible; con fecha → vence en/antes del límite.
+  return pagos.filter((p) => !p.fecha_programada || p.fecha_programada <= limite);
+}
+
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 
 export function CxpPagosModule({
@@ -290,6 +331,16 @@ export function CxpPagosModule({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [estado, setEstado] = useState(estadoInicial);
+
+  // La pestaña Programación (estadoInicial='pendientes') trae el filtro por
+  // horizonte de vencimiento, con default "hoy + vencidos". La de Pagos (histórico)
+  // no lo necesita.
+  const esProgramacion = estadoInicial === 'pendientes';
+  const [horizonte, setHorizonte] = useState(esProgramacion ? 'hoy_vencidos' : 'todos');
+  const hoyISO = useMemo(
+    () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()),
+    []
+  );
 
   const [selected, setSelected] = useState<Pago | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -304,8 +355,7 @@ export function CxpPagosModule({
     }
   );
 
-  // Acción pendiente: aprobar / cancelar (confirm) o marcar pagado (dialog).
-  const [aprobarPago, setAprobarPago] = useState<Pago | null>(null);
+  // Acción pendiente: cancelar (confirm) o autorizar+registrar pago (dialog).
   const [cancelarPago, setCancelarPago] = useState<Pago | null>(null);
   const [pagarPago, setPagarPago] = useState<Pago | null>(null);
 
@@ -403,7 +453,10 @@ export function CxpPagosModule({
     void fetchPagos();
   }, [fetchPagos]);
 
-  const filtered = useMemo(() => filtrarPagosPorEstado(pagos, estado), [pagos, estado]);
+  const filtered = useMemo(() => {
+    const porEstado = filtrarPagosPorEstado(pagos, estado);
+    return esProgramacion ? filtrarPagosPorHorizonte(porEstado, horizonte, hoyISO) : porEstado;
+  }, [pagos, estado, esProgramacion, horizonte, hoyISO]);
 
   const openDetail = useCallback((p: Pago) => {
     setSelected(p);
@@ -411,23 +464,6 @@ export function CxpPagosModule({
   }, []);
 
   // ── Acciones ───────────────────────────────────────────────────────────────
-
-  const doAprobar = useCallback(
-    async (pago: Pago) => {
-      const sb = createSupabaseBrowserClient();
-      const { error } = await sb.schema('erp').rpc('cxp_pago_aprobar', { p_pago_id: pago.id });
-      if (error) {
-        // El RPC valida Dirección server-side; muestra su error elegante.
-        feedback.error(getSupabaseErrorMessage(error, 'No se pudo aprobar el pago.'), {
-          title: 'No se pudo aprobar',
-        });
-        throw error; // mantiene el ConfirmDialog abierto
-      }
-      feedback.success('Pago aprobado');
-      void fetchPagos();
-    },
-    [feedback, fetchPagos]
-  );
 
   const doCancelar = useCallback(
     async (pago: Pago, motivo: string) => {
@@ -466,6 +502,17 @@ export function CxpPagosModule({
             className="w-48"
           />
 
+          {esProgramacion && (
+            <Combobox
+              value={horizonte}
+              onChange={(v) => setHorizonte(v ?? 'todos')}
+              options={HORIZONTE_OPTIONS}
+              placeholder="Horizonte"
+              size="sm"
+              className="w-44"
+            />
+          )}
+
           <Button
             variant="outline"
             size="icon"
@@ -486,7 +533,7 @@ export function CxpPagosModule({
               <Wallet className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-2 font-medium">Sin pagos en este estado</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Programa pagos desde la pestaña «Programación».
+                Programa pagos desde la pestaña «Facturas».
               </p>
             </div>
           ) : (
@@ -545,25 +592,14 @@ export function CxpPagosModule({
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5">
-                            {p.estado === 'programado' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 px-2 text-xs"
-                                onClick={() => setAprobarPago(p)}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Aprobar
-                              </Button>
-                            )}
-                            {p.estado === 'aprobado' && (
+                            {(p.estado === 'programado' || p.estado === 'aprobado') && (
                               <Button
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs"
                                 onClick={() => setPagarPago(p)}
                               >
                                 <Wallet className="h-3.5 w-3.5" />
-                                Marcar pagado
+                                Autorizar y registrar
                               </Button>
                             )}
                             {p.estado !== 'pagado' &&
@@ -597,11 +633,7 @@ export function CxpPagosModule({
         empresa={empresa}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onAprobar={(p) => {
-          setDrawerOpen(false);
-          setAprobarPago(p);
-        }}
-        onMarcarPagado={(p) => {
+        onAutorizarPagar={(p) => {
           setDrawerOpen(false);
           setPagarPago(p);
         }}
@@ -609,28 +641,6 @@ export function CxpPagosModule({
           setDrawerOpen(false);
           setCancelarPago(p);
         }}
-      />
-
-      {/* Aprobar — confirmación (el RPC valida Dirección). */}
-      <ConfirmDialog
-        open={!!aprobarPago}
-        onOpenChange={(v) => !v && setAprobarPago(null)}
-        onConfirm={async () => {
-          if (aprobarPago) await doAprobar(aprobarPago);
-        }}
-        title="¿Aprobar este pago?"
-        description={
-          aprobarPago ? (
-            <>
-              Vas a aprobar el pago de{' '}
-              <strong>{aprobarPago.proveedor_nombre ?? '(sin proveedor)'}</strong> por{' '}
-              <strong>{formatCurrency(aprobarPago.monto_total)}</strong>. Solo Dirección puede
-              aprobar pagos; si no tienes ese rol, la acción será rechazada.
-            </>
-          ) : null
-        }
-        confirmLabel="Aprobar"
-        confirmVariant="default"
       />
 
       {/* Cancelar — confirmación con motivo (audit trail, p2p-cancelaciones D1).
@@ -646,9 +656,11 @@ export function CxpPagosModule({
         />
       )}
 
-      {/* Marcar pagado — egreso real, confirmación fuerte con fecha + referencia. */}
+      {/* Autorizar y registrar pago — Dirección. Egreso real: confirmación fuerte
+          con fecha + referencia + comprobante. Aprueba (si venía programado) y
+          marca pagado en un paso (RPC cxp_pago_autorizar_y_pagar). */}
       {pagarPago && (
-        <MarcarPagadoDialog
+        <AutorizarYPagarDialog
           key={pagarPago.id}
           pago={pagarPago}
           empresaId={empresaId}
@@ -672,8 +684,7 @@ function PagoDrawer({
   empresa,
   open,
   onClose,
-  onAprobar,
-  onMarcarPagado,
+  onAutorizarPagar,
   onCancelar,
 }: {
   pago: Pago | null;
@@ -681,8 +692,7 @@ function PagoDrawer({
   empresa: EmpresaSlug;
   open: boolean;
   onClose: () => void;
-  onAprobar: (pago: Pago) => void;
-  onMarcarPagado: (pago: Pago) => void;
+  onAutorizarPagar: (pago: Pago) => void;
   onCancelar: (pago: Pago) => void;
 }) {
   const [aplicaciones, setAplicaciones] = useState<FacturaAplicada[]>([]);
@@ -832,16 +842,10 @@ function PagoDrawer({
       footer={
         conAcciones ? (
           <div className="flex flex-wrap items-center gap-2">
-            {pago.estado === 'programado' ? (
-              <Button variant="outline" className="gap-1.5" onClick={() => onAprobar(pago)}>
-                <CheckCircle2 className="h-4 w-4" />
-                Aprobar
-              </Button>
-            ) : null}
-            {pago.estado === 'aprobado' ? (
-              <Button className="gap-1.5" onClick={() => onMarcarPagado(pago)}>
+            {pago.estado === 'programado' || pago.estado === 'aprobado' ? (
+              <Button className="gap-1.5" onClick={() => onAutorizarPagar(pago)}>
                 <Wallet className="h-4 w-4" />
-                Marcar pagado
+                Autorizar y registrar pago
               </Button>
             ) : null}
             {puedeCancelar ? (
@@ -1069,7 +1073,7 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
 
 // ── Dialog: marcar pagado (egreso real) ────────────────────────────────────────
 
-function MarcarPagadoDialog({
+function AutorizarYPagarDialog({
   pago,
   empresaId,
   empresa,
@@ -1091,19 +1095,21 @@ function MarcarPagadoDialog({
   const handleSubmit = async () => {
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
-    const { error } = await sb.schema('erp').rpc('cxp_pago_marcar_pagado', {
+    // Aprueba (si venía 'programado') y marca pagado en un paso. El RPC valida
+    // rol Dirección server-side.
+    const { error } = await sb.schema('erp').rpc('cxp_pago_autorizar_y_pagar', {
       p_pago_id: pago.id,
       p_fecha_pago: fecha || undefined,
       p_referencia: referencia || undefined,
     });
     setSubmitting(false);
     if (error) {
-      feedback.error(getSupabaseErrorMessage(error, 'No se pudo marcar como pagado.'), {
-        title: 'No se pudo marcar pagado',
+      feedback.error(getSupabaseErrorMessage(error, 'No se pudo autorizar y registrar el pago.'), {
+        title: 'No se pudo registrar el pago',
       });
       return;
     }
-    feedback.success('Pago marcado como pagado', {
+    feedback.success('Pago autorizado y registrado', {
       description: pago.cuenta_nombre
         ? 'Se emitió el movimiento bancario (egreso) en la cuenta.'
         : 'Sin cuenta bancaria: no se emitió movimiento. Concílialo manualmente.',
@@ -1115,14 +1121,15 @@ function MarcarPagadoDialog({
     <Dialog open onOpenChange={(v) => !v && !submitting && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Marcar pago como pagado</DialogTitle>
+          <DialogTitle>Autorizar y registrar pago</DialogTitle>
           <DialogDescription>
-            Confirma el egreso de <strong>{formatCurrency(pago.monto_total)}</strong> a{' '}
+            Autoriza y registra el egreso de <strong>{formatCurrency(pago.monto_total)}</strong> a{' '}
             <strong>{pago.proveedor_nombre ?? '(sin proveedor)'}</strong>.{' '}
             {pago.cuenta_nombre
               ? `Se emitirá un cargo en «${pago.cuenta_nombre}».`
               : 'Este pago no tiene cuenta bancaria: no se emitirá movimiento.'}{' '}
-            Esta acción registra dinero saliendo y no es reversible automáticamente.
+            Solo Dirección puede hacerlo. Registra dinero saliendo y no es reversible
+            automáticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -1169,7 +1176,7 @@ function MarcarPagadoDialog({
             Cancelar
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={submitting}>
-            {submitting ? 'Registrando…' : 'Confirmar pago'}
+            {submitting ? 'Registrando…' : 'Autorizar y registrar'}
           </Button>
         </DialogFooter>
       </DialogContent>
