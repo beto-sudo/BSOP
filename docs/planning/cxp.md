@@ -352,6 +352,13 @@ patrón canónico de **ADR-037** (subledger gemelo):
 
 ## Bitácora
 
+- **2026-06-29 — Tooltip en checkbox de selección bloqueado (claridad).**
+  Conta no veía _por qué_ algunas facturas/pagos no se podían seleccionar para
+  agrupar. Se agrega `title`/`aria-label` al checkbox deshabilitado con el motivo:
+  "Clasifica la cuenta contable…", "Enlaza un proveedor…", "Sin saldo por programar"
+  o "Selección limitada a [Proveedor]" (Facturas), y "Solo pagos programados o
+  aprobados" / "Selección limitada a [Proveedor]" (Programación). Solo UI.
+
 - **2026-06-29 — Agrupar pagos · Fase 2 (consolidar pagos ya fragmentados al pagar).**
   Para los pagos sueltos que ya existen del mismo proveedor, en la pestaña
   **Programación** se seleccionan varios (mismo proveedor, programado/aprobado) y

@@ -654,15 +654,25 @@ export function CxpPagosModule({
                               const otroProv =
                                 !!selProveedorId && p.proveedor_id !== selProveedorId;
                               const disabled = !elegible || (!checked && otroProv);
+                              // Motivo del bloqueo (tooltip) para que se entienda al instante.
+                              let motivo: string | undefined;
+                              if (disabled && !checked) {
+                                if (!elegible)
+                                  motivo = 'Solo se consolidan pagos programados o aprobados';
+                                else if (otroProv)
+                                  motivo = `Selección limitada a ${selectedPagos[0]?.proveedor_nombre ?? 'un proveedor'}`;
+                              }
                               return (
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={disabled}
-                                  onChange={() => togglePagoSel(p)}
-                                  aria-label="Seleccionar pago para consolidar"
-                                  className="h-4 w-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                                />
+                                <span title={motivo} aria-label={motivo} className="flex">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={disabled}
+                                    onChange={() => togglePagoSel(p)}
+                                    aria-label="Seleccionar pago para consolidar"
+                                    className="h-4 w-4 cursor-pointer accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                                  />
+                                </span>
                               );
                             })()}
                           </td>
