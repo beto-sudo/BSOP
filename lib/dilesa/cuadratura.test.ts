@@ -566,6 +566,10 @@ describe('calcularCuadratura', () => {
       expect(cob.engancheAlPrecio).toBe(156943); // el enganche cubre el saldo del precio
       expect(cob.engancheCliente).toBe(0); // nada del enganche fondea gastos
       expect(cob.aportacionPromocion).toBe(12569.42); // DILESA solo aporta del bono (< 15k)
+      // `dilesa-descuento-perdonado-motor`: descuentoAplicado usa la promo CONSUMIDA
+      // (12,569.42), NO el tope del bono (15,000). Antes daba 15,000 → 2,430.58 de
+      // "descuento perdonado" fantasma en la revisión PLD.
+      expect(c.descuentoAplicado).toBe(12569.42);
       expect(cob.sobreprecioCobertura).toBe(0); // NO se deriva sobreprecio fantasma
       expect(cob.pagareNecesario).toBe(0);
       expect(cob.saldoCobertura).toBe(0); // cuadra
@@ -579,6 +583,39 @@ describe('calcularCuadratura', () => {
       const split = partirDescuento(c.descuentoReal, cob.promocion);
       expect(split.promocion).toBe(13361.42);
       expect(split.sobreprecio).toBe(0);
+    });
+
+    // `dilesa-descuento-perdonado-motor`: bono parcialmente consumido CON sobreprecio
+    // — el caso que disparaba el warning PLD de Aracely (M10-L32). El tope del bono
+    // (15,000) no se consume completo (13,380); con sobreprecio 20,000 el motor daba
+    // descuentoAplicado 35,000 y `descuentoAplicado − cheque` = 1,620 de perdón
+    // fantasma. Con el fix usa la promo consumida → 33,380 = cheque → perdón 0.
+    it('bono parcialmente consumido + sobreprecio: descuentoAplicado = promo consumida, sin perdón fantasma (Aracely M10-L32)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 940000,
+        montoCreditoTitular: 940000, // el crédito cubre el precio → el enganche fondea gastos
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: 33380, // cheque a notaría girado (Fase 11)
+        gastosEscrituracion: 63380,
+        apoyoInfonavit: 0,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 20000, // 920k → 940k escriturado (hecho)
+        promocionGastos: 15000, // TOPE del bono del catálogo
+        depositos: [{ monto: 30000, directoCliente: true, tieneRecibo: false }],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      const cob = c.coberturaGastos!;
+      expect(cob.aportacionPromocion).toBe(13380); // bono CONSUMIDO < tope 15,000
+      expect(cob.sobreprecioCobertura).toBe(20000);
+      expect(cob.saldoCobertura).toBe(0); // los gastos cuadran
+      // FIX: promo consumida (13,380) + sobreprecio (20,000) = 33,380, NO el tope
+      // (15,000 + 20,000 = 35,000).
+      expect(c.descuentoAplicado).toBe(33380);
+      expect(c.chequePagado).toBe(33380);
+      // "Descuento perdonado" de la revisión PLD = descuentoAplicado − cheque.
+      expect(c.descuentoAplicado - c.chequePagado).toBe(0); // sin fantasma → sin warning
     });
 
     // Camino "Cobrar" del residual de precio (iniciativa dilesa-saldos-residuales S2):
