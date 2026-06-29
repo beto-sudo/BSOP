@@ -450,40 +450,19 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // la migración 20260623155819; antes se revolvían en `productos_adicionales`.
   const sobreprecioGastos = n(i.sobreprecioGastos);
   const productosAdicionales = n(i.productosAdicionales);
-  // Tope a lo autorizado desde el inicio: el saldo solo acredita el descuento
-  // hasta el máximo CONFIABLE (promo de la solicitud). Sin tope confiable
-  // (legacy) se aplica el otorgado completo. El exceso sobre el tope NO reduce
-  // el saldo (queda como pendiente a revisar).
-  const descuentoAplicado = tieneDesglose
-    ? round2(promocionGastos + sobreprecioGastos)
-    : i.descuentoMaximoAutorizado != null
-      ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
-      : descuentoOtorgadoTotal;
   const gastosNetos = n(i.gastosEscrituracion) - n(i.apoyoInfonavit);
-  const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoAplicado;
-  // Con desglose, el cheque a notaría cubre los gastos netos COMPLETOS (las 4
-  // fuentes los fondean; ADR-045). Sin desglose, la fórmula vieja de Coda
-  // (capeada al excedente disponible) — fallback intacto.
-  const chequeNotariaCalculado = tieneDesglose
-    ? round2(gastosNetos)
-    : round2(Math.min(gastosNetos, excedenteDisponible));
 
-  // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
-  // saldo efectivo usa este, no el calculado: mide un giro real contra el
-  // descuento, no una sugerencia.
-  const chequePagado = round2(n(i.montoChequeNotaria));
-  // Saldo efectivo: el descuento aplicado cubre el faltante de cobranza y el
-  // cheque girado se fondea de ese descuento (o del excedente). Equivale a
-  // `chequePagado − excedenteDisponible`.
-  const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
-  const cubierta = saldoCliente <= TOLERANCIA_SALDO;
-
-  // ADR-045: desglose de las fuentes que cubren el presupuesto notarial COMPLETO.
-  // Solo con desglose poblado. Gastos BRUTOS = subsidio Infonavit + aportación
-  // DILESA (promoción) + enganche + sobreprecio + pagaré → saldo 0. El split del
-  // lado DILESA (lo que cubre tras el enganche y el pagaré) se hace con
-  // `partirDescuento`: promoción (bono autorizado, topado) + sobreprecio (el resto).
-  // Fuente ÚNICA para la card de cuadratura y el mini-resumen (no recalcular).
+  // ADR-045 + iniciativa `dilesa-descuento-perdonado-motor`: el desglose de las
+  // fuentes que cubren el presupuesto notarial COMPLETO se calcula ANTES del
+  // `descuentoAplicado`, porque en el modelo desglosado ese descuento debe usar la
+  // promoción REALMENTE consumida (`aportacionPromocion`, topada a lo necesario vía
+  // `partirDescuento`) y NO el TOPE del bono — si no, el bono no usado se cuela como
+  // "descuento perdonado" fantasma en la revisión PLD (`descuentoAplicado − cheque`).
+  // Solo con desglose poblado. Gastos BRUTOS = subsidio Infonavit + aportación DILESA
+  // (promoción) + enganche + sobreprecio + pagaré → saldo 0. El split del lado DILESA
+  // (lo que cubre tras el enganche y el pagaré) es `partirDescuento`: promoción (bono
+  // autorizado, topado) + sobreprecio (el resto). Fuente ÚNICA para la card de
+  // cuadratura y el mini-resumen (no recalcular).
   const gastosNetosR = round2(gastosNetos);
   const gastosBrutosR = round2(n(i.gastosEscrituracion));
   // El enganche del cliente cubre PRIMERO el saldo del precio (lo que el crédito
@@ -525,6 +504,39 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     promocionGastos,
     sobreprecioGastos
   );
+
+  // Descuento que reduce el saldo. Con desglose (ADR-045 + `dilesa-descuento-
+  // perdonado-motor`): promoción CONSUMIDA (`aportacionPromocion`, ya topada al bono
+  // autorizado por `partirDescuento`) + sobreprecio CAPTURADO (hecho escriturado, lo
+  // absorbe el crédito). Antes se usaba el TOPE del bono (`promocionGastos`), que
+  // sobre-estimaba el descuento cuando el bono no se consumía completo y dejaba un
+  // "descuento perdonado" fantasma (`descuentoAplicado − cheque`) en la Fase 13
+  // (ej. Aracely M10-L32: tope 15,000 vs consumido 13,380 → 1,620 fantasma). Como
+  // `aportacionPromocion ≤ promocionGastos`, el fix nunca infla el descuento. Sin
+  // desglose (ventas cerradas/legacy) → modelo viejo: `descuento_total` topado al
+  // máximo autorizado. Fallback que NO altera nada histórico.
+  const descuentoAplicado = tieneDesglose
+    ? round2(aportacionPromocion + sobreprecioGastos)
+    : i.descuentoMaximoAutorizado != null
+      ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
+      : descuentoOtorgadoTotal;
+  const excedenteDisponible = montoDisponible - valorEscrituracion + descuentoAplicado;
+  // Con desglose, el cheque a notaría cubre los gastos netos COMPLETOS (las 4
+  // fuentes los fondean; ADR-045). Sin desglose, la fórmula vieja de Coda
+  // (capeada al excedente disponible) — fallback intacto.
+  const chequeNotariaCalculado = tieneDesglose
+    ? round2(gastosNetos)
+    : round2(Math.min(gastosNetos, excedenteDisponible));
+
+  // Cheque a notaría GIRADO (capturado en Fase 11; 0 si aún no se gira). El
+  // saldo efectivo usa este, no el calculado: mide un giro real contra el
+  // descuento, no una sugerencia.
+  const chequePagado = round2(n(i.montoChequeNotaria));
+  // Saldo efectivo: el descuento aplicado cubre el faltante de cobranza y el
+  // cheque girado se fondea de ese descuento (o del excedente). Equivale a
+  // `chequePagado − excedenteDisponible`.
+  const saldoCliente = round2(saldoCobranza - descuentoAplicado + chequePagado);
+  const cubierta = saldoCliente <= TOLERANCIA_SALDO;
   const saldoCobertura = round2(
     gastosBrutosR -
       n(i.apoyoInfonavit) -
