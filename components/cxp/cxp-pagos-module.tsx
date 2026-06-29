@@ -59,7 +59,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
-import { FileAttachments } from '@/components/file-attachments';
+import { FileAttachments, useAdjuntos } from '@/components/file-attachments';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
 import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
@@ -1092,6 +1092,17 @@ function AutorizarYPagarDialog({
   const [referencia, setReferencia] = useState(pago.referencia ?? '');
   const [submitting, setSubmitting] = useState(false);
 
+  // Espejo del gate server (cxp_pago_autorizar_y_pagar): no se puede registrar el
+  // pago sin fecha y sin comprobante cargado. `entidad_tipo='cxp_pago'` (singular)
+  // es como FileAttachments guarda los adjuntos de 'cxp_pagos'.
+  const { adjuntos, refresh } = useAdjuntos({
+    empresaId,
+    entidadTipo: 'cxp_pago',
+    entidadId: pago.id,
+  });
+  const tieneComprobante = adjuntos.some((a) => a.rol === 'comprobante');
+  const puedeRegistrar = !!fecha && tieneComprobante && !submitting;
+
   const handleSubmit = async () => {
     setSubmitting(true);
     const sb = createSupabaseBrowserClient();
@@ -1158,7 +1169,7 @@ function AutorizarYPagarDialog({
           </div>
           <div className="space-y-1.5">
             <span className="text-xs text-muted-foreground">
-              Comprobante (imagen o PDF de la transferencia)
+              Comprobante (imagen o PDF de la transferencia) — obligatorio
             </span>
             <FileAttachments
               empresaId={empresaId}
@@ -1167,15 +1178,24 @@ function AutorizarYPagarDialog({
               entidadId={pago.id}
               roles={COMPROBANTE_ROLES}
               variant="flat"
+              onChange={() => void refresh()}
             />
           </div>
+
+          {!puedeRegistrar && !submitting && (
+            <p className="text-[11px] text-amber-600">
+              {!fecha
+                ? 'Indica la fecha de pago para continuar.'
+                : 'Sube el comprobante del pago para continuar.'}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          <Button onClick={() => void handleSubmit()} disabled={!puedeRegistrar}>
             {submitting ? 'Registrando…' : 'Autorizar y registrar'}
           </Button>
         </DialogFooter>

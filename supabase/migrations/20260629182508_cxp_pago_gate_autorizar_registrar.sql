@@ -13,6 +13,7 @@
 -- Esta migración:
 --   1. `cxp_pago_autorizar_y_pagar` — RPC nueva: en un paso aprueba (si venía
 --      'programado') y marca pagado. Gate Dirección. Es la acción de Michelle.
+--      Exige además fecha de pago y comprobante cargado (erp.adjuntos).
 --   2. `cxp_pago_marcar_pagado` — se le agrega el gate Dirección (defensa: ya no
 --      debe poder ejecutarla Contabilidad).
 --   3. `cxp_pago_aprobar` se mantiene con su gate Dirección (sin cambios).
@@ -47,6 +48,18 @@ BEGIN
   END IF;
   IF NOT (core.fn_is_admin() OR core.fn_user_has_role('Dirección', v.empresa_id)) THEN
     RAISE EXCEPTION 'Solo admin o un usuario con rol Dirección puede autorizar y registrar pagos';
+  END IF;
+  -- Exige fecha de pago y comprobante cargado (control financiero: no se registra
+  -- un egreso sin fecha ni evidencia). El comprobante vive en erp.adjuntos.
+  IF p_fecha_pago IS NULL THEN
+    RAISE EXCEPTION 'La fecha de pago es obligatoria';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM erp.adjuntos
+    WHERE entidad_tipo = 'cxp_pago' AND entidad_id = p_pago_id
+      AND rol = 'comprobante' AND sustituido_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Sube el comprobante del pago antes de autorizar y registrarlo';
   END IF;
 
   UPDATE erp.cxp_pagos

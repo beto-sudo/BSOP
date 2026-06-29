@@ -374,6 +374,10 @@ patrón canónico de **ADR-037** (subledger gemelo):
   - **Programar exige cuenta contable:** el botón "Programar pago" (pestaña
     Facturas) solo se habilita si la factura tiene proveedor enlazado **y** cuenta
     contable clasificada — no se programa un egreso sin clasificar.
+  - **Autorizar y registrar exige fecha + comprobante:** el botón se deshabilita
+    hasta que haya fecha de pago y comprobante cargado; reforzado server-side en
+    `cxp_pago_autorizar_y_pagar` (RAISE si falta fecha o no existe adjunto
+    `rol='comprobante'`) — no se registra un egreso sin fecha ni evidencia.
   - Migración `20260629182508`. Aplica a prod al mergear con label `finanzas-ok`.
 
 - **2026-06-29 — Fix: facturas sin botón "Programar pago" (proveedor sin enlazar).**
