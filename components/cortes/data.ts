@@ -110,6 +110,7 @@ export async function fetchAbrirCajaContext(): Promise<{
     .from('cajas')
     .select('id, nombre')
     .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('activo', true)
     .order('nombre');
   if (error) throw error;
 
