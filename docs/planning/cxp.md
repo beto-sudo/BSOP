@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 — conciliación de `cxp_pagos` contra el estado de cuenta. CxP ya hace su parte (emite los movimientos bancarios); el casamiento movimiento↔banco es **v1 de `conciliacion-bancaria`** (hermana, hoy desbloqueada porque CxP ya emite). Decidir con Beto si esa iniciativa lo absorbe o se hace un puente mínimo acá. Sprints 6 y 7 **cerrados**.
 **Dueño:** Beto
 **Creada:** 2026-04-28
-**Última actualización:** 2026-06-29 (fix: facturas de egreso sin proveedor enlazado no mostraban "Programar pago" — match emisor→proveedor del importador no filtraba por empresa; agregado scoping + trigger DB de auto-enlace + backfill, migración `20260629174922`)
+**Última actualización:** 2026-06-29 (nuevo reparto de deberes de pago: Contabilidad programa, Dirección autoriza+registra en un paso; "programar" sin gate, "autorizar+registrar" gateado a Dirección + filtro de horizonte en Programación, migración `20260629182508`)
 
 ## Problema
 
@@ -233,6 +233,23 @@ Revisión contra prod (2026-06-28): los dos entregables que faltaban resultaron
 
 ## Decisiones registradas
 
+### 2026-06-29 — Contabilidad programa, Dirección autoriza+registra (separación de deberes)
+
+Reunión Michelle + Administración. El control de pagos se reparte así:
+**Contabilidad** programa los pagos (y los carga al banco), **Dirección** los
+autoriza y registra en BSOP. Implicaciones de diseño:
+
+- "Programar" deja de ser un acto de Dirección → cualquier usuario con acceso al
+  módulo puede programar (queda en `programado`, sin autorizar).
+- La autorización y el registro del pago se fusionan en **un solo paso** para
+  Dirección (`cxp_pago_autorizar_y_pagar`): por decisión de Michelle, ella
+  autoriza y registra de un jalón; se sellan ambos timestamps de auditoría
+  (`aprobado_*` y `pagado_*`). El estado `aprobado` intermedio queda como legacy
+  (pagos viejos) pero el flujo nuevo no lo expone como paso separado.
+- `marcar_pagado` se blinda con gate Dirección (antes libre) por si se invoca por
+  otra vía. Política uniforme para todas las empresas (gate por rol Dirección por
+  empresa, no por código empresa-específico).
+
 ### 2026-06-29 — El enlace factura→proveedor se resuelve por RFC scoped a empresa (+ trigger DB)
 
 El match emisor→proveedor **siempre** debe filtrar por `empresa_id`: un mismo RFC
@@ -334,6 +351,34 @@ patrón canónico de **ADR-037** (subledger gemelo):
   reusan CxC y CxP (convención `shared-modules-refactor`, ADR-011).
 
 ## Bitácora
+
+- **2026-06-29 — Nuevo reparto de responsabilidades de pago (reunión Michelle + Admin).**
+  Se separa "programar" de "autorizar": **Contabilidad** carga facturas, clasifica
+  partida/cuenta y **programa** los pagos (y los carga al banco ellos mismos);
+  **Dirección (Michelle)** **autoriza y registra** el pago en BSOP. Antes
+  "programar = autoriza" (gate Dirección en Facturas) y "marcar pagado" era libre
+  — se invirtió.
+  - **Facturas tab:** "Programar pago" deja de exigir rol Dirección (lo gatea el
+    acceso al módulo) y ya **no auto-aprueba** — el pago queda en `programado`.
+  - **Programación tab:** una sola acción **"Autorizar y registrar pago"** para
+    pagos `programado`/`aprobado` (RPC nueva `cxp_pago_autorizar_y_pagar`: aprueba
+    si venía programado + marca pagado, atómico, gate Dirección). Se retiró el
+    botón "Aprobar" separado.
+  - **Gate:** `cxp_pago_marcar_pagado` ahora exige Dirección (antes libre);
+    `cxp_pago_aprobar` se mantiene. Aplica a **todas las empresas** (gate por rol
+    Dirección por empresa).
+  - **Filtro de horizonte** en Programación: default **"Hoy + vencidos"**; presets
+    próxima semana / próximos 15 días / próximo mes / todos (acumulativos; los
+    pagos sin fecha programada siempre visibles). Helper puro
+    `filtrarPagosPorHorizonte` + tests.
+  - **Programar exige cuenta contable:** el botón "Programar pago" (pestaña
+    Facturas) solo se habilita si la factura tiene proveedor enlazado **y** cuenta
+    contable clasificada — no se programa un egreso sin clasificar.
+  - **Autorizar y registrar exige fecha + comprobante:** el botón se deshabilita
+    hasta que haya fecha de pago y comprobante cargado; reforzado server-side en
+    `cxp_pago_autorizar_y_pagar` (RAISE si falta fecha o no existe adjunto
+    `rol='comprobante'`) — no se registra un egreso sin fecha ni evidencia.
+  - Migración `20260629182508`. Aplica a prod al mergear con label `finanzas-ok`.
 
 - **2026-06-29 — Fix: facturas sin botón "Programar pago" (proveedor sin enlazar).**
   Beto reportó facturas de egreso en DILESA donde no aparecía el botón. Causa raíz:
