@@ -4,10 +4,10 @@
 **Empresas:** DILESA (única que escritura vivienda; las tarifas son del notario que atiende >90% de la escrituración, pero se aplican a todas las ventas sin discriminar por notario)
 **Schemas afectados:** `dilesa` (tablas nuevas `gastos_notariales_config` + `gastos_notariales_tabulador`, RLS empresa-scoped set-membership; Sprint 3 agrega columna `tiene_propiedad` a `dilesa.ventas` para elegir la columna del tabulador). `core` (Sprint 2: módulo RBAC nuevo para la pantalla de configuración, ADR-014). Helper `lib/dilesa/gastos-notariales/` (cálculo puro + carga de config). **Línea roja:** NO toca el motor de cuadratura (`lib/dilesa/cuadratura.ts`) ni `fn_calcular_precio_venta` — solo precarga el campo `dilesa.ventas.gastos_escrituracion` que ya existe, igual que hoy lo hace el análisis IA del PDF.
 **Estado:** in_progress
-**Próximo hito:** Sprint 2 — UI de configuración para editar las tarifas cada enero (mientras tanto se editan por SQL). Sprint 1 (datos + cálculo) y Sprint 3 (integración en la fase de dictaminar: panel + precarga + flag de propiedad) ya en prod.
+**Próximo hito:** capturar el **valor catastral** (Beto investiga de dónde sale — predial/CLG) para cerrar el residual de la valuación; conseguir tarifas de fraccionamientos futuros + revisar los 7 casos especiales con Memo; Sprint 2 — UI de configuración de tarifas. Rediseño v2 (cotizador oficial, por categoría) en PR.
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-26 (S1 en prod #1061 + S3 integración en la fase de dictaminar)
+**Última actualización:** 2026-06-29 (rediseño v2 según el cotizador oficial del notario)
 
 > Detonante: en la fase 8 (dictaminar) el campo «Gastos de escrituración» es
 > captura 100% manual. Beto creía que se extraía del Anexo B, pero el notario
@@ -133,6 +133,18 @@ apertura II). Input nuevo: `tiene_propiedad` (Sprint 3).
   integrado en la pantalla de dictaminar (precarga suave del campo + snapshot del
   desglose al cerrar, en ambos formularios). Se hizo S3 antes que S2 porque da el
   valor visible; S2 (editar tarifas) es mantenimiento anual.
+- **2026-06-29** — Rediseño v2 según el **cotizador oficial del notario** (Excel).
+  El modelo v1 estaba incompleto: las tarifas dependen del **tipo de vivienda**
+  (interés social = LDE / residencial medio = LDS, que cubre Lomas del Sol y del
+  Valle), los topes superiores son **$35,422** (no 13,373/24,073), la valuación
+  catastral es **valor catastral × % (0.2 / 0.18)** y hay conceptos nuevos (SIMAS,
+  avalúo, forma ISAI municipal); CNPR es fijo. Migración v2 aplicada a prod:
+  `dilesa.proyectos.categoria_notarial`, `dilesa.ventas.valor_catastral`, config
+  por categoría + tabulador con topes reales. Motor + panel + tests reescritos;
+  validado al peso contra los 2 ejemplos del cotizador (LDE $922k→$44,333; LDS
+  $3.5M→$188,869). Validación del mes (junio): 9/19 comparables cuadran (residual
+  = la valuación catastral aún sin capturar). Pendiente: capturar el valor
+  catastral, tarifas de fraccionamientos futuros, 7 casos especiales con Memo.
 
 ## Decisiones registradas
 
@@ -145,3 +157,8 @@ apertura II). Input nuevo: `tiene_propiedad` (Sprint 3).
 - **2026-06-26** — Apertura de crédito usa la columna «DILESA» del tabulador (no
   CONSTRU) y NO depende de la propiedad previa (eso solo aplica a compraventa).
   Confirmado por Beto.
+- **2026-06-29** — Tarifas por **tipo de vivienda** (no por fraccionamiento ni set
+  único): interés social y residencial medio. Cada proyecto se clasifica en
+  `categoria_notarial`. El tabulador de compraventa/apertura (Registro Público) es
+  el mismo para ambas; difieren las cuotas de Municipio y Otros. CNPR es cuota
+  fija (no por derechohabiente). Fuente: cotizador oficial del notario 2026.

@@ -30,6 +30,9 @@ export type GastosNotarialesPanelProps = {
   gastosCapturado: number | null;
   tienePropiedad: boolean;
   onTienePropiedadChange: (v: boolean) => void;
+  /** Valor catastral (string del input) + setter — alimenta la valuación catastral. */
+  valorCatastral: string;
+  onValorCatastralChange: (v: string) => void;
   /** Setea el campo de gastos = total calculado. */
   onUsarCalculo: () => void;
   /** Solo Dirección edita el check y aplica el cálculo. */
@@ -41,6 +44,8 @@ export function GastosNotarialesPanel({
   gastosCapturado,
   tienePropiedad,
   onTienePropiedadChange,
+  valorCatastral,
+  onValorCatastralChange,
   onUsarCalculo,
   editable,
 }: GastosNotarialesPanelProps) {
@@ -62,6 +67,25 @@ export function GastosNotarialesPanel({
         ¿Algún derechohabiente ya tiene propiedad a su nombre?
         <span className="text-[var(--text)]/45">(cambia la tarifa de compraventa)</span>
       </label>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className="text-[var(--text)]/80">Valor catastral:</label>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={valorCatastral}
+          onChange={(e) => onValorCatastralChange(e.target.value)}
+          disabled={!editable}
+          placeholder="del predial / CLG"
+          className="w-44 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm"
+        />
+        {desglose.faltaValorCatastral ? (
+          <span className="text-[12px] text-amber-600">
+            falta — la valuación catastral queda en $0
+          </span>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {desglose.bloques.map((b) => (
