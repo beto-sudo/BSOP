@@ -10,13 +10,14 @@
  */
 import { type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, Sheet } from 'lucide-react';
 import type { ReporteDef } from '@/lib/dilesa/reportes/tipos';
 
 export function ReporteShell({
   reporte,
   volverHref,
   pdfHref,
+  csvHref,
   filtros,
   children,
 }: {
@@ -25,6 +26,8 @@ export function ReporteShell({
   volverHref: string;
   /** Link de exportación a PDF (con los filtros actuales). Omitir = sin botón. */
   pdfHref?: string;
+  /** Link de exportación a CSV (con los filtros actuales). Omitir = sin botón. */
+  csvHref?: string;
   /** Barra de filtros (selects, date-range…). */
   filtros?: ReactNode;
   children: ReactNode;
@@ -52,17 +55,28 @@ export function ReporteShell({
             <p className="max-w-2xl text-sm text-[var(--text)]/60">{reporte.descripcion}</p>
           </div>
         </div>
-        {pdfHref ? (
-          <a
-            href={pdfHref}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
-          >
-            <Download className="h-4 w-4" />
-            Exportar PDF
-          </a>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {csvHref ? (
+            <a
+              href={csvHref}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
+            >
+              <Sheet className="h-4 w-4" />
+              Exportar CSV
+            </a>
+          ) : null}
+          {pdfHref ? (
+            <a
+              href={pdfHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm font-medium text-[var(--text)]/80 hover:bg-[var(--bg)]/40"
+            >
+              <Download className="h-4 w-4" />
+              Exportar PDF
+            </a>
+          ) : null}
+        </div>
       </header>
 
       {filtros ? <div className="flex flex-wrap items-center gap-3">{filtros}</div> : null}
