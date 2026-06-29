@@ -3,11 +3,11 @@
 **Slug:** `dilesa-descuento-perdonado-motor`
 **Empresas:** DILESA
 **Schemas afectados:** `lib/dilesa/cuadratura.ts` (en el modelo desglosado ADR-045, `descuentoAplicado` pasa a usar la promoción REALMENTE consumida `aportacionPromocion` + sobreprecio capturado, en vez del TOPE del bono `promocionGastos`). Sin migración ni cambio de schema de DB. Consumidores indirectos: `app/api/dilesa/ventas/[id]/revision-pld/route.ts` (calcula `descuentoPerdonado = descuentoAplicado − chequePagado`) y la revisión PLD de la Fase 13.
-**Estado:** in_progress
-**Próximo hito:** Revisar con Michelle los 4 outliers de sobreprecio que el fix no resuelve (M11-L7, M3-L16, M8-L10, M11-L14) — definir si ese residual es perdón legítimo antes de tocar la lógica de sobreprecio.
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-06-29
-**Última actualización:** 2026-06-29 (Sprint 1 mergeado [#1132] — fix en prod; pendiente: outliers de sobreprecio con Michelle)
+**Última actualización:** 2026-06-29 (CERRADA — Sprint 1 mergeado [#1132] en prod. Los 4 outliers de sobreprecio se revisarán caso por caso conforme salgan, no como frente abierto — decisión de Beto.)
 
 > Detonante: revisando la venta de **ARACELY MARTINEZ VASQUEZ** (M10-L32-LDLE) en la
 > revisión PLD de la Fase 13, Beto vio el warning _"Σ liquidaciones = valor pactado −
@@ -88,7 +88,11 @@ sobreprecioGastos`) + tests (M3-L9 real + Aracely M10-L32 sintético) + script. 
   CI verdes localmente.
 - 2026-06-29 — **[#1132] MERGEADO** (commit `18ef559`). Sin migración → no hubo
   `db-push-on-merge`; el fix entra a prod con el deploy de Vercel. Aracely M10-L32 deja de
-  marcar el warning (perdón 0). Queda abierto el frente de los 4 outliers de sobreprecio.
+  marcar el warning (perdón 0).
+- 2026-06-29 — **CERRADA.** Beto decide revisar los 4 outliers de sobreprecio (M11-L7,
+  M3-L16, M8-L10, M11-L14) caso por caso conforme aparezcan, no como frente abierto. El bug
+  del bono (el detonante) queda resuelto en prod. Sin Reminders pendientes que matcheen la
+  iniciativa.
 
 ## Decisiones registradas
 
