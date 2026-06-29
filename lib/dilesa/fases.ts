@@ -113,6 +113,42 @@ export function accionFase(posicion: number): string {
 }
 
 /**
+ * Quién controla principalmente el tiempo de cada fase (iniciativa
+ * dilesa-fluidez-pipeline, R1). Las de `tercero` (avalúo, Infonavit, notaría) no
+ * deben cargarse al equipo cuando lleguen al score por venta (S2b); en el radar
+ * por fase (S2a) son solo una etiqueta informativa. `mixta` = depende de ambos.
+ *
+ * PROPUESTA INICIAL — confirmar con Beto. Es metadata estática y barata de
+ * ajustar (solo este mapa).
+ */
+export type FaseResponsable = 'interna' | 'tercero' | 'mixta';
+
+const RESPONSABLE_BY_POS: ReadonlyMap<number, FaseResponsable> = new Map([
+  [1, 'interna'], // Asignación Solicitada
+  [2, 'interna'], // Asignada
+  [3, 'interna'], // Formalizada (promesa)
+  [4, 'interna'], // Avalúo Solicitado (lo pedimos nosotros)
+  [5, 'tercero'], // Avalúo Cerrado (perito externo)
+  [6, 'tercero'], // Inscrita (Infonavit inscribe el crédito)
+  [7, 'interna'], // Dictamen Solicitado
+  [8, 'tercero'], // Dictaminada (Infonavit)
+  [9, 'tercero'], // Validación Patronal (patrón / Infonavit)
+  [10, 'interna'], // Firmas Programadas
+  [11, 'tercero'], // Escriturada (notaría)
+  [12, 'tercero'], // Detonada (Infonavit deposita)
+  [13, 'interna'], // Facturada
+  [14, 'interna'], // Preparada para Entrega
+  [15, 'interna'], // Entregada
+  [16, 'mixta'], // Conformidad del Cliente
+  [17, 'interna'], // Operación Terminada
+]);
+
+/** Responsable principal del tiempo de una fase (interna/tercero/mixta). */
+export function responsableFase(posicion: number): FaseResponsable {
+  return RESPONSABLE_BY_POS.get(posicion) ?? 'interna';
+}
+
+/**
  * "Lo que sigue" para una venta cuya última fase COMPLETADA es `fasePosicion`:
  * la acción (infinitivo) de la fase siguiente. `null` si ya está en la 17
  * (no hay siguiente) o si no hay posición.

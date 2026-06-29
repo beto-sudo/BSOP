@@ -6307,6 +6307,17 @@ export type Database = {
         }
         Relationships: []
       }
+      v_fase_benchmark: {
+        Row: {
+          empresa_id: string | null
+          fase: string | null
+          mediana: number | null
+          n: number | null
+          p90: number | null
+          posicion: number | null
+        }
+        Relationships: []
+      }
       v_inventario_prototipo: {
         Row: {
           empresa_id: string | null
@@ -6565,6 +6576,87 @@ export type Database = {
           },
         ]
       }
+      v_venta_fase_duraciones: {
+        Row: {
+          dias_en_fase: number | null
+          empresa_id: string | null
+          es_negativo: boolean | null
+          es_tramo_abierto: boolean | null
+          estado: string | null
+          fase: string | null
+          fecha_entrada: string | null
+          fecha_salida: string | null
+          posicion: number | null
+          proyecto_id: string | null
+          tipo_credito: string | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_encuestas_respondidas"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_proyecto_avances"
+            referencedColumns: ["proyecto_id"]
+          },
+          {
+            foreignKeyName: "unidades_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "venta_fases_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_ventas_lista_antiguedad: {
         Row: {
           dias_en_fase: number | null
@@ -6743,6 +6835,16 @@ export type Database = {
           unidad_id: string
           vendedor_usuario_id: string
           venta_id: string
+        }[]
+      }
+      fn_fase_calificacion: {
+        Args: { p_desde?: string; p_empresa: string; p_hasta?: string }
+        Returns: {
+          fase: string
+          mediana: number
+          n: number
+          p90: number
+          posicion: number
         }[]
       }
       fn_generar_estimacion_borrador: {

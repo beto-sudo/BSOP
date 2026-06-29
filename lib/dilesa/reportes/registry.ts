@@ -16,6 +16,7 @@ import {
   CalendarRange,
   Clock,
   CreditCard,
+  Gauge,
   GitBranch,
   Layers,
   Trophy,
@@ -138,6 +139,17 @@ export const REPORTES: readonly ReporteDef[] = [
     icon: Clock,
     tipo: 'modulo',
     pdf: true,
+  },
+  {
+    id: 'calificacion-por-fase',
+    nombre: 'Calificación por fase',
+    descripcion:
+      'Qué tan rápido avanza cada fase del pipeline: mediana y p90 de días, contra su histórico, con banda y tendencia. Dónde se atora el proceso, filtrable por periodo.',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/calificacion-por-fase',
+    icon: Gauge,
+    tipo: 'modulo',
+    pdf: false,
   },
 ];
 
