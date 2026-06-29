@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `lib/dilesa/cuadratura.ts` (en el modelo desglosado ADR-045, `descuentoAplicado` pasa a usar la promoción REALMENTE consumida `aportacionPromocion` + sobreprecio capturado, en vez del TOPE del bono `promocionGastos`). Sin migración ni cambio de schema de DB. Consumidores indirectos: `app/api/dilesa/ventas/[id]/revision-pld/route.ts` (calcula `descuentoPerdonado = descuentoAplicado − chequePagado`) y la revisión PLD de la Fase 13.
 **Estado:** in_progress
-**Próximo hito:** Implementar Opción A en `cuadratura.ts` + test que blinda la regla; abrir PR (financiero → OK de Beto antes de mergear). Después: revisar con Michelle los 4 outliers de sobreprecio que el fix no resuelve.
+**Próximo hito:** Beto revisa y mergea [#1132](https://github.com/beto-sudo/BSOP/pull/1132) (financiero, sin auto-merge). Después: revisar con Michelle los 4 outliers de sobreprecio que el fix no resuelve.
 **Dueño:** Beto
 **Creada:** 2026-06-29
-**Última actualización:** 2026-06-29 (promoción + análisis de impacto con el motor real)
+**Última actualización:** 2026-06-29 (Sprint 1 en PR [#1132]: fix del motor + tests + script de análisis; 6 checks CI verdes localmente)
 
 > Detonante: revisando la venta de **ARACELY MARTINEZ VASQUEZ** (M10-L32-LDLE) en la
 > revisión PLD de la Fase 13, Beto vio el warning _"Σ liquidaciones = valor pactado −
@@ -81,7 +81,11 @@ revisa por separado.
 ## Bitácora
 
 - 2026-06-29 — Promoción + diagnóstico + análisis de impacto con el motor real. Script
-  `scripts/analyze_dilesa_descuento_perdonado.ts`. (PR pendiente.)
+  `scripts/analyze_dilesa_descuento_perdonado.ts`.
+- 2026-06-29 — Sprint 1 en PR [#1132](https://github.com/beto-sudo/BSOP/pull/1132): fix
+  Opción A en `cuadratura.ts` (reorden + `descuentoAplicado = aportacionPromocion +
+sobreprecioGastos`) + tests (M3-L9 real + Aracely M10-L32 sintético) + script. 6 checks
+  CI verdes localmente. Sin auto-merge (financiero) — espera revisión y merge de Beto.
 
 ## Decisiones registradas
 
