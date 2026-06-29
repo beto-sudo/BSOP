@@ -1211,8 +1211,9 @@ function FacturaDrawer({
   // Programar pago — lo hace Contabilidad (cualquiera con acceso al módulo; el
   // gate de pantalla ya lo da <RequireAccess>). Programar solo deja el pago en
   // 'programado'; quien AUTORIZA y registra el pago es Dirección, en la pestaña
-  // Programación (decisión 2026-06-29). Aparece si la factura tiene monto por
-  // programar y hay proveedor enlazado.
+  // Programación (decisión 2026-06-29). La sección aparece si la factura tiene
+  // monto por programar; dentro, el botón exige proveedor enlazado Y cuenta
+  // contable clasificada (no se programa sin clasificar el egreso).
   const puedeProgramar =
     factura != null &&
     (factura.estado_cxp === 'por_pagar' || factura.estado_cxp === 'parcial') &&
@@ -1350,7 +1351,15 @@ function FacturaDrawer({
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Programar pago
                   </div>
-                  {factura.proveedor_id ? (
+                  {!factura.proveedor_id ? (
+                    <p className="text-muted-foreground">
+                      Enlaza un proveedor a la factura antes de programar el pago.
+                    </p>
+                  ) : !factura.cuenta_contable_id ? (
+                    <p className="text-muted-foreground">
+                      Clasifica la cuenta contable de la factura antes de programar el pago.
+                    </p>
+                  ) : (
                     <>
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-muted-foreground">
@@ -1368,10 +1377,6 @@ function FacturaDrawer({
                         en la pestaña Programación.
                       </p>
                     </>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      Enlaza un proveedor a la factura antes de programar el pago.
-                    </p>
                   )}
                 </section>
               </>

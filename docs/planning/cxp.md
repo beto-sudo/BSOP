@@ -371,6 +371,9 @@ patrón canónico de **ADR-037** (subledger gemelo):
     próxima semana / próximos 15 días / próximo mes / todos (acumulativos; los
     pagos sin fecha programada siempre visibles). Helper puro
     `filtrarPagosPorHorizonte` + tests.
+  - **Programar exige cuenta contable:** el botón "Programar pago" (pestaña
+    Facturas) solo se habilita si la factura tiene proveedor enlazado **y** cuenta
+    contable clasificada — no se programa un egreso sin clasificar.
   - Migración `20260629182508`. Aplica a prod al mergear con label `finanzas-ok`.
 
 - **2026-06-29 — Fix: facturas sin botón "Programar pago" (proveedor sin enlazar).**
