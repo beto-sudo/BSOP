@@ -70,6 +70,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // captura de fase (`/[id]/capturar/*`).
   '/dilesa/ventas/[id]': 'dilesa.ventas.operacion',
   '/dilesa/ventas/[id]/pipeline': 'dilesa.ventas.pipeline',
+  '/dilesa/ventas/[id]/fluidez': 'dilesa.ventas.pipeline',
   '/dilesa/ventas/[id]/cuadratura': 'dilesa.ventas.cuadratura',
   '/dilesa/ventas/[id]/estado-cuenta': 'dilesa.ventas.estado_cuenta',
   '/dilesa/ventas/[id]/documentos': 'dilesa.ventas.documentos',

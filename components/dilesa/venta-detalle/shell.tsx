@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { VENTA_ESTADO_CONFIG } from '@/lib/status-tokens';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { useVentaDetalle } from './provider';
 import { BackLink, HoldBanner } from './ui';
 import { VentaExpedienteTabs } from './tabs';
@@ -48,8 +49,7 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
     const sb = createSupabaseBrowserClient();
     void sb
       .schema('dilesa')
-      .from('v_fase_vara')
-      .select('vara, p90')
+      .rpc('fn_fase_vara', { p_empresa: DILESA_EMPRESA_ID })
       .eq('posicion', fasePos)
       .then(({ data }) => {
         if (!activo) return;

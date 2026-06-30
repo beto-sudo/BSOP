@@ -222,22 +222,52 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     }
     const ventasArr = (rawVentas ?? []) as VentaRow[];
 
-    // Unidades + productos (prototipo) + proyectos: `.eq(empresa_id)` en
-    // lugar de `.in(ids[])` para evitar URLs > 8KB (Cloudflare rechaza con
-    // HTTP 400 "Bad Request").
-    const { data: uns, error: uErr } = await sb
-      .schema('dilesa')
-      .from('unidades')
-      .select('id, identificador, proyecto_id, producto_id')
-      .eq('empresa_id', empresaId);
-    if (uErr) {
-      return { error: getSupabaseErrorMessage(uErr, 'No se pudieron cargar las unidades.') };
+    // Catálogos satélite: son independientes entre sí, así que van en PARALELO
+    // (antes eran 6 round-trips secuenciales → la lista tardaba varios segundos;
+    // ahora 1). `.eq(empresa_id)` en vez de `.in(ids[])` para evitar URLs > 8KB
+    // (Cloudflare rechaza con HTTP 400). Los vendedores (core.usuarios) se
+    // resuelven por FK desde las ventas ya cargadas; `.in('id', [])` con lista
+    // vacía regresa cero filas sin error.
+    const vendedorIds = [
+      ...new Set(ventasArr.map((v) => v.vendedor_usuario_id).filter((x): x is string => !!x)),
+    ];
+    const [unsRes, prjsRes, prodsRes, personasRes, antiguedadRes, usuariosRes] = await Promise.all([
+      sb
+        .schema('dilesa')
+        .from('unidades')
+        .select('id, identificador, proyecto_id, producto_id')
+        .eq('empresa_id', empresaId),
+      sb.schema('dilesa').from('proyectos').select('id, nombre').eq('empresa_id', empresaId),
+      sb
+        .schema('dilesa')
+        .from('productos')
+        .select('id, nombre')
+        .eq('empresa_id', empresaId)
+        .is('deleted_at', null),
+      sb
+        .schema('erp')
+        .from('personas')
+        .select('id, nombre, apellido_paterno, apellido_materno')
+        .eq('empresa_id', empresaId)
+        .eq('tipo', 'cliente'),
+      sb.schema('dilesa').rpc('fn_ventas_lista_antiguedad', { p_empresa: empresaId }),
+      sb
+        .schema('core')
+        .from('usuarios')
+        .select('id, first_name, last_name, email')
+        .in('id', vendedorIds),
+    ]);
+
+    const firstErr = unsRes.error ?? prjsRes.error ?? prodsRes.error ?? personasRes.error;
+    if (firstErr) {
+      return { error: getSupabaseErrorMessage(firstErr, 'No se pudo cargar la lista de ventas.') };
     }
+
     const unidadMap = new Map<
       string,
       { identificador: string; proyecto_id: string | null; producto_id: string | null }
     >();
-    for (const u of uns ?? []) {
+    for (const u of unsRes.data ?? []) {
       unidadMap.set(u.id as string, {
         identificador: u.identificador as string,
         proyecto_id: (u.proyecto_id as string | null) ?? null,
@@ -245,77 +275,31 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       });
     }
 
-    const { data: prjs, error: prjErr } = await sb
-      .schema('dilesa')
-      .from('proyectos')
-      .select('id, nombre')
-      .eq('empresa_id', empresaId);
-    if (prjErr) {
-      return { error: getSupabaseErrorMessage(prjErr, 'No se pudieron cargar los proyectos.') };
-    }
     const proyectoMap = new Map<string, string>();
-    for (const p of prjs ?? []) proyectoMap.set(p.id as string, p.nombre as string);
+    for (const p of prjsRes.data ?? []) proyectoMap.set(p.id as string, p.nombre as string);
 
-    const { data: prods, error: prodErr } = await sb
-      .schema('dilesa')
-      .from('productos')
-      .select('id, nombre')
-      .eq('empresa_id', empresaId)
-      .is('deleted_at', null);
-    if (prodErr) {
-      return { error: getSupabaseErrorMessage(prodErr, 'No se pudieron cargar los prototipos.') };
-    }
     const productoMap = new Map<string, string>();
-    for (const p of prods ?? []) productoMap.set(p.id as string, p.nombre as string);
+    for (const p of prodsRes.data ?? []) productoMap.set(p.id as string, p.nombre as string);
 
-    // Personas cross-schema — mismo patrón `.eq(empresa_id) + tipo='cliente'`.
-    const { data: personas, error: pErr } = await sb
-      .schema('erp')
-      .from('personas')
-      .select('id, nombre, apellido_paterno, apellido_materno')
-      .eq('empresa_id', empresaId)
-      .eq('tipo', 'cliente');
-    if (pErr) {
-      return { error: getSupabaseErrorMessage(pErr, 'No se pudieron cargar los compradores.') };
-    }
     const personaMap = new Map<string, string>();
-    for (const p of personas ?? []) {
+    for (const p of personasRes.data ?? []) {
       const nombre = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean).join(' ');
       personaMap.set(p.id as string, nombre || '(sin nombre)');
     }
 
-    // Vendedores cross-schema — resolución desde `core.usuarios` por FK.
-    // Las ventas creadas en BSOP llevan `vendedor_usuario_id` (FK) pero
-    // tienen el campo legacy `vendedor` (text) vacío. Las migradas de
-    // Coda al revés. Resolvemos prioritizando la FK y caemos al text legacy.
-    const vendedorIds = [
-      ...new Set(ventasArr.map((v) => v.vendedor_usuario_id).filter((x): x is string => !!x)),
-    ];
+    // Vendedor: FK a core.usuarios (ventas nuevas), fallback al texto legacy
+    // (ventas migradas de Coda).
     const usuarioMap = new Map<string, string>();
-    if (vendedorIds.length > 0) {
-      const { data: usuarios } = await sb
-        .schema('core')
-        .from('usuarios')
-        .select('id, first_name, last_name, email')
-        .in('id', vendedorIds);
-      for (const u of usuarios ?? []) {
-        const nombreCompleto = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
-        const fallback = (u.email as string | null) ?? '';
-        usuarioMap.set(u.id as string, nombreCompleto || fallback);
-      }
+    for (const u of usuariosRes.data ?? []) {
+      const nombreCompleto = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+      const fallback = (u.email as string | null) ?? '';
+      usuarioMap.set(u.id as string, nombreCompleto || fallback);
     }
 
-    // Días en fase actual (iniciativa dilesa-fluidez-pipeline S1): la vista
-    // `v_ventas_lista_antiguedad` lo calcula en la base (CURRENT_DATE - fecha de
-    // entrada a la fase) para no traer las ~14k filas de venta_fases. Solo trae
-    // las activas (pipeline vivo); las demás quedan sin dato (null → "—").
+    // Días en fase actual (S1): la vista `v_ventas_lista_antiguedad` lo calcula
+    // en la base. Solo trae las activas; las demás quedan sin dato (null → "—").
     const diasMap = new Map<string, number>();
-    const { data: antiguedad } = await sb
-      .schema('dilesa')
-      .from('v_ventas_lista_antiguedad')
-      .select('venta_id, dias_en_fase')
-      .eq('empresa_id', empresaId);
-    for (const a of antiguedad ?? []) {
+    for (const a of antiguedadRes.data ?? []) {
       if (a.dias_en_fase != null) diasMap.set(a.venta_id as string, a.dias_en_fase as number);
     }
 
@@ -376,11 +360,11 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   useEffect(() => {
     let activo = true;
     const sb = createSupabaseBrowserClient();
+    // RPC SECURITY DEFINER (no la vista directa): evita la RLS-por-fila sobre
+    // ~15k filas de venta_fases que hacía la lectura tardar segundos.
     void sb
       .schema('dilesa')
-      .from('v_fase_vara')
-      .select('posicion, vara, p90')
-      .eq('empresa_id', empresaId)
+      .rpc('fn_fase_vara', { p_empresa: empresaId })
       .then(({ data }) => {
         if (!activo) return;
         const m = new Map<number, FaseBenchmarkRef>();

@@ -78,40 +78,34 @@ export function CalificacionPorFaseView() {
     setLoading(true);
     setError(null);
     const sb = createSupabaseBrowserClient();
-
-    const benchRes = await sb
-      .schema('dilesa')
-      .from('v_fase_vara')
-      .select('posicion, fase, mediana, p90, n, meta, vara')
-      .eq('empresa_id', DILESA_EMPRESA_ID);
-    if (benchRes.error) {
-      setError(getSupabaseErrorMessage(benchRes.error, 'No se pudo cargar el benchmark.'));
-      setLoading(false);
-      return;
-    }
+    // El benchmark (vara) es independiente del corte del periodo → va en paralelo
+    // con el RPC / la antigüedad, no en serie. Vía RPC SECURITY DEFINER (no la
+    // vista) para evitar la RLS-por-fila que hacía esto tardar segundos.
+    const benchQuery = sb.schema('dilesa').rpc('fn_fase_vara', { p_empresa: DILESA_EMPRESA_ID });
 
     if (periodo === 'activas') {
       // Permanencia ACTUAL del pipeline vivo (no tramos cerrados): se agrega en
       // el cliente desde la antigüedad de cada venta activa.
-      const antRes = await sb
-        .schema('dilesa')
-        .from('v_ventas_lista_antiguedad')
-        .select('fase_posicion, fase_actual, dias_en_fase')
-        .eq('empresa_id', DILESA_EMPRESA_ID);
-      if (antRes.error) {
-        setError(getSupabaseErrorMessage(antRes.error, 'No se pudo cargar el pipeline activo.'));
+      const [benchRes, antRes] = await Promise.all([
+        benchQuery,
+        sb.schema('dilesa').rpc('fn_ventas_lista_antiguedad', { p_empresa: DILESA_EMPRESA_ID }),
+      ]);
+      if (benchRes.error || antRes.error) {
+        setError(
+          getSupabaseErrorMessage(
+            benchRes.error ?? antRes.error,
+            'No se pudo cargar el pipeline activo.'
+          )
+        );
         setLoading(false);
         return;
       }
       const rows = (antRes.data ?? [])
-        .filter(
-          (r): r is { fase_posicion: number; fase_actual: string; dias_en_fase: number } =>
-            r.fase_posicion != null && r.fase_posicion <= 14 && r.dias_en_fase != null
-        )
+        .filter((r) => r.fase_posicion != null && r.fase_posicion <= 14 && r.dias_en_fase != null)
         .map((r) => ({
-          posicion: r.fase_posicion,
+          posicion: r.fase_posicion as number,
           fase: r.fase_actual ?? '',
-          dias: r.dias_en_fase,
+          dias: r.dias_en_fase as number,
         }));
       setBenchmark((benchRes.data ?? []) as FaseBenchmark[]);
       setPeriodoRaw(agregarPorFase(rows));
@@ -141,12 +135,18 @@ export function CalificacionPorFaseView() {
       };
     }
 
-    const [curRes, prevRes] = await Promise.all([
+    const [benchRes, curRes, prevRes] = await Promise.all([
+      benchQuery,
       sb.schema('dilesa').rpc('fn_fase_calificacion', curArgs),
       prevArgs ? sb.schema('dilesa').rpc('fn_fase_calificacion', prevArgs) : Promise.resolve(null),
     ]);
-    if (curRes.error) {
-      setError(getSupabaseErrorMessage(curRes.error, 'No se pudo calcular la calificación.'));
+    if (benchRes.error || curRes.error) {
+      setError(
+        getSupabaseErrorMessage(
+          benchRes.error ?? curRes.error,
+          'No se pudo calcular la calificación.'
+        )
+      );
       setLoading(false);
       return;
     }

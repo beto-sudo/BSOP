@@ -6920,6 +6920,18 @@ export type Database = {
           posicion: number
         }[]
       }
+      fn_fase_vara: {
+        Args: { p_empresa: string }
+        Returns: {
+          fase: string
+          mediana: number
+          meta: number
+          n: number
+          p90: number
+          posicion: number
+          vara: number
+        }[]
+      }
       fn_generar_estimacion_borrador: {
         Args: {
           p_contratista_id: string
@@ -6987,6 +6999,15 @@ export type Database = {
           p_venta_id: string
         }
         Returns: undefined
+      }
+      fn_ventas_lista_antiguedad: {
+        Args: { p_empresa: string }
+        Returns: {
+          dias_en_fase: number
+          fase_actual: string
+          fase_posicion: number
+          venta_id: string
+        }[]
       }
       obra_estimacion_autorizar: {
         Args: { p_estimacion_id: string; p_override_motivo?: string }
