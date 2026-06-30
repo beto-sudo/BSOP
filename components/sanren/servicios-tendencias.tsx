@@ -2,7 +2,11 @@
 
 import { useMemo } from 'react';
 import type { ReciboVista } from '@/lib/sanren-servicios';
-import { computePronostico } from '@/lib/sanren/servicios-analytics';
+import {
+  computePronostico,
+  computePronosticoGasto,
+  computeBancoProyectado,
+} from '@/lib/sanren/servicios-analytics';
 
 /**
  * Gráficas de tendencia del módulo SANREN → Servicios (iniciativa
@@ -78,7 +82,7 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
       const total = tipos.reduce((a, t) => a + (row[t] ?? 0), 0);
       return { mes, row, total };
     });
-    const forecast = computePronostico(recibos, (r) => r.monto);
+    const forecast = computePronosticoGasto(recibos);
     const max = Math.max(1, ...data.map((d) => d.total), forecast?.valor ?? 0);
     return { data, tipos, max, forecast };
   }, [recibos]);
@@ -115,9 +119,10 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
       });
     }
 
+    const bancoProy = computeBancoProyectado(recibos);
     const max = Math.max(1, ...items.map((d) => Math.max(d.consumo, d.produccion)));
-    const bancoMax = Math.max(1, ...luz.map((d) => d.banco ?? 0));
-    return { items, max, bancoMax, hayBanco: luz.some((d) => d.banco != null) };
+    const bancoMax = Math.max(1, ...luz.map((d) => d.banco ?? 0), bancoProy?.banco ?? 0);
+    return { items, max, bancoMax, hayBanco: luz.some((d) => d.banco != null), bancoProy };
   }, [recibos]);
 
   // ── Ahorro: gasto de luz por año ────────────────────────────────────────────
@@ -158,6 +163,7 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--text)]/60" />
               esperado ({mesCorto(gasto.forecast.periodo)})
+              {gasto.forecast.cubiertoPorBanco ? ' · cubierto por banco' : ''}
             </span>
           ) : null}
         </div>
@@ -193,7 +199,12 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
                       strokeOpacity={0.55}
                       strokeDasharray="3 2"
                     >
-                      <title>{`${d.mes} (esperado): ${money(d.total)}`}</title>
+                      <title>
+                        {`${d.mes} (esperado): ${money(d.total)}` +
+                          (gasto.forecast?.cubiertoPorBanco
+                            ? ' — consumo neto cubierto por el banco de energía (solo cargo fijo)'
+                            : '')}
+                      </title>
                     </rect>
                     <text
                       x={x + bw / 2}
@@ -364,6 +375,52 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
                       </circle>
                     );
                   })}
+                  {/* Proyección del banco al próximo periodo (segmento punteado):
+                      el consumo neto esperado se descuenta del saldo. */}
+                  {solar.bancoProy
+                    ? (() => {
+                        const slot = W / Math.max(solar.items.length, 1);
+                        const off = Math.max(4, Math.min(18, slot / 2 - 3)) + 2;
+                        const reales = solar.items
+                          .map((d, i) => (d.banco != null ? i : -1))
+                          .filter((i) => i >= 0);
+                        const lastIdx = reales[reales.length - 1];
+                        if (lastIdx == null) return null;
+                        const x1 = lastIdx * slot + 3 + off;
+                        const y1 = H - ((solar.items[lastIdx].banco ?? 0) / solar.bancoMax) * H;
+                        const x2 = (solar.items.length - 1) * slot + 3 + off;
+                        const y2 = H - (solar.bancoProy.banco / solar.bancoMax) * H;
+                        return (
+                          <>
+                            <line
+                              x1={x1}
+                              y1={y1}
+                              x2={x2}
+                              y2={y2}
+                              stroke={BANCO_COLOR}
+                              strokeWidth={2}
+                              strokeDasharray="4 3"
+                              opacity={0.7}
+                            />
+                            <circle
+                              cx={x2}
+                              cy={y2}
+                              r={3}
+                              fill="var(--card)"
+                              stroke={BANCO_COLOR}
+                              strokeWidth={1.5}
+                            >
+                              <title>
+                                {`${solar.bancoProy.periodo} · banco esperado: ${kwh(solar.bancoProy.banco)} a favor` +
+                                  (solar.bancoProy.netoDelBanco > 0
+                                    ? ` (−${kwh(solar.bancoProy.netoDelBanco)} del banco)`
+                                    : ` (+${kwh(-solar.bancoProy.netoDelBanco)} al banco)`)}
+                              </title>
+                            </circle>
+                          </>
+                        );
+                      })()
+                    : null}
                 </>
               ) : null}
             </svg>

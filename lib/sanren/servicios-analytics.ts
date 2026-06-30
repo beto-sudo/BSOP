@@ -71,13 +71,7 @@ export function computeServicioKpis(recibos: ReciboVista[]): ServicioKpiSet {
     : null;
 
   // Banco de energía: el del recibo de luz más reciente que lo reporte.
-  let bancoEnergia: number | null = null;
-  const conBanco = recibos
-    .filter((r) => r.extraccion?.energia_acumulada_favor != null)
-    .sort((a, b) => b.periodo.localeCompare(a.periodo));
-  if (conBanco.length > 0) {
-    bancoEnergia = conBanco[0].extraccion?.energia_acumulada_favor ?? null;
-  }
+  const bancoEnergia = ultimoBanco(recibos);
 
   return {
     count,
@@ -344,4 +338,77 @@ export function computePronostico(
   }
 
   return { periodo: next, valor: Math.max(0, Math.round(valor)), base };
+}
+
+/** kWh a favor del banco según el recibo (de luz) más reciente que lo reporte. */
+export function ultimoBanco(recibos: ReciboVista[]): number | null {
+  const conBanco = recibos
+    .filter((r) => r.extraccion?.energia_acumulada_favor != null)
+    .sort((a, b) => b.periodo.localeCompare(a.periodo));
+  return conBanco.length ? (conBanco[0].extraccion?.energia_acumulada_favor ?? null) : null;
+}
+
+export interface PronosticoGasto {
+  periodo: string;
+  valor: number;
+  /** El consumo neto del próximo periodo se cubre con el banco → gasto = cargo fijo. */
+  cubiertoPorBanco: boolean;
+}
+
+/**
+ * Pronóstico de **gasto** ($) del próximo periodo, consciente del banco de
+ * energía para cuentas solares (net-metering).
+ *
+ * En una cuenta con paneles, mientras el banco de kWh a favor cubra el consumo
+ * neto del periodo (consumo − generación), el recibo es solo el **cargo fijo**
+ * (≈ el monto reciente), no el gasto estacional histórico de la era pre-banco.
+ * Solo cuando el banco no alcanza se paga energía → ahí caemos al estacional
+ * como proxy (sin tarifa CFE exacta, ver planning). Agua/Gas usan el estacional
+ * normal.
+ */
+export function computePronosticoGasto(recibos: ReciboVista[]): PronosticoGasto | null {
+  const esSolar = recibos.length > 0 && recibos.every((r) => r.tiene_produccion);
+  if (!esSolar) {
+    const p = computePronostico(recibos, (r) => r.monto);
+    return p ? { periodo: p.periodo, valor: p.valor, cubiertoPorBanco: false } : null;
+  }
+
+  const projC = computePronostico(recibos, (r) => r.consumo_periodo);
+  const projP = computePronostico(recibos, (r) => r.produccion_periodo);
+  const projMonto = computePronostico(recibos, (r) => r.monto);
+  const periodo = projC?.periodo ?? projP?.periodo ?? projMonto?.periodo;
+  if (!periodo) return null;
+
+  const banco = ultimoBanco(recibos) ?? 0;
+  const neto = (projC?.valor ?? 0) - (projP?.valor ?? 0); // kWh a comprar de la red
+  const cubierto = neto <= 0 || neto <= banco;
+
+  const montos = serieMensual(recibos, (r) => r.monto);
+  const fijoReciente = montos.length ? avg(montos.slice(-3).map((m) => m.valor)) : 0;
+  const valor = cubierto ? fijoReciente : (projMonto?.valor ?? fijoReciente);
+
+  return { periodo, valor: Math.max(0, Math.round(valor)), cubiertoPorBanco: cubierto };
+}
+
+export interface BancoProyeccion {
+  periodo: string;
+  /** Saldo del banco proyectado tras el próximo periodo. */
+  banco: number;
+  /** kWh tomados del banco (>0 si consumo>generación; <0 si se acumula). */
+  netoDelBanco: number;
+}
+
+/**
+ * Proyecta el saldo del banco de energía tras el próximo periodo:
+ * banco − (consumo esperado − generación esperada). Null si no hay banco.
+ */
+export function computeBancoProyectado(recibos: ReciboVista[]): BancoProyeccion | null {
+  const banco = ultimoBanco(recibos);
+  if (banco == null) return null;
+  const projC = computePronostico(recibos, (r) => r.consumo_periodo);
+  const projP = computePronostico(recibos, (r) => r.produccion_periodo);
+  const periodo = projC?.periodo ?? projP?.periodo;
+  if (!periodo) return null;
+  const neto = (projC?.valor ?? 0) - (projP?.valor ?? 0);
+  return { periodo, banco: Math.max(0, banco - neto), netoDelBanco: neto };
 }
