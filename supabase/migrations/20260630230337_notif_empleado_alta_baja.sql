@@ -8,7 +8,7 @@
 --
 -- Componentes:
 --   1. `erp.empleados.notif_alta_at` / `notif_baja_at` — idempotencia del
---      disparo automático (mismo patrón que `dilesa.ventas.notif_*_at`). El
+--      disparo automático (mismo patrón notif_*_at que ya usan las ventas). El
 --      botón "Reenviar aviso" del expediente ignora el timestamp.
 --   2. Definiciones en `core.notification_definitions` (slugs `empleado_alta`
 --      y `empleado_baja`) — UNA POR EMPRESA (DILESA + RDB), porque cada empresa
