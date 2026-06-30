@@ -4,6 +4,8 @@ import {
   computeServicioKpis,
   computeComparativos,
   computeAnomalias,
+  computePronostico,
+  addMes,
 } from '@/lib/sanren/servicios-analytics';
 import type { ReciboVista } from '@/lib/sanren-servicios';
 
@@ -160,5 +162,48 @@ describe('computeAnomalias', () => {
     const anom = computeAnomalias(recibos);
     expect(anom.has('a3')).toBe(true);
     expect(anom.has('g2')).toBe(false);
+  });
+});
+
+describe('addMes', () => {
+  it('avanza un mes y maneja el salto de año', () => {
+    expect(addMes('2025-06')).toBe('2025-07');
+    expect(addMes('2025-12')).toBe('2026-01');
+    expect(addMes('2025-09')).toBe('2025-10');
+  });
+});
+
+describe('computePronostico', () => {
+  const pickConsumo = (r: ReturnType<typeof recibo>) => r.consumo_periodo;
+
+  it('mezcla estacionalidad y tendencia cuando hay ambas', () => {
+    // Mismo mes (jul) año previo = 300; recientes (abr/may/jun 2025) promedian 100.
+    const recibos = [
+      recibo({ id: 'h1', periodo: '2024-07', consumo_periodo: 300 }),
+      recibo({ id: 'r1', periodo: '2025-04', consumo_periodo: 90 }),
+      recibo({ id: 'r2', periodo: '2025-05', consumo_periodo: 100 }),
+      recibo({ id: 'r3', periodo: '2025-06', consumo_periodo: 110 }),
+    ];
+    const p = computePronostico(recibos, pickConsumo);
+    expect(p?.periodo).toBe('2025-07');
+    expect(p?.base).toBe('estacional+tendencia');
+    expect(p?.valor).toBe(200); // 0.5*300 + 0.5*100
+  });
+
+  it('usa solo tendencia si no hay historia del mismo mes', () => {
+    const recibos = [
+      recibo({ id: 'r1', periodo: '2025-04', consumo_periodo: 100 }),
+      recibo({ id: 'r2', periodo: '2025-05', consumo_periodo: 200 }),
+      recibo({ id: 'r3', periodo: '2025-06', consumo_periodo: 300 }),
+    ];
+    const p = computePronostico(recibos, pickConsumo);
+    expect(p?.periodo).toBe('2025-07');
+    expect(p?.base).toBe('tendencia');
+    expect(p?.valor).toBe(200);
+  });
+
+  it('devuelve null sin datos del campo', () => {
+    const recibos = [recibo({ id: 'x', periodo: '2025-01' })]; // consumo_periodo null
+    expect(computePronostico(recibos, pickConsumo)).toBeNull();
   });
 });

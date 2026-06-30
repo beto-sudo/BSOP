@@ -2,11 +2,17 @@
 
 import { useMemo } from 'react';
 import type { ReciboVista } from '@/lib/sanren-servicios';
+import { computePronostico } from '@/lib/sanren/servicios-analytics';
 
 /**
  * Gráficas de tendencia del módulo SANREN → Servicios (iniciativa
- * sanren-servicios, Sprint 4). SVG a mano con tokens del theme (patrón
- * Playtomic/Health, sin librería de charts).
+ * sanren-servicios). SVG a mano con tokens del theme (patrón Playtomic/Health,
+ * sin librería de charts).
+ *
+ * Cada gráfica de consumo/gasto proyecta el **próximo periodo** (barra punteada
+ * "esperado") mezclando tendencia reciente + estacionalidad. La gráfica solar
+ * superpone la **línea del banco de energía** (kWh a favor acumulados) para ver
+ * el saldo disponible contra lo que se consume.
  */
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -24,11 +30,15 @@ function money(n: number): string {
   });
 }
 
+const kwh = (n: number) => `${Math.round(n).toLocaleString('es-MX')} kWh`;
+
 const SERVICIO_COLOR: Record<string, string> = {
   luz: 'var(--color-amber-500, #f59e0b)',
   gas: 'var(--color-orange-500, #f97316)',
   agua: 'var(--color-sky-500, #0ea5e9)',
 };
+
+const BANCO_COLOR = 'var(--color-violet-500, #8b5cf6)';
 
 function Card({
   title,
@@ -68,11 +78,12 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
       const total = tipos.reduce((a, t) => a + (row[t] ?? 0), 0);
       return { mes, row, total };
     });
-    const max = Math.max(1, ...data.map((d) => d.total));
-    return { data, tipos, max };
+    const forecast = computePronostico(recibos, (r) => r.monto);
+    const max = Math.max(1, ...data.map((d) => d.total), forecast?.valor ?? 0);
+    return { data, tipos, max, forecast };
   }, [recibos]);
 
-  // ── Solar: consumo vs producción de luz por periodo ─────────────────────────
+  // ── Solar: consumo vs producción + banco de energía por periodo ─────────────
   const solar = useMemo(() => {
     const luz = recibos
       .filter(
@@ -82,11 +93,31 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
         periodo: r.periodo.slice(0, 7),
         consumo: r.consumo_periodo ?? 0,
         produccion: r.produccion_periodo ?? 0,
+        banco: r.extraccion?.energia_acumulada_favor ?? null,
+        forecast: false,
       }))
       .sort((a, b) => a.periodo.localeCompare(b.periodo))
       .slice(-18);
-    const max = Math.max(1, ...luz.map((d) => Math.max(d.consumo, d.produccion)));
-    return { luz, max };
+
+    const luzRecibos = recibos.filter((r) => r.tiene_produccion);
+    const fcConsumo = computePronostico(luzRecibos, (r) => r.consumo_periodo);
+    const fcProduccion = computePronostico(luzRecibos, (r) => r.produccion_periodo);
+    const fcPeriodo = fcConsumo?.periodo ?? fcProduccion?.periodo ?? null;
+
+    const items = [...luz];
+    if (fcPeriodo) {
+      items.push({
+        periodo: fcPeriodo,
+        consumo: fcConsumo?.valor ?? 0,
+        produccion: fcProduccion?.valor ?? 0,
+        banco: null,
+        forecast: true,
+      });
+    }
+
+    const max = Math.max(1, ...items.map((d) => Math.max(d.consumo, d.produccion)));
+    const bancoMax = Math.max(1, ...luz.map((d) => d.banco ?? 0));
+    return { items, max, bancoMax, hayBanco: luz.some((d) => d.banco != null) };
   }, [recibos]);
 
   // ── Ahorro: gasto de luz por año ────────────────────────────────────────────
@@ -104,9 +135,14 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
   const H = 240;
   const PAD_B = 28;
 
+  // Slots del gasto: meses reales + un slot "esperado" si hay pronóstico.
+  const gastoSlots = gasto.forecast
+    ? [...gasto.data, { mes: gasto.forecast.periodo, row: {}, total: gasto.forecast.valor }]
+    : gasto.data;
+
   return (
     <div className="space-y-4">
-      {/* Gasto mensual por servicio (barras apiladas) */}
+      {/* Gasto mensual por servicio (barras apiladas) + pronóstico */}
       <Card title="Gasto mensual por servicio" subtitle="Últimos 24 meses con recibo capturado">
         <div className="mb-3 flex flex-wrap gap-4 text-xs text-[var(--text)]/65">
           {gasto.tipos.map((t) => (
@@ -118,6 +154,12 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
               {t}
             </span>
           ))}
+          {gasto.forecast ? (
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--text)]/60" />
+              esperado ({mesCorto(gasto.forecast.periodo)})
+            </span>
+          ) : null}
         </div>
         <div className="overflow-x-auto">
           <svg viewBox={`0 0 ${W} ${H + PAD_B}`} className="min-w-[760px]">
@@ -132,9 +174,40 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
                 strokeOpacity="0.08"
               />
             ))}
-            {gasto.data.map((d, i) => {
-              const bw = Math.max(6, Math.min(34, W / Math.max(gasto.data.length, 1) - 6));
-              const x = i * (W / Math.max(gasto.data.length, 1)) + 3;
+            {gastoSlots.map((d, i) => {
+              const bw = Math.max(6, Math.min(34, W / Math.max(gastoSlots.length, 1) - 6));
+              const x = i * (W / Math.max(gastoSlots.length, 1)) + 3;
+              const isForecast = gasto.forecast != null && i === gastoSlots.length - 1;
+              if (isForecast) {
+                const h = (d.total / gasto.max) * H;
+                return (
+                  <g key={d.mes}>
+                    <rect
+                      x={x}
+                      y={H - h}
+                      width={bw}
+                      height={h}
+                      fill="var(--text)"
+                      fillOpacity={0.12}
+                      stroke="var(--text)"
+                      strokeOpacity={0.55}
+                      strokeDasharray="3 2"
+                    >
+                      <title>{`${d.mes} (esperado): ${money(d.total)}`}</title>
+                    </rect>
+                    <text
+                      x={x + bw / 2}
+                      y={H + 18}
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="var(--text)"
+                      opacity="0.5"
+                    >
+                      {mesCorto(d.mes)}
+                    </text>
+                  </g>
+                );
+              }
               let yAcc = H;
               return (
                 <g key={d.mes}>
@@ -175,11 +248,11 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
         </div>
       </Card>
 
-      {/* Solar: consumo vs producción */}
-      {solar.luz.length > 0 ? (
+      {/* Solar: consumo vs generación + banco de energía + pronóstico */}
+      {solar.items.length > 0 ? (
         <Card
-          title="Energía: consumo vs. generación solar (Luz)"
-          subtitle="kWh por periodo — cuando la barra verde supera la gris, generaste más de lo que consumiste"
+          title="Energía: consumo vs. generación + banco (Luz)"
+          subtitle="kWh por periodo — la línea morada es el saldo del banco de energía; la barra punteada es el próximo periodo esperado"
         >
           <div className="mb-3 flex flex-wrap gap-4 text-xs text-[var(--text)]/65">
             <span className="flex items-center gap-1.5">
@@ -187,6 +260,16 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Generación
+            </span>
+            {solar.hayBanco ? (
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-4" style={{ backgroundColor: BANCO_COLOR }} /> Banco (kWh a
+                favor)
+              </span>
+            ) : null}
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--text)]/60" />{' '}
+              esperado
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -202,19 +285,39 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
                   strokeOpacity="0.08"
                 />
               ))}
-              {solar.luz.map((d, i) => {
-                const slot = W / Math.max(solar.luz.length, 1);
+              {solar.items.map((d, i) => {
+                const slot = W / Math.max(solar.items.length, 1);
                 const bw = Math.max(4, Math.min(18, slot / 2 - 3));
                 const x = i * slot + 3;
                 const hC = (d.consumo / solar.max) * H;
                 const hP = (d.produccion / solar.max) * H;
+                const dash = d.forecast ? { strokeDasharray: '3 2', strokeWidth: 1 } : {};
                 return (
                   <g key={d.periodo}>
-                    <rect x={x} y={H - hC} width={bw} height={hC} fill="var(--text)" opacity={0.4}>
-                      <title>{`${d.periodo} · consumo: ${d.consumo} kWh`}</title>
+                    <rect
+                      x={x}
+                      y={H - hC}
+                      width={bw}
+                      height={hC}
+                      fill="var(--text)"
+                      opacity={d.forecast ? 0.18 : 0.4}
+                      stroke={d.forecast ? 'var(--text)' : undefined}
+                      strokeOpacity={0.55}
+                      {...dash}
+                    >
+                      <title>{`${d.periodo}${d.forecast ? ' (esperado)' : ''} · consumo: ${kwh(d.consumo)}`}</title>
                     </rect>
-                    <rect x={x + bw + 2} y={H - hP} width={bw} height={hP} fill="#10b981">
-                      <title>{`${d.periodo} · generación: ${d.produccion} kWh`}</title>
+                    <rect
+                      x={x + bw + 2}
+                      y={H - hP}
+                      width={bw}
+                      height={hP}
+                      fill="#10b981"
+                      opacity={d.forecast ? 0.3 : 1}
+                      stroke={d.forecast ? '#10b981' : undefined}
+                      {...dash}
+                    >
+                      <title>{`${d.periodo}${d.forecast ? ' (esperado)' : ''} · generación: ${kwh(d.produccion)}`}</title>
                     </rect>
                     {i % 2 === 0 ? (
                       <text
@@ -231,6 +334,38 @@ export function ServiciosTendencias({ recibos }: { recibos: ReciboVista[] }) {
                   </g>
                 );
               })}
+
+              {/* Línea del banco de energía (eje propio, escala bancoMax) */}
+              {solar.hayBanco ? (
+                <>
+                  <polyline
+                    fill="none"
+                    stroke={BANCO_COLOR}
+                    strokeWidth={2}
+                    points={solar.items
+                      .map((d, i) => {
+                        if (d.banco == null) return null;
+                        const slot = W / Math.max(solar.items.length, 1);
+                        const x = i * slot + 3 + (Math.max(4, Math.min(18, slot / 2 - 3)) + 2);
+                        const y = H - (d.banco / solar.bancoMax) * H;
+                        return `${x},${y}`;
+                      })
+                      .filter(Boolean)
+                      .join(' ')}
+                  />
+                  {solar.items.map((d, i) => {
+                    if (d.banco == null) return null;
+                    const slot = W / Math.max(solar.items.length, 1);
+                    const x = i * slot + 3 + (Math.max(4, Math.min(18, slot / 2 - 3)) + 2);
+                    const y = H - (d.banco / solar.bancoMax) * H;
+                    return (
+                      <circle key={`b-${d.periodo}`} cx={x} cy={y} r={2.5} fill={BANCO_COLOR}>
+                        <title>{`${d.periodo} · banco: ${kwh(d.banco)} a favor`}</title>
+                      </circle>
+                    );
+                  })}
+                </>
+              ) : null}
             </svg>
           </div>
         </Card>

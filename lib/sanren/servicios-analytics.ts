@@ -211,3 +211,86 @@ export function computeAnomalias(
 
   return out;
 }
+
+/** Mes calendario siguiente a un periodo `yyyy-mm` (maneja el salto de año). */
+export function addMes(periodo: string): string {
+  const [y, m] = periodo.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}`;
+}
+
+/** Serie mensual {periodo, valor} de un campo, sumando por mes (orden asc). */
+export function serieMensual(
+  recibos: ReciboVista[],
+  pick: (r: ReciboVista) => number | null
+): { periodo: string; valor: number }[] {
+  const map = new Map<string, number>();
+  for (const r of recibos) {
+    const v = pick(r);
+    if (v == null) continue;
+    map.set(yyyymm(r.periodo), (map.get(yyyymm(r.periodo)) ?? 0) + v);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([periodo, valor]) => ({ periodo, valor }));
+}
+
+export interface Pronostico {
+  /** Periodo `yyyy-mm` pronosticado (el mes siguiente al último con dato). */
+  periodo: string;
+  valor: number;
+  /** Cómo se estimó: estacional (años previos), tendencia (meses recientes) o ambos. */
+  base: 'estacional+tendencia' | 'estacional' | 'tendencia';
+}
+
+const avg = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/**
+ * Pronóstico del próximo periodo para un campo (consumo, producción, monto…).
+ *
+ * Mezcla 50/50 dos señales cuando ambas existen:
+ *  - **estacional**: promedio del mismo mes en años anteriores ("lo que sucedió
+ *    en años anteriores").
+ *  - **tendencia**: promedio de los últimos `recientes` meses ("lo que se ha
+ *    venido consumiendo").
+ *
+ * Si solo hay una, usa esa. Devuelve null si no hay datos. `recibos` debe venir
+ * ya filtrado por servicio.
+ */
+export function computePronostico(
+  recibos: ReciboVista[],
+  pick: (r: ReciboVista) => number | null,
+  opts: { recientes?: number } = {}
+): Pronostico | null {
+  const recientes = opts.recientes ?? 3;
+  const serie = serieMensual(recibos, pick);
+  if (serie.length === 0) return null;
+
+  const ultimo = serie[serie.length - 1].periodo;
+  const next = addMes(ultimo);
+  const nextMM = next.slice(5, 7);
+
+  const mismosMeses = serie.filter((s) => s.periodo.slice(5, 7) === nextMM).map((s) => s.valor);
+  const ultimosN = serie.slice(-recientes).map((s) => s.valor);
+
+  const estacional = mismosMeses.length > 0 ? avg(mismosMeses) : null;
+  const tendencia = ultimosN.length > 0 ? avg(ultimosN) : null;
+
+  let valor: number;
+  let base: Pronostico['base'];
+  if (estacional != null && tendencia != null) {
+    valor = 0.5 * estacional + 0.5 * tendencia;
+    base = 'estacional+tendencia';
+  } else if (estacional != null) {
+    valor = estacional;
+    base = 'estacional';
+  } else if (tendencia != null) {
+    valor = tendencia;
+    base = 'tendencia';
+  } else {
+    return null;
+  }
+
+  return { periodo: next, valor: Math.max(0, Math.round(valor)), base };
+}
