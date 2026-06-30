@@ -18,6 +18,7 @@ export function VentaExpedienteTabs({ id }: { id: string }) {
       tabs={[
         { label: 'Operación', href: base, exact: true, module: 'dilesa.ventas.operacion' },
         { label: 'Pipeline', href: `${base}/pipeline`, module: 'dilesa.ventas.pipeline' },
+        { label: 'Fluidez', href: `${base}/fluidez`, module: 'dilesa.ventas.pipeline' },
         { label: 'Cuadratura', href: `${base}/cuadratura`, module: 'dilesa.ventas.cuadratura' },
         {
           label: 'Estado de cuenta',
