@@ -31,6 +31,13 @@ import { generateBriefingMarkdown } from '@/lib/briefing/build';
 import { mdToEmailHtml } from '@/lib/briefing/markdown';
 import { sendBriefingEmail } from '@/lib/briefing/email';
 import { matamorosFecha } from '@/lib/briefing/fecha';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import {
+  getDefinitionBySlug,
+  renderSubject,
+  splitRecipientsExtra,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 // Web search + generación con Opus puede tomar > 60s; damos holgura.
 export const maxDuration = 300;
@@ -87,8 +94,57 @@ export async function GET(req: NextRequest) {
   }
 
   const html = mdToEmailHtml(markdown);
-  const subject = `Daily Briefing — ${fecha.iso} (${fecha.diaSemana})`;
-  const sent = await sendBriefingEmail(resendKey, { html, subject, to: BRIEFING_TO });
+
+  // Catálogo de notificaciones (slug `daily_briefing`, global). FAIL-OPEN: si el
+  // catálogo no responde, se usan los defaults hardcoded. El cron corre con
+  // service role (sin sesión), por eso el admin client.
+  const admin = getSupabaseAdminClient();
+  const def = admin ? await getDefinitionBySlug(admin, 'daily_briefing') : null;
+
+  const subject = renderSubject(def?.subject_template ?? 'Daily Briefing — {fecha} ({dia})', {
+    fecha: fecha.iso,
+    dia: fecha.diaSemana,
+  });
+
+  // Kill switch.
+  if (def && !def.activo) {
+    if (admin) {
+      await writeNotificationLog(admin, {
+        definitionId: def.id,
+        status: 'skipped',
+        recipients: { to: [] },
+        subject,
+        context: { fecha: fecha.iso },
+      });
+    }
+    const skip = { status: 'skipped', reason: 'kill switch (daily_briefing desactivado)' };
+    console.log('[daily-briefing]', JSON.stringify(skip));
+    return NextResponse.json(skip);
+  }
+
+  const extras = def
+    ? splitRecipientsExtra(def.recipients_extra)
+    : { to: [BRIEFING_TO], cc: [], bcc: [] };
+  const to = extras.to[0] ?? BRIEFING_TO;
+  const from = def
+    ? def.from_name
+      ? `${def.from_name} <${def.from_email}>`
+      : def.from_email
+    : undefined;
+
+  const sent = await sendBriefingEmail(resendKey, { html, subject, to, from });
+
+  if (admin) {
+    await writeNotificationLog(admin, {
+      definitionId: def?.id ?? null,
+      status: sent.ok ? 'sent' : 'failed',
+      recipients: { to: [to] },
+      subject,
+      resendId: sent.id ?? null,
+      errorMessage: sent.ok ? null : String(sent.error),
+      context: { fecha: fecha.iso },
+    });
+  }
 
   if (!sent.ok) {
     console.error('[daily-briefing] Resend falló:', sent.error);
@@ -101,7 +157,7 @@ export async function GET(req: NextRequest) {
   const result = {
     status: 'sent',
     resendId: sent.id,
-    to: BRIEFING_TO,
+    to,
     fecha: fecha.iso,
     healthAvailable: health.available,
   };
