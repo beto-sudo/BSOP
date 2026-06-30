@@ -589,17 +589,18 @@ function CapturarFase8Body() {
         });
         return;
       }
-      // El crédito directo (pagaré) se exige por faltante de GASTOS o porque Dirección
-      // eligió "Cobrar" un residual (precio o gastos). Un solo pagaré cubre ambos; el
-      // motor lo asigna gastos-primero. Si Dirección ABSORBE el faltante de gastos
-      // (Máxima Aportación), NO se exige pagaré por ese concepto (evita el deadlock).
-      // Debe estar guardado + firmado antes de cerrar.
+      // El crédito directo (pagaré) se exige por faltante de GASTOS vigente (a menos
+      // que Dirección lo ABSORBA — Máxima Aportación, evita el deadlock) o porque
+      // Dirección eligió "Cobrar" el residual de PRECIO. Un solo pagaré cubre ambos; el
+      // motor lo asigna gastos-primero. Debe estar guardado + firmado antes de cerrar.
+      // OJO: NO se ancla en `saldo_gastos_resolucion === 'cobrar'` suelto — si el cliente
+      // deposita el faltante DESPUÉS de elegir "cobrar", `pagareNecesario` cae a 0 y el
+      // pagaré deja de exigirse (si no, la venta queda trabada sin vía de salida).
       const requierePagare =
         (cob != null &&
           cob.pagareNecesario > 0.0049 &&
           venta.saldo_gastos_resolucion !== 'absorber') ||
-        venta.saldo_residual_resolucion === 'cobrar' ||
-        venta.saldo_gastos_resolucion === 'cobrar';
+        venta.saldo_residual_resolucion === 'cobrar';
       if (requierePagare && !cdGuardado) {
         toast.add({
           title: 'Falta configurar el crédito directo',
@@ -1174,6 +1175,16 @@ function CapturarFase8Body() {
           ? (resumen.props.cuadratura.coberturaGastos?.pagareNecesario ?? 0)
           : 0;
       const montoR = Math.round(monto * 100) / 100;
+      // Si Dirección ABSORBE el faltante de gastos pero ya había un crédito directo
+      // (pagaré) configurado para ese faltante, hay que limpiarlo: si no, el form se
+      // oculta (`aplicaCD` = false) pero `monto_credito_directo` sigue inflando el
+      // Valor Real y subvaluando la NC. Solo se limpia cuando el pagaré NO lo necesita
+      // el residual de PRECIO (si Dirección eligió "Cobrar" el precio, el mismo pagaré
+      // lo cubre y NO se toca).
+      const limpiarCreditoDirecto =
+        tipo === 'absorber' &&
+        venta.saldo_residual_resolucion !== 'cobrar' &&
+        (venta.monto_credito_directo ?? 0) > 0;
       setResolviendoGastos(true);
       const { data: userRes } = await sb.auth.getUser();
       const userId = userRes?.user?.id ?? null;
@@ -1186,6 +1197,7 @@ function CapturarFase8Body() {
           saldo_gastos_monto: montoR,
           saldo_gastos_autorizado_por: userId,
           saldo_gastos_at: at,
+          ...(limpiarCreditoDirecto ? { monto_credito_directo: null, cd_plan_pagos: null } : {}),
         })
         .eq('id', venta.id);
       setResolviendoGastos(false);
@@ -1205,6 +1217,9 @@ function CapturarFase8Body() {
               saldo_gastos_monto: montoR,
               saldo_gastos_autorizado_por: userId,
               saldo_gastos_at: at,
+              ...(limpiarCreditoDirecto
+                ? { monto_credito_directo: null, cd_plan_pagos: null }
+                : {}),
             }
           : v
       );
@@ -1215,7 +1230,7 @@ function CapturarFase8Body() {
             : 'Faltante de gastos por cobrar',
         description:
           tipo === 'absorber'
-            ? `DILESA absorbe ${money2(montoR)} de gastos (Máxima Aportación). Ya puedes cerrar la dictaminación.`
+            ? `DILESA absorbe ${money2(montoR)} de gastos (Máxima Aportación).${limpiarCreditoDirecto ? ' Se eliminó el crédito directo del faltante de gastos.' : ''} Ya puedes cerrar la dictaminación.`
             : `${money2(montoR)} de gastos quedan por cobrar al cliente (pagaré). Configura el crédito directo y sube el pagaré firmado.`,
         type: 'success',
       });
