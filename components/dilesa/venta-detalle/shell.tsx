@@ -15,21 +15,51 @@
  * con el shell de captura sin arrastrar el `VentaDetalleProvider`.
  */
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { OperacionResumen } from '@/components/dilesa/operacion-resumen';
 import { Badge } from '@/components/ui/badge';
 import { VENTA_ESTADO_CONFIG } from '@/lib/status-tokens';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useVentaDetalle } from './provider';
 import { BackLink, HoldBanner } from './ui';
 import { VentaExpedienteTabs } from './tabs';
 import { BotonSiguienteFase } from './boton-siguiente-fase';
 import { FASES_ORDEN } from './types';
 import { diasEnFase, colorDiasFase } from '@/lib/dilesa/dias-en-fase';
+import {
+  bandaFluidez,
+  colorFluidez,
+  tooltipFluidez,
+  type FaseBenchmarkRef,
+} from '@/lib/dilesa/fluidez-venta';
 
 export function VentaExpedienteShell({ children }: { children: ReactNode }) {
   const d = useVentaDetalle();
   const { venta, loading, error, scopeVendedor } = d;
+
+  // Benchmark de la fase actual (S2b): mediana/p90 históricos para contextualizar
+  // los días en fase. Hook antes de cualquier return (reglas de hooks).
+  const fasePos = venta?.fase_posicion ?? null;
+  const [benchFase, setBenchFase] = useState<FaseBenchmarkRef | null>(null);
+  useEffect(() => {
+    if (fasePos == null) return; // el estado inicial ya es null
+    let activo = true;
+    const sb = createSupabaseBrowserClient();
+    void sb
+      .schema('dilesa')
+      .from('v_fase_benchmark')
+      .select('mediana, p90')
+      .eq('posicion', fasePos)
+      .then(({ data }) => {
+        if (!activo) return;
+        const row = data?.[0];
+        setBenchFase(row ? { mediana: row.mediana, p90: row.p90 } : null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [fasePos]);
 
   if (loading) {
     return (
@@ -90,6 +120,8 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
       ? (d.fases.find((f) => f.posicion === venta.fase_posicion)?.fecha ?? null)
       : null;
   const diasFaseActual = diasEnFase(fechaFaseActual);
+  // Banda de riesgo: los días vs. el benchmark de la fase (S2b).
+  const bandaFaseActual = bandaFluidez(diasFaseActual, benchFase);
 
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -132,8 +164,10 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
             ) : null}
             {diasFaseActual != null ? (
               <span
-                className={`text-xs font-medium tabular-nums ${colorDiasFase(diasFaseActual)}`}
-                title={`${diasFaseActual} día${diasFaseActual === 1 ? '' : 's'} en esta fase`}
+                className={`text-xs font-medium tabular-nums ${
+                  bandaFaseActual ? colorFluidez(bandaFaseActual) : colorDiasFase(diasFaseActual)
+                }`}
+                title={tooltipFluidez(diasFaseActual, venta.fase_actual, benchFase)}
               >
                 {diasFaseActual} d en fase
               </span>
@@ -181,6 +215,7 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
         fasePosicion={venta.fase_posicion}
         totalFases={FASES_ORDEN.length}
         diasEnFase={diasFaseActual}
+        diasBanda={bandaFaseActual}
         cuadratura={cuadratura}
       />
 
