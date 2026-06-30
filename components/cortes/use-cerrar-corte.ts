@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useTransition } from 'react';
 import { cerrarCaja, obtenerVouchersDelCorte, type Denominacion } from '@/app/rdb/cortes/actions';
+import { fetchCorteIngresosTarjeta } from './data';
 import { DENOMINACIONES_DEFAULT, type Corte, type Voucher } from './types';
 
 /**
@@ -25,8 +26,13 @@ export function useCerrarCorte() {
   const [step, setStep] = useState<1 | 2>(1);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
+  // Ingresos por tarjeta autoritativos (rdb.v_cortes_totales), resueltos al abrir
+  // el diálogo. Se inicializa optimista con el valor del list view y se corrige
+  // con el fetch — así el paso de Vouchers aparece aunque el list view venga con
+  // lag de Waitry (mismo criterio que el guard server-side de cerrarCaja).
+  const [ingresosTarjeta, setIngresosTarjeta] = useState(0);
 
-  const isWizard = (corte?.ingresos_tarjeta ?? 0) > 0;
+  const isWizard = ingresosTarjeta > 0;
 
   const loadVouchers = useCallback(async (corteId: string) => {
     setLoadingVouchers(true);
@@ -48,11 +54,20 @@ export function useCerrarCorte() {
     setError(null);
     setStep(1);
     setVouchers([]);
+    // Optimista desde el list view; se corrige abajo con la fuente autoritativa.
+    const listTarjeta = next.ingresos_tarjeta ?? 0;
+    setIngresosTarjeta(listTarjeta);
     setOpen(true);
-    // Pre-carga en wizard para ver vouchers ya adjuntos previamente.
-    if ((next.ingresos_tarjeta ?? 0) > 0) {
+    if (listTarjeta > 0) {
       void loadVouchers(next.id);
     }
+    // Resolver ingresos_tarjeta autoritativos (rdb.v_cortes_totales). Si el list
+    // view venía en 0 por lag y aquí resulta > 0, activamos el wizard y cargamos
+    // los vouchers adjuntos para que el cajero pueda subir antes de cerrar.
+    void fetchCorteIngresosTarjeta(next.id).then((auth) => {
+      setIngresosTarjeta(auth);
+      if (auth > 0 && listTarjeta === 0) void loadVouchers(next.id);
+    });
   }
 
   function updateCantidad(idx: number, val: string) {

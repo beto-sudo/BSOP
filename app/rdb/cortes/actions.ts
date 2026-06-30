@@ -183,6 +183,39 @@ export async function cerrarCaja(input: CerrarCajaInput): Promise<void> {
   } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('No autenticado');
 
+  // Guard server-side: no se puede cerrar un corte con ingresos por tarjeta sin
+  // al menos un voucher de terminal adjunto. El gate del wizard en el cliente
+  // depende de `rdb.v_cortes_lista`, que puede traer ingresos_tarjeta en 0 por
+  // lag de sync de Waitry al momento del cierre — eso dejó pasar el cierre del
+  // corte de Caja Elda (2026-06-30) con $5,275 de tarjeta y 0 vouchers. Aquí
+  // validamos contra la misma fuente que la conciliación (`rdb.v_cortes_totales`),
+  // que no depende de lo que el cliente tenía cargado.
+  const { data: totales, error: totalesErr } = await supabase
+    .schema('rdb')
+    .from('v_cortes_totales')
+    .select('ingresos_tarjeta')
+    .eq('corte_id', input.corte_id)
+    .maybeSingle();
+  if (totalesErr) throw new Error(`Error al consultar totales del corte: ${totalesErr.message}`);
+
+  const ingresosTarjeta = Number(totales?.ingresos_tarjeta ?? 0);
+  if (ingresosTarjeta > 0) {
+    const { count, error: voucherCountErr } = await supabase
+      .schema('erp')
+      .from('cortes_vouchers')
+      .select('id', { count: 'exact', head: true })
+      .eq('empresa_id', RDB_EMPRESA_ID)
+      .eq('corte_id', input.corte_id)
+      .eq('categoria', 'voucher_tarjeta');
+    if (voucherCountErr) throw new Error(`Error al verificar vouchers: ${voucherCountErr.message}`);
+    if (!count || count === 0) {
+      throw new Error(
+        'No se puede cerrar: hay ingresos por tarjeta sin voucher de terminal. ' +
+          'Sube al menos un voucher (cierre de lote) antes de cerrar el corte.'
+      );
+    }
+  }
+
   // Calcular total desde denominaciones
   const efectivo_contado = input.denominaciones.reduce(
     (sum, d) => sum + d.denominacion * d.cantidad,

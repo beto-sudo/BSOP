@@ -92,6 +92,22 @@ export async function fetchCorteDetail(corteId: string): Promise<{
   };
 }
 
+// Ingresos por tarjeta autoritativos de un corte (rdb.v_cortes_totales) — misma
+// fuente que la conciliación y que el guard server-side de `cerrarCaja`. El
+// list view (rdb.v_cortes_lista) puede ir con lag de Waitry, así que el wizard
+// de cierre se apoya en esto para decidir si exige vouchers. Devuelve 0 si falla.
+export async function fetchCorteIngresosTarjeta(corteId: string): Promise<number> {
+  const supabase = createSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .schema('rdb')
+    .from('v_cortes_totales')
+    .select('ingresos_tarjeta')
+    .eq('corte_id', corteId)
+    .maybeSingle();
+  if (error) return 0;
+  return Number((data as { ingresos_tarjeta?: number } | null)?.ingresos_tarjeta ?? 0);
+}
+
 // Load the list of cajas for the empresa and resolve the logged-in user's name.
 export async function fetchAbrirCajaContext(): Promise<{
   cajas: Caja[];
