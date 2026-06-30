@@ -45,6 +45,14 @@ export type CuadraturaPanelProps = {
    * "Saldo por cubrir".
    */
   saldoResidual?: { resolucion: 'cobrar' | 'absorber' | null; monto: number | null } | null;
+  /**
+   * Resolución del faltante de GASTOS (Sprint 3 de `dilesa-saldos-residuales`): cuando
+   * el motor expone `requiereResolucionSaldoGastos`, la card de cobertura deja de pintar
+   * el residual como "sobreprecio" y "Cuadra ✓" y refleja la decisión de Dirección
+   * (cobrar/absorber) o lo marca como saldo del cliente por resolver. NO cambia ningún
+   * monto del motor; solo la etiqueta.
+   */
+  saldoGastos?: { resolucion: 'cobrar' | 'absorber' | null } | null;
 };
 
 export function CuadraturaPanel({
@@ -53,6 +61,7 @@ export function CuadraturaPanel({
   chequeCapturado,
   hayFacturaCfdi,
   saldoResidual,
+  saldoGastos,
 }: CuadraturaPanelProps) {
   // Cobertura del presupuesto notarial COMPLETO: el motor (`coberturaGastos`) ya
   // trae todos los componentes y el saldo — fuente única, el panel no recalcula.
@@ -82,6 +91,20 @@ export function CuadraturaPanel({
       : resolucion === 'cobrar'
         ? 'El cliente cubre este saldo con un pagaré (autorizado por Dirección).'
         : 'Saldo pendiente del cliente. En la dictaminación, Dirección lo resuelve: cobrarlo (pagaré) o absorberlo (nota de crédito). Los gastos de escrituración se desglosan abajo.';
+  // Faltante de GASTOS (Sprint 3): cuando el motor lo señala, el "(−) Sobreprecio" sin
+  // sobreprecio capturado es en realidad un saldo a resolver (no algo gratis que paga el
+  // crédito). La etiqueta refleja la decisión de Dirección; los montos no cambian.
+  const gastosResol = saldoGastos?.resolucion ?? null;
+  const requiereResolverGastos = c.requiereResolucionSaldoGastos === true;
+  const sobreprecioEsFantasma = requiereResolverGastos && !!cob && cob.sobreprecio <= 0.5;
+  const faltanteGastosSinResolver = requiereResolverGastos && gastosResol == null;
+  const lineaResidualGastosLabel = sobreprecioEsFantasma
+    ? gastosResol === 'absorber'
+      ? '(−) Aportación DILESA (Máxima Aportación)'
+      : gastosResol === 'cobrar'
+        ? '(−) Por cobrar al cliente (pagaré)'
+        : '(−) Saldo de gastos a cargo del cliente'
+    : '(−) Sobreprecio';
   return (
     <div className="space-y-5">
       {c.posibleDobleConteo ? (
@@ -273,8 +296,9 @@ export function CuadraturaPanel({
           <Fila label="(−) Aportación DILESA (promoción)" value={money(cob.aportacionPromocion)} />
           <Fila label="(−) Enganche del cliente" value={money(cob.engancheCliente)} />
           <Fila
-            label="(−) Sobreprecio"
+            label={lineaResidualGastosLabel}
             value={money(cob.sobreprecioCobertura)}
+            tone={sobreprecioEsFantasma && gastosResol == null ? 'warn' : undefined}
             hint={
               cob.sobreprecioCobertura > 0 && cob.sobreprecioCobertura < 1
                 ? 'residuo de redondeo del enganche'
@@ -285,12 +309,42 @@ export function CuadraturaPanel({
               financia el residual de precio y se ve en la card de cobertura del precio. */}
           <Fila label="(−) Pagaré del cliente" value={money(cob.pagareGastos)} />
           <div className="my-1 border-t border-[var(--border)]" />
-          <Fila
-            label={Math.abs(cob.saldoCobertura) <= 2 ? '(=) Cuadra ✓' : '(=) Saldo'}
-            value={money(cob.saldoCobertura)}
-            strong
-            tone={Math.abs(cob.saldoCobertura) <= 2 ? 'ok' : 'warn'}
-          />
+          {faltanteGastosSinResolver ? (
+            <Fila
+              label="(=) Saldo de gastos por resolver"
+              value={money(cob.pagareNecesario)}
+              strong
+              tone="warn"
+            />
+          ) : (
+            <Fila
+              label={
+                gastosResol === 'absorber'
+                  ? '(=) Absorbido por DILESA (Máxima Aportación)'
+                  : gastosResol === 'cobrar'
+                    ? '(=) Por cobrar (pagaré)'
+                    : Math.abs(cob.saldoCobertura) <= 2
+                      ? '(=) Cuadra ✓'
+                      : '(=) Saldo'
+              }
+              value={money(cob.saldoCobertura)}
+              strong
+              tone={
+                gastosResol === 'cobrar' || gastosResol === 'absorber'
+                  ? 'ok'
+                  : Math.abs(cob.saldoCobertura) <= 2
+                    ? 'ok'
+                    : 'warn'
+              }
+            />
+          )}
+          {faltanteGastosSinResolver ? (
+            <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+              Este faltante no es sobreprecio: el bono y el enganche no alcanzan a cubrir los
+              gastos. En la dictaminación, Dirección lo resuelve — el cliente lo deposita o firma un
+              pagaré, o DILESA lo absorbe (Máxima Aportación).
+            </p>
+          ) : null}
           {cob.engancheAlPrecio > 0 ? (
             <p className="mt-1 text-[11px] text-[var(--text)]/45">
               El enganche del cliente ({money(cob.engancheAlPrecio + cob.engancheCliente)}) cubre

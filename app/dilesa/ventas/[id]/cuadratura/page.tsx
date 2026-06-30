@@ -67,6 +67,7 @@ function CuadraturaBody() {
           resolucion: venta.saldo_residual_resolucion,
           monto: venta.saldo_residual_monto,
         }}
+        saldoGastos={{ resolucion: venta.saldo_gastos_resolucion }}
       />
     </div>
   );
