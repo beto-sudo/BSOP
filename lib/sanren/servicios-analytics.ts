@@ -212,12 +212,48 @@ export function computeAnomalias(
   return out;
 }
 
-/** Mes calendario siguiente a un periodo `yyyy-mm` (maneja el salto de año). */
-export function addMes(periodo: string): string {
+/** Avanza `n` meses un periodo `yyyy-mm` (maneja el salto de año). */
+export function addMeses(periodo: string, n: number): string {
   const [y, m] = periodo.split('-').map(Number);
-  const ny = m === 12 ? y + 1 : y;
-  const nm = m === 12 ? 1 : m + 1;
+  const total = y * 12 + (m - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
   return `${ny}-${String(nm).padStart(2, '0')}`;
+}
+
+/** Mes calendario siguiente a un periodo `yyyy-mm`. */
+export function addMes(periodo: string): string {
+  return addMeses(periodo, 1);
+}
+
+/** Meses entre dos periodos `yyyy-mm` (b − a). */
+function mesesEntre(a: string, b: string): number {
+  const [ya, ma] = a.split('-').map(Number);
+  const [yb, mb] = b.split('-').map(Number);
+  return (yb - ya) * 12 + (mb - ma);
+}
+
+/**
+ * Cadencia (en meses) entre recibos consecutivos: la moda de los huecos. Luz es
+ * bimestral → 2; Agua/Gas mensual → 1. Robusto a un hueco suelto (recibo
+ * estimado, corrección). Default 1 con <2 datos.
+ */
+function inferStep(serie: { periodo: string }[]): number {
+  if (serie.length < 2) return 1;
+  const counts = new Map<number, number>();
+  for (let i = 1; i < serie.length; i++) {
+    const g = mesesEntre(serie[i - 1].periodo, serie[i].periodo);
+    if (g > 0) counts.set(g, (counts.get(g) ?? 0) + 1);
+  }
+  let best = 1;
+  let bestC = 0;
+  for (const [g, c] of counts) {
+    if (c > bestC || (c === bestC && g < best)) {
+      best = g;
+      bestC = c;
+    }
+  }
+  return best;
 }
 
 /** Serie mensual {periodo, valor} de un campo, sumando por mes (orden asc). */
@@ -247,16 +283,38 @@ export interface Pronostico {
 const avg = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 /**
+ * Factor de tendencia anual: cuánto corre el consumo de los últimos 12 meses
+ * vs. los 12 previos. Clamp [0.7, 1.4] y solo se aplica con ventanas
+ * comparables (≥3 datos cada una) para no inflar con historia incompleta.
+ */
+function factorTendencia(serie: { periodo: string; valor: number }[], ultimo: string): number {
+  const recientes: number[] = [];
+  const previos: number[] = [];
+  for (const s of serie) {
+    const mb = mesesEntre(s.periodo, ultimo); // ≥0 = en o antes del último
+    if (mb >= 0 && mb <= 11) recientes.push(s.valor);
+    else if (mb >= 12 && mb <= 23) previos.push(s.valor);
+  }
+  if (recientes.length < 3 || previos.length < 3) return 1;
+  const sumPrev = previos.reduce((a, b) => a + b, 0);
+  if (sumPrev <= 0) return 1;
+  const ratio = recientes.reduce((a, b) => a + b, 0) / sumPrev;
+  return Math.min(1.4, Math.max(0.7, ratio));
+}
+
+/**
  * Pronóstico del próximo periodo para un campo (consumo, producción, monto…).
  *
- * Mezcla 50/50 dos señales cuando ambas existen:
- *  - **estacional**: promedio del mismo mes en años anteriores ("lo que sucedió
- *    en años anteriores").
- *  - **tendencia**: promedio de los últimos `recientes` meses ("lo que se ha
- *    venido consumiendo").
+ * El próximo periodo se calcula con la **cadencia real** del servicio (Luz es
+ * bimestral → +2 meses; Agua/Gas → +1). Dos modelos:
+ *  - **estacional**: si hay recibos del mismo mes en años anteriores ("lo que
+ *    sucedió en años anteriores"), toma su promedio y lo escala por el factor de
+ *    tendencia anual ("lo que se ha venido consumiendo"). Captura el patrón
+ *    estacional (p. ej. el pico de agosto) sin ignorar la tendencia.
+ *  - **tendencia**: si no hay historia del mismo mes, promedia los últimos
+ *    `recientes` recibos.
  *
- * Si solo hay una, usa esa. Devuelve null si no hay datos. `recibos` debe venir
- * ya filtrado por servicio.
+ * Devuelve null si no hay datos. `recibos` debe venir ya filtrado por servicio.
  */
 export function computePronostico(
   recibos: ReciboVista[],
@@ -268,28 +326,21 @@ export function computePronostico(
   if (serie.length === 0) return null;
 
   const ultimo = serie[serie.length - 1].periodo;
-  const next = addMes(ultimo);
+  const next = addMeses(ultimo, inferStep(serie));
   const nextMM = next.slice(5, 7);
 
   const mismosMeses = serie.filter((s) => s.periodo.slice(5, 7) === nextMM).map((s) => s.valor);
-  const ultimosN = serie.slice(-recientes).map((s) => s.valor);
-
-  const estacional = mismosMeses.length > 0 ? avg(mismosMeses) : null;
-  const tendencia = ultimosN.length > 0 ? avg(ultimosN) : null;
 
   let valor: number;
   let base: Pronostico['base'];
-  if (estacional != null && tendencia != null) {
-    valor = 0.5 * estacional + 0.5 * tendencia;
+  if (mismosMeses.length > 0) {
+    valor = avg(mismosMeses) * factorTendencia(serie, ultimo);
     base = 'estacional+tendencia';
-  } else if (estacional != null) {
-    valor = estacional;
-    base = 'estacional';
-  } else if (tendencia != null) {
-    valor = tendencia;
-    base = 'tendencia';
   } else {
-    return null;
+    const ultimosN = serie.slice(-recientes).map((s) => s.valor);
+    if (ultimosN.length === 0) return null;
+    valor = avg(ultimosN);
+    base = 'tendencia';
   }
 
   return { periodo: next, valor: Math.max(0, Math.round(valor)), base };

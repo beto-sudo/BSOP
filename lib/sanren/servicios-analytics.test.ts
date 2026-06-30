@@ -176,8 +176,8 @@ describe('addMes', () => {
 describe('computePronostico', () => {
   const pickConsumo = (r: ReturnType<typeof recibo>) => r.consumo_periodo;
 
-  it('mezcla estacionalidad y tendencia cuando hay ambas', () => {
-    // Mismo mes (jul) año previo = 300; recientes (abr/may/jun 2025) promedian 100.
+  it('usa el mismo mes de años anteriores con factor de tendencia neutro', () => {
+    // Sin 12m previos comparables (ventanas <3) → factor 1, predice el año pasado.
     const recibos = [
       recibo({ id: 'h1', periodo: '2024-07', consumo_periodo: 300 }),
       recibo({ id: 'r1', periodo: '2025-04', consumo_periodo: 90 }),
@@ -187,7 +187,55 @@ describe('computePronostico', () => {
     const p = computePronostico(recibos, pickConsumo);
     expect(p?.periodo).toBe('2025-07');
     expect(p?.base).toBe('estacional+tendencia');
-    expect(p?.valor).toBe(200); // 0.5*300 + 0.5*100
+    expect(p?.valor).toBe(300);
+  });
+
+  it('proyecta el próximo bimestre (no el próximo mes) y captura el pico estacional', () => {
+    // Luz bimestral en meses pares; agosto es el pico cada año.
+    const meses = [
+      ['2024-08', 6000],
+      ['2024-10', 5000],
+      ['2024-12', 3000],
+      ['2025-02', 4000],
+      ['2025-04', 3000],
+      ['2025-06', 4000],
+      ['2025-08', 6000],
+      ['2025-10', 5000],
+      ['2025-12', 3000],
+      ['2026-02', 4000],
+      ['2026-04', 3000],
+      ['2026-06', 4000],
+    ] as const;
+    const recibos = meses.map(([periodo, c], i) =>
+      recibo({ id: `l${i}`, servicio_tipo: 'luz', periodo, consumo_periodo: c })
+    );
+    const p = computePronostico(recibos, pickConsumo);
+    expect(p?.periodo).toBe('2026-08'); // +2 meses, no julio
+    expect(p?.base).toBe('estacional+tendencia');
+    expect(p?.valor).toBe(6000); // promedio de agostos (factor 1, tendencia plana)
+  });
+
+  it('escala por tendencia anual con clamp', () => {
+    const meses = [
+      ['2024-08', 1000],
+      ['2024-10', 1000],
+      ['2024-12', 1000],
+      ['2025-02', 1000],
+      ['2025-04', 1000],
+      ['2025-06', 1000],
+      ['2025-08', 2000],
+      ['2025-10', 2000],
+      ['2025-12', 2000],
+      ['2026-02', 2000],
+      ['2026-04', 2000],
+      ['2026-06', 2000],
+    ] as const;
+    const recibos = meses.map(([periodo, c], i) =>
+      recibo({ id: `t${i}`, servicio_tipo: 'luz', periodo, consumo_periodo: c })
+    );
+    const p = computePronostico(recibos, pickConsumo);
+    // mismos agostos: avg(1000,2000)=1500; ratio 12000/6000=2 → clamp 1.4 → 2100.
+    expect(p?.valor).toBe(2100);
   });
 
   it('usa solo tendencia si no hay historia del mismo mes', () => {
