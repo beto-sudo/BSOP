@@ -1,6 +1,6 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect --
+/* eslint-disable @typescript-eslint/no-explicit-any --
  * Supabase row mapping is dynamic; tightening types requires generated
  * Database shape refinements that are out of scope for the empleado
  * detail module. El useEffect con fetchAll es el patrón estándar
@@ -45,7 +45,17 @@ import { Button } from '@/components/ui/button';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Save, Loader2, UserX, Pencil, X, FileText, FileSignature } from 'lucide-react';
+import {
+  ArrowLeft,
+  Save,
+  Loader2,
+  UserX,
+  Pencil,
+  X,
+  FileText,
+  FileSignature,
+  Send,
+} from 'lucide-react';
 
 type Persona = {
   id: string;
@@ -524,6 +534,7 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
   const [motivoBaja, setMotivoBaja] = useState('');
   const [fechaBaja, setFechaBaja] = useState(new Date().toISOString().split('T')[0]);
   const [givingBaja, setGivingBaja] = useState(false);
+  const [testingAviso, setTestingAviso] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const { data: emp, error: eErr } = await supabase
@@ -768,12 +779,47 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
       alert(`Error: ${err.message}`);
       return;
     }
+    // Aviso de baja al comité (catálogo `empleado_baja`). Fire-and-forget:
+    // que el email falle NO debe romper la baja, que ya quedó registrada.
+    void fetch(`/api/rh/empleados/${empleado.id}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'baja' }),
+    }).catch(() => {});
     setShowBajaDialog(false);
     if (generarFiniquito) {
       router.push(`/${empresaSlug}/rh/personal/${empleado.id}/finiquito`);
       return;
     }
     await fetchAll();
+  };
+
+  // Manda el aviso (alta/baja según el estado del empleado) SOLO a tu correo,
+  // con asunto [PRUEBA]. No toca al comité ni la idempotencia. Útil para validar
+  // el template con datos reales antes de que dispare automático.
+  const handleProbarAviso = async () => {
+    if (!empleado) return;
+    const tipo = !empleado.activo || empleado.fecha_baja ? 'baja' : 'alta';
+    setTestingAviso(true);
+    try {
+      const res = await fetch(`/api/rh/empleados/${empleado.id}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, test: true }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        sentTo?: string[];
+        error?: string;
+      };
+      if (json.ok) {
+        alert(`Aviso de prueba (${tipo}) enviado a: ${(json.sentTo ?? []).join(', ')}`);
+      } else {
+        alert(`No se pudo enviar la prueba: ${json.error ?? 'error'}`);
+      }
+    } finally {
+      setTestingAviso(false);
+    }
   };
 
   if (loading) {
@@ -863,6 +909,20 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={handleProbarAviso}
+              disabled={testingAviso}
+              title="Envía el aviso de alta/baja SOLO a tu correo, con asunto [PRUEBA]"
+              className="gap-1.5 rounded-xl border-[var(--border)] text-[var(--text)] disabled:opacity-50"
+            >
+              {testingAviso ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}{' '}
+              Probar aviso
+            </Button>
             <Button
               variant="outline"
               onClick={() => router.push(`/${empresaSlug}/rh/personal/${empleado.id}/contrato`)}

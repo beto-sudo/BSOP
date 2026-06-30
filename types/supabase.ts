@@ -9369,6 +9369,8 @@ export type Database = {
           metodo_pago_sat: string | null
           motivo_baja: string | null
           notas: string | null
+          notif_alta_at: string | null
+          notif_baja_at: string | null
           nss: string | null
           numero_empleado: string | null
           periodo_prueba_dias: number | null
@@ -9404,6 +9406,8 @@ export type Database = {
           metodo_pago_sat?: string | null
           motivo_baja?: string | null
           notas?: string | null
+          notif_alta_at?: string | null
+          notif_baja_at?: string | null
           nss?: string | null
           numero_empleado?: string | null
           periodo_prueba_dias?: number | null
@@ -9439,6 +9443,8 @@ export type Database = {
           metodo_pago_sat?: string | null
           motivo_baja?: string | null
           notas?: string | null
+          notif_alta_at?: string | null
+          notif_baja_at?: string | null
           nss?: string | null
           numero_empleado?: string | null
           periodo_prueba_dias?: number | null

@@ -2,11 +2,12 @@
 
 **Slug:** `notificaciones-catalogo`
 **Empresas:** todas (modelo empresa-aware con NULL = global)
-**Schemas afectados:** `core` (2 tablas nuevas: `notification_definitions`, `notification_log`)
-**Estado:** done
+**Schemas afectados:** `core` (`notification_definitions`, `notification_log`), `erp` (columnas `empleados.notif_alta_at` / `notif_baja_at`)
+**Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Última actualización:** 2026-05-26 (4 sprints mergeados, iniciativa cerrada)
+**Próximo hito:** S6 alta/baja de empleados al comité (PR abierto); luego S5 centralizar los 6 emails huérfanos (hold, avalúo, dictamen, encuesta, briefing, orden de compra).
+**Última actualización:** 2026-06-30 (reabierta Fase 2 — completar el catálogo + avisos de personal)
 
 ## Problema
 
@@ -252,6 +253,39 @@ Orden de risk-progression:
   send con feedback de status.
 - **2026-05-26** — Iniciativa cerrada. Pendiente: Beto valida cada
   correo end-to-end via la nueva UI (test send + envío real).
+
+### Fase 2 — completar el catálogo (reapertura 2026-06-30)
+
+Auditoría a pedido de Beto: el sistema manda MÁS correos que los 10
+registrados. Varios nacieron después del catálogo y saltan el registro
+(from/subject hardcoded), por eso no aparecen en `/settings/notificaciones`,
+no se pueden apagar ni editar, y su traza no liga a una definición:
+
+- `lib/dilesa/hold-emails.ts` (hold creado / por vencer — manual + cron)
+- `lib/dilesa/avaluo-emails.ts` (solicitud de avalúo)
+- `lib/dilesa/dictamen-emails.ts` (solicitud de dictamen)
+- `lib/dilesa/encuesta-emails.ts` (encuesta post-venta — cron + manual)
+- `lib/briefing/email.ts` (briefing matutino — cron `daily-briefing`)
+- `dilesa_orden_compra` (slug referenciado en código pero nunca sembrado →
+  corre por fallback, invisible/inapagable en la UI)
+
+Y faltaba el correo de alta/baja de personal que Coda mandaba al comité.
+
+- **S6 — Avisos de alta/baja de personal** (esta sesión, PR abierto):
+  slugs `empleado_alta` / `empleado_baja` **por empresa** (DILESA + RDB →
+  `comite@dilesa.mx`, primer uso del override por `empresa_id` del catálogo).
+  Migración `20260630230337` (columnas idempotencia `erp.empleados.notif_*_at`
+  - seed por empresa). `lib/rh/empleado-emails.ts` (render alta/baja con el
+    layout de DILESA). API `POST /api/rh/empleados/[id]/notify` con flags
+    `resend`/`test` (test = [PRUEBA] solo al usuario). Disparo automático
+    fire-and-forget en el wizard de alta y en `handleBaja` del detalle + botón
+    "Probar aviso" en el expediente. Kill switch + log como el resto.
+- **S5 — Centralizar los 6 huérfanos** (siguiente PR): sembrar + reconectar
+  cada handler al catálogo (mismo refactor que el Sprint 2 original), uno o
+  dos por PR para no arriesgar los correos vivos. La orden de compra solo
+  necesita el seed (ya lee el catálogo con fail-open).
+- **S7 (opcional)** — mostrar el schedule del cron en la UI (read-only desde
+  `trigger_config.schedule_human`).
 
 ## Riesgos / open topics
 

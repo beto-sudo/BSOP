@@ -534,6 +534,13 @@ export function EmpleadoAltaWizard({
           description: 'Expediente completo. Listo para generar contrato.',
           type: 'success',
         });
+        // Aviso de alta al comité (catálogo `empleado_alta`). Fire-and-forget:
+        // que el email falle NO debe romper el alta, que ya quedó registrada.
+        void fetch(`/api/rh/empleados/${eId}/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo: 'alta' }),
+        }).catch(() => {});
         onCreated(eId);
         resetAll();
         onOpenChange(false);
