@@ -60,6 +60,7 @@ export function CuadraturaAjustes({
   descuentoPromocion,
   descuentoReal,
   sobreprecioCapturado,
+  saldoGastosResolucion,
 }: {
   ventaId: string;
   values: CuadraturaInputsStr;
@@ -86,6 +87,11 @@ export function CuadraturaAjustes({
    *  para señalar cuánto del descuento por sobreprecio falta formalizar como
    *  Máxima Aportación en la solicitud. */
   sobreprecioCapturado: number;
+  /** Resolución del faltante de gastos en la dictaminación (Sprint 3 de
+   *  `dilesa-saldos-residuales`). Renombra la parte del "descuento" sin sobreprecio
+   *  capturado detrás según la decisión de Dirección, para que no se lea como
+   *  "sobreprecio" cuando en realidad es un saldo a resolver. `null` = sin resolver. */
+  saldoGastosResolucion?: 'cobrar' | 'absorber' | null;
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
@@ -101,10 +107,23 @@ export function CuadraturaAjustes({
     // residual). Mismo helper que la card de cobertura del presupuesto notarial.
     const { promocion: descuentoPorPromocion, sobreprecio: descuentoPorSobreprecio } =
       partirDescuento(descuentoReal, descuentoPromocion, sobreprecioCapturado);
-    // Cuánto del sobreprecio aún no está formalizado como productos adicionales
-    // (precio inflado) → pendiente de capturar como Máxima Aportación.
-    const sobreprecioPorCapturar =
-      Math.round((descuentoPorSobreprecio - sobreprecioCapturado) * 100) / 100;
+    // La parte del "descuento por sobreprecio" SIN sobreprecio capturado detrás no es
+    // sobreprecio real: es el faltante de gastos que Dirección resuelve en la
+    // dictaminación (cobrar/absorber/depósito). Se separa para no leerlo como
+    // "sobreprecio". El total NO cambia (= descuento real); cuando el cliente paga, el
+    // valor real sube y el descuento real baja solo. (Sprint 3 dilesa-saldos-residuales.)
+    const saldoGastosPorResolver = Math.max(
+      0,
+      Math.round((descuentoPorSobreprecio - sobreprecioCapturado) * 100) / 100
+    );
+    const sobreprecioReal =
+      Math.round((descuentoPorSobreprecio - saldoGastosPorResolver) * 100) / 100;
+    const saldoGastosLabel =
+      saldoGastosResolucion === 'absorber'
+        ? '(+) Aportación DILESA (Máxima Aportación)'
+        : saldoGastosResolucion === 'cobrar'
+          ? '(+) Por cobrar al cliente (pagaré)'
+          : '(+) Saldo de gastos por resolver';
     return (
       <section className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text)]/55">
@@ -115,12 +134,25 @@ export function CuadraturaAjustes({
             label="Descuento por promoción (bono autorizado)"
             value={moneyFmt.format(descuentoPorPromocion)}
           />
-          <DerivadoRow
-            label="(+) Descuento por sobreprecio"
-            value={moneyFmt.format(descuentoPorSobreprecio)}
-          />
+          {sobreprecioReal > 0.5 ? (
+            <DerivadoRow
+              label="(+) Descuento por sobreprecio"
+              value={moneyFmt.format(sobreprecioReal)}
+            />
+          ) : null}
+          {saldoGastosPorResolver > 0.5 ? (
+            <DerivadoRow
+              label={saldoGastosLabel}
+              value={moneyFmt.format(saldoGastosPorResolver)}
+              tone={saldoGastosResolucion == null ? 'warn' : undefined}
+            />
+          ) : null}
           <div className="my-1 border-t border-[var(--border)]" />
-          <DerivadoRow label="(=) Descuento total" value={moneyFmt.format(descuentoTotal)} strong />
+          <DerivadoRow
+            label="(=) Descuento real frente al escriturado"
+            value={moneyFmt.format(descuentoTotal)}
+            strong
+          />
         </div>
         <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-[var(--border)] px-3 py-2">
           <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text)]/50">
@@ -133,12 +165,15 @@ export function CuadraturaAjustes({
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--text)]/50">
           El <strong>descuento por promoción</strong> es el bono autorizado del catálogo (tope{' '}
-          {moneyFmt.format(descuentoPromocion)}); el <strong>descuento por sobreprecio</strong> es
-          lo que DILESA concede de más subiendo el precio. Juntos son el descuento real frente al
-          valor escriturado ({moneyFmt.format(descuentoTotal)}).
-          {sobreprecioPorCapturar > 0.5
-            ? ` De esos, ${moneyFmt.format(sobreprecioPorCapturar)} no tienen sobreprecio capturado detrás: son un saldo de gastos que Dirección resuelve en la dictaminación (cobrar con pagaré, absorber como Máxima Aportación, o que el cliente lo deposite).`
+          {moneyFmt.format(descuentoPromocion)}).
+          {sobreprecioReal > 0.5
+            ? ` El descuento por sobreprecio (${moneyFmt.format(sobreprecioReal)}) es lo que DILESA concede subiendo el precio (ya capturado).`
             : ''}
+          {saldoGastosPorResolver > 0.5
+            ? ` El ${saldoGastosResolucion == null ? 'saldo de gastos por resolver' : saldoGastosResolucion === 'absorber' ? 'monto que DILESA absorbe (Máxima Aportación)' : 'monto por cobrar al cliente'} (${moneyFmt.format(saldoGastosPorResolver)}) no es sobreprecio: el bono y el enganche no alcanzan a cubrir los gastos. Dirección lo resuelve en la dictaminación (cobrar con pagaré, absorber como Máxima Aportación, o que el cliente lo deposite); al pagarse, el descuento real baja solo.`
+            : ''}{' '}
+          Todo junto es el descuento real frente al valor escriturado (
+          {moneyFmt.format(descuentoTotal)}).
         </p>
       </section>
     );
@@ -302,18 +337,21 @@ function DerivadoRow({
   label,
   value,
   strong = false,
+  tone,
 }: {
   label: string;
   value: string;
   strong?: boolean;
+  tone?: 'warn';
 }) {
+  const valueTone = tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-[var(--text)]';
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className={strong ? 'font-medium text-[var(--text)]/80' : 'text-[var(--text)]/65'}>
         {label}
       </span>
       <span
-        className={`tabular-nums text-[var(--text)] ${strong ? 'text-base font-semibold' : 'font-medium'}`}
+        className={`tabular-nums ${valueTone} ${strong ? 'text-base font-semibold' : 'font-medium'}`}
       >
         {value}
       </span>
