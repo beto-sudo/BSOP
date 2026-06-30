@@ -45,6 +45,20 @@ let updateCorteResult: { data: { id: string }[]; error: { message: string } | nu
   error: null,
 };
 let upsertDenomError: { message: string } | null = null;
+// Guard de vouchers de tarjeta al cerrar (rdb.v_cortes_totales + count de vouchers).
+let totalesResult: {
+  data: { ingresos_tarjeta: number } | null;
+  error: { message: string } | null;
+} = { data: { ingresos_tarjeta: 0 }, error: null };
+let voucherCountResult: {
+  data: null;
+  count: number | null;
+  error: { message: string } | null;
+} = {
+  data: null,
+  count: 0,
+  error: null,
+};
 
 // registrarMovimiento state.
 let insertMovimientoResult: { data: { id: string } | null; error: { message: string } | null } = {
@@ -107,10 +121,12 @@ function buildSupabaseMock(): any {
           let _op = '';
           const _filters: Record<string, unknown> = {};
           let _payload: unknown = null;
+          let _selectOpts: { head?: boolean; count?: string } | undefined;
 
           const builder: any = {
-            select(_cols: string) {
+            select(_cols: string, opts?: { head?: boolean; count?: string }) {
               _op = _op || 'select';
+              _selectOpts = opts;
               return builder;
             },
             insert(payload: unknown) {
@@ -167,6 +183,9 @@ function buildSupabaseMock(): any {
               if (schemaName === 'erp' && tableName === 'cortes_vouchers') {
                 return { data: voucherLookup, error: voucherLookupError };
               }
+              if (schemaName === 'rdb' && tableName === 'v_cortes_totales') {
+                return totalesResult;
+              }
               return { data: null, error: null };
             },
             async single() {
@@ -213,6 +232,15 @@ function buildSupabaseMock(): any {
               }
               if (schemaName === 'erp' && tableName === 'cortes_vouchers' && _op === 'delete') {
                 return Promise.resolve({ data: null, error: deleteVoucherError }).then(onFulfilled);
+              }
+              if (
+                schemaName === 'erp' &&
+                tableName === 'cortes_vouchers' &&
+                _op === 'select' &&
+                _selectOpts?.head
+              ) {
+                // Count query del guard de cierre: .select('id',{count,head}).
+                return Promise.resolve(voucherCountResult).then(onFulfilled);
               }
               if (schemaName === 'erp' && tableName === 'cortes_vouchers' && _op === 'select') {
                 return Promise.resolve(vouchersListResult).then(onFulfilled);
@@ -289,6 +317,8 @@ beforeEach(() => {
   insertCorteResult = { data: { id: 'corte-new' }, error: null };
   updateCorteResult = { data: [{ id: 'corte-1' }], error: null };
   upsertDenomError = null;
+  totalesResult = { data: { ingresos_tarjeta: 0 }, error: null };
+  voucherCountResult = { data: null, count: 0, error: null };
   insertMovimientoResult = { data: { id: 'mov-1' }, error: null };
   previewData = null;
   previewError = null;
@@ -456,6 +486,52 @@ describe('cerrarCaja', () => {
         denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 0 }],
       })
     ).resolves.toBeUndefined();
+  });
+
+  // Guard de vouchers de tarjeta (regresión: corte Caja Elda 2026-06-30 cerró
+  // con $5,275 de tarjeta y 0 vouchers porque el gate del cliente dependía del
+  // list view con lag de Waitry).
+  it('throws si hay ingresos por tarjeta y 0 vouchers de terminal', async () => {
+    totalesResult = { data: { ingresos_tarjeta: 5275 }, error: null };
+    voucherCountResult = { data: null, count: 0, error: null };
+    await expect(
+      cerrarCaja({
+        corte_id: 'corte-1',
+        denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
+      })
+    ).rejects.toThrow(/ingresos por tarjeta sin voucher/i);
+  });
+
+  it('success si hay ingresos por tarjeta y al menos un voucher', async () => {
+    totalesResult = { data: { ingresos_tarjeta: 5275 }, error: null };
+    voucherCountResult = { data: null, count: 1, error: null };
+    await expect(
+      cerrarCaja({
+        corte_id: 'corte-1',
+        denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('no exige voucher si no hay ingresos por tarjeta', async () => {
+    totalesResult = { data: { ingresos_tarjeta: 0 }, error: null };
+    voucherCountResult = { data: null, count: 0, error: null };
+    await expect(
+      cerrarCaja({
+        corte_id: 'corte-1',
+        denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws si error consultando totales del corte', async () => {
+    totalesResult = { data: null, error: { message: 'view timeout' } };
+    await expect(
+      cerrarCaja({
+        corte_id: 'corte-1',
+        denominaciones: [{ denominacion: 100, tipo: 'billete', cantidad: 5 }],
+      })
+    ).rejects.toThrow(/totales del corte/i);
   });
 });
 
