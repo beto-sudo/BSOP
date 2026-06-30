@@ -48,13 +48,14 @@ export function VentaExpedienteShell({ children }: { children: ReactNode }) {
     const sb = createSupabaseBrowserClient();
     void sb
       .schema('dilesa')
-      .from('v_fase_benchmark')
-      .select('mediana, p90')
+      .from('v_fase_vara')
+      .select('vara, p90')
       .eq('posicion', fasePos)
       .then(({ data }) => {
         if (!activo) return;
         const row = data?.[0];
-        setBenchFase(row ? { mediana: row.mediana, p90: row.p90 } : null);
+        // `vara` = meta de Dirección si existe, si no la mediana histórica (S3).
+        setBenchFase(row ? { mediana: row.vara, p90: row.p90 } : null);
       });
     return () => {
       activo = false;

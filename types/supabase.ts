@@ -3058,6 +3058,42 @@ export type Database = {
         }
         Relationships: []
       }
+      fase_metas: {
+        Row: {
+          activa: boolean
+          created_at: string
+          editado_por: string | null
+          empresa_id: string
+          id: string
+          meta_dias: number
+          nota: string | null
+          posicion: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          editado_por?: string | null
+          empresa_id: string
+          id?: string
+          meta_dias: number
+          nota?: string | null
+          posicion: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          editado_por?: string | null
+          empresa_id?: string
+          id?: string
+          meta_dias?: number
+          nota?: string | null
+          posicion?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gastos_notariales_config: {
         Row: {
           activa: boolean
@@ -6339,6 +6375,19 @@ export type Database = {
           n: number | null
           p90: number | null
           posicion: number | null
+        }
+        Relationships: []
+      }
+      v_fase_vara: {
+        Row: {
+          empresa_id: string | null
+          fase: string | null
+          mediana: number | null
+          meta: number | null
+          n: number | null
+          p90: number | null
+          posicion: number | null
+          vara: number | null
         }
         Relationships: []
       }

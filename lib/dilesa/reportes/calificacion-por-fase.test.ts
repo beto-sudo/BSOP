@@ -80,6 +80,22 @@ describe('construirCalificacion', () => {
     expect(construirCalificacion(periodo, benchmark).tramosMedidos).toBe(17);
   });
 
+  it('la meta de Dirección sustituye a la mediana como vara (S3)', () => {
+    // Sin meta: periodo 12 vs mediana 4 → ratio 3 → rojo.
+    const sinMeta = construirCalificacion([raw(3, 'Formalizada', 50, 12, 100)], benchmark);
+    expect(sinMeta.filas.find((f) => f.posicion === 3)?.banda).toBe('rojo');
+    // Con meta 10 (más holgada): 12/10 = 1.2 → ámbar. Se muestra la meta y la vara.
+    const conMeta = construirCalificacion(
+      [raw(3, 'Formalizada', 50, 12, 100)],
+      [{ posicion: 3, fase: 'Formalizada', mediana: 4, p90: 120, n: 1000, meta: 10, vara: 10 }]
+    );
+    const fila = conMeta.filas.find((f) => f.posicion === 3)!;
+    expect(fila.banda).toBe('ambar');
+    expect(fila.meta).toBe(10);
+    expect(fila.vara).toBe(10);
+    expect(fila.baseline).toBe(4); // el histórico sigue visible
+  });
+
   it('asigna responsable (tercero en Escriturada=notaría, interna en Facturada)', () => {
     const r = construirCalificacion([], benchmark);
     expect(r.filas.find((f) => f.posicion === 11)?.responsable).toBe('tercero');

@@ -378,14 +378,15 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     const sb = createSupabaseBrowserClient();
     void sb
       .schema('dilesa')
-      .from('v_fase_benchmark')
-      .select('posicion, mediana, p90')
+      .from('v_fase_vara')
+      .select('posicion, vara, p90')
       .eq('empresa_id', empresaId)
       .then(({ data }) => {
         if (!activo) return;
         const m = new Map<number, FaseBenchmarkRef>();
+        // `vara` = meta de Dirección si existe, si no la mediana histórica (S3).
         for (const b of data ?? []) {
-          if (b.posicion != null) m.set(b.posicion, { mediana: b.mediana, p90: b.p90 });
+          if (b.posicion != null) m.set(b.posicion, { mediana: b.vara, p90: b.p90 });
         }
         setBenchmark(m);
       });

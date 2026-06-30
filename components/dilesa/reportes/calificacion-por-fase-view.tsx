@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { usePermissions, useEffectiveUser } from '@/components/providers';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { getReporte } from '@/lib/dilesa/reportes/registry';
 import {
@@ -57,6 +58,12 @@ function fechaISO(msEpoch: number): string {
 
 export function CalificacionPorFaseView() {
   const { filters, setFilter } = useUrlFilters(DEFAULT_FILTERS);
+  // Solo Dirección/admin edita metas (la RLS lo enforce; aquí decide si se
+  // muestra el input). Espejo del patrón de requisiciones/presupuesto.
+  const { permissions } = usePermissions();
+  const { data: effectiveUser } = useEffectiveUser();
+  const esDireccion =
+    permissions.isAdmin || (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
   const periodo = (
     Object.prototype.hasOwnProperty.call(PERIODOS, filters.periodo) ? filters.periodo : 'trimestre'
   ) as PeriodoKey;
@@ -74,8 +81,8 @@ export function CalificacionPorFaseView() {
 
     const benchRes = await sb
       .schema('dilesa')
-      .from('v_fase_benchmark')
-      .select('posicion, fase, mediana, p90, n')
+      .from('v_fase_vara')
+      .select('posicion, fase, mediana, p90, n, meta, vara')
       .eq('empresa_id', DILESA_EMPRESA_ID);
     if (benchRes.error) {
       setError(getSupabaseErrorMessage(benchRes.error, 'No se pudo cargar el benchmark.'));
@@ -153,6 +160,39 @@ export function CalificacionPorFaseView() {
     void cargar();
   }, [cargar]);
 
+  // Fija/actualiza/borra la meta de una fase (solo Dirección; la RLS lo enforce).
+  // Valor vacío = borrar la meta (vuelve a la mediana histórica como vara).
+  const guardarMeta = useCallback(
+    async (posicion: number, valor: string) => {
+      const sb = createSupabaseBrowserClient();
+      const limpio = valor.trim();
+      if (limpio === '') {
+        await sb
+          .schema('dilesa')
+          .from('fase_metas')
+          .update({ activa: false })
+          .eq('empresa_id', DILESA_EMPRESA_ID)
+          .eq('posicion', posicion);
+      } else {
+        const meta = Number(limpio);
+        if (Number.isNaN(meta) || meta < 0) return;
+        const { error: upErr } = await sb
+          .schema('dilesa')
+          .from('fase_metas')
+          .upsert(
+            { empresa_id: DILESA_EMPRESA_ID, posicion, meta_dias: meta, activa: true },
+            { onConflict: 'empresa_id,posicion' }
+          );
+        if (upErr) {
+          setError(getSupabaseErrorMessage(upErr, 'No se pudo guardar la meta.'));
+          return;
+        }
+      }
+      await cargar();
+    },
+    [cargar]
+  );
+
   const result = useMemo(
     () => construirCalificacion(periodoRaw, benchmark, previoRaw),
     [periodoRaw, benchmark, previoRaw]
@@ -208,8 +248,15 @@ export function CalificacionPorFaseView() {
 
       <p className="text-xs text-[var(--text)]/50">
         {esActivas
-          ? 'Permanencia actual de las ventas vivas en cada fase. Banda vs. el histórico de la fase.'
-          : 'Mediana y p90 de días por fase en el periodo (tramos ya completados). Banda = qué tan lenta vs. su histórico. Fases 1–14 del pipeline; las post-entrega se excluyen.'}
+          ? 'Permanencia actual de las ventas vivas en cada fase. Banda vs. la vara de la fase (meta o histórico).'
+          : 'Mediana y p90 de días por fase en el periodo (tramos ya completados). Banda = qué tan lenta vs. su vara. Fases 1–14 del pipeline; las post-entrega se excluyen.'}
+        {esDireccion ? (
+          <span className="text-[var(--text)]/40">
+            {' '}
+            Como Dirección, puedes editar la <strong>Meta</strong> de cada fase (vacío = usar la
+            mediana histórica).
+          </span>
+        ) : null}
       </p>
 
       {error ? (
@@ -240,6 +287,7 @@ export function CalificacionPorFaseView() {
                 <th className="hidden px-3 py-2.5 text-right font-medium md:table-cell">
                   Histórico
                 </th>
+                <th className="px-3 py-2.5 text-right font-medium">Meta</th>
                 <th className="px-3 py-2.5 text-center font-medium">Banda</th>
                 {!esActivas ? (
                   <th className="hidden px-3 py-2.5 text-right font-medium md:table-cell">
@@ -278,6 +326,27 @@ export function CalificacionPorFaseView() {
                   </td>
                   <td className="hidden px-3 py-2.5 text-right tabular-nums text-[var(--text)]/45 md:table-cell">
                     {f.baseline != null ? `${f.baseline} d` : '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {esDireccion ? (
+                      <input
+                        key={`meta-${f.posicion}-${f.meta ?? ''}`}
+                        type="number"
+                        min={0}
+                        defaultValue={f.meta ?? ''}
+                        placeholder={f.baseline != null ? String(f.baseline) : '—'}
+                        onBlur={(e) => {
+                          if (e.target.value !== String(f.meta ?? ''))
+                            void guardarMeta(f.posicion, e.target.value);
+                        }}
+                        className="w-14 rounded border border-[var(--border)] bg-[var(--card)] px-1.5 py-0.5 text-right text-xs tabular-nums"
+                        title="Meta de días para esta fase (vacío = usar la mediana histórica)"
+                      />
+                    ) : f.meta != null ? (
+                      <span className="tabular-nums text-[var(--text)]/70">{f.meta} d</span>
+                    ) : (
+                      <span className="text-[var(--text)]/30">auto</span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     {f.banda === 'gris' ? (
