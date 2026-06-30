@@ -618,6 +618,43 @@ describe('calcularCuadratura', () => {
       expect(c.descuentoAplicado - c.chequePagado).toBe(0); // sin fantasma → sin warning
     });
 
+    // `dilesa-descuento-perdonado-motor`: sobreprecio capturado >> el que cubre los
+    // gastos — el caso que disparaba el warning PLD de Christopher (M3-L16). El precio
+    // se subió 101,000 (920k → 1,021k) pero solo 15,000 de ese sobreprecio cubre los
+    // gastos (el resto es venta real que DILESA conserva). El motor sumaba el CAPTURADO
+    // (101,000) a descuentoAplicado → `descuentoAplicado − cheque` = 70,360 de perdón
+    // fantasma. Con el efectivo (sobreprecioCobertura 15,000) → descuentoAplicado =
+    // 15,000 = descuentoReal, sin fantasma.
+    it('sobreprecio capturado >> el que cubre gastos: descuentoAplicado usa el efectivo, sin perdón fantasma (Christopher M3-L16)', () => {
+      const c = calcularCuadratura({
+        valorEscrituracion: 1021000,
+        montoCreditoTitular: 1021000, // crédito cubre el precio → el enganche fondea gastos
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: 30640, // cheque a notaría girado (Fase 11)
+        gastosEscrituracion: 60640,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        sobreprecioGastos: 101000, // 920k → 1,021k escriturado (hecho); solo 15k cubre gastos
+        promocionGastos: 0, // sin bono
+        depositos: [{ monto: 15640, directoCliente: true, tieneRecibo: true }],
+        proyectoNombre: 'Lomas de los Encinos',
+      });
+      const cob = c.coberturaGastos!;
+      expect(cob.aportacionPromocion).toBe(0); // sin bono
+      expect(cob.sobreprecioCobertura).toBe(15000); // efectivo: lo que cubre los gastos
+      expect(cob.saldoCobertura).toBe(0); // los gastos cuadran
+      // FIX: el efectivo (15,000), NO el capturado (101,000).
+      expect(c.descuentoAplicado).toBe(15000);
+      expect(c.descuentoReal).toBe(15000); // descuentoAplicado == descuentoReal
+      expect(c.chequePagado).toBe(30640);
+      // "Descuento perdonado" de la revisión PLD = descuentoAplicado − cheque.
+      expect(Math.max(0, c.descuentoAplicado - c.chequePagado)).toBe(0); // sin fantasma → sin warning
+      // El saldoCliente legacy (no mostrado en desglose) también queda sano.
+      expect(c.saldoCliente).toBe(0); // antes: −86,000
+    });
+
     // Camino "Cobrar" del residual de precio (iniciativa dilesa-saldos-residuales S2):
     // el cliente firma un pagaré por los $792. El pagaré NO sobre-fondea los gastos
     // (ya cuadran): se asigna al PRECIO, sube el Valor Real y baja la NC en $792.
@@ -748,11 +785,13 @@ describe('calcularCuadratura', () => {
       expect(c.comisionVendedor).toBe(8995.39); // (909,539 − 10,000) × 1%
     });
 
-    it('operacionCubierta es model-aware: cubierta aunque el saldoCliente legacy sea fantasma — Arizpe', () => {
-      // El crédito cubre el precio (909,000) y las fuentes cubren los gastos. El
-      // `saldoCliente` legacy = cheque 18,313 − descuento 15,000 = 3,313 (fantasma,
-      // NO deuda) y marca `cubierta=false`; `operacionCubierta` corrige a true y el
-      // copiloto/gates lo leen. saldoOperacion = 0 (nada pendiente).
+    it('operacionCubierta es model-aware y el saldoCliente legacy ya no es fantasma — Arizpe', () => {
+      // El crédito cubre el precio (909,000) y las fuentes cubren los gastos.
+      // `dilesa-descuento-perdonado-motor`: con `descuentoAplicado` usando el
+      // sobreprecio EFECTIVO (15,000 promo + 3,313 sobreprecio = 18,313 = cheque), el
+      // `saldoCliente` legacy queda en 0 (antes daba 3,313 fantasma usando el descuento
+      // sin el sobreprecio). `operacionCubierta` sigue siendo la fuente canónica para
+      // copiloto/gates. saldoOperacion = 0 (nada pendiente).
       const c = calcularCuadratura({
         valorEscrituracion: 909000,
         montoCreditoTitular: 909000,
@@ -767,8 +806,9 @@ describe('calcularCuadratura', () => {
         promocionGastos: 15000,
         depositos: [],
       });
-      expect(c.saldoCliente).toBe(3313); // legacy fantasma
-      expect(c.cubierta).toBe(false); // legacy, equivocado para desglose
+      expect(c.descuentoAplicado).toBe(18313); // promo 15,000 + sobreprecio efectivo 3,313
+      expect(c.saldoCliente).toBe(0); // ya no fantasma (antes 3,313)
+      expect(c.cubierta).toBe(true); // legacy ya coincide con operacionCubierta
       expect(c.operacionCubierta).toBe(true); // ← model-aware: SÍ cubierta
       expect(c.saldoOperacion).toBe(0); // nada pendiente
     });

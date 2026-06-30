@@ -69,6 +69,8 @@ function expediente(partial: Partial<ExpedientePld> = {}): ExpedientePld {
     // Descuento $15,000 (gastos escrituración), $13,378 girados a notaría →
     // $1,622 perdonados = el hueco exacto entre liquidaciones y pactado.
     descuentoPerdonado: 1622,
+    // Enganche íntegro al precio (los depósitos == liquidaciones del aviso).
+    engancheAGastos: 0,
     ...partial,
   };
 }
@@ -121,6 +123,40 @@ describe('cruzarPldConExpediente — caso real cuadrado', () => {
 
   it('veredicto: verde (el caso real cuadra con el descuento)', () => {
     expect(veredictoDe(checks)).toBe('verde');
+  });
+});
+
+describe('cruzarPldConExpediente — liq_vs_depositos netea el enganche a gastos', () => {
+  // Caso Christopher M3-L16: el aviso declara liquidaciones del PRECIO ($1,021,000,
+  // solo el crédito); los depósitos registrados incluyen el enganche de $15,640 que
+  // fondea GASTOS notariales, no el precio. Netear ese enganche cuadra el check.
+  const ext = () =>
+    extraccion({
+      valorPactado: 1021000,
+      liquidaciones: [{ fecha: '2026-06-01', monto: 1021000 }],
+    });
+  const exp = (partial: Partial<ExpedientePld> = {}) =>
+    expediente({
+      valorEscrituracion: 1021000,
+      depositos: [1021000, 15640], // crédito + enganche
+      descuentoPerdonado: 0,
+      engancheAGastos: 15640,
+      ...partial,
+    });
+
+  it('pasa: depósitos ($1,036,640) − enganche a gastos ($15,640) = liquidaciones', () => {
+    const c = porClave(cruzarPldConExpediente(ext(), exp()), 'liq_vs_depositos');
+    expect(c?.ok).toBe(true);
+  });
+
+  it('sin netear (enganche a gastos = 0) el mismo caso marcaría warning', () => {
+    const c = porClave(
+      cruzarPldConExpediente(ext(), exp({ engancheAGastos: 0 })),
+      'liq_vs_depositos'
+    );
+    expect(c?.ok).toBe(false);
+    expect(c?.severidad).toBe('warning');
+    expect(c?.detalle).toContain('1,036,640');
   });
 });
 

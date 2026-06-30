@@ -507,16 +507,22 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
 
   // Descuento que reduce el saldo. Con desglose (ADR-045 + `dilesa-descuento-
   // perdonado-motor`): promoción CONSUMIDA (`aportacionPromocion`, ya topada al bono
-  // autorizado por `partirDescuento`) + sobreprecio CAPTURADO (hecho escriturado, lo
-  // absorbe el crédito). Antes se usaba el TOPE del bono (`promocionGastos`), que
-  // sobre-estimaba el descuento cuando el bono no se consumía completo y dejaba un
-  // "descuento perdonado" fantasma (`descuentoAplicado − cheque`) en la Fase 13
-  // (ej. Aracely M10-L32: tope 15,000 vs consumido 13,380 → 1,620 fantasma). Como
-  // `aportacionPromocion ≤ promocionGastos`, el fix nunca infla el descuento. Sin
-  // desglose (ventas cerradas/legacy) → modelo viejo: `descuento_total` topado al
-  // máximo autorizado. Fallback que NO altera nada histórico.
+  // autorizado por `partirDescuento`) + sobreprecio que CUBRE el presupuesto
+  // (`sobreprecioCobertura`, el efectivo — ya topado al faltante por `partirDescuento`).
+  // Antes se usaban el TOPE del bono (`promocionGastos`) y el sobreprecio CAPTURADO
+  // (`sobreprecioGastos`), ambos sin topar: sobre-estimaban el descuento cuando el bono
+  // no se consumía completo o el precio se subía MÁS de lo que cubre los gastos, y
+  // dejaban un "descuento perdonado" fantasma (`descuentoAplicado − cheque`) en la
+  // Fase 13. Casos reales: Aracely M10-L32 (tope bono 15,000 vs consumido 13,380 →
+  // 1,620 fantasma, ya corregido el lado promo) y Christopher M3-L16 (sobreprecio
+  // capturado 101,000 vs efectivo 15,000 → 70,360 fantasma, corregido aquí el lado
+  // sobreprecio). Con el efectivo, `descuentoAplicado` == `descuentoReal` y el fix
+  // nunca infla el descuento (`aportacionPromocion ≤ promocionGastos`,
+  // `sobreprecioCobertura ≤ sobreprecioGastos`). Sin desglose (ventas cerradas/legacy)
+  // → modelo viejo: `descuento_total` topado al máximo autorizado. Fallback que NO
+  // altera nada histórico.
   const descuentoAplicado = tieneDesglose
-    ? round2(aportacionPromocion + sobreprecioGastos)
+    ? round2(aportacionPromocion + sobreprecioCobertura)
     : i.descuentoMaximoAutorizado != null
       ? Math.min(descuentoOtorgadoTotal, Math.max(0, n(i.descuentoMaximoAutorizado)))
       : descuentoOtorgadoTotal;
