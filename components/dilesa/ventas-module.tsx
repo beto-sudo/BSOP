@@ -18,6 +18,15 @@ import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import { proximaFase } from '@/lib/dilesa/fases';
 import { colorDiasFase } from '@/lib/dilesa/dias-en-fase';
+import {
+  bandaFluidez,
+  colorFluidez,
+  labelFluidez,
+  severidadFluidez,
+  toneFluidez,
+  tooltipFluidez,
+  type FaseBenchmarkRef,
+} from '@/lib/dilesa/fluidez-venta';
 import { VENTA_ESTADO_CONFIG, VENTA_ESTADOS } from '@/lib/status-tokens';
 import { Input } from '@/components/ui/input';
 import {
@@ -147,6 +156,9 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     permissions.isAdmin ||
     permissions.modulos.get('dilesa.ventas.fase01_solicitud')?.write === true;
   const [ventas, setVentas] = useState<VentaListaRow[]>([]);
+  // Benchmark por fase (mediana/p90) de S2a: contextualiza los días en fase del
+  // chip y alimenta la columna Fluidez. Carga aparte (cambia poco; 14 filas).
+  const [benchmark, setBenchmark] = useState<Map<number, FaseBenchmarkRef>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -360,6 +372,39 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     };
   }, [fetchVentas]);
 
+  // Benchmark por fase (S2a): mediana/p90 de días por posición de fase.
+  useEffect(() => {
+    let activo = true;
+    const sb = createSupabaseBrowserClient();
+    void sb
+      .schema('dilesa')
+      .from('v_fase_benchmark')
+      .select('posicion, mediana, p90')
+      .eq('empresa_id', empresaId)
+      .then(({ data }) => {
+        if (!activo) return;
+        const m = new Map<number, FaseBenchmarkRef>();
+        for (const b of data ?? []) {
+          if (b.posicion != null) m.set(b.posicion, { mediana: b.mediana, p90: b.p90 });
+        }
+        setBenchmark(m);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [empresaId]);
+
+  // Banda de riesgo de una venta = sus días en la fase actual vs. el benchmark
+  // de esa fase. `null` si no hay días (fuera del pipeline vivo) o sin benchmark.
+  const bandaDe = useCallback(
+    (v: VentaListaRow) =>
+      bandaFluidez(
+        v.diasEnFase,
+        v.fase_posicion != null ? (benchmark.get(v.fase_posicion) ?? null) : null
+      ),
+    [benchmark]
+  );
+
   const proyectosPresentes = useMemo(
     () => [...new Set(ventas.map((v) => v.proyectoNombre).filter(Boolean))].sort(),
     [ventas]
@@ -446,14 +491,20 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         if (!v.fase_actual) return <span>—</span>;
         // Estado (participio) + "lo que sigue" (acción infinitivo de la fase+1).
         const sig = proximaFase(v.fase_posicion);
+        // Días contextualizados por el benchmark de la fase (S2b): el color del
+        // número significa "lento PARA ESTA FASE", no un umbral fijo.
+        const bench = v.fase_posicion != null ? (benchmark.get(v.fase_posicion) ?? null) : null;
+        const banda = bandaFluidez(v.diasEnFase, bench);
         return (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
               <Badge tone="neutral">{v.fase_actual}</Badge>
               {v.diasEnFase != null ? (
                 <span
-                  className={`text-xs font-medium tabular-nums ${colorDiasFase(v.diasEnFase)}`}
-                  title={`${v.diasEnFase} día${v.diasEnFase === 1 ? '' : 's'} en esta fase`}
+                  className={`text-xs font-medium tabular-nums ${
+                    banda ? colorFluidez(banda) : colorDiasFase(v.diasEnFase)
+                  }`}
+                  title={tooltipFluidez(v.diasEnFase, v.fase_actual, bench)}
                 >
                   {v.diasEnFase} d
                 </span>
@@ -485,6 +536,18 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           {VENTA_ESTADO_CONFIG[v.estado as keyof typeof VENTA_ESTADO_CONFIG]?.label ?? v.estado}
         </Badge>
       ),
+    },
+    {
+      key: 'fluidez',
+      label: 'Fluidez',
+      type: 'custom',
+      // Ordena por severidad: críticas arriba. Las sin dato (fuera de pipeline) al fondo.
+      accessor: (v) => severidadFluidez(bandaDe(v)),
+      render: (v) => {
+        const banda = bandaDe(v);
+        if (!banda) return <span className="text-[var(--text)]/30">—</span>;
+        return <Badge tone={toneFluidez(banda)}>{labelFluidez(banda)}</Badge>;
+      },
     },
     { key: 'vendedor', label: 'Vendedor', type: 'text', render: (v) => v.vendedor ?? '—' },
   ];

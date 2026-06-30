@@ -15,6 +15,7 @@
 import type { Cuadratura } from '@/lib/dilesa/cuadratura';
 import { proximaFase } from '@/lib/dilesa/fases';
 import { colorDiasFase } from '@/lib/dilesa/dias-en-fase';
+import { colorFluidez, type BandaFluidez } from '@/lib/dilesa/fluidez-venta';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -41,6 +42,8 @@ export type OperacionResumenProps = {
   totalFases: number;
   /** Días en la fase actual (S1 dilesa-fluidez-pipeline); `null` = sin dato. */
   diasEnFase?: number | null;
+  /** Banda de riesgo de los días vs. el benchmark de la fase (S2b). */
+  diasBanda?: BandaFluidez | null;
   cuadratura: Cuadratura;
 };
 
@@ -54,6 +57,7 @@ export function OperacionResumen({
   fasePosicion,
   totalFases,
   diasEnFase,
+  diasBanda,
   cuadratura,
 }: OperacionResumenProps) {
   const pct =
@@ -96,7 +100,11 @@ export function OperacionResumen({
                 <span className="font-medium text-[var(--text)]/80">{faseActual}</span>
                 <span className="flex items-center gap-2">
                   {diasEnFase != null ? (
-                    <span className={`font-medium tabular-nums ${colorDiasFase(diasEnFase)}`}>
+                    <span
+                      className={`font-medium tabular-nums ${
+                        diasBanda ? colorFluidez(diasBanda) : colorDiasFase(diasEnFase)
+                      }`}
+                    >
                       {diasEnFase} d en fase
                     </span>
                   ) : null}
