@@ -10,6 +10,13 @@ import {
 } from '@/components/module-page';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import type { ServiciosData, ReciboVista } from '@/lib/sanren-servicios';
+import {
+  computeServicioKpis,
+  computeComparativos,
+  computeAnomalias,
+  type ServicioKpiSet,
+  type Comparativos as ComparativosData,
+} from '@/lib/sanren/servicios-analytics';
 import { ServiciosTendencias } from '@/components/sanren/servicios-tendencias';
 import { ReciboDrawer } from '@/components/sanren/recibo-drawer';
 
@@ -29,6 +36,11 @@ function money(n: number | null): string {
 function num(n: number | null, suffix = ''): string {
   if (n == null) return '—';
   return `${n.toLocaleString('es-MX')}${suffix}`;
+}
+
+function pct(n: number | null): string {
+  if (n == null) return '—';
+  return `${n >= 0 ? '+' : ''}${(n * 100).toFixed(0)}%`;
 }
 
 const SERVICIO_STYLE: Record<string, { label: string; cls: string }> = {
@@ -57,6 +69,128 @@ const FILTER_DEFAULTS = {
   desde: '',
   hasta: '',
 };
+
+type Kpi = {
+  key: string;
+  label: string;
+  value: React.ReactNode;
+  valueClassName?: string;
+};
+
+const u = (s: string | null) => (s ? ` ${s}` : '');
+
+/**
+ * KPIs según el servicio activo. "Todos" mantiene el resumen genérico; cada
+ * servicio muestra las métricas que cuentan su historia (Luz → solar/banco,
+ * Agua/Gas → consumo y pico). Tope de 5 por ADR-004 R3.
+ */
+function buildKpis(servicio: string, k: ServicioKpiSet): Kpi[] {
+  if (servicio === 'luz') {
+    return [
+      { key: 'gasto', label: 'Gasto', value: money(k.gasto) },
+      { key: 'consumo', label: 'kWh consumidos', value: num(k.consumoTotal) },
+      { key: 'gen', label: 'kWh generados', value: num(k.generacionTotal) },
+      {
+        key: 'banco',
+        label: 'Banco de energía',
+        value: k.bancoEnergia != null ? `${num(k.bancoEnergia)} kWh` : '—',
+        valueClassName: k.bancoEnergia && k.bancoEnergia > 0 ? 'text-emerald-600' : undefined,
+      },
+      { key: 'costo', label: 'Costo/kWh', value: money(k.costoUnitarioProm) },
+    ];
+  }
+  if (servicio === 'agua' || servicio === 'gas') {
+    return [
+      { key: 'gasto', label: 'Gasto', value: money(k.gasto) },
+      { key: 'consumo', label: 'Consumo', value: num(k.consumoTotal, u(k.consumoUnidad)) },
+      { key: 'costo', label: `Costo/${k.consumoUnidad ?? 'u'}`, value: money(k.costoUnitarioProm) },
+      { key: 'prom', label: 'Consumo prom.', value: num(k.consumoPromMensual, u(k.consumoUnidad)) },
+      {
+        key: 'pico',
+        label: 'Mes pico',
+        value: k.mesPico ? fmtPeriodo(k.mesPico.periodo) : '—',
+      },
+    ];
+  }
+  // "Todos"
+  return [
+    { key: 'n', label: 'Recibos', value: k.count },
+    { key: 'gasto', label: 'Gasto', value: money(k.gasto) },
+    {
+      key: 'pend',
+      label: 'Pendientes de pago',
+      value: k.pendientes,
+      valueClassName: k.pendientes > 0 ? 'text-amber-500' : undefined,
+    },
+    {
+      key: 'rango',
+      label: 'Periodo',
+      value: k.rango ? `${fmtPeriodo(k.rango[0])} – ${fmtPeriodo(k.rango[1])}` : '—',
+    },
+  ];
+}
+
+/** Color del delta: subir gasto es malo (ámbar/rojo), bajar es bueno (verde). */
+function deltaCls(d: number | null): string {
+  if (d == null) return 'text-[var(--text)]/50';
+  return d > 0 ? 'text-amber-600' : 'text-emerald-600';
+}
+
+/**
+ * Tarjeta de comparativos año-vs-año + alertas. Vive en la pestaña "Análisis".
+ * Solo se muestra cuando hay historia suficiente para comparar.
+ */
+function Comparativos({ c, alertas }: { c: ComparativosData; alertas: number }) {
+  const hayYoY = c.gastoMismoMesAnioPrevio != null;
+  const hay12m = c.totalPrev12m > 0;
+  if (!hayYoY && !hay12m && alertas === 0) return null;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {hayYoY ? (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text)]/55">
+            {c.ultimoPeriodo ? fmtPeriodo(c.ultimoPeriodo) : '—'} vs. año previo
+          </div>
+          <div className={`mt-1 text-2xl font-semibold tabular-nums ${deltaCls(c.deltaGastoPct)}`}>
+            {pct(c.deltaGastoPct)}
+          </div>
+          <div className="text-xs text-[var(--text)]/55">
+            {money(c.gastoUltimo)} vs. {money(c.gastoMismoMesAnioPrevio)}
+          </div>
+        </div>
+      ) : null}
+
+      {hay12m ? (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text)]/55">
+            Últimos 12 meses
+          </div>
+          <div className={`mt-1 text-2xl font-semibold tabular-nums ${deltaCls(c.delta12mPct)}`}>
+            {pct(c.delta12mPct)}
+          </div>
+          <div className="text-xs text-[var(--text)]/55">
+            {money(c.total12m)} vs. {money(c.totalPrev12m)} previos
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+        <div className="text-xs font-medium uppercase tracking-wider text-[var(--text)]/55">
+          Alertas de consumo
+        </div>
+        <div
+          className={`mt-1 text-2xl font-semibold tabular-nums ${
+            alertas > 0 ? 'text-amber-500' : 'text-[var(--text)]/50'
+          }`}
+        >
+          {alertas}
+        </div>
+        <div className="text-xs text-[var(--text)]/55">Recibos con consumo inusual</div>
+      </div>
+    </div>
+  );
+}
 
 export function ServiciosView({ data }: { data: ServiciosData }) {
   const { recibos, servicios, empresaId, errors } = data;
@@ -88,16 +222,14 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
     });
   }, [recibos, filters]);
 
-  const kpis = useMemo(() => {
-    const n = filtered.length;
-    const gasto = filtered.reduce((a, r) => a + (r.monto ?? 0), 0);
-    const pendientes = filtered.filter((r) => !r.pagado).length;
-    const meses = filtered.map((r) => r.periodo.slice(0, 7)).sort();
-    const rango = meses.length
-      ? `${fmtPeriodo(meses[0])} – ${fmtPeriodo(meses[meses.length - 1])}`
-      : '—';
-    return { n, gasto, pendientes, rango };
-  }, [filtered]);
+  const kpis = useMemo(
+    () => buildKpis(filters.servicio, computeServicioKpis(filtered)),
+    [filtered, filters.servicio]
+  );
+
+  const anomalias = useMemo(() => computeAnomalias(filtered), [filtered]);
+
+  const comparativos = useMemo(() => computeComparativos(filtered), [filtered]);
 
   const columns: Column<ReciboVista>[] = [
     {
@@ -127,7 +259,23 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
       type: 'custom',
       align: 'right',
       accessor: (r) => r.consumo_periodo ?? -1,
-      render: (r) => num(r.consumo_periodo, r.unidad_consumo ? ` ${r.unidad_consumo}` : ''),
+      render: (r) => {
+        const a = anomalias.get(r.id);
+        return (
+          <span className="inline-flex items-center justify-end gap-1">
+            {a ? (
+              <span
+                title={`Consumo inusual: ${pct(a.exceso)} sobre el promedio reciente (${num(Math.round(a.baseline))})`}
+                className="text-amber-500"
+                aria-label="Consumo inusual"
+              >
+                ⚠
+              </span>
+            ) : null}
+            {num(r.consumo_periodo, r.unidad_consumo ? ` ${r.unidad_consumo}` : '')}
+          </span>
+        );
+      },
     },
     {
       key: 'costo_unitario',
@@ -206,32 +354,21 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
     <div className="space-y-4">
       {errors.length > 0 ? <ErrorBanner error={errors.join(' · ')} /> : null}
 
-      <ModuleKpiStrip
-        cols={4}
-        stats={[
-          { key: 'n', label: 'Recibos', value: kpis.n },
-          { key: 'gasto', label: 'Gasto', value: money(kpis.gasto) },
-          {
-            key: 'pend',
-            label: 'Pendientes de pago',
-            value: kpis.pendientes,
-            valueClassName: kpis.pendientes > 0 ? 'text-amber-500' : undefined,
-          },
-          { key: 'rango', label: 'Periodo', value: kpis.rango },
-        ]}
-      />
-
+      {/* Lente por servicio: Todos · Luz · Agua · Gas (reemplaza el dropdown). */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex w-fit gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1 text-sm">
           {[
-            { id: 'recibos', label: 'Recibos' },
-            { id: 'tendencias', label: 'Tendencias' },
-          ].map((t) => {
-            const active = (filters.tab || 'recibos') === t.id;
+            { id: '', label: 'Todos' },
+            ...tiposPresentes.map((t) => ({
+              id: t,
+              label: SERVICIO_STYLE[t]?.label ?? t,
+            })),
+          ].map((lente) => {
+            const active = (filters.servicio || '') === lente.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setFilter('tab', t.id)}
+                key={lente.id || 'todos'}
+                onClick={() => setFilter('servicio', lente.id)}
                 aria-pressed={active}
                 className={`rounded-md px-3 py-1 transition ${
                   active
@@ -239,7 +376,7 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
                     : 'text-[var(--text)]/60 hover:text-[var(--text)]'
                 }`}
               >
-                {t.label}
+                {lente.label}
               </button>
             );
           })}
@@ -250,6 +387,32 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
         >
           + Nuevo recibo
         </button>
+      </div>
+
+      <ModuleKpiStrip cols={kpis.length === 5 ? 5 : 4} stats={kpis} />
+
+      {/* Vista: tabla de recibos o análisis del servicio activo. */}
+      <div className="flex w-fit gap-1 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1 text-sm">
+        {[
+          { id: 'recibos', label: 'Recibos' },
+          { id: 'analisis', label: 'Análisis' },
+        ].map((t) => {
+          const active = (filters.tab || 'recibos') === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setFilter('tab', t.id)}
+              aria-pressed={active}
+              className={`rounded-md px-3 py-1 transition ${
+                active
+                  ? 'bg-[var(--text)]/10 font-medium text-[var(--text)]'
+                  : 'text-[var(--text)]/60 hover:text-[var(--text)]'
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       <ModuleFilters
@@ -265,19 +428,6 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
           ) : undefined
         }
       >
-        <select
-          value={filters.servicio}
-          onChange={(e) => setFilter('servicio', e.target.value)}
-          className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm"
-        >
-          <option value="">Todos los servicios</option>
-          {tiposPresentes.map((t) => (
-            <option key={t} value={t}>
-              {SERVICIO_STYLE[t]?.label ?? t}
-            </option>
-          ))}
-        </select>
-
         <select
           value={filters.estadoPago}
           onChange={(e) => setFilter('estadoPago', e.target.value)}
@@ -312,8 +462,11 @@ export function ServiciosView({ data }: { data: ServiciosData }) {
         />
       </ModuleFilters>
 
-      {(filters.tab || 'recibos') === 'tendencias' ? (
-        <ServiciosTendencias recibos={filtered} />
+      {(filters.tab || 'recibos') === 'analisis' ? (
+        <div className="space-y-4">
+          <Comparativos c={comparativos} alertas={anomalias.size} />
+          <ServiciosTendencias recibos={filtered} />
+        </div>
       ) : (
         <DataTable<ReciboVista>
           data={filtered}
