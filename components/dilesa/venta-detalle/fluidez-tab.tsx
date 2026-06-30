@@ -36,9 +36,7 @@ export function FluidezTabBody() {
     const sb = createSupabaseBrowserClient();
     void sb
       .schema('dilesa')
-      .from('v_fase_vara')
-      .select('posicion, vara, p90')
-      .eq('empresa_id', DILESA_EMPRESA_ID)
+      .rpc('fn_fase_vara', { p_empresa: DILESA_EMPRESA_ID })
       .then(({ data }) => {
         if (!activo) return;
         const m = new Map<number, VaraRef>();

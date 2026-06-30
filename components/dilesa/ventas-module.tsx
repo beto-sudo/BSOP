@@ -250,11 +250,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         .select('id, nombre, apellido_paterno, apellido_materno')
         .eq('empresa_id', empresaId)
         .eq('tipo', 'cliente'),
-      sb
-        .schema('dilesa')
-        .from('v_ventas_lista_antiguedad')
-        .select('venta_id, dias_en_fase')
-        .eq('empresa_id', empresaId),
+      sb.schema('dilesa').rpc('fn_ventas_lista_antiguedad', { p_empresa: empresaId }),
       sb
         .schema('core')
         .from('usuarios')
@@ -364,11 +360,11 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   useEffect(() => {
     let activo = true;
     const sb = createSupabaseBrowserClient();
+    // RPC SECURITY DEFINER (no la vista directa): evita la RLS-por-fila sobre
+    // ~15k filas de venta_fases que hacía la lectura tardar segundos.
     void sb
       .schema('dilesa')
-      .from('v_fase_vara')
-      .select('posicion, vara, p90')
-      .eq('empresa_id', empresaId)
+      .rpc('fn_fase_vara', { p_empresa: empresaId })
       .then(({ data }) => {
         if (!activo) return;
         const m = new Map<number, FaseBenchmarkRef>();
