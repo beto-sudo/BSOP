@@ -100,17 +100,9 @@ export type ExpedientePld = {
   unidadNumeroOficial: string | null;
   unidadM2Terreno: number | null;
   unidadM2Construccion: number | null;
-  /** Montos de los depósitos registrados (erp.cxc_pagos de la venta). */
+  /** Montos de los depósitos registrados (erp.cxc_pagos de la venta). El techo de
+   *  la banda de liquidaciones del aviso (crédito + enganche = todo lo recibido). */
   depositos: number[];
-  /**
-   * Enganche del cliente aplicado a GASTOS notariales (no al precio), del motor
-   * de cuadratura (`coberturaGastos.engancheCliente`). El aviso PLD declara las
-   * liquidaciones del PRECIO (= valor de escrituración), pero los depósitos
-   * registrados incluyen este enganche que fondea los gastos, no el precio. Sin
-   * netearlo, toda venta con enganche-a-gastos marca un falso descuadre por este
-   * monto. 0 cuando el enganche va íntegro al precio (o no hay enganche).
-   */
-  engancheAGastos: number;
   /**
    * Descuento "perdonado" (no cobrado) = descuento aplicado − cheque a notaría
    * girado, ≥ 0 (del motor de cuadratura). Las liquidaciones del aviso quedan
@@ -350,43 +342,48 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
         )
   );
 
-  // 8. Liquidaciones vs valor pactado (neto de descuento) y vs depósitos
-  //    registrados (warnings). El valor pactado es el de escrituración; las
-  //    liquidaciones (lo realmente pagado) quedan por debajo en el descuento
-  //    PERDONADO (no cobrado) — ese hueco es legítimo, no un descuadre.
+  // 8. Liquidaciones del aviso dentro de la BANDA esperada (warnings). El oficial
+  //    de cumplimiento captura las liquidaciones de dos formas igualmente válidas:
+  //    solo el PRECIO (el crédito que liquida el inmueble) o el precio MÁS el
+  //    enganche que el cliente aportó (parte del cual fondea gastos notariales). Por
+  //    eso no se exige igualdad exacta sino una banda [piso, techo]:
+  //      - piso  = valor pactado − descuento perdonado (no cobrado): el precio que
+  //                realmente liquidó el inmueble. Por debajo = sub-declaración.
+  //      - techo = total de depósitos recibidos (crédito + enganche): todo el dinero
+  //                que entró. Por arriba = el aviso declara más de lo que se recibió.
+  //    El ancho de la banda = el enganche que excede el precio (lo que fondea gastos)
+  //    — exactamente la ambigüedad legítima de captura. Casos reales: Christopher
+  //    M3-L16 (reportó solo el precio → cae en el piso) y Nancy M22-L1 (reportó todos
+  //    los depósitos → cae en el techo); ambos cuadran.
   const totalLiquidaciones = ext.liquidaciones.reduce((s, l) => s + (l.monto || 0), 0);
   const perdonado = Math.max(0, exp.descuentoPerdonado);
-  const liquidacionesEsperadas = ext.valorPactado - perdonado;
+  const totalDepositos = exp.depositos.reduce((s, m) => s + (m || 0), 0);
+  const piso = ext.valorPactado - perdonado;
+  const techo = Math.max(totalDepositos, piso); // si los depósitos no alcanzan el piso, la banda colapsa al precio
+
+  // Piso: el aviso no declara MENOS que el precio liquidado (neto del perdón).
   checks.push(
-    montosIguales(totalLiquidaciones, liquidacionesEsperadas, 1)
-      ? ok('liq_vs_pactado', 'Σ liquidaciones = valor pactado − descuento', 'warning')
+    totalLiquidaciones >= piso - 1
+      ? ok('liq_vs_pactado', 'Σ liquidaciones ≥ precio (neto de descuento)', 'warning')
       : falla(
           'liq_vs_pactado',
-          'Σ liquidaciones = valor pactado − descuento',
+          'Σ liquidaciones ≥ precio (neto de descuento)',
           'warning',
           perdonado > 0
-            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; con el descuento perdonado de ${money(perdonado)} se esperaban ${money(liquidacionesEsperadas)} (valor pactado ${money(ext.valorPactado)}). Diferencia ${money(totalLiquidaciones - liquidacionesEsperadas)}.`
-            : `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (diferencia ${money(totalLiquidaciones - ext.valorPactado)}).`
+            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el precio neto del descuento perdonado (${money(perdonado)}) es ${money(piso)} (valor pactado ${money(ext.valorPactado)}). Faltan ${money(piso - totalLiquidaciones)}.`
+            : `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (faltan ${money(piso - totalLiquidaciones)}).`
         )
   );
-  // Las liquidaciones del aviso son las del PRECIO (= valor de escrituración); los
-  // depósitos registrados incluyen el enganche que fondea GASTOS notariales, no el
-  // precio. Se netea ese enganche-a-gastos para comparar sobre la misma base (el
-  // dinero que liquidó el inmueble), si no toda venta con enganche marca un falso
-  // descuadre por su monto.
-  const totalDepositos = exp.depositos.reduce((s, m) => s + (m || 0), 0);
-  const engancheAGastos = Math.max(0, exp.engancheAGastos);
-  const depositosAlPrecio = totalDepositos - engancheAGastos;
+
+  // Techo: el aviso no declara MÁS dinero del que efectivamente entró (depósitos).
   checks.push(
-    montosIguales(totalLiquidaciones, depositosAlPrecio, 1)
-      ? ok('liq_vs_depositos', 'Σ liquidaciones = depósitos al precio', 'warning')
+    totalLiquidaciones <= techo + 1
+      ? ok('liq_vs_depositos', 'Σ liquidaciones ≤ depósitos recibidos', 'warning')
       : falla(
           'liq_vs_depositos',
-          'Σ liquidaciones = depósitos al precio',
+          'Σ liquidaciones ≤ depósitos recibidos',
           'warning',
-          engancheAGastos > 0
-            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; los depósitos al precio suman ${money(depositosAlPrecio)} (depósitos registrados ${money(totalDepositos)} − enganche a gastos ${money(engancheAGastos)}). Diferencia ${money(totalLiquidaciones - depositosAlPrecio)}.`
-            : `Las liquidaciones suman ${money(totalLiquidaciones)}; los depósitos registrados en la venta suman ${money(totalDepositos)}.`
+          `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; los depósitos registrados en la venta suman ${money(totalDepositos)} (el aviso declara ${money(totalLiquidaciones - techo)} de más).`
         )
   );
 
