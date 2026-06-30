@@ -324,6 +324,21 @@ export type Cuadratura = {
    */
   requiereResolucionSaldoResidual: boolean;
   /**
+   * true si la operación necesita que Dirección **resuelva explícitamente** el
+   * saldo residual de GASTOS notariales antes de cerrar la dictaminación (fase 8):
+   * hay desglose y `coberturaGastos.pagareNecesario` supera la tolerancia de
+   * redondeo (`TOLERANCIA_SALDO`). El faltante de gastos se resuelve cobrándolo
+   * (pagaré), absorbiéndolo DILESA (Máxima Aportación) o cubriéndolo el cliente con
+   * un depósito (que baja `pagareNecesario` solo). Hasta el Sprint 3 de
+   * `dilesa-saldos-residuales` este faltante solo tenía el camino "pagaré" (el gate
+   * lo exigía) y, en el panel, el residual sin sobreprecio capturado se pintaba como
+   * "sobreprecio" haciendo cuadrar la card en falso. Esta señal es el GOBIERNO de la
+   * decisión, no aritmética nueva: `pagareNecesario` ya existe y el monto absorbido
+   * ya cae en la NC derivada. `false` en legacy/cerradas (sin desglose) y cuando el
+   * faltante es ruido de redondeo (≤ tolerancia).
+   */
+  requiereResolucionSaldoGastos: boolean;
+  /**
    * Desglose de facturación (ADR-045), solo con desglose. Factura de venta
    * (escrituración) + factura de enganche = total facturado; − NC = neto (=
    * escritura). `null` en legacy/cerradas.
@@ -516,11 +531,16 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // Fase 13. Casos reales: Aracely M10-L32 (tope bono 15,000 vs consumido 13,380 →
   // 1,620 fantasma, ya corregido el lado promo) y Christopher M3-L16 (sobreprecio
   // capturado 101,000 vs efectivo 15,000 → 70,360 fantasma, corregido aquí el lado
-  // sobreprecio). Con el efectivo, `descuentoAplicado` == `descuentoReal` y el fix
-  // nunca infla el descuento (`aportacionPromocion ≤ promocionGastos`,
-  // `sobreprecioCobertura ≤ sobreprecioGastos`). Sin desglose (ventas cerradas/legacy)
-  // → modelo viejo: `descuento_total` topado al máximo autorizado. Fallback que NO
-  // altera nada histórico.
+  // sobreprecio). Con el efectivo, `descuentoAplicado` ≈ `descuentoReal` (idénticos
+  // salvo centavos de redondeo de la detonación, p.ej. Arizpe 18,313 vs 18,313.29) y
+  // el fix nunca infla el descuento: `partirDescuento` garantiza `aportacionPromocion
+  // ≤ promocionGastos` y `aportacionPromocion + sobreprecioCobertura =
+  // faltanteGastosDilesa` (el total del split, ya topado). OJO: `sobreprecioCobertura`
+  // NO está acotado por `sobreprecioGastos` — cuando el sobreprecio capturado es 0 y el
+  // faltante supera el bono, el residual se vuelve `sobreprecioCobertura` (el "fantasma"
+  // que el Sprint 3 expone como `requiereResolucionSaldoGastos`). Sin desglose (ventas
+  // cerradas/legacy) → modelo viejo: `descuento_total` topado al máximo autorizado.
+  // Fallback que NO altera nada histórico.
   const descuentoAplicado = tieneDesglose
     ? round2(aportacionPromocion + sobreprecioCobertura)
     : i.descuentoMaximoAutorizado != null
@@ -624,6 +644,14 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
   // ⇒ true). Solo aplica al modelo desglosado.
   const requiereResolucionSaldoResidual =
     tieneDesglose && (saldoPrecioPorCubrir ?? 0) > TOLERANCIA_SALDO;
+  // Señal de gobierno hermana para el faltante de GASTOS (Sprint 3 de
+  // `dilesa-saldos-residuales`): `pagareNecesario` es el saldo de gastos que ni el
+  // subsidio, ni el bono autorizado, ni el enganche, ni el sobreprecio capturado
+  // cubren. Cuando supera la tolerancia, Dirección debe resolverlo explícito
+  // (cobrar/absorber/depósito) en vez de que el motor lo absorba en silencio como
+  // "sobreprecio" fantasma. No cambia ninguna aritmética (`pagareNecesario` ya está
+  // calculado arriba); solo expone que el caso requiere decisión.
+  const requiereResolucionSaldoGastos = tieneDesglose && pagareNecesario > TOLERANCIA_SALDO;
 
   // Cobertura model-aware de TODA la operación — fuente ÚNICA para el copiloto de
   // cierre y otros gates. NO el `saldoCliente`/`cubierta` legacy, que en ventas
@@ -764,6 +792,7 @@ export function calcularCuadratura(i: CuadraturaInput): Cuadratura {
     saldoPrecioEscrituracion,
     saldoPrecioPorCubrir,
     requiereResolucionSaldoResidual,
+    requiereResolucionSaldoGastos,
     desgloseFacturacion,
     posibleDobleConteo,
   };

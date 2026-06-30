@@ -59,6 +59,9 @@ export type Venta = {
   // Resolución del saldo residual de precio (iniciativa dilesa-saldos-residuales).
   saldo_residual_resolucion: 'cobrar' | 'absorber' | null;
   saldo_residual_monto: number | null;
+  // Resolución del faltante de gastos (Sprint 3: hermana de saldo_residual_*).
+  saldo_gastos_resolucion: 'cobrar' | 'absorber' | null;
+  saldo_gastos_monto: number | null;
   promocion_id: string | null;
   coda_row_id: string | null;
   monto_detonado: number | null;

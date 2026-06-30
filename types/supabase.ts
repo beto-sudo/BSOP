@@ -5887,6 +5887,10 @@ export type Database = {
           productos_adicionales: number
           promocion_gastos_monto: number | null
           promocion_id: string | null
+          saldo_gastos_at: string | null
+          saldo_gastos_autorizado_por: string | null
+          saldo_gastos_monto: number | null
+          saldo_gastos_resolucion: string | null
           saldo_residual_at: string | null
           saldo_residual_autorizado_por: string | null
           saldo_residual_monto: number | null
@@ -5995,6 +5999,10 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          saldo_gastos_at?: string | null
+          saldo_gastos_autorizado_por?: string | null
+          saldo_gastos_monto?: number | null
+          saldo_gastos_resolucion?: string | null
           saldo_residual_at?: string | null
           saldo_residual_autorizado_por?: string | null
           saldo_residual_monto?: number | null
@@ -6103,6 +6111,10 @@ export type Database = {
           productos_adicionales?: number
           promocion_gastos_monto?: number | null
           promocion_id?: string | null
+          saldo_gastos_at?: string | null
+          saldo_gastos_autorizado_por?: string | null
+          saldo_gastos_monto?: number | null
+          saldo_gastos_resolucion?: string | null
           saldo_residual_at?: string | null
           saldo_residual_autorizado_por?: string | null
           saldo_residual_monto?: number | null

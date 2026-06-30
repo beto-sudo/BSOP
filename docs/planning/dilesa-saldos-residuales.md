@@ -2,12 +2,12 @@
 
 **Slug:** `dilesa-saldos-residuales`
 **Empresas:** DILESA
-**Schemas afectados:** `dilesa.ventas` — **campos nuevos de resolución del saldo residual** (tipo `cobrar`|`absorber`, monto, autorizado_por, fecha). Motor `lib/dilesa/cuadratura.ts` (exponer el residual de **precio** como saldo accionable — hoy solo el de **gastos** lo es vía `coberturaGastos.pagareNecesario`) + gate de resolución en `app/dilesa/ventas/[id]/capturar/8-dictaminada/page.tsx` (reusa `<CreditoDirectoCaptura>` para el camino pagaré) + `components/dilesa/cuadratura-panel.tsx` (muestra la resolución en vez de la nota suave) + reconciliación de la NC en `app/api/dilesa/ventas/[ventaId]/cerrar-fase13`. La nota de crédito se mantiene **derivada** (Facturado − Valor Real). Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md). Sin backfill de cerradas.
-**Estado:** done
-**Próximo hito:** — (iniciativa cerrada 2026-06-25; S1 + S2 en prod)
+**Schemas afectados:** `dilesa.ventas` — **campos nuevos de resolución del saldo residual** (tipo `cobrar`|`absorber`, monto, autorizado*por, fecha). Motor `lib/dilesa/cuadratura.ts` (exponer el residual de **precio** como saldo accionable — hoy solo el de **gastos** lo es vía `coberturaGastos.pagareNecesario`) + gate de resolución en `app/dilesa/ventas/[id]/capturar/8-dictaminada/page.tsx` (reusa `<CreditoDirectoCaptura>` para el camino pagaré) + `components/dilesa/cuadratura-panel.tsx` (muestra la resolución en vez de la nota suave) + reconciliación de la NC en `app/api/dilesa/ventas/[ventaId]/cerrar-fase13`. La nota de crédito se mantiene **derivada** (Facturado − Valor Real). Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md). Sin backfill de cerradas.
+**Estado:** in_progress
+**Próximo hito:** Sprint 3 — gobierno del faltante de GASTOS (gemelo del de precio): motor `requiereResolucionSaldoGastos` + migración `saldo_gastos*\*` + control de Dirección + label del panel. PR sin auto-merge; la migración la aplica Beto.
 **Dueño:** Beto
 **Creada:** 2026-06-25
-**Última actualización:** 2026-06-25 (CERRADA — S1 #1040 + S2 #1044 en prod: resolución explícita del saldo residual de precio en la dictaminación, NC derivada + reconciliación F13. Beto valida en prod; reabrir si hace falta ajuste)
+**Última actualización:** 2026-06-30 (REABIERTA — Sprint 3: el faltante de GASTOS solo tenía el camino "pagaré" forzado y ninguna opción de absorber → deadlock; en el panel el residual sin sobreprecio capturado se pintaba como "sobreprecio" y "Cuadra ✓" en falso. Análisis multi-agente + Codex confirmó: la aritmética ya es correcta, falta el gobierno. Construido; migración pendiente de aplicar por Beto)
 
 > Detonante operativo: la venta **JUAN ANTONIO HERNANDEZ MUÑOZ** (M3-L9-LDLE, Infonavit Tradicional) — el precio (920,000) lo cubren crédito (762,265) + enganche (156,943), dejando **$792 de saldo de precio** que DILESA absorbe otorgando una nota de crédito. Beto: en la dictaminación debe haber un campo para **cuadrar** ese residual — si no lo va a pagar el cliente (pagaré), se mete como nota de crédito para que Ale cuadre y avance la fase, y ese monto se considere en la NC que se otorga al facturar.
 
@@ -51,7 +51,36 @@ En la fase 8, cuando quede saldo residual de precio, Dirección lo **resuelve ex
 - **Pagaré formal para el residual de _precio_** (camino "Cobrar"): reusar `<CreditoDirectoCaptura>` con la asignación correcta gastos↔precio en el motor (separada de S1 para no rushear sobre la cuadratura que ya cuadra).
 - Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md) documentando la resolución del residual de precio.
 
-**Fuera de alcance (v1):** backfill de ventas cerradas (el residual histórico ya cae en el descuento real, no se reabre); la vía CxC simple para el cobro (se usa pagaré formal).
+**Sprint 3 — Gobierno del faltante de GASTOS (gemelo del de precio).**
+
+El residual de **precio** quedó gobernado en S1/S2, pero el faltante de **gastos**
+(`coberturaGastos.pagareNecesario`) seguía con dos defectos: (a) en el cierre de fase 8
+solo existía el camino **pagaré forzado** (`pagareNecesario > 0 ⇒ exige crédito directo`)
+y **ninguna opción de absorber** → si Dirección quería que DILESA lo absorbiera (Máxima
+Aportación), la fase quedaba en **deadlock**; (b) en el panel, cuando no hay sobreprecio
+capturado, el motor parte el faltante como `sobreprecioCobertura` (sobreprecio **fantasma**)
+y la card decía **"Cuadra ✓ $0"** escondiendo un hueco real (caso José Cruz M3-L8: $8,230).
+
+Una revisión multi-agente + Codex confirmó que **la aritmética ya es correcta** (`valorReal`/
+NC/comisión no dependen del split; el monto absorbido ya cae en la NC derivada vía el cheque
+a notaría) — **falta el gobierno + el label**, no recalcular. Alcance:
+
+- Motor (`cuadratura.ts`): expone `requiereResolucionSaldoGastos` (= hay desglose y
+  `pagareNecesario` > `TOLERANCIA_SALDO`); **señal pura, cero aritmética nueva**. Tests
+  (Arizpe/MAYRA/José Cruz/Juan Antonio + camino "depositar"). Corrige un comentario falso
+  (`sobreprecioCobertura ≤ sobreprecioGastos`, que Arizpe desmiente).
+- Schema (migración `20260630224829`): 4 columnas nullable `saldo_gastos_*` (gemelas de
+  `saldo_residual_*`). **La aplica Beto** (toca prod). PR **sin auto-merge** (el código rompe
+  en prod sin las columnas).
+- Fase 8 (`8-dictaminada/page.tsx`): control «Resolver saldo de gastos» (Absorber = Máxima
+  Aportación / Cobrar = pagaré; el depósito del cliente baja `pagareNecesario` solo) + **gate
+  reescrito, no agregado**: «absorber» satisface el cierre (mata el deadlock), «cobrar» exige
+  el pagaré, y todo faltante > tolerancia obliga a decisión explícita.
+- Panel (`cuadratura-panel.tsx`): la card de cobertura deja de pintar el residual sin
+  sobreprecio capturado como "sobreprecio"/"Cuadra ✓"; muestra la resolución o el saldo a
+  resolver. **No toca `saldoCobertura`/`operacionCubierta`** (que gobiernan gates 9-16).
+
+**Fuera de alcance (v1):** backfill de ventas cerradas (el residual histórico ya cae en el descuento real, no se reabre); la vía CxC simple para el cobro (se usa pagaré formal). **(Sprint 3):** no se altera ninguna aritmética del motor (`partirDescuento`, `descuentoAplicado`, `valorReal`, NC, comisión intactos); no se reusan las columnas `saldo_residual_*` (una venta puede tener residual de precio Y de gastos a la vez); sin backfill de cerradas (solo cambia display si se abre el expediente).
 
 ## Riesgos
 
@@ -74,8 +103,13 @@ En la fase 8, cuando quede saldo residual de precio, Dirección lo **resuelve ex
 - **2026-06-25 (S1 en prod)** — [PR #1040](https://github.com/beto-sudo/BSOP/pull/1040) **mergeado** (CI 5/5 verde). Beto dio OK para aplicar + mergear. La migración `20260625204005` se aplicó a prod **vía MCP** (el `db push` se atoraba por drift heredado de otras sesiones: huérfanos remotos `203023`/`210939`); **ledger reconciliado 1:1** en la misma sesión (`repair applied 20260625204005` + `reverted 20260625211829`, el huérfano que generó el MCP). Las 4 columnas viven en `dilesa.ventas`; `SCHEMA_REF` + `types/supabase.ts` regenerados desde prod y en sync. El control «Resolver saldo del cliente» + el gate ya operan en la dictaminación. Sigue: Sprint 2.
 - **2026-06-25 (Sprint 2 — pagaré del residual + reconciliación F13 + ADR addendum)** — [PR #1044](https://github.com/beto-sudo/BSOP/pull/1044) **mergeado** (código verde, 2070 tests). (1) **Motor** ([`cuadratura.ts`](../../lib/dilesa/cuadratura.ts)): el pagaré se asigna **gastos-primero** (`pagareAGastos = min(pagaré, pagareNecesario)`, el resto `pagarePrecio`). Un pagaré tomado para el residual de precio (camino "Cobrar") ya no sobre-fondea los gastos; eleva el Valor Real y **baja la NC** en ese monto. Ventas existentes idénticas (verificado: 45 tests previos intactos + 1 nuevo, Juan Antonio cobrando $792 → NC 13,361 → 12,569). (2) **Fase 8**: al elegir "Cobrar" aparece la captura del crédito directo cubriendo el total (gastos + precio); el gate exige el pagaré configurado + firmado para cerrar. Botoneras reordenadas antes de la captura. (3) **F13** ([`cerrar-fase13`](../../app/api/dilesa/ventas/[ventaId]/cerrar-fase13/route.ts)): si Dirección **absorbió**, la NC del CFDI debe cubrir la requerida por la cuadratura (que ya incluye lo absorbido); si queda corta, no cierra sin override de Dirección; rastro en `audit_log`. Acotado a ventas con absorción. (4) **Addendum a [ADR-048](../adr/048_cierre_financiero_dictaminacion.md)** (A1–A4). **Sin migración** (S2 es solo código). **Drift heredado resuelto**: prod tenía la columna `estimacion_id` de [PR #1043](https://github.com/beto-sudo/BSOP/pull/1043) (otra sesión, estimaciones→CxP) sin mergear → `schema:check` rojo. Per la regla `reference_ci_schema_check_prod` **no se absorbe schema ajeno**: #1043 estaba verde y sin review requerido → se aterrizó primero, rebase de #1044 → `schema:check` verde → **#1044 mergeado** (CI 3m3s). **S1 + S2 en prod — alcance v1 completo.**
 
+- **2026-06-30 (Sprint 3 — gobierno del faltante de gastos)** — **REABIERTA.** Detonante: ventas reclasificadas productos↔sobreprecio (José Cruz M3-L8, Christopher M3-L16) dejaron ver que, sin sobreprecio capturado, el panel pinta el faltante de gastos como "sobreprecio" y dice "Cuadra ✓" en falso; y la fase 8 solo ofrecía pagaré (sin "absorber") → deadlock. **Análisis multi-agente (5 mapeadores → diseño → 3 verificadores adversariales) + revisión independiente de Codex (gpt-5.5):** veredicto NO-GO al SPEC grande (12 archivos/migración/gates que **re-rompían** invariantes vivos de `dilesa-descuento-perdonado-motor` — deadlock fase 8, doble conteo NC F13) y GO al cambio chico de **gobierno + label**. El número ya existe (`pagareNecesario`); la aritmética ya neutraliza el P&L. Construido: motor `requiereResolucionSaldoGastos` (señal pura) + migración `20260630224829` (`saldo_gastos_*`) + control fase 8 (absorber/cobrar, gate reescrito anti-deadlock) + label del panel. **6 checks de CI verdes locales** (typecheck + 2232 tests, +5 asserts nuevos: Arizpe/MAYRA/José Cruz `requiereResolucionSaldoGastos=true`, Juan Antonio `false`, camino "depositar" apaga el flag). **Migración NO aplicada a prod** → PR **sin auto-merge** ([PR #1152](https://github.com/beto-sudo/BSOP/pull/1152); pendiente OK de Beto para `db push` + Preview + label `finanzas-ok`). **Codex review sobre el diff real** encontró 2 bordes de flujo (ambos corregidos en `5a36252`): **P1** — cambiar de "cobrar" a "absorber" con pagaré ya configurado dejaba `monto_credito_directo` stale inflando el valor real / subvaluando la NC → al absorber se limpia el crédito directo (salvo que el residual de precio lo necesite); **P2** — el gate exigía pagaré por `saldo_gastos_resolucion === 'cobrar'` suelto y trababa la venta si el cliente depositaba después → se quita ese término (el de `pagareNecesario > 0` ya basta). Sigue: aplicar migración + addendum a ADR-048 (resolución del residual de gastos).
+
 ## Decisiones registradas
 
+- **2026-06-30 (S3) — No tocar la aritmética del motor; solo gobierno + label.** La revisión adversarial + Codex confirmó que `valorReal`/NC/comisión ya reflejan el desenlace correcto (lo absorbido cae en la NC derivada vía el cheque a notaría; un pagaré/depósito real ya sube el valor real). Recomponer `descuentoAplicado` o crear un `saldoGastosResidual` nuevo **reintroducía** el "descuento perdonado" fantasma que `dilesa-descuento-perdonado-motor` ya mató. El saldo de gastos **es** `pagareNecesario` (ya calculado); solo se expone como señal de gobierno.
+- **2026-06-30 (S3) — Gate reescrito, no agregado (anti-deadlock).** El gate de fase 8 ya exigía pagaré por `pagareNecesario > 0`; agregar un segundo gate "resolución" encima dejaba "absorber" sin salida (el viejo seguía pidiendo pagaré). Se reescribió: `pagareNecesario` solo exige pagaré cuando la resolución **no** es `absorber`; «absorber» (Máxima Aportación) cierra sin pagaré; el depósito del cliente baja `pagareNecesario` solo.
+- **2026-06-30 (S3) — Columnas `saldo_gastos_*` nuevas, no reusar `saldo_residual_*`.** Una venta puede tener residual de precio Y faltante de gastos a la vez; mezclarlos rompería la auditoría y la reconciliación de F13.
 - **2026-06-25 — La NC se mantiene derivada (`Facturado − Valor Real`), no se captura a mano.** El campo de dictaminación autoriza/registra la absorción; F13 reconcilia contra el CFDI de NC real. Razón: el monto absorbido ya cae en el descuento real → la NC derivada ya lo incluye; capturarlo a mano duplicaría la verdad y abriría descuadres.
 - **2026-06-25 — Gate "siempre explícito" anclado a `TOLERANCIA_SALDO` (~$5).** Todo residual de precio por encima del ruido de redondeo obliga a Dirección a elegir Cobrar o Absorber antes de cerrar la fase 8. No hay umbral de auto-absorción silenciosa (se descartó el gate con tolerancia de $2,000): Beto quiere que ningún monto real se absorba sin decisión.
 - **2026-06-25 — El cobro del residual de precio reusa el crédito directo (pagaré formal)**, no una vía CxC simple. Misma maquinaria que el residual de gastos (`<CreditoDirectoCaptura>`), extendida para dispararse también con el saldo de precio.
