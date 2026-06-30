@@ -29,13 +29,19 @@ export type FaseCalificacionRaw = {
   p90: number | null;
 };
 
-/** Fila por fase de la vista `v_fase_benchmark` (vara histórica). */
+/**
+ * Fila por fase de la vista `v_fase_vara` (benchmark histórico + meta editable).
+ * `mediana` es el histórico (se muestra como referencia); `meta` la fija
+ * Dirección (S3); `vara` = `COALESCE(meta, mediana)` — contra la que se mide.
+ */
 export type FaseBenchmark = {
   posicion: number;
   fase: string;
   mediana: number | null;
   p90: number | null;
   n: number;
+  meta?: number | null;
+  vara?: number | null;
 };
 
 export type BandaFase = 'verde' | 'ambar' | 'rojo' | 'gris';
@@ -54,9 +60,13 @@ export type FaseCalificacionRow = {
   n: number;
   mediana: number | null;
   p90: number | null;
-  /** Vara: mediana histórica de la fase (default de "meta" hasta S3). */
+  /** Mediana histórica de la fase (referencia que se muestra). */
   baseline: number | null;
-  /** mediana del periodo / baseline. `null` si falta dato. */
+  /** Meta editable por Dirección (S3); `null` si no se ha fijado. */
+  meta: number | null;
+  /** Vara efectiva contra la que se mide: `meta ?? baseline`. */
+  vara: number | null;
+  /** mediana del periodo / vara. `null` si falta dato. */
   ratio: number | null;
   banda: BandaFase;
   /** mediana del periodo − mediana del periodo anterior (días). + = se alentó. */
@@ -104,7 +114,10 @@ export function construirCalificacion(
       const n = p?.n ?? 0;
       const mediana = p?.mediana ?? null;
       const baselineMed = b.mediana;
-      const ratio = mediana != null && baselineMed ? mediana / baselineMed : null;
+      const meta = b.meta ?? null;
+      // Vara efectiva: la meta de Dirección si existe, si no la mediana histórica.
+      const vara = b.vara ?? meta ?? baselineMed;
+      const ratio = mediana != null && vara ? mediana / vara : null;
       const deltaPrevio = mediana != null && prev?.mediana != null ? mediana - prev.mediana : null;
       return {
         posicion: b.posicion,
@@ -114,8 +127,10 @@ export function construirCalificacion(
         mediana,
         p90: p?.p90 ?? null,
         baseline: baselineMed,
+        meta,
+        vara,
         ratio,
-        banda: bandaDe(n, mediana, baselineMed),
+        banda: bandaDe(n, mediana, vara),
         deltaPrevio,
       };
     });
