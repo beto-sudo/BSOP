@@ -47,6 +47,7 @@ function CuadraturaBody() {
         descuentoPromocion={cuadratura.coberturaGastos?.promocion ?? 0}
         descuentoReal={cuadratura.descuentoReal}
         sobreprecioCapturado={cuadratura.coberturaGastos?.sobreprecio ?? 0}
+        saldoGastosResolucion={venta.saldo_gastos_resolucion}
         descuentoMaximo={promo ? promo.monto : Number(venta.descuento_maximo_autorizado ?? 0)}
         descuentoMaximoFuente={
           promo ? promo.nombre : venta.descuento_maximo_autorizado != null ? 'legacy Coda' : null
