@@ -103,6 +103,15 @@ export type ExpedientePld = {
   /** Montos de los depósitos registrados (erp.cxc_pagos de la venta). */
   depositos: number[];
   /**
+   * Enganche del cliente aplicado a GASTOS notariales (no al precio), del motor
+   * de cuadratura (`coberturaGastos.engancheCliente`). El aviso PLD declara las
+   * liquidaciones del PRECIO (= valor de escrituración), pero los depósitos
+   * registrados incluyen este enganche que fondea los gastos, no el precio. Sin
+   * netearlo, toda venta con enganche-a-gastos marca un falso descuadre por este
+   * monto. 0 cuando el enganche va íntegro al precio (o no hay enganche).
+   */
+  engancheAGastos: number;
+  /**
    * Descuento "perdonado" (no cobrado) = descuento aplicado − cheque a notaría
    * girado, ≥ 0 (del motor de cuadratura). Las liquidaciones del aviso quedan
    * por debajo del valor pactado EXACTAMENTE en este monto — es el descuento
@@ -360,15 +369,24 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
             : `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (diferencia ${money(totalLiquidaciones - ext.valorPactado)}).`
         )
   );
+  // Las liquidaciones del aviso son las del PRECIO (= valor de escrituración); los
+  // depósitos registrados incluyen el enganche que fondea GASTOS notariales, no el
+  // precio. Se netea ese enganche-a-gastos para comparar sobre la misma base (el
+  // dinero que liquidó el inmueble), si no toda venta con enganche marca un falso
+  // descuadre por su monto.
   const totalDepositos = exp.depositos.reduce((s, m) => s + (m || 0), 0);
+  const engancheAGastos = Math.max(0, exp.engancheAGastos);
+  const depositosAlPrecio = totalDepositos - engancheAGastos;
   checks.push(
-    montosIguales(totalLiquidaciones, totalDepositos, 1)
-      ? ok('liq_vs_depositos', 'Σ liquidaciones = depósitos registrados', 'warning')
+    montosIguales(totalLiquidaciones, depositosAlPrecio, 1)
+      ? ok('liq_vs_depositos', 'Σ liquidaciones = depósitos al precio', 'warning')
       : falla(
           'liq_vs_depositos',
-          'Σ liquidaciones = depósitos registrados',
+          'Σ liquidaciones = depósitos al precio',
           'warning',
-          `Las liquidaciones suman ${money(totalLiquidaciones)}; los depósitos registrados en la venta suman ${money(totalDepositos)}.`
+          engancheAGastos > 0
+            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; los depósitos al precio suman ${money(depositosAlPrecio)} (depósitos registrados ${money(totalDepositos)} − enganche a gastos ${money(engancheAGastos)}). Diferencia ${money(totalLiquidaciones - depositosAlPrecio)}.`
+            : `Las liquidaciones suman ${money(totalLiquidaciones)}; los depósitos registrados en la venta suman ${money(totalDepositos)}.`
         )
   );
 

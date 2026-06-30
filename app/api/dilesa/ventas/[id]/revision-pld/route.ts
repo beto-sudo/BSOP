@@ -356,8 +356,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
       Number(a.monto_total ?? 0)
     ),
     // Descuento perdonado (no cobrado): el hueco legítimo entre liquidaciones y
-    // valor pactado. El cheque a notaría girado NO perdona (entró y salió).
+    // valor pactado. El cheque a notaría girado NO perdona (entró y salió). Con el
+    // desglose corregido (`dilesa-descuento-perdonado-motor`) `descuentoAplicado` ==
+    // descuento real, así que el sobreprecio que NO perdona ya no infla este hueco.
     descuentoPerdonado: Math.max(0, (cuad?.descuentoAplicado ?? 0) - (cuad?.chequePagado ?? 0)),
+    // Enganche del cliente que fondea gastos notariales (no el precio): se netea de
+    // los depósitos registrados para comparar contra las liquidaciones del aviso
+    // sobre la misma base (el dinero que liquidó el precio del inmueble).
+    engancheAGastos: cuad?.coberturaGastos?.engancheCliente ?? 0,
   };
 
   // ── PDFs del ciclo ───────────────────────────────────────────────
