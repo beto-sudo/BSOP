@@ -137,7 +137,7 @@ export function CuadraturaAjustes({
           lo que DILESA concede de más subiendo el precio. Juntos son el descuento real frente al
           valor escriturado ({moneyFmt.format(descuentoTotal)}).
           {sobreprecioPorCapturar > 0.5
-            ? ` Falta formalizar ${moneyFmt.format(sobreprecioPorCapturar)} de sobreprecio como Máxima Aportación en la solicitud.`
+            ? ` De esos, ${moneyFmt.format(sobreprecioPorCapturar)} no tienen sobreprecio capturado detrás: son un saldo de gastos que Dirección resuelve en la dictaminación (cobrar con pagaré, absorber como Máxima Aportación, o que el cliente lo deposite).`
             : ''}
         </p>
       </section>

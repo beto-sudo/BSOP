@@ -480,6 +480,9 @@ describe('calcularCuadratura', () => {
       expect(c.saldoPrecioEscrituracion).toBe(0);
       expect(c.saldoPrecioPorCubrir).toBe(0); // crédito cubre el precio → nada por cubrir
       expect(c.requiereResolucionSaldoResidual).toBe(false); // sin residual → nada que resolver
+      // Hay faltante de gastos (pagaré 9,387 > tolerancia) → requiere resolución; aquí
+      // ya está resuelto vía el pagaré capturado (camino "cobrar").
+      expect(c.requiereResolucionSaldoGastos).toBe(true);
     });
 
     it('desglosa el presupuesto notarial completo y cuadra en 0 — MAYRA', () => {
@@ -531,6 +534,12 @@ describe('calcularCuadratura', () => {
       expect(cob.aportacionPromocion).toBe(15000);
       expect(cob.sobreprecioCobertura).toBe(3313);
       expect(cob.saldoCobertura).toBe(0); // las 5 fuentes cubren los gastos brutos
+      // Sprint 3 (gobierno del faltante de gastos): el sobreprecio NO está capturado
+      // (sobreprecioGastos: 0), así que esos 3,313 son el "sobreprecio fantasma" — el
+      // motor expone que requiere resolución explícita (cobrar/absorber/depósito).
+      // No cambia ninguna aritmética: pagareNecesario YA es 3,313.
+      expect(cob.pagareNecesario).toBe(3313);
+      expect(c.requiereResolucionSaldoGastos).toBe(true);
       // Descuento real (escritura − valor real) = 18,313.29; la card "Descuento" lo
       // parte en promoción 15,000 + sobreprecio 3,313.29 (.29 = escritura redonda
       // 909,000 vs detonación 908,999.71; se fija al formalizar Máx. Aportación).
@@ -576,6 +585,9 @@ describe('calcularCuadratura', () => {
       expect(c.saldoPrecioEscrituracion).toBe(157735); // crédito no cubre; lo cubre el enganche
       expect(c.saldoPrecioPorCubrir).toBe(792); // 157,735 − 156,943 enganche (lo que ve el cliente)
       expect(c.requiereResolucionSaldoResidual).toBe(true); // 792 > tolerancia → Dirección lo resuelve
+      // El faltante es de PRECIO, no de gastos: el bono cubre los gastos completos
+      // (pagareNecesario 0) → la resolución de gastos NO aplica aquí.
+      expect(c.requiereResolucionSaldoGastos).toBe(false);
       // Descuento real = 13,361.42 < 15,000 → todo bono (promoción), sin sobreprecio.
       // El "$17,953 de sobreprecio fantasma" del reporte original venía solo de los
       // gastos inflados (62,161); con los gastos correctos del Anexo B (42,569.42) se va.
@@ -583,6 +595,57 @@ describe('calcularCuadratura', () => {
       const split = partirDescuento(c.descuentoReal, cob.promocion);
       expect(split.promocion).toBe(13361.42);
       expect(split.sobreprecio).toBe(0);
+    });
+
+    // Sprint 3 de `dilesa-saldos-residuales` — gobierno del faltante de GASTOS.
+    // Caso real José Cruz (M3-L8): productos reales 101,000 (sobreprecio capturado 0),
+    // crédito ≈ precio, gastos netos 23,230 > bono 15,000 → quedan 8,230 que el motor
+    // venía pintando como "sobreprecio" fantasma. El flag expone que Dirección debe
+    // resolverlo; la aritmética (pagareNecesario, valorReal, comisión) NO cambia.
+    const joseCruz = (over = {}) =>
+      calcularCuadratura({
+        valorEscrituracion: 1021000,
+        montoCreditoTitular: 1020999,
+        montoCreditoCotitular: 0,
+        montoCreditoDirecto: null,
+        montoChequeNotaria: null,
+        gastosEscrituracion: 53230,
+        apoyoInfonavit: 30000,
+        precioBase: 920000,
+        incrementoCredito: 0,
+        productosAdicionales: 101000, // productos reales (post-reclasificación)
+        sobreprecioGastos: 0, // sin sobreprecio capturado
+        promocionGastos: 15000,
+        depositos: [],
+        proyectoNombre: 'Lomas de los Encinos',
+        ...over,
+      });
+
+    it('expone el faltante de gastos como resolución pendiente cuando no hay sobreprecio capturado — José Cruz', () => {
+      const c = joseCruz();
+      const cob = c.coberturaGastos!;
+      expect(cob.pagareNecesario).toBe(8230); // 23,230 − 15,000 bono − 0 enganche − 0 sobreprecio
+      expect(c.requiereResolucionSaldoGastos).toBe(true);
+      // El "sobreprecio fantasma" sigue ahí en la cobertura (no tocamos aritmética),
+      // pero ahora el flag obliga a resolverlo en vez de cuadrar en falso.
+      expect(cob.sobreprecioCobertura).toBe(8230);
+      expect(cob.saldoCobertura).toBe(0);
+      // Comisión sobre valor real (sobreprecio capturado 0 → base completa); productos
+      // sí comisionan, por eso no se restan. Regresión-guard de que el flag no mueve $$.
+      expect(c.valorRealVentaDilesa).toBe(997769); // 1,020,999 − 23,230 cheque calculado
+      expect(c.comisionVendedor).toBe(9977.69);
+    });
+
+    it('el depósito del cliente apaga el faltante de gastos (camino "depositar")', () => {
+      // El cliente deposita los 8,231; el crédito ya cubre el precio (saldo 1), así que
+      // el depósito fondea gastos → pagareNecesario cae a 0 → ya no requiere resolución.
+      const c = joseCruz({
+        depositos: [{ monto: 8231, directoCliente: true, tieneRecibo: false }],
+      });
+      const cob = c.coberturaGastos!;
+      expect(cob.engancheCliente).toBe(8230); // 8,231 − 1 (saldo del precio)
+      expect(cob.pagareNecesario).toBe(0);
+      expect(c.requiereResolucionSaldoGastos).toBe(false);
     });
 
     // `dilesa-descuento-perdonado-motor`: bono parcialmente consumido CON sobreprecio
