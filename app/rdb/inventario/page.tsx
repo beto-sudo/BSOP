@@ -36,6 +36,7 @@ import { printStockList } from '@/components/inventario/print-stock-list';
 import { type StockItem } from '@/components/inventario/types';
 import { computeStockStats } from '@/components/inventario/utils';
 import { formatCurrency } from '@/lib/format';
+import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 
 const FILTER_DEFAULTS = {
   search: '',
@@ -183,7 +184,9 @@ function InventarioStockBody() {
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
     } catch (e: unknown) {
-      setErrorStock(e instanceof Error ? e.message : 'Error al cargar inventario');
+      // PostgrestError no es instanceof Error → usar el helper para no perder
+      // el mensaje real (p.ej. timeout, permission denied).
+      setErrorStock(getSupabaseErrorMessage(e, 'Error al cargar inventario'));
     } finally {
       setLoadingStock(false);
     }
@@ -202,7 +205,7 @@ function InventarioStockBody() {
       if (error) throw error;
       setItems((data ?? []) as StockItem[]);
     } catch (e: unknown) {
-      setErrorStock(e instanceof Error ? e.message : 'Error al cargar inventario histórico');
+      setErrorStock(getSupabaseErrorMessage(e, 'Error al cargar inventario histórico'));
     } finally {
       setLoadingStock(false);
     }
