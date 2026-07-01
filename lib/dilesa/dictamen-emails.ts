@@ -19,6 +19,7 @@
 
 import { renderEmailLayout, renderSeccionDatos, escapeHtml } from './email-layout';
 import type { EmpresaBranding } from './email-branding';
+import { dedupEmails, type NotificationOverrides } from '../notifications/overrides';
 
 const RESEND_FROM = 'DILESA <noreply@bsop.io>';
 
@@ -63,7 +64,8 @@ interface SendResult {
 }
 
 export async function sendDictamenSolicitudEmail(
-  ctx: DictamenSolicitudContext
+  ctx: DictamenSolicitudContext,
+  overrides?: NotificationOverrides
 ): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -75,13 +77,21 @@ export async function sendDictamenSolicitudEmail(
     return { ok: false, sentTo: [], error: 'sin email del notario' };
   }
 
-  const recipients: string[] = [ctx.notarioEmail];
-  const ccs: string[] = [];
-  if (ctx.vendedorEmail && ctx.vendedorEmail !== ctx.notarioEmail) {
-    ccs.push(ctx.vendedorEmail);
-  }
+  // Recipientes dinámicos (notario + cc al gerente de ventas) + los fijos del
+  // catálogo (overrides.extra*). Sin overrides = comportamiento de siempre.
+  const recipients = dedupEmails([ctx.notarioEmail, ...(overrides?.extraTo ?? [])]);
+  const ccs = dedupEmails([
+    ctx.vendedorEmail && ctx.vendedorEmail !== ctx.notarioEmail ? ctx.vendedorEmail : null,
+    ...(overrides?.extraCc ?? []),
+  ]).filter((c) => !recipients.some((r) => r.toLowerCase() === c.toLowerCase()));
+  const bccs = dedupEmails(overrides?.extraBcc ?? []).filter(
+    (b) =>
+      !recipients.some((r) => r.toLowerCase() === b.toLowerCase()) &&
+      !ccs.some((c) => c.toLowerCase() === b.toLowerCase())
+  );
 
-  const { subject, html } = renderTemplate(ctx);
+  const { subject: computedSubject, html } = renderTemplate(ctx);
+  const subject = overrides?.subject ?? computedSubject;
 
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -90,9 +100,11 @@ export async function sendDictamenSolicitudEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: RESEND_FROM,
+      from: overrides?.from ?? RESEND_FROM,
       to: recipients,
       cc: ccs.length > 0 ? ccs : undefined,
+      bcc: bccs.length > 0 ? bccs : undefined,
+      reply_to: overrides?.replyTo ?? undefined,
       subject,
       html,
     }),
@@ -102,7 +114,7 @@ export async function sendDictamenSolicitudEmail(
     console.warn(`[dictamen-emails] resend ${resp.status}: ${errText.slice(0, 400)}`);
     return { ok: false, sentTo: recipients, error: `resend ${resp.status}` };
   }
-  return { ok: true, sentTo: [...recipients, ...ccs] };
+  return { ok: true, sentTo: [...recipients, ...ccs, ...bccs] };
 }
 
 function fechaTextoMx(): string {

@@ -6,8 +6,8 @@
 **Estado:** in_progress
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Próximo hito:** S5b — centralizar los 4 correos de ventas (hold, avalúo, dictamen, encuesta). S6 (#1153) y S5a (orden de compra + briefing) ya en prod / PR abierto.
-**Última actualización:** 2026-06-30 (S5a: seed orden de compra + briefing al catálogo)
+**Próximo hito:** S5b.1 (avalúo + dictamen) PR abierto — requiere label `finanzas-ok` (falso positivo por "avalúo"). Sigue S5b.2 (hold + encuesta). S6/#1153 y S5a en prod.
+**Última actualización:** 2026-07-01 (S5b.1: seed + wiring avalúo/dictamen + helper overrides)
 
 ## Problema
 
@@ -286,8 +286,14 @@ Y faltaba el correo de alta/baja de personal que Coda mandaba al comité.
   - **S5a (PR abierto)** — lote de bajo riesgo: `dilesa_orden_compra` (solo
     seed, ya lee el catálogo) + `daily_briefing` (seed + reconexión del cron,
     interno a Beto). Migración `20260630235504` (solo INSERT, sin DDL).
-  - **S5b (sigue)** — los 4 de ventas a clientes/proveedores: `hold`,
-    `avaluo`, `dictamen`, `encuesta`. Fail-open al comportamiento actual.
+  - **S5b.1 (PR abierto)** — `dilesa_avaluo_solicitud` + `dilesa_dictamen_solicitud`
+    (Fases 4 y 7). Helper compartido `lib/notifications/overrides.ts`
+    (`overridesFromDefinition` + `dedupEmails`) para no repetir el boilerplate
+    del catálogo en cada route; libs con param `overrides?` (fail-open). Trip del
+    finanzas-gate por la palabra "avalúo" (falso positivo, solo seed) → requiere
+    label `finanzas-ok`.
+  - **S5b.2 (sigue)** — `hold` (creado/por vencer, multi-caller) + `encuesta`
+    post-venta (cron + manual).
 - **S7 (opcional)** — mostrar el schedule del cron en la UI (read-only desde
   `trigger_config.schedule_human`).
 
