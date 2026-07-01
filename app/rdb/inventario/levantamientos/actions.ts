@@ -44,7 +44,7 @@ export async function crearLevantamiento(
       notas: input.notas?.trim() || null,
       tolerancia_pct_override: input.tolerancia_pct_override ?? null,
       tolerancia_monto_override: input.tolerancia_monto_override ?? null,
-      tipo: input.tipo ?? 'fisico',
+      tipo: input.tipo ?? 'total',
       created_by: session.user.id,
     })
     .select('id, folio')

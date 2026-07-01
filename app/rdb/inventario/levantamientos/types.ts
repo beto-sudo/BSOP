@@ -10,8 +10,8 @@ export type CrearLevantamientoInput = {
   notas?: string;
   tolerancia_pct_override?: number | null;
   tolerancia_monto_override?: number | null;
-  /** 'fisico' (default) — el schema permite otros tipos a futuro. */
-  tipo?: string;
+  /** 'total' (default) | 'parcial' | 'spot' — debe coincidir con el CHECK de erp.inventario_levantamientos. */
+  tipo?: 'total' | 'parcial' | 'spot';
 };
 
 export type FirmarPasoInput = {
