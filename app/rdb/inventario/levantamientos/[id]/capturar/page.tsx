@@ -150,7 +150,8 @@ function CapturarInner() {
     return lineas
       .filter(
         (l) =>
-          l.producto_nombre.toLowerCase().includes(q) || l.producto_codigo.toLowerCase().includes(q)
+          (l.producto_nombre ?? '').toLowerCase().includes(q) ||
+          (l.producto_codigo ?? '').toLowerCase().includes(q)
       )
       .slice(0, 25);
   }, [lineas, search]);
@@ -179,7 +180,7 @@ function CapturarInner() {
     e.preventDefault();
     const q = search.trim().toLowerCase();
     if (!q) return;
-    const exactCode = lineas.find((l) => l.producto_codigo.toLowerCase() === q);
+    const exactCode = lineas.find((l) => (l.producto_codigo ?? '').toLowerCase() === q);
     if (exactCode) {
       seleccionar(exactCode.producto_id);
       return;
