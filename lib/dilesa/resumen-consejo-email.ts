@@ -17,7 +17,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KpisDelDia } from './resumen-consejo-kpis';
-import { fechaISOMatamoros } from '@/lib/fecha-mx';
+import { fechaISOMatamoros, inicioMesMatamoros } from '@/lib/fecha-mx';
 
 // ── Tipos por sección ───────────────────────────────────────────────────────
 
@@ -840,27 +840,14 @@ export function renderResumenConsejoHtml(
 
 // ── Fetch ────────────────────────────────────────────────────────────────────
 
-const MONTH_NAMES = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-/** Fecha-título en español (ej. "7 de junio de 2026"), TZ America/Matamoros. */
+/** Fecha-título en español (ej. "7 de junio de 2026"), TZ America/Matamoros (DST real). */
 export function fechaTituloCST(now: Date): string {
-  // America/Matamoros = UTC-6 (CST) / UTC-5 (CDT). Aproximación CST fija para el
-  // título; el guard de domingo del cron usa el TZ real.
-  const cst = new Date(now.getTime() - 6 * 3600 * 1000);
-  return `${cst.getUTCDate()} de ${MONTH_NAMES[cst.getUTCMonth()]} de ${cst.getUTCFullYear()}`;
+  return new Intl.DateTimeFormat('es-MX', {
+    timeZone: 'America/Matamoros',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(now);
 }
 
 /** Hora objetivo de envío en horario local de Matamoros (8pm). */
@@ -898,17 +885,16 @@ export async function fetchResumenConsejoData(
 ): Promise<ResumenConsejoData> {
   const dilesa = supabase.schema('dilesa');
   const erp = supabase.schema('erp');
-  const inicioMes = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-    .toISOString()
-    .slice(0, 10);
-  // "Hoy" = fecha calendario local de Matamoros (el correo sale a las 20:00
-  // locales, ya con el día consumido). `venta_fases.fecha` es un `date` local,
-  // así que comparamos contra la misma fecha local — no contra el día UTC.
+  // "Hoy" y "el mes" = calendario LOCAL de Matamoros. El correo sale a las 20:00
+  // locales, cuando el día/mes UTC ya rodó al siguiente — un corte en UTC vacía
+  // el acumulado del mes en cada cierre (bug del 30-jun-2026: acumulado en cero).
+  // `venta_fases.fecha` es un `date` local, así que comparamos fecha local.
+  const inicioMes = inicioMesMatamoros(now);
   const hoyISO = fechaISOMatamoros(now);
-  // Ventana de absorción: 3 meses móviles hasta hoy.
-  const inicio3m = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - ABSORCION_VENTANA_MESES, now.getUTCDate())
-  )
+  // Ventana de absorción: 3 meses móviles hasta hoy (aritmética de calendario
+  // sobre los componentes de la fecha local; Date.UTC solo resuelve el rollover).
+  const [hoyY, hoyM, hoyD] = hoyISO.split('-').map(Number);
+  const inicio3m = new Date(Date.UTC(hoyY, hoyM - 1 - ABSORCION_VENTANA_MESES, hoyD))
     .toISOString()
     .slice(0, 10);
 
