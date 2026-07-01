@@ -127,9 +127,17 @@ describe('relojMatamoros — envío 8pm local con DST real', () => {
 });
 
 describe('fechaTituloCST', () => {
-  it('aplica el offset CST (UTC-6) al título', () => {
+  it('usa el calendario local de Matamoros', () => {
     expect(fechaTituloCST(new Date('2026-06-07T02:00:00Z'))).toBe('6 de junio de 2026');
     expect(fechaTituloCST(new Date('2026-06-07T18:00:00Z'))).toBe('7 de junio de 2026');
+  });
+
+  it('resuelve el DST real, no un offset fijo -6', () => {
+    // 2026-07-01 05:30 UTC = 2026-07-01 00:30 en Matamoros (CDT, UTC-5); un
+    // offset fijo -6 daría 23:30 del 30 de junio.
+    expect(fechaTituloCST(new Date('2026-07-01T05:30:00Z'))).toBe('1 de julio de 2026');
+    // El instante del incidente del 30-jun-2026 (20:00 locales, mes UTC ya en julio).
+    expect(fechaTituloCST(new Date('2026-07-01T01:00:00Z'))).toBe('30 de junio de 2026');
   });
 });
 
