@@ -18,3 +18,10 @@ export {
   type LogRecipients,
   type WriteLogInput,
 } from './log';
+
+export {
+  overridesFromDefinition,
+  dedupEmails,
+  type NotificationOverrides,
+  type ResolvedOverrides,
+} from './overrides';

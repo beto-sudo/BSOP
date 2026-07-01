@@ -25,6 +25,11 @@ import { sendAvaluoSolicitudEmail, type AvaluoSolicitudContext } from '@/lib/dil
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 import { signAvaluoToken } from '@/lib/dilesa/avaluo-token';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
+import {
+  getDefinitionBySlug,
+  overridesFromDefinition,
+  writeNotificationLog,
+} from '@/lib/notifications';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -232,7 +237,46 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     vendedorTelefono: gerente?.telefono ?? null,
   };
 
-  const res = await sendAvaluoSolicitudEmail(emailCtx);
+  // Catálogo de notificaciones (slug `dilesa_avaluo_solicitud`). FAIL-OPEN a los
+  // defaults hardcoded de la lib si el catálogo no responde.
+  const ref = `${proyectoNombre} · ${unidad?.identificador ?? ''}`.trim();
+  const def = await getDefinitionBySlug(admin, 'dilesa_avaluo_solicitud', venta.empresa_id);
+  const { killed, definitionId, overrides } = overridesFromDefinition(def, {
+    ref,
+    proyecto: proyectoNombre,
+    unidad: unidad?.identificador ?? '',
+  });
+
+  if (killed) {
+    await writeNotificationLog(admin, {
+      definitionId,
+      empresaId: venta.empresa_id,
+      status: 'skipped',
+      recipients: { to: [] },
+      subject: overrides.subject ?? null,
+      triggeredByUserId: user.id,
+      context: { venta_id: venta.id },
+    });
+    return NextResponse.json({
+      ok: false,
+      skipped: true,
+      error: 'La solicitud de avalúo está desactivada en /settings/notificaciones.',
+    });
+  }
+
+  const res = await sendAvaluoSolicitudEmail(emailCtx, overrides);
+
+  await writeNotificationLog(admin, {
+    definitionId,
+    empresaId: venta.empresa_id,
+    status: res.ok ? 'sent' : 'failed',
+    recipients: { to: res.sentTo },
+    subject: overrides.subject ?? `Solicitud de avalúo — ${ref}`,
+    errorMessage: res.ok ? null : (res.error ?? 'send failed'),
+    triggeredByUserId: user.id,
+    context: { venta_id: venta.id },
+  });
+
   if (!res.ok) {
     return NextResponse.json({
       ok: false,
