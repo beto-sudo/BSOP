@@ -40,6 +40,9 @@ import Link from 'next/link';
 import { usePermissions } from '@/components/providers';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency, formatPercent } from '@/lib/format';
+import { RuvHitoChips } from '@/components/dilesa/ruv-hito-chips';
+import { FilterMultiCombobox } from '@/components/ui/filter-multi-combobox';
+import { HITO_RUV_OPTIONS, matchHitosRuv } from '@/lib/dilesa/ruv-hitos';
 
 type VentaRow = {
   id: string;
@@ -60,6 +63,9 @@ type VentaRow = {
 export type VentaListaRow = VentaRow & {
   cliente: string;
   unidadIdentificador: string | null;
+  /** Hitos RUV de la unidad (`dilesa.unidades`, capturados en el módulo RUV). */
+  unidadFechaDtu: string | null;
+  unidadFechaExtraccion: string | null;
   proyectoNombre: string;
   prototipo: string | null;
   /** Precio efectivo: `valor_escrituracion ?? valor_comercial`. */
@@ -173,6 +179,9 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
   // El dato vive en el chip de Fase, pero el filtro va aparte para poder aislar
   // lo que se está enfriando sin saturar la columna.
   const [antiguedadFiltro, setAntiguedadFiltro] = useState('');
+  // Hitos RUV de la unidad (con/sin DTU · con/sin extracción). Multi-select
+  // con semántica AND — insumo directo del corte "escriturables".
+  const [hitosFiltro, setHitosFiltro] = useState<string[]>([]);
   const [rangoEscritura, setRangoEscritura] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // `faseFiltro` se deriva del query param (single source of truth: el URL).
@@ -235,7 +244,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       sb
         .schema('dilesa')
         .from('unidades')
-        .select('id, identificador, proyecto_id, producto_id')
+        .select('id, identificador, proyecto_id, producto_id, fecha_dtu, fecha_extraccion')
         .eq('empresa_id', empresaId),
       sb.schema('dilesa').from('proyectos').select('id, nombre').eq('empresa_id', empresaId),
       sb
@@ -265,13 +274,21 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
 
     const unidadMap = new Map<
       string,
-      { identificador: string; proyecto_id: string | null; producto_id: string | null }
+      {
+        identificador: string;
+        proyecto_id: string | null;
+        producto_id: string | null;
+        fecha_dtu: string | null;
+        fecha_extraccion: string | null;
+      }
     >();
     for (const u of unsRes.data ?? []) {
       unidadMap.set(u.id as string, {
         identificador: u.identificador as string,
         proyecto_id: (u.proyecto_id as string | null) ?? null,
         producto_id: (u.producto_id as string | null) ?? null,
+        fecha_dtu: (u.fecha_dtu as string | null) ?? null,
+        fecha_extraccion: (u.fecha_extraccion as string | null) ?? null,
       });
     }
 
@@ -316,6 +333,8 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           vendedor: vendedorResuelto,
           cliente: personaMap.get(v.persona_id) ?? '(sin comprador)',
           unidadIdentificador: u?.identificador ?? null,
+          unidadFechaDtu: u?.fecha_dtu ?? null,
+          unidadFechaExtraccion: u?.fecha_extraccion ?? null,
           proyectoNombre: u?.proyecto_id ? (proyectoMap.get(u.proyecto_id) ?? '') : '',
           prototipo: u?.producto_id ? (productoMap.get(u.producto_id) ?? null) : null,
           // `Valor de Escrituración` es el precio correcto de venta (Beto);
@@ -431,6 +450,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
         const min = Number(antiguedadFiltro);
         if (v.diasEnFase == null || v.diasEnFase < min) return false;
       }
+      if (!matchHitosRuv(v.unidadFechaDtu, v.unidadFechaExtraccion, hitosFiltro)) return false;
       if (!isInDateRange(v.fecha_escritura, rangoEscritura)) return false;
       if (!matchVentaSearch(v, search)) return false;
       return true;
@@ -444,6 +464,7 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
     vendedorFiltro,
     creditoFiltro,
     antiguedadFiltro,
+    hitosFiltro,
     rangoEscritura,
   ]);
 
@@ -456,7 +477,15 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
       key: 'unidadIdentificador',
       label: 'Unidad',
       type: 'text',
-      render: (v) => v.unidadIdentificador ?? '—',
+      render: (v) =>
+        v.unidadIdentificador ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span>{v.unidadIdentificador}</span>
+            <RuvHitoChips fechaDtu={v.unidadFechaDtu} fechaExtraccion={v.unidadFechaExtraccion} />
+          </div>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'prototipo',
@@ -644,6 +673,14 @@ export function VentasModule({ empresaId }: { empresaId: string }) {
           <option value="60">≥ 60 días en fase</option>
           <option value="90">≥ 90 días en fase</option>
         </select>
+        <FilterMultiCombobox
+          value={hitosFiltro}
+          onChange={setHitosFiltro}
+          options={HITO_RUV_OPTIONS}
+          placeholder="Hitos RUV"
+          searchPlaceholder="Buscar hito…"
+          className="w-40"
+        />
         <DateRangeFilter
           label="Escritura"
           ariaPrefix="Fecha escritura"

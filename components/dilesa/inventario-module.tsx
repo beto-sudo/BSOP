@@ -35,6 +35,10 @@ import { Boxes, RefreshCw, Search, ArrowRight } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { formatCurrency } from '@/lib/format';
 import { UnidadDetailDrawer } from '@/components/dilesa/unidad-detail-drawer';
+import { RuvHitoChips } from '@/components/dilesa/ruv-hito-chips';
+import { FilterMultiCombobox } from '@/components/ui/filter-multi-combobox';
+import type { FilterComboboxOption } from '@/components/ui/filter-combobox';
+import { HITO_RUV_OPTIONS, matchHitosRuv } from '@/lib/dilesa/ruv-hitos';
 
 type UnidadRow = {
   id: string;
@@ -43,6 +47,9 @@ type UnidadRow = {
   m2_construccion: number | null;
   es_esquina: boolean | null;
   tiene_frente_verde: boolean | null;
+  /** Hitos RUV (fuente de verdad: los captura el módulo RUV). */
+  fecha_dtu: string | null;
+  fecha_extraccion: string | null;
   estado: string;
   proyecto_id: string;
   producto_id: string | null;
@@ -71,6 +78,29 @@ export type UnidadListaRow = UnidadRow & {
    */
   diasInventario: number;
 };
+
+/**
+ * Opciones del multi-select de Características: las físicas del lote
+ * (esquina / frente verde) + los hitos RUV (con/sin DTU y extracción).
+ * Semántica AND — la unidad debe cumplir TODO lo seleccionado.
+ */
+export const CARACTERISTICA_OPTIONS: readonly FilterComboboxOption[] = [
+  { id: 'esquina', label: 'Esquina' },
+  { id: 'frente_verde', label: 'Frente verde' },
+  ...HITO_RUV_OPTIONS,
+];
+
+/** ¿La unidad cumple TODAS las características seleccionadas (AND)? */
+export function matchCaracteristicas(
+  u: Pick<UnidadRow, 'es_esquina' | 'tiene_frente_verde' | 'fecha_dtu' | 'fecha_extraccion'>,
+  seleccion: readonly string[]
+): boolean {
+  for (const s of seleccion) {
+    if (s === 'esquina' && !u.es_esquina) return false;
+    if (s === 'frente_verde' && !u.tiene_frente_verde) return false;
+  }
+  return matchHitosRuv(u.fecha_dtu, u.fecha_extraccion, seleccion);
+}
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
   en_construccion: 'info',
@@ -166,9 +196,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
   const [search, setSearch] = useState('');
   const [proyectoFiltro, setProyectoFiltro] = useState('');
   const [prototipoFiltro, setPrototipoFiltro] = useState('');
-  const [caracteristicaFiltro, setCaracteristicaFiltro] = useState<'' | 'esquina' | 'frente_verde'>(
-    ''
-  );
+  const [caracteristicasFiltro, setCaracteristicasFiltro] = useState<string[]>([]);
   const [rangoIngreso, setRangoIngreso] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [detalleUnidadId, setDetalleUnidadId] = useState<string | null>(null);
 
@@ -188,7 +216,7 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
       .schema('dilesa')
       .from('unidades')
       .select(
-        'id, identificador, area_m2, m2_construccion, es_esquina, tiene_frente_verde, estado, proyecto_id, producto_id, created_at'
+        'id, identificador, area_m2, m2_construccion, es_esquina, tiene_frente_verde, fecha_dtu, fecha_extraccion, estado, proyecto_id, producto_id, created_at'
       )
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
@@ -381,13 +409,12 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
     return unidades.filter((u) => {
       if (proyectoFiltro && u.proyectoNombre !== proyectoFiltro) return false;
       if (prototipoFiltro && u.prototipo !== prototipoFiltro) return false;
-      if (caracteristicaFiltro === 'esquina' && !u.es_esquina) return false;
-      if (caracteristicaFiltro === 'frente_verde' && !u.tiene_frente_verde) return false;
+      if (!matchCaracteristicas(u, caracteristicasFiltro)) return false;
       if (!isInDateRange(u.created_at, rangoIngreso)) return false;
       if (q && !u.identificadorCompleto.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [unidades, search, proyectoFiltro, prototipoFiltro, caracteristicaFiltro, rangoIngreso]);
+  }, [unidades, search, proyectoFiltro, prototipoFiltro, caracteristicasFiltro, rangoIngreso]);
 
   const kpis = useMemo(() => deriveKpis(filtrados), [filtrados]);
 
@@ -422,7 +449,8 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
         <div className="flex flex-wrap gap-1">
           {u.es_esquina ? <Badge tone="info">Esquina</Badge> : null}
           {u.tiene_frente_verde ? <Badge tone="success">Frente verde</Badge> : null}
-          {!u.es_esquina && !u.tiene_frente_verde ? (
+          <RuvHitoChips fechaDtu={u.fecha_dtu} fechaExtraccion={u.fecha_extraccion} />
+          {!u.es_esquina && !u.tiene_frente_verde && !u.fecha_dtu && !u.fecha_extraccion ? (
             <span className="text-[var(--text)]/30">—</span>
           ) : null}
         </div>
@@ -543,17 +571,14 @@ export function InventarioModule({ empresaId }: { empresaId: string }) {
             </option>
           ))}
         </select>
-        <select
-          value={caracteristicaFiltro}
-          onChange={(e) =>
-            setCaracteristicaFiltro(e.target.value as '' | 'esquina' | 'frente_verde')
-          }
-          className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
-        >
-          <option value="">Cualquier característica</option>
-          <option value="esquina">Solo esquinas</option>
-          <option value="frente_verde">Solo frente verde</option>
-        </select>
+        <FilterMultiCombobox
+          value={caracteristicasFiltro}
+          onChange={setCaracteristicasFiltro}
+          options={CARACTERISTICA_OPTIONS}
+          placeholder="Características"
+          searchPlaceholder="Buscar característica…"
+          className="w-48"
+        />
         <DateRangeFilter
           label="Ingreso"
           ariaPrefix="Fecha de ingreso a inventario"

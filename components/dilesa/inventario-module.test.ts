@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeDiasInventario, deriveKpis, type UnidadListaRow } from './inventario-module';
+import {
+  computeDiasInventario,
+  deriveKpis,
+  matchCaracteristicas,
+  type UnidadListaRow,
+} from './inventario-module';
 
 function row(overrides: Partial<UnidadListaRow>): UnidadListaRow {
   return {
@@ -9,6 +14,8 @@ function row(overrides: Partial<UnidadListaRow>): UnidadListaRow {
     m2_construccion: null,
     es_esquina: null,
     tiene_frente_verde: null,
+    fecha_dtu: null,
+    fecha_extraccion: null,
     estado: 'en_construccion',
     proyecto_id: 'p',
     producto_id: null,
@@ -89,6 +96,41 @@ describe('deriveKpis (Inventario DILESA — ADR-034)', () => {
     expect(k[1]?.value).toBe(0);
     expect(k[2]?.value).toBe(1);
     expect(k[4]?.value).toBe('90 días');
+  });
+});
+
+describe('matchCaracteristicas (multi-select AND: físicas + hitos RUV)', () => {
+  const unidad = row({
+    es_esquina: true,
+    tiene_frente_verde: false,
+    fecha_dtu: '2026-05-10',
+    fecha_extraccion: null,
+  });
+
+  it('selección vacía matchea todo', () => {
+    expect(matchCaracteristicas(unidad, [])).toBe(true);
+  });
+
+  it('características físicas: esquina y frente verde', () => {
+    expect(matchCaracteristicas(unidad, ['esquina'])).toBe(true);
+    expect(matchCaracteristicas(unidad, ['frente_verde'])).toBe(false);
+  });
+
+  it('hitos RUV positivos: con_dtu / con_extraccion', () => {
+    expect(matchCaracteristicas(unidad, ['con_dtu'])).toBe(true);
+    expect(matchCaracteristicas(unidad, ['con_extraccion'])).toBe(false);
+  });
+
+  it('hitos RUV negativos: sin_dtu / sin_extraccion (el corte "qué falta")', () => {
+    expect(matchCaracteristicas(unidad, ['sin_dtu'])).toBe(false);
+    expect(matchCaracteristicas(unidad, ['sin_extraccion'])).toBe(true);
+  });
+
+  it('semántica AND: todas las seleccionadas deben cumplirse', () => {
+    expect(matchCaracteristicas(unidad, ['esquina', 'con_dtu'])).toBe(true);
+    expect(matchCaracteristicas(unidad, ['esquina', 'con_extraccion'])).toBe(false);
+    // Contradicción (con + sin el mismo hito) da vacío por construcción.
+    expect(matchCaracteristicas(unidad, ['con_dtu', 'sin_dtu'])).toBe(false);
   });
 });
 
