@@ -3,11 +3,11 @@
 **Slug:** `notificaciones-catalogo`
 **Empresas:** todas (modelo empresa-aware con NULL = global)
 **Schemas afectados:** `core` (`notification_definitions`, `notification_log`), `erp` (columnas `empleados.notif_alta_at` / `notif_baja_at`)
-**Estado:** in_progress
+**Estado:** done
 **Dueño:** Beto
 **Creada:** 2026-05-26
-**Próximo hito:** S5b.1 (avalúo + dictamen) PR abierto — requiere label `finanzas-ok` (falso positivo por "avalúo"). Sigue S5b.2 (hold + encuesta). S6/#1153 y S5a en prod.
-**Última actualización:** 2026-07-01 (S5b.1: seed + wiring avalúo/dictamen + helper overrides)
+**Próximo hito:** — (Fase 2 cerrada; S7 "schedule del cron visible en la UI" queda como backlog opcional).
+**Última actualización:** 2026-07-01 (S5b.2 cierra la centralización: hold + encuesta)
 
 ## Problema
 
@@ -283,17 +283,20 @@ Y faltaba el correo de alta/baja de personal que Coda mandaba al comité.
 - **S5 — Centralizar los 6 huérfanos**: sembrar + reconectar cada handler al
   catálogo (mismo refactor que el Sprint 2 original). Por R1 va en lotes para
   no arriesgar los correos vivos:
-  - **S5a (PR abierto)** — lote de bajo riesgo: `dilesa_orden_compra` (solo
-    seed, ya lee el catálogo) + `daily_briefing` (seed + reconexión del cron,
-    interno a Beto). Migración `20260630235504` (solo INSERT, sin DDL).
-  - **S5b.1 (PR abierto)** — `dilesa_avaluo_solicitud` + `dilesa_dictamen_solicitud`
-    (Fases 4 y 7). Helper compartido `lib/notifications/overrides.ts`
-    (`overridesFromDefinition` + `dedupEmails`) para no repetir el boilerplate
-    del catálogo en cada route; libs con param `overrides?` (fail-open). Trip del
-    finanzas-gate por la palabra "avalúo" (falso positivo, solo seed) → requiere
-    label `finanzas-ok`.
-  - **S5b.2 (sigue)** — `hold` (creado/por vencer, multi-caller) + `encuesta`
-    post-venta (cron + manual).
+  - **S5a** ([#1155](https://github.com/beto-sudo/BSOP/pull/1155), en prod) —
+    `dilesa_orden_compra` (solo seed, ya lee el catálogo) + `daily_briefing`
+    (seed + reconexión del cron, interno a Beto). Migración `20260630235504`.
+  - **S5b.1** ([#1156](https://github.com/beto-sudo/BSOP/pull/1156), en prod) —
+    `dilesa_avaluo_solicitud` + `dilesa_dictamen_solicitud` (Fases 4 y 7). Helper
+    compartido `lib/notifications/overrides.ts` (`overridesFromDefinition` +
+    `dedupEmails`) para no repetir el boilerplate del catálogo en cada route;
+    libs con param `overrides?` (fail-open). Requirió label `finanzas-ok` (falso
+    positivo del gate por la palabra "avalúo").
+  - **S5b.2** (PR abierto) — `dilesa_hold` (5 eventos del apartado) + `dilesa_encuesta`
+    (posventa + aviso interno). Por tener varios call sites cada uno, la
+    reconexión al catálogo vive DENTRO de las libs (`hold-emails` /
+    `encuesta-emails`): kill switch + from/reply-to + recipientes extra + log,
+    fail-open; el asunto se mantiene por-evento en código. Cierra S5.
 - **S7 (opcional)** — mostrar el schedule del cron en la UI (read-only desde
   `trigger_config.schedule_human`).
 
