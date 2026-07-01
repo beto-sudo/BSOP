@@ -16,8 +16,16 @@
 
 import { renderEmailLayout, escapeHtml } from './email-layout';
 import type { EmpresaBranding } from './email-branding';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import {
+  getDefinitionBySlug,
+  overridesFromDefinition,
+  writeNotificationLog,
+  dedupEmails,
+} from '@/lib/notifications';
 
 const RESEND_FROM = 'DILESA <noreply@bsop.io>';
+const ENCUESTA_SLUG = 'dilesa_encuesta';
 
 export type EncuestaEmailVariante = 'inicial' | 'recordatorio' | 'ultimo';
 
@@ -69,7 +77,10 @@ export async function sendEncuestaEmail(
     return { ok: false, error: 'sin email del cliente' };
   }
   const { subject, html } = renderEncuestaEmail(ctx, variante);
-  return postResend(apiKey, [ctx.clienteEmail], subject, html);
+  return postResend(apiKey, [ctx.clienteEmail], subject, html, {
+    empresaId: ctx.branding.empresaId,
+    context: { variante, tipo: 'cliente' },
+  });
 }
 
 /** Render puro (testeable) del correo al cliente. */
@@ -144,7 +155,10 @@ export async function sendAvisoAtencionClientes(ctx: AvisoAtencionContext): Prom
     return { ok: false, error: 'sin destinatarios internos' };
   }
   const { subject, html } = renderAvisoAtencion(ctx);
-  return postResend(apiKey, ctx.destinatarios, subject, html);
+  return postResend(apiKey, ctx.destinatarios, subject, html, {
+    empresaId: ctx.branding.empresaId,
+    context: { tipo: 'aviso_interno' },
+  });
 }
 
 /** Render puro (testeable) del aviso interno a Atención a Clientes. */
@@ -190,16 +204,73 @@ async function postResend(
   apiKey: string,
   to: string[],
   subject: string,
-  html: string
+  html: string,
+  meta: { empresaId: string | null; context: Record<string, unknown> }
 ): Promise<SendResult> {
+  // Catálogo de notificaciones (slug `dilesa_encuesta`, gobierna el correo al
+  // cliente y el aviso interno). El asunto sigue por-variante; del catálogo se
+  // respetan kill switch, from/reply-to, recipientes extra y el log.
+  // FAIL-OPEN: sin admin/definición se usa el comportamiento de hoy.
+  const admin = getSupabaseAdminClient();
+  const def = admin ? await getDefinitionBySlug(admin, ENCUESTA_SLUG, meta.empresaId) : null;
+  const { killed, definitionId, overrides } = overridesFromDefinition(def);
+
+  if (killed) {
+    if (admin) {
+      await writeNotificationLog(admin, {
+        definitionId,
+        empresaId: meta.empresaId,
+        status: 'skipped',
+        recipients: { to: [] },
+        subject,
+        context: meta.context,
+      });
+    }
+    return { ok: false, error: 'kill switch (dilesa_encuesta desactivado)' };
+  }
+
+  const recipients = dedupEmails([...to, ...(overrides.extraTo ?? [])]);
+  const ccs = dedupEmails(overrides.extraCc ?? []).filter(
+    (c) => !recipients.some((r) => r.toLowerCase() === c.toLowerCase())
+  );
+  const bccs = dedupEmails(overrides.extraBcc ?? []).filter(
+    (b) =>
+      !recipients.some((r) => r.toLowerCase() === b.toLowerCase()) &&
+      !ccs.some((c) => c.toLowerCase() === b.toLowerCase())
+  );
+
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: RESEND_FROM, to, subject, html }),
+    body: JSON.stringify({
+      from: overrides.from ?? RESEND_FROM,
+      to: recipients,
+      cc: ccs.length > 0 ? ccs : undefined,
+      bcc: bccs.length > 0 ? bccs : undefined,
+      reply_to: overrides.replyTo ?? undefined,
+      subject,
+      html,
+    }),
   });
+  const respId = resp.ok
+    ? (((await resp.json().catch(() => null)) as { id?: string } | null)?.id ?? null)
+    : null;
+
+  if (admin) {
+    await writeNotificationLog(admin, {
+      definitionId,
+      empresaId: meta.empresaId,
+      status: resp.ok ? 'sent' : 'failed',
+      recipients: { to: recipients, cc: ccs, bcc: bccs },
+      subject,
+      resendId: respId,
+      errorMessage: resp.ok ? null : `resend ${resp.status}`,
+      context: meta.context,
+    });
+  }
+
   if (!resp.ok) {
-    const errText = await resp.text();
-    console.warn(`[encuesta-emails] resend ${resp.status}: ${errText.slice(0, 400)}`);
+    console.warn(`[encuesta-emails] resend ${resp.status}`);
     return { ok: false, error: `resend ${resp.status}` };
   }
   return { ok: true };

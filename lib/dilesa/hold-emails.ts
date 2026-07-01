@@ -33,6 +33,13 @@ import {
   escapeHtml,
 } from './email-layout';
 import type { EmpresaBranding } from './email-branding';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import {
+  getDefinitionBySlug,
+  overridesFromDefinition,
+  writeNotificationLog,
+  dedupEmails,
+} from '@/lib/notifications';
 
 /**
  * `From` para Resend. Usa `noreply@bsop.io` porque es el dominio que el
@@ -97,17 +104,48 @@ export async function sendHoldEmail(
     return { ok: false, sentTo: [], error: 'RESEND_API_KEY missing' };
   }
 
-  const recipients: string[] = [];
-  if (ctx.vendedorEmail) recipients.push(ctx.vendedorEmail);
-  if (ctx.clienteEmail && ctx.clienteEmail !== ctx.vendedorEmail) {
-    recipients.push(ctx.clienteEmail);
+  // Catálogo de notificaciones (slug `dilesa_hold`, gobierna las 5 variantes).
+  // El asunto sigue siendo por-evento (lo computa renderTemplate); del catálogo
+  // se respetan kill switch, from/reply-to, recipientes extra y el log. Como
+  // hay 7 call sites (cron + form + route), la lógica vive aquí, no en cada
+  // caller. FAIL-OPEN: sin admin/definición se usa el comportamiento de hoy.
+  const admin = getSupabaseAdminClient();
+  const def = admin ? await getDefinitionBySlug(admin, 'dilesa_hold', ctx.empresaId) : null;
+  const { killed, definitionId, overrides } = overridesFromDefinition(def);
+
+  const { subject, html } = renderTemplate(type, ctx);
+
+  if (killed) {
+    if (admin) {
+      await writeNotificationLog(admin, {
+        definitionId,
+        empresaId: ctx.empresaId,
+        status: 'skipped',
+        recipients: { to: [] },
+        subject,
+        context: { venta_id: ctx.ventaId, evento: type },
+      });
+    }
+    return { ok: false, sentTo: [], error: 'kill switch (dilesa_hold desactivado)' };
   }
+
+  const recipients = dedupEmails([
+    ctx.vendedorEmail,
+    ctx.clienteEmail && ctx.clienteEmail !== ctx.vendedorEmail ? ctx.clienteEmail : null,
+    ...(overrides.extraTo ?? []),
+  ]);
+  const ccs = dedupEmails(overrides.extraCc ?? []).filter(
+    (c) => !recipients.some((r) => r.toLowerCase() === c.toLowerCase())
+  );
+  const bccs = dedupEmails(overrides.extraBcc ?? []).filter(
+    (b) =>
+      !recipients.some((r) => r.toLowerCase() === b.toLowerCase()) &&
+      !ccs.some((c) => c.toLowerCase() === b.toLowerCase())
+  );
   if (recipients.length === 0) {
     console.warn(`[hold-emails] no recipients for ${type} venta=${ctx.ventaId}`);
     return { ok: false, sentTo: [], error: 'no recipients' };
   }
-
-  const { subject, html } = renderTemplate(type, ctx);
 
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -116,18 +154,37 @@ export async function sendHoldEmail(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: RESEND_FROM,
+      from: overrides.from ?? RESEND_FROM,
       to: recipients,
+      cc: ccs.length > 0 ? ccs : undefined,
+      bcc: bccs.length > 0 ? bccs : undefined,
+      reply_to: overrides.replyTo ?? undefined,
       subject,
       html,
     }),
   });
+  const respId = resp.ok
+    ? (((await resp.json().catch(() => null)) as { id?: string } | null)?.id ?? null)
+    : null;
+
+  if (admin) {
+    await writeNotificationLog(admin, {
+      definitionId,
+      empresaId: ctx.empresaId,
+      status: resp.ok ? 'sent' : 'failed',
+      recipients: { to: recipients, cc: ccs, bcc: bccs },
+      subject,
+      resendId: respId,
+      errorMessage: resp.ok ? null : `resend ${resp.status}`,
+      context: { venta_id: ctx.ventaId, evento: type },
+    });
+  }
+
   if (!resp.ok) {
-    const errText = await resp.text();
-    console.warn(`[hold-emails] resend ${resp.status} ${type}: ${errText.slice(0, 400)}`);
+    console.warn(`[hold-emails] resend ${resp.status} ${type}`);
     return { ok: false, sentTo: recipients, error: `resend ${resp.status}` };
   }
-  return { ok: true, sentTo: recipients };
+  return { ok: true, sentTo: [...recipients, ...ccs, ...bccs] };
 }
 
 function fechaTextoMx(): string {
