@@ -31,7 +31,8 @@ export type FirmarPasoData = {
 export type LineaParaCapturar = {
   linea_id: string;
   producto_id: string;
-  producto_codigo: string;
+  /** erp.productos.codigo es nullable — guardar antes de `.toLowerCase()` u otras ops de string. */
+  producto_codigo: string | null;
   producto_nombre: string;
   unidad: string;
   categoria: string | null;
@@ -44,7 +45,8 @@ export type LineaParaCapturar = {
 export type LineaParaRevisar = {
   linea_id: string;
   producto_id: string;
-  producto_codigo: string;
+  /** erp.productos.codigo es nullable — guardar antes de `.toLowerCase()` u otras ops de string. */
+  producto_codigo: string | null;
   producto_nombre: string;
   unidad: string;
   categoria: string | null;
