@@ -61,7 +61,9 @@ export function ReporteUnidadesEscriturablesPDF({
           <Text style={[s.th, s.colUnidad]}>Unidad</Text>
           <Text style={[s.th, s.colProy]}>Proyecto / prototipo</Text>
           <Text style={[s.th, s.colSit]}>Situación</Text>
-          <Text style={[s.th, s.colCliente]}>Comprador · fase</Text>
+          <Text style={[s.th, s.colCliente]}>Comprador</Text>
+          <Text style={[s.th, s.colFase]}>Fase (días)</Text>
+          <Text style={[s.th, s.colVend]}>Vendedor</Text>
           <Text style={[s.th, s.colFecha]}>Obra term.</Text>
           <Text style={[s.th, s.colFecha]}>DTU</Text>
           <Text style={[s.th, s.colFecha]}>Extracción</Text>
@@ -76,9 +78,15 @@ export function ReporteUnidadesEscriturablesPDF({
             <Text style={[s.tdMuted, s.colSit]}>
               {u.situacion === 'inventario' ? 'Inventario' : 'Asignada'}
             </Text>
-            <Text style={[s.tdMuted, s.colCliente]}>
-              {u.cliente ? [u.cliente, u.faseActual].filter(Boolean).join(' · ') : '—'}
+            <Text style={[s.tdMuted, s.colCliente]}>{u.cliente ?? '—'}</Text>
+            <Text style={[s.tdMuted, s.colFase]}>
+              {u.faseActual
+                ? u.diasEnFase != null
+                  ? `${u.faseActual} (${u.diasEnFase} d)`
+                  : u.faseActual
+                : '—'}
             </Text>
+            <Text style={[s.tdMuted, s.colVend]}>{u.vendedor ?? '—'}</Text>
             <Text style={[s.tdMuted, s.colFecha]}>
               {u.obraTerminada
                 ? u.fechaObraTerminada
@@ -162,10 +170,12 @@ const s = StyleSheet.create({
     borderTopColor: colors.primary,
   },
   tdTotal: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: colors.text },
-  colUnidad: { width: '13%' },
-  colProy: { width: '19%' },
-  colSit: { width: '9%' },
-  colCliente: { width: '23%' },
-  colFecha: { width: '9%' },
-  colEstatus: { width: '9%' },
+  colUnidad: { width: '11%' },
+  colProy: { width: '14%' },
+  colSit: { width: '7%' },
+  colCliente: { width: '16%' },
+  colFase: { width: '13%' },
+  colVend: { width: '10%' },
+  colFecha: { width: '7%' },
+  colEstatus: { width: '8%' },
 });

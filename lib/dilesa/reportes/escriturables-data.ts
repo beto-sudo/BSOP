@@ -36,6 +36,9 @@ export type VentaCandidataRaw = {
   unidad_id: string | null;
   persona_id: string;
   fase_actual: string | null;
+  /** Texto legacy (ventas migradas de Coda); fallback del FK. */
+  vendedor: string | null;
+  vendedor_usuario_id: string | null;
 };
 
 export type ObraRaw = {
@@ -57,6 +60,10 @@ export type UnidadEscriturableRow = {
   cliente: string | null;
   /** Fase actual de la venta (solo asignadas). */
   faseActual: string | null;
+  /** Días en la fase actual (solo asignadas con dato en la vista de antigüedad). */
+  diasEnFase: number | null;
+  /** Vendedor de la venta (FK a core.usuarios con fallback al texto legacy). */
+  vendedor: string | null;
   obraTerminada: boolean;
   /** `fecha_terminada` de la construcción más reciente, si existe. */
   fechaObraTerminada: string | null;
@@ -75,11 +82,16 @@ export type EscriturablesBundle = {
   productos: ReadonlyArray<{ id: string; nombre: string }>;
   /** persona_id → nombre completo del comprador. */
   clientes: ReadonlyMap<string, string>;
+  /** usuario_id → nombre del vendedor (de `core.usuarios`). */
+  vendedores: ReadonlyMap<string, string>;
+  /** venta_id → días en la fase actual (RPC `fn_ventas_lista_antiguedad`). */
+  diasEnFase: ReadonlyMap<string, number>;
 };
 
 export const UNIDADES_ESCRITURABLES_SELECT =
   'id, identificador, estado, proyecto_id, producto_id, fecha_dtu, fecha_extraccion, activo_id';
-export const VENTAS_CANDIDATAS_SELECT = 'id, unidad_id, persona_id, fase_actual';
+export const VENTAS_CANDIDATAS_SELECT =
+  'id, unidad_id, persona_id, fase_actual, vendedor, vendedor_usuario_id';
 export const OBRAS_SELECT = 'unidad_id, fecha_terminada, estado';
 
 /** Estados de unidad que cuentan como inventario vendible (espejo del módulo Inventario). */
@@ -131,6 +143,14 @@ export function normalizarEscriturables(b: EscriturablesBundle): UnidadEscritura
       situacion,
       cliente: venta ? (b.clientes.get(venta.persona_id) ?? '(sin comprador)') : null,
       faseActual: venta?.fase_actual ?? null,
+      diasEnFase: venta ? (b.diasEnFase.get(venta.id) ?? null) : null,
+      // Vendedor: FK a core.usuarios (ventas nuevas), fallback al texto
+      // legacy (ventas migradas de Coda) — mismo criterio que ventas-module.
+      vendedor: venta
+        ? venta.vendedor_usuario_id
+          ? (b.vendedores.get(venta.vendedor_usuario_id) ?? venta.vendedor)
+          : venta.vendedor
+        : null,
       obraTerminada,
       fechaObraTerminada: fechaObraMap.get(u.id) ?? null,
       fechaDtu: u.fecha_dtu,

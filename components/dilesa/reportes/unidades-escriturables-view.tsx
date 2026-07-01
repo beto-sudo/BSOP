@@ -148,12 +148,14 @@ export function UnidadesEscriturablesView() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1180px] text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--bg)]/40 text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
                 <th className="px-3 py-2.5 font-medium">Unidad</th>
                 <th className="px-3 py-2.5 font-medium">Proyecto / prototipo</th>
                 <th className="px-3 py-2.5 font-medium">Situación</th>
+                <th className="px-3 py-2.5 font-medium">Fase</th>
+                <th className="px-3 py-2.5 font-medium">Vendedor</th>
                 <th className="px-3 py-2.5 font-medium">Obra terminada</th>
                 <th className="px-3 py-2.5 font-medium">DTU</th>
                 <th className="px-3 py-2.5 font-medium">Extracción</th>
@@ -178,12 +180,26 @@ export function UnidadesEscriturablesView() {
                     ) : (
                       <div className="flex flex-col gap-0.5">
                         <Badge tone="info">Asignada</Badge>
-                        <span className="text-xs text-[var(--text)]/60">
-                          {u.cliente}
-                          {u.faseActual ? ` · ${u.faseActual}` : ''}
-                        </span>
+                        <span className="text-xs text-[var(--text)]/60">{u.cliente}</span>
                       </div>
                     )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {u.faseActual ? (
+                      <div className="flex items-center gap-2">
+                        <Badge tone="neutral">{u.faseActual}</Badge>
+                        {u.diasEnFase != null ? (
+                          <span className="text-xs tabular-nums text-[var(--text)]/60">
+                            {u.diasEnFase} d
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-[var(--text)]/30">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-[var(--text)]/70">
+                    {u.vendedor ?? <span className="text-[var(--text)]/30">—</span>}
                   </td>
                   <td className="px-3 py-2.5 text-[var(--text)]/70">
                     {u.obraTerminada ? (
@@ -208,7 +224,7 @@ export function UnidadesEscriturablesView() {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-[var(--accent)]/40 bg-[var(--bg)]/40 font-semibold">
-                <td className="px-3 py-2.5 text-[var(--text)]" colSpan={7}>
+                <td className="px-3 py-2.5 text-[var(--text)]" colSpan={9}>
                   {result.unidades.length} unidades
                   {filtros.mostrar === 'escriturables'
                     ? ` escriturables (de ${result.totalCandidatas} candidatas)`

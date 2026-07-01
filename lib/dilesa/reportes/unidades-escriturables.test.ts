@@ -33,9 +33,21 @@ function bundle(overrides: Partial<EscriturablesBundle>): EscriturablesBundle {
     proyectos: [{ id: 'p1', nombre: 'Lomas' }],
     productos: [{ id: 'prod1', nombre: 'LDLE-ISC' }],
     clientes: new Map([['per1', 'Ana García']]),
+    vendedores: new Map([['usr1', 'Pedro Vendedor']]),
+    diasEnFase: new Map([['v1', 42]]),
     ...overrides,
   };
 }
+
+const venta = (overrides: Partial<EscriturablesBundle['ventas'][number]>) => ({
+  id: 'v1',
+  unidad_id: 'a',
+  persona_id: 'per1',
+  fase_actual: null,
+  vendedor: null,
+  vendedor_usuario_id: null,
+  ...overrides,
+});
 
 describe('normalizarEscriturables (universo candidato)', () => {
   it('inventario: en_construccion/terminada sin activo_id entran; planeada/lote no', () => {
@@ -58,17 +70,33 @@ describe('normalizarEscriturables (universo candidato)', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('venta activa sin escriturar convierte la unidad en asignada, con cliente y fase', () => {
+  it('venta activa sin escriturar convierte la unidad en asignada, con cliente, fase y días', () => {
     const rows = normalizarEscriturables(
       bundle({
         unidades: [unidad({ id: 'a', estado: 'vendida' })],
-        ventas: [{ id: 'v1', unidad_id: 'a', persona_id: 'per1', fase_actual: 'Detonada' }],
+        ventas: [venta({ fase_actual: 'Detonada' })],
       })
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.situacion).toBe('asignada');
     expect(rows[0]?.cliente).toBe('Ana García');
     expect(rows[0]?.faseActual).toBe('Detonada');
+    expect(rows[0]?.diasEnFase).toBe(42);
+  });
+
+  it('vendedor: FK a core.usuarios con fallback al texto legacy', () => {
+    const rows = normalizarEscriturables(
+      bundle({
+        unidades: [unidad({ id: 'a', estado: 'vendida' }), unidad({ id: 'b', estado: 'vendida' })],
+        ventas: [
+          venta({ id: 'v1', unidad_id: 'a', vendedor_usuario_id: 'usr1', vendedor: 'Legacy P.' }),
+          venta({ id: 'v2', unidad_id: 'b', vendedor: 'María Legacy' }),
+        ],
+      })
+    );
+    const por = new Map(rows.map((r) => [r.unidadId, r]));
+    expect(por.get('a')?.vendedor).toBe('Pedro Vendedor'); // FK gana
+    expect(por.get('b')?.vendedor).toBe('María Legacy'); // sin FK → legacy
   });
 
   it('unidad vendida SIN venta activa (ya escriturada) queda fuera', () => {
@@ -96,7 +124,7 @@ describe('normalizarEscriturables (universo candidato)', () => {
     const rows = normalizarEscriturables(
       bundle({
         unidades: [unidad({ id: 'a', estado: 'vendida', fecha_extraccion: '2026-06-01' })],
-        ventas: [{ id: 'v1', unidad_id: 'a', persona_id: 'per1', fase_actual: null }],
+        ventas: [venta({})],
         obras: [{ unidad_id: 'a', fecha_terminada: '2026-03-15', estado: 'terminada' }],
       })
     );
@@ -134,6 +162,8 @@ function row(overrides: Partial<UnidadEscriturableRow>): UnidadEscriturableRow {
     situacion: 'inventario',
     cliente: null,
     faseActual: null,
+    diasEnFase: null,
+    vendedor: null,
     obraTerminada: true,
     fechaObraTerminada: null,
     fechaDtu: '2026-05-01',
