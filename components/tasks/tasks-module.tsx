@@ -216,7 +216,9 @@ export function TasksModule({
       const { data: empData } = await supabase
         .schema('erp')
         .from('empleados')
-        .select('id, persona:persona_id(nombre, apellido_paterno)')
+        .select(
+          'id, persona:persona_id(nombre, apellido_paterno), departamento:departamento_id(nombre)'
+        )
         .in('empresa_id', ids)
         .eq('activo', true)
         .is('deleted_at', null);
@@ -224,9 +226,12 @@ export function TasksModule({
       const mapped: Empleado[] = (empData ?? []).map((e: Record<string, unknown>) => {
         const persona = Array.isArray(e.persona) ? e.persona[0] : e.persona;
         const p = (persona ?? null) as { nombre?: string; apellido_paterno?: string } | null;
+        const depto = Array.isArray(e.departamento) ? e.departamento[0] : e.departamento;
+        const d = (depto ?? null) as { nombre?: string } | null;
         return {
           id: e.id as string,
           nombre: [p?.nombre, p?.apellido_paterno].filter(Boolean).join(' '),
+          departamento: d?.nombre ?? null,
         };
       });
       setEmpleados(mapped);
@@ -765,12 +770,15 @@ export function TasksModule({
     if (search) {
       const s = search.toLowerCase();
       if (isRich) {
-        const responsableName = empleadoMap.get(t.asignado_a ?? '')?.nombre?.toLowerCase() ?? '';
+        const responsable = empleadoMap.get(t.asignado_a ?? '');
+        const responsableName = responsable?.nombre?.toLowerCase() ?? '';
+        const responsableDepto = responsable?.departamento?.toLowerCase() ?? '';
         if (
           !t.titulo.toLowerCase().includes(s) &&
           !t.descripcion?.toLowerCase().includes(s) &&
           !t.departamento_nombre?.toLowerCase().includes(s) &&
-          !responsableName.includes(s)
+          !responsableName.includes(s) &&
+          !responsableDepto.includes(s)
         )
           return false;
       } else if (!t.titulo.toLowerCase().includes(s)) {
@@ -789,6 +797,8 @@ export function TasksModule({
         .split(',')
         .map((d) => d.trim())
         .filter(Boolean);
+      const responsableDepto = empleadoMap.get(t.asignado_a ?? '')?.departamento;
+      if (responsableDepto) taskDeptos.push(responsableDepto);
       if (!taskDeptos.includes(filterDepto)) return false;
     }
     return true;

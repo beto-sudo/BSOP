@@ -94,8 +94,14 @@ export function TasksFiltersBar({
         });
       }
     });
+    // Also surface departments derived from the assigned employees, so tasks
+    // created via the UI (departamento_nombre = null) are still filterable.
+    empleados.forEach((e) => {
+      const d = e.departamento?.trim();
+      if (d) deptos.add(d);
+    });
     return [...deptos].sort().map((d) => ({ id: d, label: d }));
-  }, [tasks, isRich]);
+  }, [tasks, isRich, empleados]);
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">

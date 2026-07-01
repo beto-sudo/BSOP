@@ -50,7 +50,7 @@ export type ErpTask = {
   departamento_nombre?: string | null;
 };
 
-export type Empleado = { id: string; nombre: string };
+export type Empleado = { id: string; nombre: string; departamento?: string | null };
 
 export type TaskUpdateRow = {
   id: string;
