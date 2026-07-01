@@ -6,7 +6,21 @@ import type { Json } from '@/types/supabase';
  * `supabase/migrations/20260611023408_dilesa_unidades_problema_zcu.sql`.
  */
 export type DesglosePrecio = {
+  /** Valor base NETO (lista − descuento_valor_base). Base de las derivaciones. */
   valor_comercial: number;
+  /** Valor base de lista del prototipo, ANTES del descuento autorizado. */
+  valor_comercial_lista?: number;
+  /**
+   * Descuento al valor base autorizado por Dirección (0 si no hay). Pega antes
+   * de las derivaciones — ver migración 20260701222450.
+   */
+  descuento_valor_base?: number;
+  /**
+   * Etiqueta del motivo del descuento (dilesa.descuento_motivos.nombre),
+   * congelada app-side al asignar — NO viene de `fn_calcular_precio_venta`.
+   * Es lo que se imprime en la solicitud junto al monto.
+   */
+  descuento_valor_base_motivo?: string;
   metros_excedentes: number;
   valor_excedente_terreno: number;
   valor_frente_verde: number;

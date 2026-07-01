@@ -34,7 +34,14 @@ export type SolicitudData = {
   precioM2Excedente: number;
   asesorVentas: string;
   // detalle
+  /** Valor comercial NETO (lista − descuento autorizado). */
   valorComercial: number;
+  /** Valor de lista + descuento autorizado por Dirección — solo se pintan si
+   *  hubo descuento; `descuentoMotivo` es la etiqueta impresa (regla Beto
+   *  2026-07-01: el descuento queda EXPUESTO en el documento firmado). */
+  valorComercialLista?: number;
+  descuentoValorBase?: number;
+  descuentoMotivo?: string;
   valorExcedenteTerreno: number;
   valorFrenteVerde: number;
   valorEsquina: number;
@@ -105,6 +112,18 @@ export function SolicitudAsignacionPDF({ data }: { data: SolicitudData }) {
 
         {/* ── Detalle de Operación ── */}
         <Text style={styles.sectionTitle}>DETALLE DE OPERACIÓN</Text>
+        {(data.descuentoValorBase ?? 0) > 0 ? (
+          <>
+            <DataRow
+              label="VALOR COMERCIAL DE LISTA:"
+              value={money(data.valorComercialLista ?? 0)}
+            />
+            <DataRow
+              label={`${(data.descuentoMotivo ?? 'DESCUENTO AUTORIZADO POR DIRECCIÓN').toUpperCase()}:`}
+              value={`− ${money(data.descuentoValorBase ?? 0)}`}
+            />
+          </>
+        ) : null}
         <DataRow label="VALOR COMERCIAL ACTUAL:" value={money(data.valorComercial)} />
         <DataRow label="VALOR EXCEDENTE DE TERRENO:" value={money(data.valorExcedenteTerreno)} />
         <DataRow label="VALOR FRENTE VERDE:" value={money(data.valorFrenteVerde)} />

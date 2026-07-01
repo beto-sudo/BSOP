@@ -63,6 +63,12 @@ export type Venta = {
   saldo_gastos_resolucion: 'cobrar' | 'absorber' | null;
   saldo_gastos_monto: number | null;
   promocion_id: string | null;
+  // Descuento al valor base autorizado por Dirección en la asignación
+  // (migración 20260701222450). Opcionales hasta que esté aplicada (select('*')).
+  descuento_valor_base?: number | null;
+  descuento_valor_base_detalle?: string | null;
+  descuento_valor_base_autorizado_at?: string | null;
+  venta_origen_id?: string | null;
   coda_row_id: string | null;
   monto_detonado: number | null;
   numero_escritura: string | null;

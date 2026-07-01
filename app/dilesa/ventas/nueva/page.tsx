@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
+import { useEffectiveUser } from '@/components/providers';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +39,7 @@ import {
 import { evaluarRiesgo } from '@/lib/dilesa/ficu/riesgo';
 import { calcularExpiraAt } from '@/lib/dilesa/hold-cola';
 import { buildAdjuntoPath } from '@/lib/storage/path';
-import { congelarDesglose } from '@/lib/dilesa/desglose-precio';
+import { congelarDesglose, leerDesglose } from '@/lib/dilesa/desglose-precio';
 import { nombreFase } from '@/lib/dilesa/fases';
 import {
   camposKycFaltantes,
@@ -73,6 +74,21 @@ type Promocion = {
   productos_aplicables: string[];
 };
 
+type DescuentoMotivo = {
+  id: string;
+  nombre: string;
+};
+
+// Ventas desasignadas/expiradas del cliente elegido — candidatas a "respetar
+// valor" en una reasignación. `valor_base` sale del desglose congelado (o de
+// la columna valor_comercial para históricas sin snapshot).
+type VentaOrigenCandidata = {
+  id: string;
+  estado: string;
+  identificador: string;
+  valor_base: number | null;
+};
+
 // El catálogo de clientes trae el KYC completo para poder detectar al vuelo
 // si una persona existente tiene el expediente incompleto (y precargar el form
 // para completarlo). Ver `lib/dilesa/kyc-persona.ts`.
@@ -80,6 +96,8 @@ type PersonaExistente = { id: string } & PersonaKycSnapshot;
 
 type CalculoPrecio = {
   valor_comercial: number;
+  valor_comercial_lista?: number;
+  descuento_valor_base?: number;
   metros_excedentes: number;
   valor_excedente_terreno: number;
   valor_frente_verde: number;
@@ -129,11 +147,17 @@ function NuevaSolicitudForm() {
   const searchParams = useSearchParams();
   const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
+  const { data: me } = useEffectiveUser();
+  // Gate del descuento al valor base: solo Dirección (o admin) ve/captura la
+  // sección. El enforcement real vive en DB (trigger guard con
+  // erp.fn_es_direccion, migración 20260701222450) — esto es solo UI.
+  const esDireccion = !!me?.isAdmin || (me?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
 
   // Catálogos
   const [unidades, setUnidades] = useState<UnidadDisponible[]>([]);
   const [tiposCredito, setTiposCredito] = useState<TipoCredito[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
+  const [descuentoMotivos, setDescuentoMotivos] = useState<DescuentoMotivo[]>([]);
   const [personasExistentes, setPersonasExistentes] = useState<PersonaExistente[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -156,6 +180,14 @@ function NuevaSolicitudForm() {
   // lo captura solo si hace falta (guía "hasta $X" = margen del crédito). Separado de
   // productos_adicionales por ADR-045 D9.
   const [sobreprecioGastos, setSobreprecioGastos] = useState<string>('');
+  // Descuento al valor base (solo Dirección): pega al valor comercial ANTES
+  // de las derivaciones. Motivo de catálogo + detalle obligatorios; liga
+  // opcional a la venta desasignada cuyo valor se respeta.
+  const [descuentoValorBase, setDescuentoValorBase] = useState<string>('');
+  const [descuentoMotivoId, setDescuentoMotivoId] = useState<string>('');
+  const [descuentoDetalle, setDescuentoDetalle] = useState<string>('');
+  const [ventaOrigenId, setVentaOrigenId] = useState<string>('');
+  const [ventasOrigen, setVentasOrigen] = useState<VentaOrigenCandidata[]>([]);
   // La fecha + hora de la solicitud la setea el servidor al guardar (now()).
   // Importante para orden FIFO en Fase 2 cuando hay inventario limitado.
 
@@ -221,7 +253,7 @@ function NuevaSolicitudForm() {
     // o ya terminada físicamente (`terminada`). Las `planeada`/`lote_urbanizado`
     // NO aparecen aquí — son lotes sin obra arrancada y no son vendibles aún
     // bajo la regla operativa DILESA (regla 20%).
-    const [uRes, prjRes, prodRes, tcRes, prRes, persRes] = await Promise.all([
+    const [uRes, prjRes, prodRes, tcRes, prRes, dmRes, persRes] = await Promise.all([
       sb
         .schema('dilesa')
         .from('unidades')
@@ -263,6 +295,14 @@ function NuevaSolicitudForm() {
         .eq('activa', true)
         .is('deleted_at', null),
       sb
+        .schema('dilesa')
+        .from('descuento_motivos')
+        .select('id, nombre')
+        .eq('empresa_id', DILESA_EMPRESA_ID)
+        .eq('activa', true)
+        .is('deleted_at', null)
+        .order('orden'),
+      sb
         .schema('erp')
         .from('personas')
         .select(
@@ -277,7 +317,13 @@ function NuevaSolicitudForm() {
     ]);
 
     const firstErr =
-      uRes.error ?? prjRes.error ?? prodRes.error ?? tcRes.error ?? prRes.error ?? persRes.error;
+      uRes.error ??
+      prjRes.error ??
+      prodRes.error ??
+      tcRes.error ??
+      prRes.error ??
+      dmRes.error ??
+      persRes.error;
     if (firstErr) {
       setLoadError(getSupabaseErrorMessage(firstErr, 'No se pudieron cargar los catálogos.'));
       setLoadingMeta(false);
@@ -308,6 +354,7 @@ function NuevaSolicitudForm() {
     setUnidades(us);
     setTiposCredito((tcRes.data ?? []) as TipoCredito[]);
     setPromociones((prRes.data ?? []) as Promocion[]);
+    setDescuentoMotivos((dmRes.data ?? []) as DescuentoMotivo[]);
     setPersonasExistentes((persRes.data ?? []) as PersonaExistente[]);
     setLoadingMeta(false);
   }, [sb]);
@@ -343,6 +390,50 @@ function NuevaSolicitudForm() {
     // Beto edita la búsqueda manualmente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaIdFromUrl, personasExistentes]);
+
+  // Ventas desasignadas/expiradas del cliente elegido — candidatas a "respetar
+  // valor" en la sección de descuento (solo Dirección la ve, pero cargar es
+  // barato y RLS filtra igual).
+  useEffect(() => {
+    setVentaOrigenId('');
+    if (!personaIdSeleccionada || clienteModo !== 'existente') {
+      setVentasOrigen([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      const { data, error } = await sb
+        .schema('dilesa')
+        .from('ventas')
+        .select('id, estado, valor_comercial, desglose_precio, unidades(identificador)')
+        .eq('empresa_id', DILESA_EMPRESA_ID)
+        .eq('persona_id', personaIdSeleccionada)
+        .in('estado', ['desasignada', 'expirada'])
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+      if (!active) return;
+      if (error) {
+        console.warn('No se pudieron cargar ventas anteriores del cliente:', error.message);
+        setVentasOrigen([]);
+        return;
+      }
+      setVentasOrigen(
+        (data ?? []).map((v) => {
+          const snap = leerDesglose(v.desglose_precio);
+          return {
+            id: v.id as string,
+            estado: v.estado as string,
+            identificador:
+              ((v.unidades as { identificador?: string } | null)?.identificador as string) ?? '—',
+            valor_base: snap?.valor_comercial ?? (v.valor_comercial as number | null),
+          };
+        })
+      );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [sb, personaIdSeleccionada, clienteModo]);
 
   // Datos de la persona seleccionada (para chip de confirmación visual).
   const personaSeleccionadaInfo = useMemo(
@@ -482,6 +573,7 @@ function NuevaSolicitudForm() {
         p_monto_credito_cotitular: Number(montoCreditoCotitular) || 0,
         p_productos_adicionales: Number(productosAdicionales) || 0,
         p_sobreprecio_gastos_escrituracion: Number(sobreprecioGastos) || 0,
+        p_descuento_valor_base: esDireccion ? Number(descuentoValorBase) || 0 : 0,
       });
       if (!active) return;
       if (error) {
@@ -502,6 +594,8 @@ function NuevaSolicitudForm() {
     montoCreditoCotitular,
     productosAdicionales,
     sobreprecioGastos,
+    descuentoValorBase,
+    esDireccion,
   ]);
 
   // Margen del crédito disponible para el sobreprecio: lo que el crédito supera al
@@ -581,6 +675,11 @@ function NuevaSolicitudForm() {
     if (!unidadId || !tipoCreditoId) return false;
     if (montoCreditoTitular.trim() === '' || montoCreditoCotitular.trim() === '') return false;
     if (productosAdicionales.trim() === '') return false;
+    // Descuento al valor base: motivo + detalle obligatorios si hay monto.
+    if ((Number(descuentoValorBase) || 0) > 0) {
+      if (!esDireccion) return false;
+      if (!descuentoMotivoId || descuentoDetalle.trim() === '') return false;
+    }
     if (clienteModo === 'existente') {
       if (!personaIdSeleccionada) return false;
       // Persona con expediente KYC incompleto: exigir completar los campos
@@ -647,6 +746,10 @@ function NuevaSolicitudForm() {
     usoEfectivoKyc,
     conocimientoDuenoBeneficiario,
     expedienteFile,
+    descuentoValorBase,
+    descuentoMotivoId,
+    descuentoDetalle,
+    esDireccion,
   ]);
 
   async function onSubmit() {
@@ -736,6 +839,15 @@ function NuevaSolicitudForm() {
       // 3) Crear venta
       const unidad = unidades.find((u) => u.id === unidadId);
       const tipoCredito = tiposCredito.find((t) => t.id === tipoCreditoId);
+      // Descuento al valor base: el monto persistido es el que APLICÓ el
+      // cálculo (clampeado al valor de lista por la fn), no el input crudo.
+      // La etiqueta del motivo se congela en el snapshot para que la
+      // solicitud/PDF la impriman aunque el catálogo cambie después.
+      const descuentoAplicado = calculo?.descuento_valor_base ?? 0;
+      const descuentoMotivoNombre =
+        descuentoAplicado > 0
+          ? (descuentoMotivos.find((m) => m.id === descuentoMotivoId)?.nombre ?? null)
+          : null;
       const { data: vIns, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
@@ -758,7 +870,11 @@ function NuevaSolicitudForm() {
           // Snapshot del desglose completo: congela el cálculo al asignar para
           // que el detalle y el PDF de solicitud no se re-tarifen en vivo si
           // cambian reglas globales (exención ZCU, +6%). Regla Beto 2026-06-15.
-          desglose_precio: congelarDesglose(calculo),
+          desglose_precio: congelarDesglose(
+            calculo && descuentoMotivoNombre
+              ? { ...calculo, descuento_valor_base_motivo: descuentoMotivoNombre }
+              : calculo
+          ),
           monto_credito_titular: Number(montoCreditoTitular) || null,
           monto_credito_cotitular: Number(montoCreditoCotitular) || null,
           productos_adicionales: Number(productosAdicionales) || 0,
@@ -768,6 +884,13 @@ function NuevaSolicitudForm() {
           // La promo elegida define el Descuento Máximo Autorizado de la
           // cuadratura (promociones.monto) — FK, ya no texto en notas.
           promocion_id: promocionId || null,
+          // Descuento al valor base (solo Dirección — trigger guard en DB
+          // valida y sella autorizado_por/at server-side).
+          descuento_valor_base: descuentoAplicado > 0 ? descuentoAplicado : null,
+          descuento_valor_base_motivo_id: descuentoAplicado > 0 ? descuentoMotivoId : null,
+          descuento_valor_base_detalle:
+            descuentoAplicado > 0 ? descuentoDetalle.trim() || null : null,
+          venta_origen_id: descuentoAplicado > 0 && ventaOrigenId ? ventaOrigenId : null,
           // Desglose escalar (ADR-045 + geometría 20260618): lo que LEE el motor
           // de cuadratura. La venta nace poblada desde el mismo
           // `fn_calcular_precio_venta`, así usa el modelo desglosado desde la
@@ -1262,6 +1385,116 @@ function NuevaSolicitudForm() {
         </div>
       </Section>
 
+      {/* ── Descuento al valor base (solo Dirección) ── */}
+      {esDireccion ? (
+        <Section title="Descuento al valor base (autorización Dirección)">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Asignar por debajo del valor de lista con razón explícita — ej. reasignación forzada
+            (problema ZCU) respetando el valor con el que el cliente asignó originalmente. Pega al
+            valor base <strong>antes</strong> de frente verde/esquina/crédito y de los porcentajes
+            de enganche/ISAI/gastos. Queda impreso en la solicitud que firma el cliente, con el
+            motivo como etiqueta.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Monto de descuento">
+              <Input
+                type="number"
+                value={descuentoValorBase}
+                onChange={(e) => setDescuentoValorBase(e.target.value)}
+                placeholder="0"
+                disabled={!unidadId}
+              />
+              {calculo && !calculo.error && (calculo.descuento_valor_base ?? 0) > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Lista {money(calculo.valor_comercial_lista ?? 0)} −{' '}
+                  {money(calculo.descuento_valor_base ?? 0)} ={' '}
+                  <strong>{money(calculo.valor_comercial)}</strong> neto
+                </p>
+              ) : null}
+            </Field>
+            <Field label="o valor base objetivo">
+              <Input
+                type="number"
+                value={
+                  calculo && !calculo.error && calculo.valor_comercial_lista != null
+                    ? String(
+                        calculo.valor_comercial_lista - (Number(descuentoValorBase) || 0) < 0
+                          ? 0
+                          : calculo.valor_comercial_lista - (Number(descuentoValorBase) || 0)
+                      )
+                    : ''
+                }
+                onChange={(e) => {
+                  const lista = calculo?.valor_comercial_lista;
+                  if (lista == null) return;
+                  const objetivo = Number(e.target.value) || 0;
+                  setDescuentoValorBase(String(Math.max(0, lista - objetivo)));
+                }}
+                disabled={!unidadId || calculo?.valor_comercial_lista == null}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Teclea el valor a respetar y el descuento se calcula solo.
+              </p>
+            </Field>
+            <Field label={(Number(descuentoValorBase) || 0) > 0 ? 'Motivo *' : 'Motivo'}>
+              <select
+                className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+                value={descuentoMotivoId}
+                onChange={(e) => setDescuentoMotivoId(e.target.value)}
+              >
+                <option value="">— selecciona —</option>
+                {descuentoMotivos.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label={
+                (Number(descuentoValorBase) || 0) > 0 ? 'Detalle del caso *' : 'Detalle del caso'
+              }
+            >
+              <Input
+                value={descuentoDetalle}
+                onChange={(e) => setDescuentoDetalle(e.target.value)}
+                placeholder="ej. reasignación de M3-L9; se respeta valor de su asignación 2026-02"
+              />
+            </Field>
+            {clienteModo === 'existente' && ventasOrigen.length > 0 ? (
+              <Field label="Venta anterior que se respeta (opcional)">
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm"
+                  value={ventaOrigenId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setVentaOrigenId(id);
+                    // Prellenar el descuento con lista − valor base de la venta
+                    // origen (verificable contra su desglose congelado).
+                    const origen = ventasOrigen.find((v) => v.id === id);
+                    const lista = calculo?.valor_comercial_lista;
+                    if (origen?.valor_base != null && lista != null) {
+                      setDescuentoValorBase(String(Math.max(0, lista - origen.valor_base)));
+                    }
+                  }}
+                >
+                  <option value="">— ninguna —</option>
+                  {ventasOrigen.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.identificador} · {v.estado}
+                      {v.valor_base != null ? ` · valor base ${money(v.valor_base)}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Al elegirla se prellena el descuento para respetar su valor base.
+                </p>
+              </Field>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
+
       {/* ── Preview cálculo ── */}
       {unidadSel && calculo && !calculo.error ? (
         <Section title="Cálculo de precio">
@@ -1271,7 +1504,24 @@ function NuevaSolicitudForm() {
             </p>
           ) : null}
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            <Row label="Valor comercial" value={money(calculo.valor_comercial)} />
+            {(calculo.descuento_valor_base ?? 0) > 0 ? (
+              <>
+                <Row
+                  label="Valor comercial de lista"
+                  value={money(calculo.valor_comercial_lista ?? 0)}
+                />
+                <Row
+                  label={`Descuento (${
+                    descuentoMotivos.find((m) => m.id === descuentoMotivoId)?.nombre ??
+                    'motivo pendiente'
+                  })`}
+                  value={`− ${money(calculo.descuento_valor_base ?? 0)}`}
+                />
+                <Row label="Valor comercial (neto)" value={money(calculo.valor_comercial)} />
+              </>
+            ) : (
+              <Row label="Valor comercial" value={money(calculo.valor_comercial)} />
+            )}
             <Row
               label={`Excedente terreno (${calculo.metros_excedentes.toFixed(1)} m²)`}
               value={money(calculo.valor_excedente_terreno)}
