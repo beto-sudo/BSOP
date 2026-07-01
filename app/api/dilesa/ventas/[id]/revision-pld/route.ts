@@ -282,7 +282,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .schema('dilesa')
     .from('ventas')
     .select(
-      'id, empresa_id, persona_id, unidad_id, notario_id, valor_escrituracion, monto_avaluo, numero_escritura, fecha_escritura'
+      'id, empresa_id, persona_id, unidad_id, notario_id, valor_escrituracion, monto_avaluo, numero_escritura, fecha_escritura, saldo_residual_resolucion'
     )
     .eq('id', ventaId)
     .is('deleted_at', null)
@@ -300,6 +300,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     monto_avaluo: number | null;
     numero_escritura: string | null;
     fecha_escritura: string | null;
+    saldo_residual_resolucion: 'cobrar' | 'absorber' | null;
   };
 
   const [{ data: empresa }, { data: persona }, { data: unidad }, notaria, { data: abonos }, cuad] =
@@ -360,6 +361,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
     // desglose corregido (`dilesa-descuento-perdonado-motor`) `descuentoAplicado` ==
     // descuento real, así que el sobreprecio que NO perdona ya no infla este hueco.
     descuentoPerdonado: Math.max(0, (cuad?.descuentoAplicado ?? 0) - (cuad?.chequePagado ?? 0)),
+    // Residual del PRECIO que DILESA absorbe con NC (crédito + enganche < valor de
+    // escrituración y Dirección lo resolvió como `absorber` en la dictaminación). Ese
+    // monto no entra como liquidación — baja el piso de la banda. Si el residual se
+    // `cobrar` (pagaré) el cliente sí lo paga → no se resta. `saldoPrecioPorCubrir` es
+    // el residual antes de la resolución; solo cuenta cuando se absorbe.
+    saldoPrecioAbsorbidoDilesa:
+      venta.saldo_residual_resolucion === 'absorber' ? (cuad?.saldoPrecioPorCubrir ?? 0) : 0,
   };
 
   // ── PDFs del ciclo ───────────────────────────────────────────────

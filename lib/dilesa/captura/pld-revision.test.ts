@@ -69,6 +69,9 @@ function expediente(partial: Partial<ExpedientePld> = {}): ExpedientePld {
     // Descuento $15,000 (gastos escrituración), $13,378 girados a notaría →
     // $1,622 perdonados = el hueco exacto entre liquidaciones y pactado.
     descuentoPerdonado: 1622,
+    // Sin residual de precio absorbido por default (el crédito + enganche cubren el
+    // precio). El caso Julio Cesar lo sobreescribe abajo.
+    saldoPrecioAbsorbidoDilesa: 0,
     ...partial,
   };
 }
@@ -162,6 +165,48 @@ describe('cruzarPldConExpediente — liquidaciones dentro de la banda [precio, d
     );
     expect(porClave(checks, 'liq_vs_pactado')?.ok).toBe(true); // ≥ piso 1,392,050
     expect(porClave(checks, 'liq_vs_depositos')?.ok).toBe(true); // ≤ techo 1,428,127
+  });
+
+  it('Julio Cesar M11-L4: DILESA absorbe el residual del precio con NC → baja el piso, pasa', () => {
+    // Crédito 903,360 + enganche 21,951 = 925,311 (todo lo recibido) < valor de
+    // escrituración 930,000. DILESA absorbe el residual 4,689.28 con una nota de
+    // crédito (resolucion='absorber'). El aviso reporta las liquidaciones recibidas.
+    // Sin restar el absorbido el piso era 930,000 → falso descuadre de 4,689.28.
+    const checks = cruzarPldConExpediente(
+      extraccion({
+        valorPactado: 930000,
+        liquidaciones: [{ fecha: '2026-06-01', monto: 925310.72 }],
+      }),
+      expediente({
+        valorEscrituracion: 930000,
+        depositos: [903360, 21951], // crédito + enganche = 925,311 (techo)
+        descuentoPerdonado: 0,
+        saldoPrecioAbsorbidoDilesa: 4689.28,
+      })
+    );
+    expect(porClave(checks, 'liq_vs_pactado')?.ok).toBe(true); // ≥ piso 925,310.72
+    expect(porClave(checks, 'liq_vs_depositos')?.ok).toBe(true); // ≤ techo 925,311
+  });
+
+  it('residual de precio SIN absorber (cobrar/null): el piso NO baja → warning', () => {
+    // Mismo hueco, pero el residual NO se absorbe (p.ej. resolucion='cobrar' o sin
+    // resolver) → saldoPrecioAbsorbidoDilesa=0. El piso sigue en 930,000: el aviso
+    // debe reportar también lo que el cliente pagará (pagaré) o resolverse.
+    const checks = cruzarPldConExpediente(
+      extraccion({
+        valorPactado: 930000,
+        liquidaciones: [{ fecha: '2026-06-01', monto: 925310.72 }],
+      }),
+      expediente({
+        valorEscrituracion: 930000,
+        depositos: [903360, 21951],
+        descuentoPerdonado: 0,
+        saldoPrecioAbsorbidoDilesa: 0,
+      })
+    );
+    const c = porClave(checks, 'liq_vs_pactado');
+    expect(c?.ok).toBe(false);
+    expect(c?.detalle).toContain('930,000');
   });
 
   it('sub-declaración (por debajo del piso): liq_vs_pactado en warning', () => {

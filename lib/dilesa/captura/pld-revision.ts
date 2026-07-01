@@ -109,9 +109,22 @@ export type ExpedientePld = {
    * por debajo del valor pactado EXACTAMENTE en este monto — es el descuento
    * que no entró como pago (el cheque a notaría sí entró y luego salió). Sin
    * esto, una operación con descuento marca un falso descuadre por el monto del
-   * descuento perdonado. 0 cuando no hay descuento.
+   * descuento perdonado. 0 cuando no hay descuento. Es el hueco del lado GASTOS.
    */
   descuentoPerdonado: number;
+  /**
+   * Saldo del PRECIO que DILESA absorbe con una nota de crédito (`saldoPrecio-
+   * PorCubrir` de la cuadratura cuando Dirección lo resuelve como `absorber` en
+   * la dictaminación). Cuando el crédito + enganche no alcanzan el valor de
+   * escrituración y DILESA come la diferencia (NC autorizada por Dirección), esa
+   * diferencia NUNCA entra como liquidación — el aviso reporta solo lo que se
+   * recibió (crédito + enganche). Sin restarlo, el piso de liquidaciones marca un
+   * falso descuadre por el monto de la NC. Es el hueco del lado PRECIO, distinto
+   * de `descuentoPerdonado` (gastos); no se doble-cuentan. 0 cuando el precio se
+   * cubre completo o el residual se resuelve como `cobrar` (pagaré: el cliente sí
+   * lo paga). Ver [[reference_dilesa_pld_liquidaciones_banda]].
+   */
+  saldoPrecioAbsorbidoDilesa: number;
 };
 
 // ── Normalización ───────────────────────────────────────────────────────
@@ -347,21 +360,34 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
   //    solo el PRECIO (el crédito que liquida el inmueble) o el precio MÁS el
   //    enganche que el cliente aportó (parte del cual fondea gastos notariales). Por
   //    eso no se exige igualdad exacta sino una banda [piso, techo]:
-  //      - piso  = valor pactado − descuento perdonado (no cobrado): el precio que
-  //                realmente liquidó el inmueble. Por debajo = sub-declaración.
+  //      - piso  = valor pactado − descuento perdonado (gastos) − saldo del precio
+  //                absorbido por DILESA vía NC (precio): el precio que REALMENTE
+  //                liquidó el inmueble, neto de lo que DILESA no cobra. Por debajo
+  //                = sub-declaración.
   //      - techo = total de depósitos recibidos (crédito + enganche): todo el dinero
   //                que entró. Por arriba = el aviso declara más de lo que se recibió.
   //    El ancho de la banda = el enganche que excede el precio (lo que fondea gastos)
   //    — exactamente la ambigüedad legítima de captura. Casos reales: Christopher
   //    M3-L16 (reportó solo el precio → cae en el piso) y Nancy M22-L1 (reportó todos
-  //    los depósitos → cae en el techo); ambos cuadran.
+  //    los depósitos → cae en el techo); ambos cuadran. Julio Cesar M11-L4: el crédito
+  //    + enganche NO alcanzan el valor de escrituración y DILESA absorbe el residual
+  //    ($4,689) con una NC → sin restarlo el piso marcaba un falso descuadre (#1160+).
   const totalLiquidaciones = ext.liquidaciones.reduce((s, l) => s + (l.monto || 0), 0);
   const perdonado = Math.max(0, exp.descuentoPerdonado);
+  const absorbidoPrecio = Math.max(0, exp.saldoPrecioAbsorbidoDilesa);
   const totalDepositos = exp.depositos.reduce((s, m) => s + (m || 0), 0);
-  const piso = ext.valorPactado - perdonado;
+  const piso = ext.valorPactado - perdonado - absorbidoPrecio;
   const techo = Math.max(totalDepositos, piso); // si los depósitos no alcanzan el piso, la banda colapsa al precio
 
-  // Piso: el aviso no declara MENOS que el precio liquidado (neto del perdón).
+  // Piso: el aviso no declara MENOS que el precio liquidado (neto de lo que DILESA
+  // no cobra: descuento perdonado del lado gastos + residual del precio absorbido
+  // con nota de crédito).
+  const deducciones: string[] = [];
+  if (perdonado > 0) deducciones.push(`descuento perdonado ${money(perdonado)}`);
+  if (absorbidoPrecio > 0)
+    deducciones.push(
+      `saldo del precio absorbido por DILESA (nota de crédito) ${money(absorbidoPrecio)}`
+    );
   checks.push(
     totalLiquidaciones >= piso - 1
       ? ok('liq_vs_pactado', 'Σ liquidaciones ≥ precio (neto de descuento)', 'warning')
@@ -369,8 +395,8 @@ export function cruzarPldConExpediente(ext: ExtraccionPld, exp: ExpedientePld): 
           'liq_vs_pactado',
           'Σ liquidaciones ≥ precio (neto de descuento)',
           'warning',
-          perdonado > 0
-            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el precio neto del descuento perdonado (${money(perdonado)}) es ${money(piso)} (valor pactado ${money(ext.valorPactado)}). Faltan ${money(piso - totalLiquidaciones)}.`
+          deducciones.length > 0
+            ? `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el precio neto (valor pactado ${money(ext.valorPactado)} − ${deducciones.join(' − ')}) es ${money(piso)}. Faltan ${money(piso - totalLiquidaciones)}.`
             : `Las liquidaciones del aviso suman ${money(totalLiquidaciones)}; el valor pactado es ${money(ext.valorPactado)} (faltan ${money(piso - totalLiquidaciones)}).`
         )
   );
