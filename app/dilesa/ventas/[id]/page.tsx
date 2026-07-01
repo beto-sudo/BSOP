@@ -158,7 +158,27 @@ function OperacionBody() {
             {calculo.componentes_detallados ? (
               <FichaGrid
                 rows={[
-                  { label: 'Valor comercial', value: fmtMoney(calculo.valor_comercial) ?? '—' },
+                  ...((calculo.descuento_valor_base ?? 0) > 0
+                    ? [
+                        {
+                          label: 'Valor comercial de lista',
+                          value: fmtMoney(calculo.valor_comercial_lista) ?? '—',
+                        },
+                        {
+                          label: `Descuento (${calculo.descuento_valor_base_motivo ?? 'sin motivo'})`,
+                          value: `− ${fmtMoney(calculo.descuento_valor_base) ?? '—'}`,
+                        },
+                        {
+                          label: 'Valor comercial (neto)',
+                          value: fmtMoney(calculo.valor_comercial) ?? '—',
+                        },
+                      ]
+                    : [
+                        {
+                          label: 'Valor comercial',
+                          value: fmtMoney(calculo.valor_comercial) ?? '—',
+                        },
+                      ]),
                   {
                     label: `Excedente terreno (${(calculo.metros_excedentes ?? 0).toFixed(1)} m²)`,
                     value: fmtMoney(calculo.valor_excedente_terreno) ?? '—',
@@ -216,6 +236,25 @@ function OperacionBody() {
                 </p>
               </>
             )}
+          </div>
+        ) : null}
+        {(venta.descuento_valor_base ?? 0) > 0 && venta.descuento_valor_base_detalle ? (
+          <div className="mt-4 border-t border-[var(--border)] pt-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
+              Descuento al valor base — detalle
+            </div>
+            <p className="mt-0.5 text-sm text-[var(--text)]/80">
+              {venta.descuento_valor_base_detalle}
+            </p>
+            {venta.descuento_valor_base_autorizado_at ? (
+              <p className="mt-0.5 text-xs text-[var(--text)]/50">
+                Autorizado por Dirección ·{' '}
+                {new Date(venta.descuento_valor_base_autorizado_at).toLocaleDateString('es-MX', {
+                  timeZone: 'America/Matamoros',
+                  dateStyle: 'medium',
+                })}
+              </p>
+            ) : null}
           </div>
         ) : null}
         {venta.motivo_desasignacion ? (

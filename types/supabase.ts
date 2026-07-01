@@ -2864,6 +2864,42 @@ export type Database = {
           },
         ]
       }
+      descuento_motivos: {
+        Row: {
+          activa: boolean
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       estimacion_tareas: {
         Row: {
           construccion_id: string
@@ -5828,6 +5864,11 @@ export type Database = {
           descuento_nota_credito: number | null
           descuento_precio: number | null
           descuento_total: number | null
+          descuento_valor_base: number | null
+          descuento_valor_base_autorizado_at: string | null
+          descuento_valor_base_autorizado_por: string | null
+          descuento_valor_base_detalle: string | null
+          descuento_valor_base_motivo_id: string | null
           desglose_precio: Json | null
           empresa_id: string
           enganche_fecha_primer_pago: string | null
@@ -5913,6 +5954,7 @@ export type Database = {
           valuador_id: string | null
           vendedor: string | null
           vendedor_usuario_id: string | null
+          venta_origen_id: string | null
         }
         Insert: {
           anticipo_comision?: number | null
@@ -5940,6 +5982,11 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          descuento_valor_base?: number | null
+          descuento_valor_base_autorizado_at?: string | null
+          descuento_valor_base_autorizado_por?: string | null
+          descuento_valor_base_detalle?: string | null
+          descuento_valor_base_motivo_id?: string | null
           desglose_precio?: Json | null
           empresa_id: string
           enganche_fecha_primer_pago?: string | null
@@ -6025,6 +6072,7 @@ export type Database = {
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
+          venta_origen_id?: string | null
         }
         Update: {
           anticipo_comision?: number | null
@@ -6052,6 +6100,11 @@ export type Database = {
           descuento_nota_credito?: number | null
           descuento_precio?: number | null
           descuento_total?: number | null
+          descuento_valor_base?: number | null
+          descuento_valor_base_autorizado_at?: string | null
+          descuento_valor_base_autorizado_por?: string | null
+          descuento_valor_base_detalle?: string | null
+          descuento_valor_base_motivo_id?: string | null
           desglose_precio?: Json | null
           empresa_id?: string
           enganche_fecha_primer_pago?: string | null
@@ -6137,8 +6190,16 @@ export type Database = {
           valuador_id?: string | null
           vendedor?: string | null
           vendedor_usuario_id?: string | null
+          venta_origen_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ventas_descuento_valor_base_motivo_id_fkey"
+            columns: ["descuento_valor_base_motivo_id"]
+            isOneToOne: false
+            referencedRelation: "descuento_motivos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ventas_promocion_id_fkey"
             columns: ["promocion_id"]
@@ -6151,6 +6212,41 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ventas_venta_origen_id_fkey"
+            columns: ["venta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_ac_ventas_entrega"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "ventas_venta_origen_id_fkey"
+            columns: ["venta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_unidad_hold_queue"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "ventas_venta_origen_id_fkey"
+            columns: ["venta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_lista_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "ventas_venta_origen_id_fkey"
+            columns: ["venta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_ventas_pipeline_antiguedad"
+            referencedColumns: ["venta_id"]
+          },
+          {
+            foreignKeyName: "ventas_venta_origen_id_fkey"
+            columns: ["venta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
         ]
@@ -6874,6 +6970,7 @@ export type Database = {
       }
       fn_calcular_precio_venta: {
         Args: {
+          p_descuento_valor_base?: number
           p_monto_credito_cotitular?: number
           p_monto_credito_titular?: number
           p_productos_adicionales?: number

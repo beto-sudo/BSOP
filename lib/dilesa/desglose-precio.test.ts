@@ -99,6 +99,35 @@ describe('leerDesglose', () => {
     expect(snap?.origen).toBe('asignacion');
   });
 
+  it('round-trip: preserva el descuento al valor base y su motivo congelado', () => {
+    // Migración 20260701222450: lista − descuento = neto, con la etiqueta del
+    // motivo congelada app-side para que la solicitud/PDF la impriman aunque
+    // el catálogo cambie después.
+    const frozen = congelarDesglose({
+      ...calculoCompleto,
+      valor_comercial: 899000,
+      valor_comercial_lista: 920000,
+      descuento_valor_base: 21000,
+      descuento_valor_base_motivo: 'Reasignación por problema ZCU',
+    });
+    const snap = leerDesglose(frozen);
+    expect(snap?.valor_comercial).toBe(899000);
+    expect(snap?.valor_comercial_lista).toBe(920000);
+    expect(snap?.descuento_valor_base).toBe(21000);
+    expect(snap?.descuento_valor_base_motivo).toBe('Reasignación por problema ZCU');
+  });
+
+  it('snapshots viejos sin descuento leen sin los campos nuevos', () => {
+    const snap = leerDesglose({
+      ...calculoCompleto,
+      origen: 'asignacion',
+      componentes_detallados: true,
+    });
+    expect(snap?.valor_comercial_lista).toBeUndefined();
+    expect(snap?.descuento_valor_base).toBeUndefined();
+    expect(snap?.descuento_valor_base_motivo).toBeUndefined();
+  });
+
   it('devuelve null para entradas inválidas', () => {
     expect(leerDesglose(null)).toBeNull();
     expect(leerDesglose(undefined)).toBeNull();

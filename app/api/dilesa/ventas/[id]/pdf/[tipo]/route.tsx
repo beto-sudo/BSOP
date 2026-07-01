@@ -870,6 +870,16 @@ export async function GET(
     fechaTexto,
     asesorVentas: vendedorNombre.toUpperCase(),
     valorComercial: Number(c?.valor_comercial ?? 0),
+    // Descuento al valor base autorizado por Dirección: expuesto en el
+    // documento firmado (lista − descuento = neto, con el motivo como
+    // etiqueta). Solo pinta si el snapshot lo trae.
+    valorComercialLista:
+      typeof c?.valor_comercial_lista === 'number' ? c.valor_comercial_lista : undefined,
+    descuentoValorBase: typeof c?.descuento_valor_base === 'number' ? c.descuento_valor_base : 0,
+    descuentoMotivo:
+      typeof c?.descuento_valor_base_motivo === 'string'
+        ? c.descuento_valor_base_motivo
+        : undefined,
     valorExcedenteTerreno: Number(c?.valor_excedente_terreno ?? 0),
     valorFrenteVerde: Number(c?.valor_frente_verde ?? 0),
     valorEsquina: Number(c?.valor_esquina ?? 0),
