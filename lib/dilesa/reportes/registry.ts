@@ -19,6 +19,7 @@ import {
   Gauge,
   GitBranch,
   Layers,
+  Stamp,
   Trophy,
   UserMinus,
 } from 'lucide-react';
@@ -137,6 +138,17 @@ export const REPORTES: readonly ReporteDef[] = [
     modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
     href: '/dilesa/ventas/reportes/estancadas',
     icon: Clock,
+    tipo: 'modulo',
+    pdf: true,
+  },
+  {
+    id: 'unidades-escriturables',
+    nombre: 'Unidades escriturables',
+    descripcion:
+      'Qué se puede firmar ya: unidades con obra terminada y extracción del RUV capturada, en inventario o asignadas sin escriturar. Incluye qué detiene al resto (falta extracción vs obra en proceso).',
+    modulo: { slug: MODULO_VENTAS_REPORTES, label: 'Ventas' },
+    href: '/dilesa/ventas/reportes/unidades-escriturables',
+    icon: Stamp,
     tipo: 'modulo',
     pdf: true,
   },
