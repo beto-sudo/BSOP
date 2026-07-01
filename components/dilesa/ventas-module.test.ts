@@ -18,6 +18,8 @@ function row(overrides: Partial<VentaListaRow>): VentaListaRow {
     fecha_escritura: null,
     cliente: 'Test',
     unidadIdentificador: null,
+    unidadFechaDtu: null,
+    unidadFechaExtraccion: null,
     proyectoNombre: '',
     prototipo: null,
     precio: null,
