@@ -4,10 +4,10 @@
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (nuevas `pos_cuentas`, `pos_rondas`, `pos_items`, `pos_pagos`, `pos_estaciones`, `pos_eventos`; vista canónica `v_ventas_canonicas`; sub-slugs RBAC `rdb.pos.*` en `core.modulos`/`core.permisos_rol`). `erp` (escritura en `movimientos_inventario` vía trigger espejo; lectura/escritura `cortes_caja`/`cortes_vouchers`). Post-cutover: `rdb.waitry_*` queda histórico read-only y el edge function `waitry-webhook` (incl. espejo a Coda) se apaga.
 **Estado:** in_progress
-**Próximo hito:** S1 — migración del schema POS + RPCs + vista canónica + tests (PR propio)
+**Próximo hito:** S2 — captura Tiendita + KDS mínimo (tras mergear la migración de S1)
 **Dueño:** Beto
 **Creada:** 2026-07-02
-**Última actualización:** 2026-07-02 (S0 cerrado: ADR-056 + slugs RBAC)
+**Última actualización:** 2026-07-02 (S1: migración del schema POS + smoke test 13/13)
 
 > **Sucede a** la saga Waitry: [`rdb-waitry-ingesta-dedup`](rdb-waitry-ingesta-dedup.md),
 > [`rdb-waitry-deduplicacion`](rdb-waitry-deduplicacion.md),
@@ -160,6 +160,16 @@ hacer.
 - Contrato Waitry cancelado (ahorro mensual + fin de la dependencia).
 
 ## Bitácora
+
+- **2026-07-02** — **S1**: migración `20260702182440_rdb_pos_schema` — 7
+  tablas `pos_*`, guards de estado, trigger de inventario espejo
+  (`erp.fn_trg_pos_to_movimientos`), 8 RPCs idempotentes, vista
+  `v_ventas_canonicas`, RLS InitPlan y realtime para KDS. Smoke test SQL
+  end-to-end (13 bloques) en `supabase/tests/pos_smoke_test.sql`, verificado
+  contra shadow: PIN, doble-tap idempotente, receta 2×355 ml → 2 botellas,
+  cobro mixto con propina/cambio, inmutabilidad, merma con autorizador,
+  auditoría atribuida. Ajuste vs ADR-056: umbral de descuento con autorizador
+  queda en 15% (hardcode v1; configurable después si hace falta).
 
 - **2026-07-02** — **S0 cerrado**: [ADR-056](../adr/056_rdb_pos_modelo.md)
   fija el modelo técnico (tablas `pos_*`, máquinas de estados, RPCs con
