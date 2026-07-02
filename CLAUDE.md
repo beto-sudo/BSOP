@@ -86,7 +86,9 @@ npm run test:coverage     # vitest + coverage thresholds — `test:run` NO basta
                           # puede pasar local y CI fallar por coverage
 npm run lint              # eslint .
 npm run format:check      # prettier --check . (¡todo el repo!)
-npm run audit:ui          # consistencia UI — solo falla con issues *critical*
+npm run audit:ui          # consistencia UI — informativo en CI (continue-on-error:
+                          # hay 12 criticals preexistentes de heurística); leer el
+                          # reporte, no bloquea
 npm run initiatives:check # tabla Activas de INITIATIVES.md en sync con docs/planning/
 npm run build             # next build — CI lo corre en job `build` paralelo; atrapa
                           # errores de prerender/imports que typecheck no ve. Si el
