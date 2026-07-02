@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { PREVIEW_COOKIE_NAME } from '@/lib/auth/preview-guard';
+import { isPublicPath } from '@/lib/auth/public-paths';
 // NOTE: The 'core' schema must be listed in Supabase Dashboard → Settings → API → Exposed Schemas.
 
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -12,23 +13,6 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * ("stop") and could not switch targets ("impersonate" again).
  */
 const PREVIEW_EXEMPT_API_PATHS = new Set(['/api/impersonate', '/api/impersonate/stop']);
-
-function isPublicPath(pathname: string) {
-  return (
-    pathname === '/login' ||
-    pathname === '/auth/callback' ||
-    pathname === '/api/auth/google' ||
-    pathname.startsWith('/compartir/') ||
-    pathname.startsWith('/api/cron/') ||
-    pathname === '/api/health/ingest' ||
-    pathname.startsWith('/_next') ||
-    pathname === '/favicon.ico' ||
-    pathname === '/logo-bs.png' ||
-    pathname === '/logo-bs.jpg' ||
-    pathname === '/logo-bsop.jpg' ||
-    pathname.startsWith('/brand/')
-  );
-}
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
