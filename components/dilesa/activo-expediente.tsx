@@ -27,6 +27,8 @@ import { FileAttachments } from '@/components/file-attachments';
 import { ActivoEscrituras } from '@/components/dilesa/activo-escrituras';
 import { ActivoPrediales } from '@/components/dilesa/activo-prediales';
 import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
+import { ActivoMovimientoDialog } from '@/components/dilesa/activo-movimiento-dialog';
+import { ActivoMovimientos } from '@/components/dilesa/activo-movimientos';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
@@ -368,6 +370,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [regresarOpen, setRegresarOpen] = useState(false);
+  const [movimientoOpen, setMovimientoOpen] = useState(false);
   // Incrementa para refetch tras editar (el effect depende de él).
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -480,6 +483,13 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
             {puedeAdmin ? (
               <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                 Editar
+              </Button>
+            ) : null}
+            {puedeAdmin &&
+            ['terreno', 'lote'].includes(activo.tipo) &&
+            !['desincorporado', 'descartado'].includes(activo.estado) ? (
+              <Button size="sm" variant="outline" onClick={() => setMovimientoOpen(true)}>
+                Subdividir / fusionar
               </Button>
             ) : null}
             {isAdmin && origen ? (
@@ -688,6 +698,8 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
               <p className="whitespace-pre-wrap text-sm text-[var(--text)]/80">{activo.notas}</p>
             </Section>
           ) : null}
+
+          <ActivoMovimientos activoId={activo.id} empresaId={DILESA_EMPRESA_ID} />
         </div>
 
         <div className="space-y-6">
@@ -735,6 +747,15 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
           open={editOpen}
           onOpenChange={setEditOpen}
           onSaved={() => setRefreshKey((k) => k + 1)}
+        />
+      ) : null}
+
+      {puedeAdmin ? (
+        <ActivoMovimientoDialog
+          activo={{ id: activo.id, nombre: activo.nombre, area_m2: activo.area_m2 }}
+          empresaId={DILESA_EMPRESA_ID}
+          open={movimientoOpen}
+          onOpenChange={setMovimientoOpen}
         />
       ) : null}
 

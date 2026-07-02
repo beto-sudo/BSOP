@@ -332,3 +332,53 @@ export async function registrarPagoPredial(input: {
   revalidatePath('/dilesa/portafolio/prediales');
   return { ok: true };
 }
+
+/**
+ * Ejecuta una subdivisión/fusión/relotificación de predios (iniciativa
+ * `dilesa-portafolio-predios` · S5, ADR-055) vía la RPC atómica
+ * `fn_ejecutar_movimiento_activos`. Gate Dirección/admin.
+ */
+export async function ejecutarMovimientoActivos(input: {
+  tipo: 'subdivision' | 'fusion' | 'relotificacion';
+  origenIds: string[];
+  resultantes: {
+    nombre: string;
+    tipo: string;
+    area_m2?: string;
+    clave_catastral?: string;
+    notas?: string;
+  }[];
+  fecha: string; // YYYY-MM-DD
+  notas?: string;
+}): Promise<{ ok: true; resultantes: string[] } | { ok: false; error: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fecha)) {
+    return { ok: false, error: 'La fecha del movimiento no es válida.' };
+  }
+  if (input.origenIds.length === 0 || input.resultantes.length === 0) {
+    return { ok: false, error: 'Se requiere al menos un predio origen y un resultante.' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede ejecutar movimientos.' };
+  }
+
+  const { data, error } = await supabase.schema('dilesa').rpc('fn_ejecutar_movimiento_activos', {
+    p_tipo: input.tipo,
+    p_origen_ids: input.origenIds,
+    p_resultantes: input.resultantes,
+    p_fecha: input.fecha,
+    p_documento_id: undefined,
+    p_notas: input.notas ?? undefined,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: getSupabaseErrorMessage(error, 'No se pudo ejecutar el movimiento.'),
+    };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  const res = (data as { resultantes?: string[] } | null)?.resultantes ?? [];
+  return { ok: true, resultantes: res };
+}

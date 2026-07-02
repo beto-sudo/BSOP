@@ -347,19 +347,20 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 
 ### Cross-cutting
 
-| Tema                               | ADR                                                   | Patrón canónico                                                                      |
-| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Módulos compartidos cross-empresa  | [ADR-011](../adr/011_shared_modules_cross_empresa.md) | thin page → `<XModule empresaSlug>` (SM1-SM6)                                        |
-| Responsive                         | [ADR-019](../adr/019_responsive_policy.md)            | JSDoc `@responsive` + `<DesktopOnlyNotice>` (R1-R5)                                  |
-| A11y baseline                      | [ADR-020](../adr/020_a11y_baseline.md)                | WCAG 2.1 AA + `@axe-core/playwright` (A1-A6)                                         |
-| Access denied                      | [ADR-024](../adr/024_access_denied_ux.md)             | `<AccessDenied>` + `<RequireAccess>` (AD1-AD5)                                       |
-| Read-only "viendo como"            | [ADR-027](../adr/027_viendo_como_readonly.md)         | cookie `bsop_preview_as` + `assertNotInPreview()` (V1-V5)                            |
-| Sub-module permissions (sub-slugs) | [ADR-030](../adr/030_submodule_permissions.md)        | sub-slugs `<padre>.<sub>` + `<RoutedModuleTabs module>` filter (SS1-SS7)             |
-| Workflow CC owns planning          | [ADR-012](../adr/012_workflow_cc_owns_planning.md)    | meta-decisión sobre roles                                                            |
-| Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)        | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M8)              |
-| Capa única de acceso a IA          | [ADR-046](../adr/046_capa_unica_acceso_ia.md)         | `lib/ai` único entry point + registry + drift-guard (registro-ia)                    |
-| Reportes (preset + vista + PDF)    | [ADR-047](../adr/047_reportes_preset_vista_pdf.md)    | registry + `<ReporteCatalogo>`/`<ReporteShell>` + hub-índice + PDF (dilesa-reportes) |
-| Timezone: "hoy" = Matamoros        | [ADR-054](../adr/054_timezone_convencion.md)          | `lib/fecha-mx.ts` (`hoyISOMatamoros`) + lint guard; `Etc/GMT+6` solo Playtomic/holds |
+| Tema                               | ADR                                                     | Patrón canónico                                                                      |
+| ---------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Módulos compartidos cross-empresa  | [ADR-011](../adr/011_shared_modules_cross_empresa.md)   | thin page → `<XModule empresaSlug>` (SM1-SM6)                                        |
+| Responsive                         | [ADR-019](../adr/019_responsive_policy.md)              | JSDoc `@responsive` + `<DesktopOnlyNotice>` (R1-R5)                                  |
+| A11y baseline                      | [ADR-020](../adr/020_a11y_baseline.md)                  | WCAG 2.1 AA + `@axe-core/playwright` (A1-A6)                                         |
+| Access denied                      | [ADR-024](../adr/024_access_denied_ux.md)               | `<AccessDenied>` + `<RequireAccess>` (AD1-AD5)                                       |
+| Read-only "viendo como"            | [ADR-027](../adr/027_viendo_como_readonly.md)           | cookie `bsop_preview_as` + `assertNotInPreview()` (V1-V5)                            |
+| Sub-module permissions (sub-slugs) | [ADR-030](../adr/030_submodule_permissions.md)          | sub-slugs `<padre>.<sub>` + `<RoutedModuleTabs module>` filter (SS1-SS7)             |
+| Workflow CC owns planning          | [ADR-012](../adr/012_workflow_cc_owns_planning.md)      | meta-decisión sobre roles                                                            |
+| Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)          | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M8)              |
+| Capa única de acceso a IA          | [ADR-046](../adr/046_capa_unica_acceso_ia.md)           | `lib/ai` único entry point + registry + drift-guard (registro-ia)                    |
+| Reportes (preset + vista + PDF)    | [ADR-047](../adr/047_reportes_preset_vista_pdf.md)      | registry + `<ReporteCatalogo>`/`<ReporteShell>` + hub-índice + PDF (dilesa-reportes) |
+| Timezone: "hoy" = Matamoros        | [ADR-054](../adr/054_timezone_convencion.md)            | `lib/fecha-mx.ts` (`hoyISOMatamoros`) + lint guard; `Etc/GMT+6` solo Playtomic/holds |
+| Movimientos catastrales de predios | [ADR-055](../adr/055_portafolio_movimientos_activos.md) | subdivisión/fusión append-only + RPC atómica; orígenes se desincorporan (linaje)     |
 
 ### Data / DB
 
