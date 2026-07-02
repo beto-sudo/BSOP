@@ -26,6 +26,7 @@ import {
   CalendarClock,
   Check,
   Copy,
+  FileText,
   FileUp,
   Link2,
   RefreshCw,
@@ -968,6 +969,21 @@ export function CxpFacturasModule({ empresaId, empresa }: CxpFacturasModuleProps
                         );
                       })()}{' '}
                       · neto {formatCurrency(f.total)}
+                      {f.estimacion_id ? (
+                        <>
+                          {' · '}
+                          <a
+                            href={`/api/dilesa/estimaciones/${f.estimacion_id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-0.5 align-text-bottom hover:underline"
+                            title="Descargar PDF de la estimación"
+                          >
+                            <FileText className="h-3 w-3" />
+                            PDF
+                          </a>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                   <Button size="sm" className="gap-2" onClick={() => setRecibirTarget(f)}>
