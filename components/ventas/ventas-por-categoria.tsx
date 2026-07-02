@@ -12,6 +12,7 @@ import { TZ } from './utils';
 import { CategoriaBadge } from './categoria-badge';
 import type { CategoriaFilter } from './types';
 import { prorratearLineas, ventaCobrada } from './venta-cobrada';
+import { fetchTiposPagoPorPedido, matchTipoPago } from './tipo-pago';
 
 // Las líneas de venta cuyo producto no resuelve a una categoría del
 // catálogo (product_id sin match en erp.productos.codigo, o producto sin
@@ -43,6 +44,7 @@ export type VentasPorCategoriaProps = {
   dateFrom: string;
   dateTo: string;
   corteFilter: string;
+  pagoFilter: string;
   search: string;
   onSearchChange: (value: string) => void;
   onCategoriaClick: (categoria: CategoriaFilter) => void;
@@ -52,6 +54,7 @@ export function VentasPorCategoria({
   dateFrom,
   dateTo,
   corteFilter,
+  pagoFilter,
   search,
   onSearchChange,
   onCategoriaClick,
@@ -87,9 +90,23 @@ export function VentasPorCategoria({
       const { data: pedidos, error: pedidosErr } = await pedidosQuery;
       if (pedidosErr) throw pedidosErr;
 
-      const validPedidos = (pedidos ?? []).filter(
+      let validPedidos = (pedidos ?? []).filter(
         (p) => !!p.order_id && !(p.status ?? '').toLowerCase().includes('cancel')
       );
+
+      // Filtro por tipo de pago — mismo criterio que el tab Pedidos: el
+      // pedido matchea si alguno de sus pagos usa ese tipo, y se reporta
+      // completo (no se parte el monto por método).
+      if (pagoFilter !== 'all') {
+        const tiposPago = await fetchTiposPagoPorPedido(
+          supabase,
+          validPedidos.map((p) => p.order_id as string)
+        );
+        validPedidos = validPedidos.filter((p) =>
+          matchTipoPago(tiposPago.get(p.order_id as string), pagoFilter)
+        );
+      }
+
       const validOrderIds = validPedidos.map((p) => p.order_id as string);
 
       if (validOrderIds.length === 0) {
@@ -172,7 +189,7 @@ export function VentasPorCategoria({
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, corteFilter]);
+  }, [dateFrom, dateTo, corteFilter, pagoFilter]);
 
   useEffect(() => {
     void fetchData();

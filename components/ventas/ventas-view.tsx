@@ -30,6 +30,7 @@ import { VentasPorCategoria } from './ventas-por-categoria';
 import { VentasComparativo } from './ventas-comparativo';
 import type { CategoriaFilter, CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
+import { fetchTiposPagoPorPedido, matchTipoPago, type TipoPago } from './tipo-pago';
 
 type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria' | 'comparativo';
 
@@ -43,6 +44,11 @@ export function VentasView() {
   const [categoriaSearch, setCategoriaSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState<CategoriaFilter | null>(null);
   const [cortes, setCortes] = useState<CorteOption[]>([]);
+  // Tipos de pago por pedido (rdb.waitry_pagos) — se carga lazy, solo cuando
+  // el filtro "Tipo de pago" está activo, para no duplicar requests en el
+  // caso común (filtro en "Todos los pagos").
+  const [tiposPago, setTiposPago] = useState<Map<string, Set<TipoPago>> | null>(null);
+  const [loadingPagos, setLoadingPagos] = useState(false);
 
   // URL-synced filter defaults are captured once at mount (today's date range).
   // Re-opening a stale tab the next day keeps the previous defaults; that's
@@ -54,6 +60,7 @@ export function VentasView() {
       search: '',
       statusFilter: 'all',
       corteFilter: 'all',
+      pagoFilter: 'all',
       dateFrom: today.from,
       dateTo: today.to,
       presetKey: 'hoy',
@@ -61,8 +68,16 @@ export function VentasView() {
     };
   }, []);
   const { filters, setFilter, setFilters, clearAll, activeCount } = useUrlFilters(filterDefaults);
-  const { search, statusFilter, corteFilter, dateFrom, dateTo, presetKey, showDuplicados } =
-    filters;
+  const {
+    search,
+    statusFilter,
+    corteFilter,
+    pagoFilter,
+    dateFrom,
+    dateTo,
+    presetKey,
+    showDuplicados,
+  } = filters;
   const showFantasmas = showDuplicados === 'on';
 
   const handlePreset = (preset: string | null) => {
@@ -162,6 +177,34 @@ export function VentasView() {
     void fetchPedidos();
   }, [fetchPedidos]);
 
+  // Con el filtro de tipo de pago activo, resolver los métodos de pago de los
+  // pedidos cargados. Se refresca cuando cambia el conjunto de pedidos.
+  useEffect(() => {
+    if (pagoFilter === 'all') return;
+    const orderIds = pedidos.map((p) => p.order_id).filter((id): id is string => !!id);
+    if (orderIds.length === 0) {
+      setTiposPago(new Map());
+      return;
+    }
+    let cancelled = false;
+    setLoadingPagos(true);
+    fetchTiposPagoPorPedido(createSupabaseBrowserClient(), orderIds)
+      .then((map) => {
+        if (!cancelled) setTiposPago(map);
+      })
+      .catch(() => {
+        // non-fatal: sin el mapa, el filtro no matchea nada y la tabla queda
+        // vacía; el usuario puede reintentar con "Actualizar".
+        if (!cancelled) setTiposPago(new Map());
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPagos(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pagoFilter, pedidos]);
+
   const openDetail = async (pedido: Pedido) => {
     setSelected(pedido);
     setDrawerOpen(true);
@@ -198,6 +241,11 @@ export function VentasView() {
 
   const filtered = pedidos.filter((p) => {
     if (statusFilter !== 'all' && p.status?.toLowerCase() !== statusFilter) return false;
+    if (
+      pagoFilter !== 'all' &&
+      !matchTipoPago(p.order_id ? tiposPago?.get(p.order_id) : undefined, pagoFilter)
+    )
+      return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -273,13 +321,15 @@ export function VentasView() {
           corteFilter={corteFilter}
           onCorteFilterChange={(value) => setFilter('corteFilter', value)}
           cortes={cortes}
+          pagoFilter={pagoFilter}
+          onPagoFilterChange={(value) => setFilter('pagoFilter', value)}
           dateFrom={dateFrom}
           dateTo={dateTo}
           onDateFromChange={(value) => setFilters({ dateFrom: value, presetKey: 'custom' })}
           onDateToChange={(value) => setFilters({ dateTo: value, presetKey: 'custom' })}
           presetKey={presetKey}
           onPresetChange={handlePreset}
-          loading={loading}
+          loading={loading || loadingPagos}
           onRefresh={() => void fetchPedidos()}
           count={filtered.length}
           activeCount={activeCount}
@@ -297,7 +347,7 @@ export function VentasView() {
         <>
           <VentasTable
             pedidos={filtered}
-            loading={loading}
+            loading={loading || loadingPagos}
             onRowClick={(pedido) => void openDetail(pedido)}
           />
           <OrderDetail
@@ -313,6 +363,7 @@ export function VentasView() {
           dateFrom={dateFrom}
           dateTo={dateTo}
           corteFilter={corteFilter}
+          pagoFilter={pagoFilter}
           search={productoSearch}
           onSearchChange={setProductoSearch}
           categoriaFilter={categoriaFilter}
@@ -324,6 +375,7 @@ export function VentasView() {
           dateFrom={dateFrom}
           dateTo={dateTo}
           corteFilter={corteFilter}
+          pagoFilter={pagoFilter}
           search={categoriaSearch}
           onSearchChange={setCategoriaSearch}
           onCategoriaClick={handleCategoriaClick}
