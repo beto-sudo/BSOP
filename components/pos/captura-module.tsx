@@ -32,13 +32,19 @@ import {
   rpcCobrar,
   rpcEnviarCocina,
   rpcMoverCuenta,
+  rpcNotaCuenta,
   rpcVoidItem,
 } from './pos-api';
 
 const ESTACION_KEY = 'bsop-pos-estacion';
 const CART_KEY = 'bsop-pos-cart';
 
-type PersistedCart = { productoId: string; cantidad: number; descuentoPct: number }[];
+type PersistedCart = {
+  productoId: string;
+  cantidad: number;
+  descuentoPct: number;
+  notas?: string;
+}[];
 
 /** Minutos desde un timestamp, para el tablero de cuentas. */
 function minutosDesde(iso: string): number {
@@ -120,6 +126,7 @@ export function PosCapturaModule() {
                 producto: byId.get(l.productoId)!,
                 cantidad: l.cantidad,
                 descuentoPct: l.descuentoPct,
+                notas: l.notas,
               }));
             if (restored.length > 0) setCart(restored);
           }
@@ -137,6 +144,7 @@ export function PosCapturaModule() {
       productoId: l.producto.id,
       cantidad: l.cantidad,
       descuentoPct: l.descuentoPct,
+      notas: l.notas,
     }));
     if (persisted.length > 0) localStorage.setItem(CART_KEY, JSON.stringify(persisted));
     else localStorage.removeItem(CART_KEY);
@@ -181,7 +189,8 @@ export function PosCapturaModule() {
 
   function addToCart(p: ProductoVenta) {
     setCart((prev) => {
-      const i = prev.findIndex((l) => l.producto.id === p.id && !l.descuentoPct);
+      // Solo se acumulan líneas "simples": con nota o descuento van aparte.
+      const i = prev.findIndex((l) => l.producto.id === p.id && !l.descuentoPct && !l.notas);
       if (i >= 0) {
         const next = [...prev];
         next[i] = { ...next[i], cantidad: next[i].cantidad + 1 };
@@ -264,6 +273,27 @@ export function PosCapturaModule() {
       });
       await refreshItems(cuentaId);
       await refreshCuentas();
+    });
+  }
+
+  function notaCartLine(idx: number) {
+    const actual = cart[idx]?.notas ?? '';
+    const nota = window.prompt('Nota para cocina (ej. sin pepinillos, sin mayonesa):', actual);
+    if (nota === null) return;
+    setCart((prev) =>
+      prev.map((l, i) => (i === idx ? { ...l, notas: nota.trim() || undefined } : l))
+    );
+  }
+
+  function notaCuenta() {
+    if (!cuenta) return;
+    const action = crypto.randomUUID();
+    const nota = window.prompt('Nota general de la orden:', cuenta.notas ?? '');
+    if (nota === null) return;
+    pedirPin('Nota de la orden', async (pin) => {
+      await rpcNotaCuenta({ cuentaId: cuenta.id, pin, nota, clientActionId: action });
+      await refreshCuentas();
+      toast.add({ title: 'Nota guardada' });
     });
   }
 
@@ -467,9 +497,15 @@ export function PosCapturaModule() {
                   >
                     ⇄
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={notaCuenta} title="Nota de la orden">
+                    📝
+                  </Button>
                 </span>
                 <Badge variant="secondary">{cuenta.estado}</Badge>
               </div>
+              {cuenta.notas && (
+                <p className="rounded bg-muted px-2 py-1 text-xs italic">“{cuenta.notas}”</p>
+              )}
               <ul className="divide-y text-sm">
                 {items.map((i) => (
                   <li key={i.id} className="flex items-center justify-between gap-2 py-1.5">
@@ -531,8 +567,23 @@ export function PosCapturaModule() {
               <ul className="divide-y text-sm">
                 {cart.map((l, idx) => (
                   <li key={idx} className="flex items-center justify-between gap-2 py-1.5">
-                    <span>{l.producto.nombre}</span>
+                    <span className="min-w-0">
+                      {l.producto.nombre}
+                      {l.notas && (
+                        <span className="block truncate text-xs italic text-muted-foreground">
+                          “{l.notas}”
+                        </span>
+                      )}
+                    </span>
                     <span className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => notaCartLine(idx)}
+                        title="Nota para cocina (sin pepinillos, etc.)"
+                      >
+                        📝
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

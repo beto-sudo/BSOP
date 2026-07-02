@@ -175,6 +175,14 @@ hacer.
 
 ## Bitácora
 
+- **2026-07-02** — **S2.6**: (a) todo se surte de cocina excepto servicios
+  (Beto): `va_a_cocina=true` en 11 categorías; quedan fuera las 8 de
+  servicio (Academias, Clínica, Propina, 4 Rentas de cancha, Torneos);
+  (b) notas por item ("sin pepinillos") desde el carrito — el KDS las
+  resalta en ámbar; (c) nota general de la orden (columna
+  `pos_cuentas.notas` + `fn_pos_nota_cuenta` con auditoría) visible también
+  en el KDS. Migración `20260702215919`.
+
 - **2026-07-02** — **S2.5 (pulido post-prueba de Beto)**: backfill de
   precios desde Waitry (migración `20260702211303`, criterio aprobado) +
   RPC `fn_pos_mover_cuenta`; UI: buscador de productos, tablero de cuentas
