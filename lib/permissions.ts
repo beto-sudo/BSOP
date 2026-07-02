@@ -162,6 +162,10 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/home': 'rdb.home',
   '/rdb/ventas': 'rdb.ventas',
   '/rdb/cortes': 'rdb.cortes',
+  // POS propio (ADR-056): padre umbrella `rdb.pos` + sub-slug por tab.
+  '/rdb/pos': 'rdb.pos.captura',
+  '/rdb/pos/kds': 'rdb.pos.kds',
+  '/rdb/pos/admin': 'rdb.pos.admin',
   // Productos: padre `rdb.productos` + 5 sub-slugs por tab (sub-slug pattern,
   // ver `submodule-permissions` iniciativa). Cada URL apunta a su sub-slug.
   '/rdb/productos': 'rdb.productos.catalogo',
@@ -227,6 +231,7 @@ export const HUB_PARENT_BY_ROUTE: Record<string, string> = {
   '/rdb/cxp': 'rdb.cxp',
   '/rdb/productos': 'rdb.productos',
   '/rdb/inventario': 'rdb.inventario',
+  '/rdb/pos': 'rdb.pos',
 };
 
 /** Maps a nav section href to its empresa slug */

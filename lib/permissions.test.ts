@@ -449,6 +449,11 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'rdb.proveedores',
   'rdb.requisiciones',
   'rdb.playtomic',
+  // POS propio (ADR-056) — padre umbrella + sub-slugs por tab.
+  'rdb.pos',
+  'rdb.pos.captura',
+  'rdb.pos.kds',
+  'rdb.pos.admin',
   'rdb.ordenes_compra',
   'rdb.recepciones',
   'rdb.admin.tasks',

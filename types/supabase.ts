@@ -17009,6 +17009,25 @@ export type Database = {
         Args: { p_client_action_id: string }
         Returns: boolean
       }
+      fn_pos_admin_guardar_operador: {
+        Args: {
+          p_activo?: boolean
+          p_empleado_id: string
+          p_pin?: string
+          p_puede_autorizar?: boolean
+        }
+        Returns: string
+      }
+      fn_pos_admin_upsert_estacion: {
+        Args: {
+          p_activa?: boolean
+          p_empresa_id: string
+          p_id?: string
+          p_nombre: string
+          p_tipo: string
+        }
+        Returns: string
+      }
       fn_pos_agregar_ronda: {
         Args: {
           p_client_action_id: string

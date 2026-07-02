@@ -4,10 +4,10 @@
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (nuevas `pos_cuentas`, `pos_rondas`, `pos_items`, `pos_pagos`, `pos_estaciones`, `pos_eventos`; vista canónica `v_ventas_canonicas`; sub-slugs RBAC `rdb.pos.*` en `core.modulos`/`core.permisos_rol`). `erp` (escritura en `movimientos_inventario` vía trigger espejo; lectura/escritura `cortes_caja`/`cortes_vouchers`). Post-cutover: `rdb.waitry_*` queda histórico read-only y el edge function `waitry-webhook` (incl. espejo a Coda) se apaga.
 **Estado:** in_progress
-**Próximo hito:** S2 — captura Tiendita + KDS mínimo (tras mergear la migración de S1)
+**Próximo hito:** Beto revisa el preview de S2 (captura + KDS + admin) y mergea; luego alta de estaciones/PINs y práctica con la hostess (S3)
 **Dueño:** Beto
 **Creada:** 2026-07-02
-**Última actualización:** 2026-07-02 (S1: migración del schema POS + smoke test 13/13)
+**Última actualización:** 2026-07-02 (S2 en PR: módulo /rdb/pos — captura, KDS, admin)
 
 > **Sucede a** la saga Waitry: [`rdb-waitry-ingesta-dedup`](rdb-waitry-ingesta-dedup.md),
 > [`rdb-waitry-deduplicacion`](rdb-waitry-deduplicacion.md),
@@ -161,6 +161,16 @@ hacer.
 
 ## Bitácora
 
+- **2026-07-02** — **S2** (PR abierto, UI sin auto-merge): módulo `/rdb/pos`
+  con routed tabs — Captura (catálogo táctil por categoría, carrito, cuentas
+  abiertas, PIN por acción, cobro efectivo/tarjeta/mixto con propina y
+  cambio, void/merma), Cocina (KDS realtime + polling fallback 5 s + alerta
+  sonora + ACK listo/entregado) y Admin (estaciones y operadores/PIN,
+  solo-admin). Migración `20260702192331`: módulos RBAC `rdb.pos` +
+  sub-slugs con backfill (captura/kds a los 7 roles RDB; admin sin backfill)
+  - RPCs `fn_pos_admin_*`. Checklist ADR-014/030 completo (NAV_ITEMS,
+    ROUTE_TO_MODULE, HUB_PARENT_BY_ROUTE, EXPECTED_DB_MODULE_SLUGS,
+    MODULE_DEPS).
 - **2026-07-02** — **S1**: migración `20260702182440_rdb_pos_schema` — 7
   tablas `pos_*`, guards de estado, trigger de inventario espejo
   (`erp.fn_trg_pos_to_movimientos`), 8 RPCs idempotentes, vista
