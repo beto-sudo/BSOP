@@ -33,7 +33,7 @@ import { ActivoEvaluacionPanel } from '@/components/dilesa/activo-evaluacion-pan
 import { ActivoBitacora } from '@/components/dilesa/activo-bitacora';
 import { ActivoFichaDialog } from '@/components/dilesa/activo-ficha-dialog';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
-import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
+import { TIPO_ACTIVO_LABEL_FULL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import {
   ArrowLeft,
@@ -237,8 +237,7 @@ const SAT_TIPOS = new Set([
   'edificio',
   'nave',
   'plaza',
-  'espectacular',
-  'unipolar',
+  'espacio_publicitario',
   'infraestructura',
   'cara',
 ]);
@@ -417,7 +416,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
       : null;
 
   const caras: CaraDetalle[] =
-    activo?.tipo === 'espectacular' && Array.isArray(satelite?.caras_detalle)
+    activo?.tipo === 'espacio_publicitario' && Array.isArray(satelite?.caras_detalle)
       ? (satelite!.caras_detalle as CaraDetalle[])
       : [];
 
@@ -473,7 +472,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
               {activo.nombre}
             </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <Badge tone="neutral">{ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo}</Badge>
+              <Badge tone="neutral">{TIPO_ACTIVO_LABEL_FULL[activo.tipo] ?? activo.tipo}</Badge>
               <Badge tone={ESTADO_TONE[activo.estado] ?? 'neutral'}>
                 {ESTADO_LABEL[activo.estado] ?? activo.estado}
               </Badge>
@@ -522,7 +521,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
       <div className="grid items-start gap-6 xl:grid-cols-2">
         <div className="space-y-6">
           <Section title="Identificación y ubicación">
-            <Field label="Tipo" value={ACTIVO_TIPO_LABEL[activo.tipo as never] ?? activo.tipo} />
+            <Field label="Tipo" value={TIPO_ACTIVO_LABEL_FULL[activo.tipo] ?? activo.tipo} />
             <Field label="Etiqueta" value={activo.etiqueta} />
             <Field label="Destino" value={activo.destino?.label ?? '—'} />
             <Field label="Zona / fraccionamiento" value={activo.zona} />
@@ -674,7 +673,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
                           {h.nombre}
                         </Link>
                         <span className="shrink-0 text-xs text-[var(--text)]/50">
-                          {ACTIVO_TIPO_LABEL[h.tipo as never] ?? h.tipo}
+                          {TIPO_ACTIVO_LABEL_FULL[h.tipo] ?? h.tipo}
                           {h.area_m2 != null ? ` · ${h.area_m2.toLocaleString('es-MX')} m²` : ''}
                         </span>
                       </li>

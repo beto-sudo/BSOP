@@ -1859,7 +1859,7 @@ export type Database = {
           },
         ]
       }
-      activo_espectacular: {
+      activo_espacio_publicitario: {
         Row: {
           activo_id: string
           alto_m: number | null
@@ -1875,6 +1875,7 @@ export type Database = {
           notas: string | null
           orientacion: string | null
           renta_mensual: number | null
+          subtipo: string
           trafico_estimado_diario: number | null
           updated_at: string
           vialidad: string | null
@@ -1894,6 +1895,7 @@ export type Database = {
           notas?: string | null
           orientacion?: string | null
           renta_mensual?: number | null
+          subtipo?: string
           trafico_estimado_diario?: number | null
           updated_at?: string
           vialidad?: string | null
@@ -1913,6 +1915,7 @@ export type Database = {
           notas?: string | null
           orientacion?: string | null
           renta_mensual?: number | null
+          subtipo?: string
           trafico_estimado_diario?: number | null
           updated_at?: string
           vialidad?: string | null

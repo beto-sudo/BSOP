@@ -72,7 +72,8 @@ const SAT_COMERCIAL: Record<string, Record<string, string>> = {
     giro_permitido: 'Giro permitido',
     banos: 'Baños',
   },
-  espectacular: {
+  espacio_publicitario: {
+    subtipo: 'Tipo de estructura',
     caras: 'Caras',
     ancho_m: 'Ancho (m)',
     alto_m: 'Alto (m)',
