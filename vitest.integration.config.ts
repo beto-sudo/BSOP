@@ -11,17 +11,17 @@ import path from 'node:path';
  *     paralelizar para evitar race conditions.
  *   - **Sin coverage** — los integration tests cubren paths que ya
  *     están en el coverage del unit test config; no doble-contamos.
- *   - **Opt-in**: corre con `npm run test:integration`, NO con
- *     `npm run test:run`. CI default no los corre.
+ *   - Corre con `npm run test:integration` (NO con `npm run test:run`).
+ *     En CI corre dentro de `schema-check.yml` contra la shadow DB, en
+ *     PRs que tocan migraciones/derivados/esta suite (blindaje-financiero S2).
  *
- * Pre-requisitos para correr (ver `docs/testing/integration-setup.md`):
+ * Pre-requisitos para correr local (ver `docs/testing/integration-setup.md`):
  *   1. Docker corriendo (OrbStack / Docker Desktop).
- *   2. `supabase start` levantado en localhost:54321.
- *   3. `supabase db reset` aplicó las 211 migrations al DB local.
+ *   2. `supabase start` levantado en localhost:54321 (aplica las
+ *      migraciones del repo a la DB local desde cero).
  *
- * Las env vars apuntan a la instancia local (no a producción) — los
- * defaults del CLI de Supabase generan llaves predecibles que se
- * inyectan en `tests/integration/setup.ts`.
+ * Las llaves apuntan a la instancia local (no a producción) — son los JWTs
+ * demo estándar del CLI de Supabase, definidos en `tests/integration/helpers.ts`.
  */
 export default defineConfig({
   test: {
