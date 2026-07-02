@@ -4,10 +4,10 @@
 **Empresas:** todas (el modelo financiero vive en `erp.*` compartido)
 **Schemas afectados:** `erp` (RPCs financieras, `audit_log`, grants), `dilesa` (gate de fase/PLD, `venta_fases`), `core` (identidad `usuarios`↔`auth.users`), Supabase Storage (bucket `adjuntos`)
 **Estado:** in_progress
-**Próximo hito:** mergear S1 (gen-functions-ref + drift-guard en schema-check.yml) → arrancar Sprint 2 (suite de integración SQL de las RPCs de dinero contra la shadow)
+**Próximo hito:** mergear S2 (suite de integración financiera en CI) → arrancar Sprint 3 (cierre de fase como RPC transaccional con gate)
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-07-02 (Beto aprobó alcance v1; arranca Sprint 1)
+**Última actualización:** 2026-07-02 (S1 mergeado #1206; S2 en PR)
 
 ## Problema
 
@@ -33,7 +33,7 @@ El Sprint 0 (ya aplicado a prod) cerró el perímetro `anon` (RPCs financieras +
 ## Alcance v1 (sprints propuestos — pendientes de aprobación)
 
 - [x] **Sprint 1 — Fuente canónica de funciones + drift-guard (ataca la clase FIFO).** Generador `gen-functions-ref` (hermano de `schema:ref`): dump versionado de `pg_get_functiondef` de todas las funciones de negocio (182) + triggers/CHECKs. Drift-guard en `schema-check.yml` (shadow) que falla el PR si la definición que producen las migraciones difiere del snapshot. Convención: toda redefinición parte de ese archivo, nunca de la migración anterior.
-- [ ] **Sprint 2 — Suite de integración SQL.** `vitest.integration.config.ts` contra `supabase start` que ejercita las ~10 RPCs de dinero (cxc/cxp/presupuesto) assertando saldos + un **caso anon-negativo** (anon-key directo → 42501). Corre en CI en PRs que tocan `supabase/migrations/**` (trigger ya existe en `drift-check.yml`).
+- [x] **Sprint 2 — Suite de integración SQL.** `vitest.integration.config.ts` contra `supabase start` que ejercita las RPCs de dinero (CxC FIFO/cancelar/re-aplicar/ajustar + movimiento espejo; CxP comprometido vivo/dedup/gate Dirección con usuarios auth reales) assertando saldos + **caso anon-negativo estricto** (anon → 42501, un error de negocio = anon alcanzó el cuerpo). 39 tests, ~1s. Corre en CI dentro de `schema-check.yml` (la shadow ya está arriba en ese job) en PRs que tocan migraciones/derivados/la suite. Residual a S3/S4: RPCs de presupuesto (baseline/órdenes de cambio) y cierre de fase.
 - [ ] **Sprint 3 — Cierre de fase como RPC transaccional.** `fn_cerrar_fase` (`SECURITY DEFINER`) que valida permiso de módulo + gate PLD en DB y commitea `adjuntos`+`ventas`+`venta_fases` juntos (absorbe `marcarFase`). Restringe INSERT directo a `venta_fases` / UPDATE de `fase_actual` a esa RPC.
 - [ ] **Sprint 4 — Gate interno + revoke amplio de anon (defensa en profundidad).** `IF NOT fn_is_admin() AND NOT fn_has_empresa(...) THEN RAISE 42501` al inicio de cada RPC mutadora (partiendo de `pg_get_functiondef`, con el snapshot de S1 y el test de S2 como red). Revoke de `anon` de todas las funciones/tablas/defaults de negocio, no solo las 30 del Sprint 0.
 - [ ] **Sprint 5 — Audit trail uniforme + identidad.** FK a `core.usuarios` en todos los `*_por`; `created_by`/`registrado_por` en `erp.facturas` y `erp.movimientos_bancarios` con backfill; FK `core.usuarios.id → auth.users(id)` (o `auth_user_id NOT NULL UNIQUE`). ADR corto del patrón único de autoría.
@@ -60,5 +60,6 @@ El Sprint 0 (ya aplicado a prod) cerró el perímetro `anon` (RPCs financieras +
 
 ## Bitácora
 
+- **2026-07-02** — **Sprint 2 ejecutado**: suite de integración financiera contra la shadow (39 tests, ~1s): `finanzas-cxc` (FIFO por vencimiento sin filtrar fuente — regresión directa del incidente; cancelar revierte saldos; re-aplicar reemplaza y valida Σ ≤ abono; ajustar respeta piso de pagado; movimiento bancario espejo ADR-037 D4), `finanzas-cxp` (comprometido vivo al programar; liberar al cancelar; dedup `uuid_sat`; **gate Dirección de `cxp_pago_aprobar` con usuarios auth reales** — con rol aprueba y audita, sin rol/otra-empresa/service-role truena), `perimetro-anon` (9 RPCs mutadoras → 42501 estricto + lecturas `v_partida_control`/`cxc_pagos`/`movimientos_bancarios`). Harness en `tests/integration/helpers.ts` (fixtures con `runTag` único; `crearUsuarioConRol` crea auth user con `core.usuarios.id = auth.uid()` — requisito de `fn_user_has_role` y del FK de `audit_log`). CI: paso nuevo en `schema-check.yml` (la shadow ya está arriba; +~1s) + triggers ampliados a `tests/integration/` y el config. Docs `integration-setup.md` des-staleados (bootstrap chicken-egg ya no aplica; "211 migrations" fuera). S1 mergeado en [#1206](https://github.com/beto-sudo/BSOP/pull/1206).
 - **2026-07-02** — Beto aprobó alcance v1 (`proposed → in_progress`). **Sprint 1 ejecutado**: `scripts/gen-functions-ref.ts` (hermano de `gen-schema-ref.ts`, formatter puro + tests de determinismo/orden/render) genera `supabase/FUNCTIONS_REF.md` (182 funciones + 166 triggers + 226 CHECKs de 11 schemas, desde la shadow); `npm run functions:ref`/`functions:check`; `db:regen` lo incluye; `schema-check.yml` lo valida (regen + artifact + diff). Convención documentada en `GOVERNANCE.md` §3 y `CLAUDE.md` (Reglas DB): toda redefinición parte de `FUNCTIONS_REF.md`. Helper `.env.local` extraído a `scripts/lib/env-local.ts` (compartido con `gen-schema-ref.ts`).
 - **2026-06-12** — Promovida desde la revisión general 2026-06-12 (auditoría ultracode). El Sprint 0 de perímetro (REVOKE anon en 30 RPCs + `v_partida_control` con `security_invoker` + expediente PLD a RESTRICT) ya está aplicado y verificado en prod (PR [#877](https://github.com/beto-sudo/BSOP/pull/877)). Esta iniciativa recoge el resto de la dimensión db-seguridad + testing-calidad del reporte.
