@@ -103,9 +103,10 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   // Arrendamiento — módulo standalone (lee activos/personas; sin dependencias de otro módulo).
   'dilesa.arrendamiento': [],
   'dilesa.portafolio': [],
-  // Hub Portafolio (ADR-030): tabs Inventario / Evaluación.
+  // Hub Portafolio (ADR-030): tabs Inventario / Evaluación / Prediales.
   'dilesa.portafolio.inventario': [],
   'dilesa.portafolio.evaluacion': [],
+  'dilesa.portafolio.prediales': [],
   'dilesa.proveedores': [],
   // Hub-índice de Reportes (iniciativa `dilesa-reportes`, ADR-047): top-level,
   // solo descubre y enlaza; sin dependencias.

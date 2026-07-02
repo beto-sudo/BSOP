@@ -270,9 +270,10 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   'dilesa.rh.departamentos',
   'dilesa.proveedores',
   'dilesa.portafolio',
-  // Sub-slugs del hub Portafolio (ADR-030): Inventario / Evaluación.
+  // Sub-slugs del hub Portafolio (ADR-030): Inventario / Evaluación / Prediales.
   'dilesa.portafolio.inventario',
   'dilesa.portafolio.evaluacion',
+  'dilesa.portafolio.prediales',
   'dilesa.proyectos',
   // Sub-slugs del hub Proyectos (iniciativa
   // `dilesa-proyectos-anteproyectos` Sprint 1, ADR-030). El padre

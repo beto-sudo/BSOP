@@ -287,3 +287,48 @@ export async function desligarDocumentoActivo(id: string): Promise<Result> {
   revalidatePath('/dilesa/portafolio');
   return { ok: true };
 }
+
+/**
+ * Registra el pago de un ejercicio predial (iniciativa
+ * `dilesa-portafolio-predios` · S3). v1 = control: marca pagado con
+ * fecha/monto/quién; NO toca CxP ni tesorería. El comprobante se adjunta
+ * por separado (erp.adjuntos, entidad prediales_ejercicios).
+ */
+export async function registrarPagoPredial(input: {
+  ejercicioId: string;
+  fechaPago: string; // YYYY-MM-DD (fecha local capturada por el operador)
+  montoPagado: number;
+  notas?: string;
+}): Promise<Result> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fechaPago)) {
+    return { ok: false, error: 'La fecha de pago no es válida.' };
+  }
+  if (!Number.isFinite(input.montoPagado) || input.montoPagado < 0) {
+    return { ok: false, error: 'El monto pagado debe ser un número ≥ 0.' };
+  }
+
+  const supabase = await getActionClient();
+  const eu = await getEffectiveUser(supabase);
+  if (!eu || !(eu.isAdmin === true || (eu.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede registrar pagos.' };
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('prediales_ejercicios')
+    .update({
+      estado: 'pagado',
+      fecha_pago: input.fechaPago,
+      monto_pagado: input.montoPagado,
+      pagado_por: eu.id,
+      ...(input.notas?.trim() ? { notas: input.notas.trim() } : {}),
+    })
+    .eq('id', input.ejercicioId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo registrar el pago.') };
+  }
+
+  revalidatePath('/dilesa/portafolio/prediales');
+  return { ok: true };
+}
