@@ -9,7 +9,9 @@ out/
 node_modules/
 
 # Git worktrees created by agents — never format checked-out copies of the repo.
+# (.claude/ = Claude Code, .Codex/ = Codex CLI.)
 .claude/worktrees/
+.Codex/worktrees/
 
 # Untracked ad-hoc scratch folder.
 tmp/
