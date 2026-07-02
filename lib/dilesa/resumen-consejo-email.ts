@@ -280,6 +280,12 @@ export type ResumenConsejoData = {
   tuberiaHistorico: { clientes: number; valor: number };
   asignaciones: AsignacionRow[];
   backlog: BacklogEscrituracion;
+  /**
+   * Fechas REALES de escritura (`ventas.fecha_escritura`) de las fases 11
+   * registradas HOY — para la nota del tile cuando difieren del día de registro
+   * (lo normal: el registro en BSOP va días después de la firma).
+   */
+  escrituras_hoy_fechas_reales: string[];
   // ③ Proyectos
   avances: AvanceRow[];
   absorcion: AbsorcionRow[];
@@ -299,6 +305,8 @@ export type Cabecera = {
   cobrado_mes: number;
   escrituras_mes_n: number;
   escrituras_mes_monto: number;
+  /** Fechas reales de las escrituras registradas hoy (nota del tile). */
+  escrituras_hoy_fechas_reales?: string[];
   cxp_por_pagar: number;
   /**
    * CxC en reconciliación: la carga histórica de pagos (sobre todo los
@@ -511,6 +519,15 @@ export function renderTarjetaEjecutiva(
     return d != null && d > SALDO_STALE_DIAS;
   }).length;
   const venc = data.construccion.vencidas;
+  // Nota del tile de escrituras: fechas REALES del acto cuando difieren del
+  // día de registro (recortada a 3 para no desbordar la tarjeta).
+  const fechasReales = (cab.escrituras_hoy_fechas_reales ?? []).filter((f) => f !== hoyISO);
+  const escriturasNota = fechasReales.length
+    ? `<br/>f. reales: ${fechasReales
+        .slice(0, 3)
+        .map((f) => fechaCortaDe(f))
+        .join(', ')}${fechasReales.length > 3 ? ` +${fechasReales.length - 3}` : ''}`
+    : '';
   const cards = [
     cardCell(
       'Ventas hoy',
@@ -519,9 +536,9 @@ export function renderTarjetaEjecutiva(
       ventasColor
     ),
     cardCell(
-      'Escrituras hoy',
+      'Escrituras registradas hoy',
       `${k.escrituras_hoy_n} · ${fmtMoneyCompact(k.escrituras_hoy_monto)}`,
-      `mes: ${cab.escrituras_mes_n} · ${fmtMoneyCompact(cab.escrituras_mes_monto)}`,
+      `mes (f. escritura): ${cab.escrituras_mes_n} · ${fmtMoneyCompact(cab.escrituras_mes_monto)}${escriturasNota}`,
       '#64748b'
     ),
     cardCell(
@@ -611,7 +628,9 @@ export function armarAsunto(
       : 'sin ventas hoy'
   );
   if (k.escrituras_hoy_n > 0)
-    segs.push(`${k.escrituras_hoy_n} escritura${k.escrituras_hoy_n > 1 ? 's' : ''}`);
+    segs.push(
+      `${k.escrituras_hoy_n} escritura${k.escrituras_hoy_n > 1 ? 's' : ''} registrada${k.escrituras_hoy_n > 1 ? 's' : ''}`
+    );
   if (!cab.cxc_preliminar && k.cxc_vencido > 0)
     segs.push(`CxC venc. ${fmtMoneyCompact(k.cxc_vencido)}`);
   const stale = data.saldos
@@ -907,6 +926,8 @@ export async function fetchResumenConsejoData(
     saldosRes,
     asign3mRes,
     movHoyRes,
+    escriturasMesRes,
+    fasesHoy11Res,
   ] = await Promise.all([
     dilesa.from('proyectos').select('id,nombre').eq('empresa_id', empresaId).is('deleted_at', null),
     dilesa.from('v_proyecto_avances').select('*').eq('empresa_id', empresaId),
@@ -931,7 +952,7 @@ export async function fetchResumenConsejoData(
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
       .gte('fecha', inicioMes)
-      .in('posicion', [2, 11]),
+      .eq('posicion', 2),
     dilesa.from('v_contratista_obra').select('*').eq('empresa_id', empresaId),
     erp.from('v_cuenta_saldo_actual').select('*').eq('empresa_id', empresaId),
     dilesa
@@ -946,6 +967,24 @@ export async function fetchResumenConsejoData(
       .select('posicion')
       .eq('empresa_id', empresaId)
       .is('deleted_at', null)
+      .eq('fecha', hoyISO),
+    // Escrituras del mes por la fecha REAL del acto (ventas.fecha_escritura),
+    // no por la fecha de registro de la fase — regla de reportes (cf. #1140).
+    // Corte a hoy: una fecha_escritura futura (firma programada) aún no cuenta.
+    dilesa
+      .from('ventas')
+      .select('id,unidad_id,valor_escrituracion,fecha_escritura')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .gte('fecha_escritura', inicioMes)
+      .lte('fecha_escritura', hoyISO),
+    // Fases 11 registradas HOY (para la nota de fechas reales del tile).
+    dilesa
+      .from('venta_fases')
+      .select('venta_id')
+      .eq('empresa_id', empresaId)
+      .is('deleted_at', null)
+      .eq('posicion', 11)
       .eq('fecha', hoyISO),
   ]);
 
@@ -999,59 +1038,87 @@ export async function fetchResumenConsejoData(
     movHoyPorPos
   );
 
-  // Asignaciones/escrituras del mes: por venta_fases del mes, agrupadas por prototipo.
-  // Requiere resolver venta → unidad → producto. Se hace con un fetch puntual de las
-  // ventas involucradas (rara vez son muchas en un mes).
+  // Asignaciones del mes: por venta_fases (fase 2 = evento interno del sistema,
+  // su fecha ES la real). Escrituras del mes: por ventas.fecha_escritura — la
+  // fecha del acto ante notario, no la del registro en BSOP (el registro suele
+  // ir días después; regla de reportes, cf. #1140). Ambas agrupadas por
+  // prototipo resolviendo venta → unidad → producto.
+  const escriturasMesRows = (escriturasMesRes.data ?? []) as {
+    id: string;
+    unidad_id: string | null;
+    valor_escrituracion: number | null;
+  }[];
   const ventaIds = [
-    ...new Set((fasesMesRes.data ?? []).map((f: { venta_id: string }) => f.venta_id)),
+    ...new Set([
+      ...(fasesMesRes.data ?? []).map((f: { venta_id: string }) => f.venta_id),
+      ...(fasesHoy11Res.data ?? []).map((f: { venta_id: string }) => f.venta_id),
+    ]),
   ];
+  const ventasMes = ventaIds.length
+    ? await dilesa
+        .from('ventas')
+        .select('id,unidad_id,precio_asignacion,valor_escrituracion,fecha_escritura')
+        .in('id', ventaIds)
+    : { data: [] };
+  const unidadIds = [
+    ...new Set(
+      [...((ventasMes.data ?? []) as { unidad_id: string | null }[]), ...escriturasMesRows]
+        .map((v) => v.unidad_id)
+        .filter(Boolean)
+    ),
+  ] as string[];
+  const unidades = unidadIds.length
+    ? await dilesa.from('unidades').select('id,producto_id').in('id', unidadIds)
+    : { data: [] };
+  const unidadProto = new Map<string, string>(
+    (unidades.data ?? []).map((u: { id: string; producto_id: string | null }) => [
+      u.id,
+      u.producto_id ?? '',
+    ])
+  );
+  const ventaInfo = new Map(
+    (ventasMes.data ?? []).map((v: Record<string, unknown>) => [v.id as string, v])
+  );
   const asignaciones: AsignacionRow[] = [];
-  if (ventaIds.length) {
-    const ventasMes = await dilesa
-      .from('ventas')
-      .select('id,unidad_id,precio_asignacion,valor_escrituracion')
-      .in('id', ventaIds);
-    const unidadIds = [
-      ...new Set(
-        (ventasMes.data ?? []).map((v: { unidad_id: string | null }) => v.unidad_id).filter(Boolean)
-      ),
-    ] as string[];
-    const unidades = unidadIds.length
-      ? await dilesa.from('unidades').select('id,producto_id').in('id', unidadIds)
-      : { data: [] };
-    const unidadProto = new Map<string, string>(
-      (unidades.data ?? []).map((u: { id: string; producto_id: string | null }) => [
-        u.id,
-        u.producto_id ?? '',
-      ])
-    );
-    const ventaInfo = new Map(
-      (ventasMes.data ?? []).map((v: Record<string, unknown>) => [v.id as string, v])
-    );
-    const acc = new Map<string, AsignacionRow>();
-    for (const f of fasesMesRes.data ?? []) {
-      const ff = f as { venta_id: string; posicion: number | null };
-      const v = ventaInfo.get(ff.venta_id) as Record<string, unknown> | undefined;
-      if (!v) continue;
-      const proto = protoNombre.get(unidadProto.get(v.unidad_id as string) ?? '') ?? '—';
-      const row = acc.get(proto) ?? {
-        nombre: proto,
-        asignaciones_mes: 0,
-        monto_asignaciones: 0,
-        escrituras_mes: 0,
-        monto_escrituras: 0,
-      };
-      if (ff.posicion === 2) {
-        row.asignaciones_mes += 1;
-        row.monto_asignaciones += Number(v.precio_asignacion ?? 0);
-      } else if (ff.posicion === 11) {
-        row.escrituras_mes += 1;
-        row.monto_escrituras += Number(v.valor_escrituracion ?? 0);
-      }
-      acc.set(proto, row);
-    }
-    asignaciones.push(...[...acc.values()].sort((x, y) => x.nombre.localeCompare(y.nombre)));
+  const acc = new Map<string, AsignacionRow>();
+  const rowDe = (proto: string): AsignacionRow => {
+    const row = acc.get(proto) ?? {
+      nombre: proto,
+      asignaciones_mes: 0,
+      monto_asignaciones: 0,
+      escrituras_mes: 0,
+      monto_escrituras: 0,
+    };
+    acc.set(proto, row);
+    return row;
+  };
+  for (const f of fasesMesRes.data ?? []) {
+    const v = ventaInfo.get((f as { venta_id: string }).venta_id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!v) continue;
+    const row = rowDe(protoNombre.get(unidadProto.get(v.unidad_id as string) ?? '') ?? '—');
+    row.asignaciones_mes += 1;
+    row.monto_asignaciones += Number(v.precio_asignacion ?? 0);
   }
+  for (const v of escriturasMesRows) {
+    const row = rowDe(protoNombre.get(unidadProto.get(v.unidad_id ?? '') ?? '') ?? '—');
+    row.escrituras_mes += 1;
+    row.monto_escrituras += Number(v.valor_escrituracion ?? 0);
+  }
+  asignaciones.push(...[...acc.values()].sort((x, y) => x.nombre.localeCompare(y.nombre)));
+
+  // Fechas reales de las escrituras registradas hoy (nota del tile).
+  const escrituras_hoy_fechas_reales = [
+    ...new Set(
+      (fasesHoy11Res.data ?? [])
+        .map((f: { venta_id: string }) => {
+          const v = ventaInfo.get(f.venta_id) as { fecha_escritura?: string | null } | undefined;
+          return v?.fecha_escritura ?? null;
+        })
+        .filter((d): d is string => Boolean(d))
+    ),
+  ].sort();
 
   // Construcción: línea de excepción. "Casas en obra" cuenta UNIDADES distintas
   // en obra física (suma de v_proyecto_avances.casas_en_construccion) — misma
@@ -1130,6 +1197,7 @@ export async function fetchResumenConsejoData(
   return {
     saldos,
     tuberiaViva,
+    escrituras_hoy_fechas_reales,
     tuberiaHistorico,
     asignaciones,
     backlog,

@@ -68,6 +68,7 @@ const DATA_DEMO: ResumenConsejoData = {
   tuberiaHistorico: { clientes: 0, valor: 0 },
   asignaciones: [],
   backlog: { comprometidas_n: 0, comprometido_monto: 0 },
+  escrituras_hoy_fechas_reales: [],
   avances: [],
   absorcion: [],
   prototipos: [],
@@ -81,6 +82,7 @@ const EMPTY: ResumenConsejoData = {
   tuberiaHistorico: { clientes: 0, valor: 0 },
   asignaciones: [],
   backlog: { comprometidas_n: 0, comprometido_monto: 0 },
+  escrituras_hoy_fechas_reales: [],
   avances: [],
   absorcion: [],
   prototipos: [],
@@ -621,6 +623,35 @@ describe('renderTarjetaEjecutiva + correo con cabecera', () => {
     expect(html).toContain('Cobrado hoy');
     expect(html).toContain('vencido $47.5M');
     expect(html).toContain('2 con hito vencido');
+  });
+
+  it('el tile de escrituras distingue registro vs fecha real (base híbrida)', () => {
+    const html = renderTarjetaEjecutiva(CAB_DEMO, DATA_DEMO, HOY);
+    // "hoy" = registradas hoy; "mes" = por fecha de escritura.
+    expect(html).toContain('Escrituras registradas hoy');
+    expect(html).toContain('mes (f. escritura):');
+    // Sin fechas reales distintas al día → sin nota.
+    expect(html).not.toContain('f. reales:');
+  });
+
+  it('muestra las fechas reales cuando difieren del día de registro, recortadas a 3', () => {
+    const cab: Cabecera = {
+      ...CAB_DEMO,
+      escrituras_hoy_fechas_reales: [
+        '2026-06-22',
+        '2026-06-23',
+        '2026-06-26',
+        '2026-06-30',
+        HOY, // una registrada el mismo día NO va en la nota
+      ],
+    };
+    const html = renderTarjetaEjecutiva(cab, DATA_DEMO, HOY);
+    expect(html).toContain('f. reales: 22 jun, 23 jun, 26 jun +1');
+  });
+
+  it('el asunto dice "registradas" para no leerse como firmas del día', () => {
+    const asunto = armarAsunto(CAB_DEMO, '13 jun', { ...DATA_DEMO, saldos: [] }, HOY);
+    expect(asunto).toContain('2 escrituras registradas');
   });
 
   it('renderResumenConsejoHtml con cabecera incluye tarjeta, alertas y línea CxC', () => {
