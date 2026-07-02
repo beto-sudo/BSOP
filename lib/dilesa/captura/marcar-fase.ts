@@ -4,8 +4,9 @@
  * Una "captura de fase" es la transacción que cierra una fase del pipeline:
  *   1. Sube los archivos a Supabase Storage (bucket `adjuntos`) → 1 path por archivo.
  *   2. Inserta filas en `erp.adjuntos` (entidad_tipo='venta', rol=<rol>) con el path.
- *   3. Inserta fila en `dilesa.venta_fases` con la fecha (today) — esa fila es la
- *      señal "fase cerrada" que destraba la siguiente.
+ *   3. Inserta fila en `dilesa.venta_fases` con la fecha (today, u override
+ *      vía `input.fecha`) — esa fila es la señal "fase cerrada" que destraba
+ *      la siguiente.
  *   4. Opcionalmente, hace UPDATE en `dilesa.ventas` para los campos de la fase
  *      (ej. precio_asignacion en Fase 3, monto_avaluo en Fase 5, etc.).
  *
@@ -50,6 +51,14 @@ export type MarcarFaseInput = {
   notas?: string | null;
   /** Usuario que captura, para `venta_fases.registrado_por`. */
   registradoPor: string | null;
+  /**
+   * Fecha (ISO `YYYY-MM-DD`) para `venta_fases.fecha`. Default: hoy (fecha de
+   * captura). Las fases cuyo hito ocurre ANTES de capturarse (ej. Fase 11:
+   * la escritura se firma en notaría y se captura después) deben pasar la
+   * fecha real del evento — el reporte "Ventas por fase" cuenta por esta
+   * columna.
+   */
+  fecha?: string | null;
 };
 
 export type MarcarFaseResult = {
@@ -67,7 +76,7 @@ export async function marcarFase(
   sb: SupabaseClient,
   input: MarcarFaseInput
 ): Promise<MarcarFaseResult> {
-  const { ventaId, faseposicion, docs, camposVenta, notas, registradoPor } = input;
+  const { ventaId, faseposicion, docs, camposVenta, notas, registradoPor, fecha } = input;
   let adjuntosCreados = 0;
 
   // 1) Subir archivos a Storage + 2) insertar en erp.adjuntos
@@ -169,7 +178,7 @@ export async function marcarFase(
       venta_id: ventaId,
       fase: nombreFase(faseposicion),
       posicion: faseposicion,
-      fecha: hoyISOMatamoros(),
+      fecha: fecha ?? hoyISOMatamoros(),
       registrado_por: registradoPor,
       notas: notas ?? null,
     })
