@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { RDB_EMPRESA_ID } from '@/lib/empresa-constants';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { type Estacion } from './pos-api';
+import { type Estacion, type Zona } from './pos-api';
 
 type Operador = {
   id: string;
@@ -30,6 +30,8 @@ export function PosAdminModule() {
   const [estaciones, setEstaciones] = useState<Estacion[]>([]);
   const [operadores, setOperadores] = useState<Operador[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [zonas, setZonas] = useState<Zona[]>([]);
+  const [nuevaZona, setNuevaZona] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const [nuevaEstacion, setNuevaEstacion] = useState('');
@@ -41,7 +43,7 @@ export function PosAdminModule() {
   const refresh = useCallback(async () => {
     const sb = createSupabaseBrowserClient();
     try {
-      const [est, ops, emps] = await Promise.all([
+      const [est, ops, emps, zns] = await Promise.all([
         sb
           .schema('rdb')
           .from('pos_estaciones')
@@ -59,10 +61,18 @@ export function PosAdminModule() {
           .select('id, persona_id')
           .eq('empresa_id', RDB_EMPRESA_ID)
           .is('deleted_at', null),
+        sb
+          .schema('rdb')
+          .from('pos_zonas')
+          .select('id, nombre, orden, activa')
+          .eq('empresa_id', RDB_EMPRESA_ID)
+          .order('orden'),
       ]);
       if (est.error) throw est.error;
       if (ops.error) throw ops.error;
       if (emps.error) throw emps.error;
+      if (zns.error) throw zns.error;
+      setZonas((zns.data ?? []) as Zona[]);
 
       const personaIds = (emps.data ?? []).map((e) => e.persona_id);
       const nombres = new Map<string, string>();
@@ -177,6 +187,25 @@ export function PosAdminModule() {
     }
   }
 
+  async function guardarZona(zona: Zona | null) {
+    try {
+      const { error: err } = await createSupabaseBrowserClient()
+        .schema('rdb')
+        .rpc('fn_pos_admin_upsert_zona', {
+          p_empresa_id: RDB_EMPRESA_ID,
+          p_nombre: zona ? zona.nombre : nuevaZona.trim(),
+          p_orden: zona ? zona.orden : 100,
+          p_activa: zona ? !zona.activa : true,
+          p_id: zona ? zona.id : undefined,
+        });
+      if (err) throw err;
+      setNuevaZona('');
+      await refresh();
+    } catch (e) {
+      setError(getSupabaseErrorMessage(e, 'Error al guardar zona'));
+    }
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {error && (
@@ -218,6 +247,32 @@ export function PosAdminModule() {
             <option value="kds">kds</option>
           </select>
           <Button onClick={crearEstacion}>Crear</Button>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-4 space-y-3">
+        <h3 className="font-medium">Zonas</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {zonas.map((z) => (
+            <button
+              key={z.id}
+              onClick={() => guardarZona(z)}
+              title={z.activa ? 'Click para desactivar' : 'Click para activar'}
+              className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                z.activa ? 'hover:border-destructive/60' : 'opacity-40 line-through'
+              }`}
+            >
+              {z.nombre}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Nueva zona (Mesa Terraza…)"
+            value={nuevaZona}
+            onChange={(e) => setNuevaZona(e.target.value)}
+          />
+          <Button onClick={() => nuevaZona.trim() && guardarZona(null)}>Crear</Button>
         </div>
       </section>
 

@@ -128,6 +128,7 @@ export const MODULE_DEPS: Record<string, readonly string[]> = {
   'rdb.inventario.movimientos': [],
   'rdb.ordenes_compra': [],
   'rdb.pos.captura': [],
+  'rdb.pos.pedidos': [],
   'rdb.pos.kds': [],
   'rdb.pos.admin': [],
   'rdb.productos.catalogo': [],

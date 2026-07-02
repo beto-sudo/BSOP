@@ -25,8 +25,16 @@ export type ProductoVenta = {
   vaACocina: boolean;
 };
 
+export type Zona = {
+  id: string;
+  nombre: string;
+  orden: number;
+  activa: boolean;
+};
+
 export type CuentaAbierta = {
   id: string;
+  folio: number | null;
   ubicacion: string | null;
   estado: string;
   tipo_venta: string;
@@ -73,6 +81,18 @@ export async function fetchEstaciones(): Promise<Estacion[]> {
     .order('nombre');
   if (error) throw error;
   return (data ?? []) as Estacion[];
+}
+
+export async function fetchZonas(): Promise<Zona[]> {
+  const { data, error } = await supabase()
+    .schema('rdb')
+    .from('pos_zonas')
+    .select('id, nombre, orden, activa')
+    .eq('empresa_id', RDB_EMPRESA_ID)
+    .eq('activa', true)
+    .order('orden');
+  if (error) throw error;
+  return (data ?? []) as Zona[];
 }
 
 /** Catálogo vendible: productos activos con precio vigente + flag cocina. */
@@ -140,7 +160,7 @@ export async function fetchCuentasAbiertas(): Promise<CuentaAbierta[]> {
   const { data, error } = await supabase()
     .schema('rdb')
     .from('pos_cuentas')
-    .select('id, ubicacion, estado, tipo_venta, total, abierta_at, notas')
+    .select('id, folio, ubicacion, estado, tipo_venta, total, abierta_at, notas')
     .eq('empresa_id', RDB_EMPRESA_ID)
     .in('estado', ['abierta', 'en_cobro'])
     .order('abierta_at', { ascending: true });

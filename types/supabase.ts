@@ -15613,6 +15613,8 @@ export type Database = {
           empresa_id: string
           estacion_id: string
           estado: string
+          fecha_operativa: string
+          folio: number | null
           id: string
           notas: string | null
           playtomic_folio: string | null
@@ -15635,6 +15637,8 @@ export type Database = {
           empresa_id: string
           estacion_id: string
           estado?: string
+          fecha_operativa?: string
+          folio?: number | null
           id?: string
           notas?: string | null
           playtomic_folio?: string | null
@@ -15657,6 +15661,8 @@ export type Database = {
           empresa_id?: string
           estacion_id?: string
           estado?: string
+          fecha_operativa?: string
+          folio?: number | null
           id?: string
           notas?: string | null
           playtomic_folio?: string | null
@@ -16104,6 +16110,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pos_zonas: {
+        Row: {
+          activa: boolean
+          created_at: string
+          empresa_id: string
+          id: string
+          nombre: string
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       productos_waitry_map: {
         Row: {
@@ -17031,6 +17067,16 @@ export type Database = {
           p_id?: string
           p_nombre: string
           p_tipo: string
+        }
+        Returns: string
+      }
+      fn_pos_admin_upsert_zona: {
+        Args: {
+          p_activa?: boolean
+          p_empresa_id: string
+          p_id?: string
+          p_nombre: string
+          p_orden?: number
         }
         Returns: string
       }
