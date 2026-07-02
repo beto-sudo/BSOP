@@ -40,7 +40,7 @@ type Resultado = {
   personaId: string;
   cliente: string;
   unidad: string | null;
-  /** Número de crédito del titular (dilesa.ventas.credito_titular_ref). */
+  /** Número(s) de crédito — titular y cotitular si existe (dilesa.ventas.credito_*_ref). */
   credito: string | null;
   saldo: number;
   estado: string;
@@ -98,7 +98,9 @@ function PagosBody() {
       sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, empresa_id, persona_id, unidad_id, estado, credito_titular_ref')
+        .select(
+          'id, empresa_id, persona_id, unidad_id, estado, credito_titular_ref, credito_cotitular_ref'
+        )
         .or(`credito_titular_ref.ilike.%${termino}%,credito_cotitular_ref.ilike.%${termino}%`)
         .is('deleted_at', null)
         .limit(40),
@@ -125,6 +127,7 @@ function PagosBody() {
       unidad_id: string | null;
       estado: string | null;
       credito_titular_ref?: string | null;
+      credito_cotitular_ref?: string | null;
     };
     const ventasPorCredito = (ventasCreditoRes.data ?? []) as VentaRow[];
 
@@ -134,7 +137,9 @@ function PagosBody() {
       const { data } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, empresa_id, persona_id, unidad_id, estado, credito_titular_ref')
+        .select(
+          'id, empresa_id, persona_id, unidad_id, estado, credito_titular_ref, credito_cotitular_ref'
+        )
         .in('persona_id', personaIds)
         .is('deleted_at', null);
       ventasPorNombre = (data ?? []) as VentaRow[];
@@ -203,7 +208,8 @@ function PagosBody() {
         personaId: v.persona_id,
         cliente: nombrePorPersona.get(v.persona_id) ?? '(sin nombre)',
         unidad: v.unidad_id ? (unidadPorId.get(v.unidad_id) ?? null) : null,
-        credito: v.credito_titular_ref ?? null,
+        credito:
+          [v.credito_titular_ref, v.credito_cotitular_ref].filter(Boolean).join(' / ') || null,
         saldo: saldoPorVenta.get(v.id) ?? 0,
         estado: v.estado ?? 'activa',
       }))
