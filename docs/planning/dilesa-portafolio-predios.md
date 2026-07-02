@@ -7,7 +7,7 @@
 **Próximo hito:** arrancar S5 (subdivisiones/fusiones + ADR; piloto = relotificación del área verde)
 **Dueño:** Beto
 **Creada:** 2026-07-01
-**Última actualización:** 2026-07-02 (S1-S4 en prod; dale a #1177; parcelas corregidas a Nava)
+**Última actualización:** 2026-07-02 (S1-S4 + etiqueta + traspaso completo en prod)
 
 > **Sucede a** [`dilesa-portafolio-expediente`](dilesa-portafolio-expediente.md) (cerrada). El visor interactivo multi-capa (fraccionamientos, avances de urbanización/ventas sobre plano) sigue viviendo en la iniciativa hermana [`mapas-interactivos`](mapas-interactivos.md) — aquí solo el render del KMZ del activo.
 
@@ -87,3 +87,4 @@ El Portafolio se vuelve la fuente de verdad de **todos** los inmuebles DILESA co
   - **Checklist KMZ/escrituras** entregado a Beto (Excel, 118 predios, en Downloads).
   - **Excepciones de datos reportadas**: clave duplicada `0022220051` (Lomas del Sol #53/#57, se conservó una), `0301000042` (#39) sin montos ni marca PAGADO, montos idénticos sospechosos entre Deportivo RDB y Business Park #43 ($186,092.55/$273,090.82 — ¿copy-paste en el Excel?), folio 31066 repetido en 3 predios (folio de recibo, no identificador). **Pregunta abierta**: ¿el convenio 60% aplica también a las parcelas ejidales? (se cargaron sin convenio).
 - **2026-07-02 — Respuestas de Beto (mañana):** dale al #1177 (label `finanzas-ok`, mergea). Las parcelas ejidales están en el municipio de **Nava** (no Piedras Negras) — corrección de datos en migración `20260702131512` (25 activos / 27 cuentas → Nava; se asumió que los 2 ranchos del mismo Excel también son Nava — corregir si no). El convenio 60% es solo con Piedras Negras: las parcelas ya estaban sin convenio, sin cambios.
+- **2026-07-02 — Etiqueta + traspaso completo (#1182, dale de Beto):** `activos.etiqueta` (identificador corto en lista/expediente/form; las 14 casas que abusaban de `municipio` como descripción migraron a etiqueta con municipio real — L. Encinos=Nava, LDV/LDS=P. Negras). Traspaso unidad→activo completo: satélites casa/lote con calle/número oficial/esquina/frente verde; `fn_liberar_unidad_portafolio` v3 copia todo + zona (fraccionamiento) + dirección; backfill de las 29 traspasadas (verificado en prod: 23 casas con número, 7 esquinas, 9 frente verde, 29 con zona, 0 municipios sucios). Nota operativa: el out-of-order del `db-push-on-merge` con PRs gateados quedó documentado — task chip propuesto para `--include-all`.
