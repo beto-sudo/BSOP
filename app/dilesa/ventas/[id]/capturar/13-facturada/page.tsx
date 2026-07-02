@@ -42,6 +42,11 @@
  * aviso + cargar el acuse; la revisión con acuse completa el ciclo y solo
  * entonces se prende el cierre.
  *
+ * La revisión se ejecuta SOLA al subir el aviso, el acuse o una NC con
+ * revisión previa (decisión Beto 2026-07-01: nadie debe aterrizar en el
+ * override de Dirección solo porque faltó el click en "Re-ejecutar"; caso
+ * DIE2026-19). El botón manual queda como reintento si la corrida falla.
+ *
  * Enforcement: Fase 12 (Detonada) debe estar cerrada.
  * Acceso: `dilesa.ventas.fase13_facturada` (Contabilidad + Gerencia Ventas +
  * Dirección).
@@ -393,6 +398,44 @@ function CapturarFase13Body() {
     [depositos]
   );
 
+  // ── Revisión PLD (extracción IA + cruce contra el expediente) ────
+  const onRevisar = useCallback(async () => {
+    setRevisando(true);
+    try {
+      const res = await fetch(`/api/dilesa/ventas/${ventaId}/revision-pld`, { method: 'POST' });
+      const json = (await res.json()) as {
+        ok: boolean;
+        revision?: RevisionDto;
+        error?: string;
+      };
+      if (json.revision) setRevision(json.revision);
+      if (!res.ok || !json.ok) {
+        toast.add({
+          title: 'La revisión no pudo completarse',
+          description: json.error ?? 'Error desconocido.',
+          type: 'error',
+        });
+        return;
+      }
+      const v = json.revision?.veredicto;
+      toast.add({
+        title:
+          v === 'verde'
+            ? 'Revisión en verde — la operación cumple'
+            : v === 'advertencias'
+              ? 'Revisión con advertencias'
+              : 'Revisión en rojo',
+        description:
+          v === 'verde'
+            ? 'Todos los checks del Aviso PLD cuadran con el expediente.'
+            : 'Revisa el detalle de los checks marcados.',
+        type: v === 'verde' ? 'success' : 'info',
+      });
+    } finally {
+      setRevisando(false);
+    }
+  }, [ventaId, toast]);
+
   // ── Subir documento (persiste al instante; XML valida primero) ───
   const onPickDoc = useCallback(
     async (slot: SlotDef, file: File) => {
@@ -507,52 +550,35 @@ function CapturarFase13Body() {
           type: advertencias > 0 ? 'info' : 'success',
         });
         await cargarDocs();
-        // Un informe o acuse nuevos dejan la revisión anterior obsoleta.
-        if (slot.rol === 'aviso_pld' || slot.rol === 'acuse_pld') void cargarRevision();
+        // Un informe o acuse nuevos dejan la revisión anterior obsoleta →
+        // la revisión corre SOLA (el server reusa la extracción del informe
+        // cuando solo cambió el acuse — la 2a corrida no re-paga la visión).
+        // NC nueva con revisión previa: re-correr para que los checks de
+        // facturación tomen la versión vigente (si no, quedan stale).
+        if (
+          slot.rol === 'aviso_pld' ||
+          slot.rol === 'acuse_pld' ||
+          ((slot.rol === 'nota_credito_xml' || slot.rol === 'nota_credito') && revision != null)
+        ) {
+          void onRevisar();
+        }
       } finally {
         setSubiendoRol(null);
       }
     },
-    [sb, ventaId, userId, empresaRfc, clienteRfc, cfdiFactura, toast, cargarDocs, cargarRevision]
+    [
+      sb,
+      ventaId,
+      userId,
+      empresaRfc,
+      clienteRfc,
+      cfdiFactura,
+      toast,
+      cargarDocs,
+      revision,
+      onRevisar,
+    ]
   );
-
-  // ── Revisión PLD (extracción IA + cruce contra el expediente) ────
-  const onRevisar = useCallback(async () => {
-    setRevisando(true);
-    try {
-      const res = await fetch(`/api/dilesa/ventas/${ventaId}/revision-pld`, { method: 'POST' });
-      const json = (await res.json()) as {
-        ok: boolean;
-        revision?: RevisionDto;
-        error?: string;
-      };
-      if (json.revision) setRevision(json.revision);
-      if (!res.ok || !json.ok) {
-        toast.add({
-          title: 'La revisión no pudo completarse',
-          description: json.error ?? 'Error desconocido.',
-          type: 'error',
-        });
-        return;
-      }
-      const v = json.revision?.veredicto;
-      toast.add({
-        title:
-          v === 'verde'
-            ? 'Revisión en verde — la operación cumple'
-            : v === 'advertencias'
-              ? 'Revisión con advertencias'
-              : 'Revisión en rojo',
-        description:
-          v === 'verde'
-            ? 'Todos los checks del Aviso PLD cuadran con el expediente.'
-            : 'Revisa el detalle de los checks marcados.',
-        type: v === 'verde' ? 'success' : 'info',
-      });
-    } finally {
-      setRevisando(false);
-    }
-  }, [ventaId, toast]);
 
   // ── Cerrar fase (el gate real vive en el endpoint) ───────────────
   const faltantes = useMemo(
@@ -564,6 +590,11 @@ function CapturarFase13Body() {
     revision.vigente &&
     revision.estado === 'completada' &&
     revision.veredicto === 'verde';
+  // Una revisión no vigente puede serlo por dos razones distintas — el
+  // mensaje debe decir cuál: el AVISO cambió (re-revisar desde cero) o solo
+  // se cargó el ACUSE después de la corrida (re-ejecutar completa el ciclo).
+  const avisoCambio =
+    !!revision && !!docs?.aviso_pld && revision.adjuntoId !== docs.aviso_pld.vigente.id;
 
   const cerrar = useCallback(
     async (motivoOverride?: string) => {
@@ -773,12 +804,17 @@ function CapturarFase13Body() {
                 {!revision.vigente && !pasosPld.informeVerde ? (
                   <p className="flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    El Aviso PLD cambió después de esta revisión — re-ejecútala para que el cierre
-                    la tome en cuenta.
+                    {avisoCambio
+                      ? 'El Aviso PLD cambió después de esta revisión — re-ejecútala para que el cierre la tome en cuenta.'
+                      : 'El acuse se cargó después de esta revisión — re-ejecútala para completar el ciclo.'}
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <VeredictoBadge veredicto={revision.veredicto} estado={revision.estado} />
+                  <VeredictoBadge
+                    veredicto={revision.veredicto}
+                    estado={revision.estado}
+                    vigente={revision.vigente}
+                  />
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-[var(--text)]/55">
                       {revision.ejecutadoPorNombre
@@ -1006,7 +1042,9 @@ function CapturarFase13Body() {
               {revision
                 ? revision.vigente
                   ? `La revisión está en ${revision.veredicto}.`
-                  : 'El Aviso PLD cambió después de la última revisión.'
+                  : avisoCambio
+                    ? 'El Aviso PLD cambió después de la última revisión.'
+                    : 'El acuse se cargó después de la última revisión — re-ejecutarla completa el ciclo sin necesidad de este override.'
                 : 'La operación no tiene revisión PLD.'}{' '}
               El cierre quedará registrado en la bitácora como autorizado por Dirección, con tu
               motivo.
@@ -1038,14 +1076,26 @@ function CapturarFase13Body() {
 function VeredictoBadge({
   veredicto,
   estado,
+  vigente,
 }: {
   veredicto: VeredictoRevision;
   estado: 'completada' | 'error';
+  /** false = el expediente cambió tras la corrida; el veredicto ya no manda. */
+  vigente: boolean;
 }) {
   if (estado === 'error') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800 dark:bg-red-950/40 dark:text-red-200">
         <XCircle className="h-3.5 w-3.5" /> Revisión fallida
+      </span>
+    );
+  }
+  if (!vigente) {
+    // Sin esto, un veredicto verde de una corrida vieja gritaba "listo para
+    // cerrar" mientras el gate pedía re-ejecutar (caso DIE2026-19).
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <AlertTriangle className="h-3.5 w-3.5" /> Desactualizada — re-ejecuta la revisión
       </span>
     );
   }
