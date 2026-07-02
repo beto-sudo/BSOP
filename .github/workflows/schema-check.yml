@@ -41,7 +41,7 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           if [ -z "$BASE" ]; then BASE="HEAD~1"; fi
           if git diff --name-only "$BASE" HEAD \
-            | grep -qE '^supabase/migrations/|^supabase/SCHEMA_REF\.md|^\.github/workflows/schema-check\.yml|^scripts/gen-schema-ref\.ts'; then
+            | grep -qE '^supabase/migrations/|^supabase/SCHEMA_REF\.md|^supabase/FUNCTIONS_REF\.md|^\.github/workflows/schema-check\.yml|^scripts/gen-schema-ref\.ts|^scripts/gen-functions-ref\.ts'; then
             echo "db_touched=true" >> "$GITHUB_OUTPUT"
             echo "El PR toca DB/schema → se valida contra la shadow."
           else
@@ -82,6 +82,7 @@ jobs:
           SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: |
           npm run schema:ref
+          npm run functions:ref
           npm run db:types
 
       # Sube los derivados regenerados desde la shadow para poder commitearlos si
@@ -94,6 +95,7 @@ jobs:
           name: derivados-shadow
           path: |
             supabase/SCHEMA_REF.md
+            supabase/FUNCTIONS_REF.md
             types/supabase.ts
           retention-days: 3
 
@@ -107,5 +109,21 @@ jobs:
             echo "::error::SCHEMA_REF.md NO coincide con el schema de las migraciones."
             echo "Descargá el artifact 'derivados-shadow' de este run y commitealo,"
             echo "o regenerá local: supabase start && npm run db:regen (ver GOVERNANCE.md §3)."
+            exit 1
+          fi
+
+      - name: Comparar FUNCTIONS_REF con el commiteado (drift-guard de funciones)
+        if: steps.changes.outputs.db_touched == 'true'
+        run: |
+          # Blindaje-financiero S1: si una migración redefine una función y el
+          # snapshot no se regeneró, o la redefinición partió de una versión
+          # vieja del cuerpo (clase del incidente FIFO), este diff lo detecta.
+          if git diff --exit-code -I '^  Last regenerated: ' supabase/FUNCTIONS_REF.md; then
+            echo "✓ FUNCTIONS_REF.md coincide con las funciones que producen las migraciones."
+          else
+            echo "::error::FUNCTIONS_REF.md NO coincide con las funciones de las migraciones."
+            echo "Toda redefinición debe partir del cuerpo en FUNCTIONS_REF.md (nunca de la"
+            echo "migración anterior). Regenerá: supabase start && npm run db:regen, o bajá"
+            echo "el artifact 'derivados-shadow' y commitealo (ver GOVERNANCE.md §3)."
             exit 1
           fi

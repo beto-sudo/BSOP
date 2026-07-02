@@ -204,10 +204,15 @@ header — restaurar antes de mergear.
 
 - Consultar `supabase/SCHEMA_REF.md` para nombres exactos de tablas/columnas.
   Las columnas date/timestamp vienen en UTC → parsear con timezone.
+- **Redefinir una función SQL (`CREATE OR REPLACE`) = partir del cuerpo en
+  `supabase/FUNCTIONS_REF.md`** (fuente canónica de la definición viva +
+  triggers + CHECKs; blindaje-financiero S1) — **nunca** de la migración
+  anterior (clase del incidente FIFO). El drift-guard de `schema-check.yml`
+  falla el PR si el snapshot no se regenera junto con la migración.
 - **Tras tocar `supabase/migrations/`**, regenerar los derivados **desde la
   shadow DB** (no contra prod) antes de commitear: `supabase start && npm run
-db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
-  requiere Docker). CI lo valida con el workflow `schema-check.yml` (levanta la
+db:regen` (regenera `SCHEMA_REF.md` + `FUNCTIONS_REF.md` + `types/supabase.ts`
+  desde las migraciones; requiere Docker). CI lo valida con el workflow `schema-check.yml` (levanta la
   shadow, regenera y compara) — determinista por rama, sin depender de prod ni
   del secret `SUPABASE_DB_URL`, y que prod esté adelantado deja de romper PRs
   ajenos. Ver `supabase/GOVERNANCE.md` §3. (Modelo `derivados-sin-drift`: las
