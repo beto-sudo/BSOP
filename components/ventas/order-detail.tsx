@@ -12,6 +12,7 @@ import { useTriggerPrint } from '@/components/print';
 
 import type { Pedido } from './types';
 import { formatCurrency, formatDate, statusVariant } from './utils';
+import { ventaCobrada } from './venta-cobrada';
 
 export function OrderDetail({
   pedido,
@@ -54,7 +55,7 @@ export function OrderDetail({
       <DetailDrawerContent>
         <div className="flex items-center justify-between">
           <Badge variant={statusVariant(pedido.status)}>{pedido.status ?? 'Sin estado'}</Badge>
-          <span className="text-lg font-semibold">{formatCurrency(pedido.total_amount)}</span>
+          <span className="text-lg font-semibold">{formatCurrency(ventaCobrada(pedido))}</span>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
@@ -84,8 +85,7 @@ export function OrderDetail({
           )}
         </div>
         {(() => {
-          const realDiscount =
-            (pedido.total_amount ?? 0) - (pedido.total_discount ?? pedido.total_amount ?? 0);
+          const realDiscount = (pedido.total_amount ?? 0) - ventaCobrada(pedido);
           const hasDiscount = realDiscount > 0.01;
           const hasService = (pedido.service_charge ?? 0) > 0;
           const hasTax = (pedido.tax ?? 0) > 0;

@@ -6,6 +6,7 @@ import { DataTable, type Column } from '@/components/module-page';
 import { formatCurrency, formatDate } from '@/lib/format';
 import type { Pedido } from './types';
 import { statusVariant } from './utils';
+import { ventaCobrada } from './venta-cobrada';
 
 const columns: Column<Pedido>[] = [
   {
@@ -51,11 +52,30 @@ const columns: Column<Pedido>[] = [
     render: (p) => p.table_name || '-',
   },
   {
+    // Venta cobrada (post-descuento) — la misma cifra que suman los tabs
+    // Por producto / Por categoría, para que los reportes cuadren entre sí.
     key: 'total_amount',
     label: 'Total',
     type: 'currency',
     cellClassName: 'font-medium',
-    render: (p) => formatCurrency(p.total_amount),
+    accessor: (p) => ventaCobrada(p),
+    render: (p) => {
+      const cobrado = ventaCobrada(p);
+      const lista = p.total_amount ?? 0;
+      return lista > cobrado + 0.01 ? (
+        <span
+          className="inline-flex flex-col items-end leading-tight"
+          title={`Precio de lista ${formatCurrency(lista)} — descuento de ${formatCurrency(lista - cobrado)}`}
+        >
+          <span>{formatCurrency(cobrado)}</span>
+          <span className="text-[11px] font-normal text-muted-foreground line-through">
+            {formatCurrency(lista)}
+          </span>
+        </span>
+      ) : (
+        formatCurrency(cobrado)
+      );
+    },
   },
   {
     key: 'status',
