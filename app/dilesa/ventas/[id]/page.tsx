@@ -29,6 +29,7 @@ import {
   MovimientosAdministrativos,
 } from '@/components/dilesa/venta-detalle/ui';
 import { fmtMoney } from '@/components/dilesa/venta-detalle/types';
+import { DescuentoValorBaseCard } from '@/components/dilesa/venta-detalle/descuento-valor-base-card';
 
 export default function VentaOperacionPage() {
   return (
@@ -238,6 +239,7 @@ function OperacionBody() {
             )}
           </div>
         ) : null}
+        <DescuentoValorBaseCard />
         {(venta.descuento_valor_base ?? 0) > 0 && venta.descuento_valor_base_detalle ? (
           <div className="mt-4 border-t border-[var(--border)] pt-4">
             <div className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
