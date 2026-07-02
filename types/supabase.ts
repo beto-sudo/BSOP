@@ -15611,6 +15611,7 @@ export type Database = {
           estacion_id: string
           estado: string
           id: string
+          notas: string | null
           playtomic_folio: string | null
           subtotal: number
           tipo_venta: string
@@ -15632,6 +15633,7 @@ export type Database = {
           estacion_id: string
           estado?: string
           id?: string
+          notas?: string | null
           playtomic_folio?: string | null
           subtotal?: number
           tipo_venta?: string
@@ -15653,6 +15655,7 @@ export type Database = {
           estacion_id?: string
           estado?: string
           id?: string
+          notas?: string | null
           playtomic_folio?: string | null
           subtotal?: number
           tipo_venta?: string
@@ -17092,6 +17095,15 @@ export type Database = {
           p_cuenta_id: string
           p_pin: string
           p_ubicacion: string
+        }
+        Returns: undefined
+      }
+      fn_pos_nota_cuenta: {
+        Args: {
+          p_client_action_id: string
+          p_cuenta_id: string
+          p_nota: string
+          p_pin: string
         }
         Returns: undefined
       }

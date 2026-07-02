@@ -32,6 +32,7 @@ export type CuentaAbierta = {
   tipo_venta: string;
   total: number;
   abierta_at: string;
+  notas: string | null;
 };
 
 export type ItemCuenta = {
@@ -49,6 +50,7 @@ export type CartLine = {
   cantidad: number;
   descuentoPct: number;
   descuentoRazon?: string;
+  notas?: string; // "sin pepinillos, sin mayonesa" — viaja al KDS
 };
 
 export type PagoInput = {
@@ -138,7 +140,7 @@ export async function fetchCuentasAbiertas(): Promise<CuentaAbierta[]> {
   const { data, error } = await supabase()
     .schema('rdb')
     .from('pos_cuentas')
-    .select('id, ubicacion, estado, tipo_venta, total, abierta_at')
+    .select('id, ubicacion, estado, tipo_venta, total, abierta_at, notas')
     .eq('empresa_id', RDB_EMPRESA_ID)
     .in('estado', ['abierta', 'en_cobro'])
     .order('abierta_at', { ascending: true });
@@ -200,6 +202,7 @@ export async function rpcAgregarRonda(args: {
         cantidad: l.cantidad,
         descuento_pct: l.descuentoPct || undefined,
         descuento_razon: l.descuentoRazon || undefined,
+        notas: l.notas || undefined,
       })),
       p_pin_autorizador: args.pinAutorizador ?? undefined,
     });
@@ -277,6 +280,21 @@ export async function rpcCancelarCuenta(args: {
       p_client_action_id: args.clientActionId,
       p_pin_autorizador: args.pinAutorizador ?? undefined,
     });
+  if (error) throw error;
+}
+
+export async function rpcNotaCuenta(args: {
+  cuentaId: string;
+  pin: string;
+  nota: string;
+  clientActionId: string;
+}): Promise<void> {
+  const { error } = await supabase().schema('rdb').rpc('fn_pos_nota_cuenta', {
+    p_cuenta_id: args.cuentaId,
+    p_pin: args.pin,
+    p_nota: args.nota,
+    p_client_action_id: args.clientActionId,
+  });
   if (error) throw error;
 }
 
