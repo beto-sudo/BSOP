@@ -75,7 +75,7 @@ una iniciativa, vive en su `## Decisiones registradas`.
 
 > Un PR no está "listo" hasta que CI pase verde. No reportar entregado antes.
 
-### Antes de `git push` — correr los 6 checks de CI
+### Antes de `git push` — correr los 8 checks de CI
 
 **Sobre todo el repo, no solo los archivos tocados**, en este orden (espejo de
 `.github/workflows/ci.yml`; si CI cambia, actualizar esta lista):
@@ -86,7 +86,13 @@ npm run test:coverage     # vitest + coverage thresholds — `test:run` NO basta
                           # puede pasar local y CI fallar por coverage
 npm run lint              # eslint .
 npm run format:check      # prettier --check . (¡todo el repo!)
+npm run audit:ui          # consistencia UI — informativo en CI (continue-on-error:
+                          # hay 12 criticals preexistentes de heurística); leer el
+                          # reporte, no bloquea
 npm run initiatives:check # tabla Activas de INITIATIVES.md en sync con docs/planning/
+npm run build             # next build — CI lo corre en job `build` paralelo; atrapa
+                          # errores de prerender/imports que typecheck no ve. Si el
+                          # PR es docs-puro puede saltarse local (CI lo corre igual)
 npm run schema:check      # SCHEMA_REF.md vs DB prod — requiere SUPABASE_DB_URL
                           # (op read "op://Infrastructure/SUPABASE_DB_URL/credential");
                           # si no tocaste DB puede saltarse: CI lo corre igual
