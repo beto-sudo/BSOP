@@ -41,6 +41,9 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // Portafolio es un hub con 2 tabs (Inventario / Evaluación) — ADR-030.
   '/dilesa/portafolio': 'dilesa.portafolio.inventario',
   '/dilesa/portafolio/evaluacion': 'dilesa.portafolio.evaluacion',
+  // Expediente full-page del activo (dilesa-portafolio-predios S2): drill-down
+  // de la lista, comparte el sub-slug del tab Inventario.
+  '/dilesa/portafolio/activo/[id]': 'dilesa.portafolio.inventario',
   // Proyectos es un hub con 2 tabs (Activos / Anteproyectos) — iniciativa
   // `dilesa-proyectos-anteproyectos` Sprint 1. El padre `dilesa.proyectos`
   // queda como umbrella; cada tab tiene su sub-slug (ADR-030 SS2). La URL
