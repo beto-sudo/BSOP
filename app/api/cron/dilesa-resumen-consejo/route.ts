@@ -159,6 +159,7 @@ export async function GET(req: NextRequest) {
     ),
     escrituras_mes_n: data.asignaciones.reduce((s, a) => s + a.escrituras_mes, 0),
     escrituras_mes_monto: data.asignaciones.reduce((s, a) => s + a.monto_escrituras, 0),
+    escrituras_hoy_fechas_reales: data.escrituras_hoy_fechas_reales,
     cxp_por_pagar: (cxpRes.data ?? []).reduce(
       (s: number, p: { monto_total: number | null }) => s + Number(p.monto_total ?? 0),
       0

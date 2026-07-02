@@ -7,7 +7,7 @@
 **Próximo hito:** Sprint 5 — cutover + closeout (smoke E2E lado a lado + revisar preview con Beto + cerrar iniciativa). Sprint 4 (absorción + meses de inventario + backlog de escrituración) en preview de revisión de Beto.
 **Dueño:** Beto
 **Creada:** 2026-06-13
-**Última actualización:** 2026-06-19 (fix del pipeline vivo: valor de escrituración con fallback a precio_asignación en fases previas a Dictaminada — antes salía $0 en Asignada/Formalizada)
+**Última actualización:** 2026-07-01 (base híbrida de escrituras: mes por fecha_escritura, tile «registradas hoy» con nota de fechas reales)
 
 > **Continuación de** [`dilesa-resumen-consejo`](dilesa-resumen-consejo.md) (cerrada 2026-06-08, v1 = paridad 1:1 con Coda). Aquella es la **referencia técnica** del correo (7 bloques, vistas, cron, guard de domingo, fechas DST). Esta iniciativa es la **Fase 2** que aquel doc dejó anotada: pasar de "réplica de Coda" a un reporte que el Consejo espere a diario.
 
@@ -140,6 +140,21 @@ Bloque "⚠️ Requiere atención" que **solo aparece si dispara algo** (cero al
 - 100% de envíos trazables en `core.notification_log` (heredado de v1).
 
 ## Bitácora
+
+- **2026-07-01 (base híbrida de escrituras — registro vs fecha real)** — En el
+  primer correo tras el fix de TZ (iniciativa `fechas-tz`), Beto notó "7
+  escrituras hoy" que se REGISTRARON hoy pero cuyas escrituras reales son de
+  junio (y 2 con `fecha_escritura` futura, 25/27-jul — firmas programadas o
+  error de captura, se revisan aparte). Regla de Beto: **los reportes siempre
+  cuentan por la fecha de la escritura, no la del registro** (alineado con el
+  módulo de Reportes, #1140). Decisión (opción híbrida, elegida por Beto):
+  el **mes** (tile, tabla por prototipo y asunto) se cuenta por
+  `ventas.fecha_escritura` en [inicio de mes, hoy] — las futuras aún no
+  cuentan; el tile **"hoy" pasa a "Escrituras registradas hoy"** (pulso
+  operativo, única forma de que el consejo vea registros tardíos de meses ya
+  cerrados) con nota "f. reales: …" cuando difieren, y el asunto dice
+  "N escrituras registradas". Asignaciones siguen por fase 2 (evento interno,
+  su fecha es la real).
 
 - **2026-06-19 (fix del pipeline vivo — valor desde la asignación)** — Beto notó que
   en el correo las primeras fases (Solicitud de Asignación, Asignada) y parte de
