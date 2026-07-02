@@ -20,8 +20,9 @@ const TIPO_LABEL: Record<string, string> = {
   edificio: 'Edificio',
   nave: 'Nave industrial',
   departamento: 'Departamento',
-  espectacular: 'Espectacular',
-  unipolar: 'Unipolar',
+  espectacular: 'Espacio publicitario',
+  unipolar: 'Espacio publicitario',
+  espacio_publicitario: 'Espacio publicitario',
 };
 
 function money(v: number): string {

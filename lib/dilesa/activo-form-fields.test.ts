@@ -11,7 +11,10 @@ import {
 describe('getSateliteFields', () => {
   it('devuelve los campos del satélite para tipos soportados', () => {
     expect(getSateliteFields('terreno').length).toBeGreaterThan(0);
-    expect(getSateliteFields('espectacular').some((f) => f.key === 'renta_mensual')).toBe(true);
+    expect(getSateliteFields('espacio_publicitario').some((f) => f.key === 'renta_mensual')).toBe(
+      true
+    );
+    expect(getSateliteFields('espacio_publicitario').some((f) => f.key === 'subtipo')).toBe(true);
     expect(getSateliteFields('terreno').some((f) => f.key === 'precio_solicitado_m2')).toBe(true);
   });
 

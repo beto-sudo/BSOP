@@ -108,7 +108,7 @@ export function ArrendamientoCaptureDialog({
         .in('destino_id', destinoIds)
         // Excluye el espectacular/unipolar PADRE: se renta por cara (tipo='cara',
         // activo hijo). El dropdown muestra las caras + el resto de hojas rentables.
-        .not('tipo', 'in', '(espectacular,unipolar)')
+        .not('tipo', 'in', '(espectacular,unipolar,espacio_publicitario)')
         .is('deleted_at', null)
         .order('nombre');
       act = (activosData ?? []) as ActivoRentable[];

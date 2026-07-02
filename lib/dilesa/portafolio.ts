@@ -145,3 +145,25 @@ export function computeTerrenoSnapshot(input: {
       : null;
   return { aprovechableM2, valorSolicitado, valorOfertado, precioM2Aprovechable, brechaPct };
 }
+
+/**
+ * Labels de TODOS los tipos de activo del master (CHECK de dilesa.activos),
+ * para listas/expediente/PDFs. `ACTIVO_TIPO_LABEL` (arriba) solo cubre los
+ * tipos liberables desde inventario de ventas.
+ */
+export const TIPO_ACTIVO_LABEL_FULL: Record<string, string> = {
+  terreno: 'Terreno',
+  espacio_publicitario: 'Espacio publicitario',
+  casa: 'Casa',
+  local: 'Local',
+  plaza: 'Plaza',
+  edificio: 'Edificio',
+  nave: 'Nave industrial',
+  departamento: 'Departamento',
+  lote: 'Lote',
+  infraestructura: 'Infraestructura',
+  cara: 'Cara publicitaria',
+  // Legacy en retiro (0 filas tras la migración de 2026-07-02):
+  espectacular: 'Espacio publicitario',
+  unipolar: 'Espacio publicitario',
+};

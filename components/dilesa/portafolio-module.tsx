@@ -16,12 +16,22 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
-import { Building2, Plus, RefreshCw, Search, Sparkles, Tags } from 'lucide-react';
+import {
+  Building2,
+  Download,
+  FileText,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Tags,
+} from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
 import { DestinosCatalogoDialog } from '@/components/dilesa/destinos-catalogo-dialog';
 import { EscriturasMatchingDialog } from '@/components/dilesa/escrituras-matching-dialog';
 import { useEffectiveUser } from '@/components/providers';
+import { TIPO_ACTIVO_LABEL_FULL as TIPO_LABEL } from '@/lib/dilesa/portafolio';
 
 type Activo = {
   id: string;
@@ -36,20 +46,6 @@ type Activo = {
   activo_padre_id: string | null;
   destino_id: string | null;
   destino: { label: string } | null;
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  terreno: 'Terreno',
-  espectacular: 'Espectacular',
-  unipolar: 'Unipolar',
-  casa: 'Casa',
-  local: 'Local',
-  plaza: 'Plaza',
-  edificio: 'Edificio',
-  nave: 'Nave',
-  departamento: 'Departamento',
-  lote: 'Lote',
-  infraestructura: 'Infraestructura',
 };
 
 const ESTADO_TONE: Record<string, BadgeTone> = {
@@ -190,6 +186,57 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
     () => Array.from(new Set(activos.map((a) => a.estado))).sort(),
     [activos]
   );
+
+  function exportarCsv() {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const filas = filtrados.map((a) =>
+      [
+        a.nombre,
+        TIPO_LABEL[a.tipo] ?? a.tipo,
+        ESTADO_LABEL[a.estado] ?? a.estado,
+        a.etiqueta ?? '',
+        a.destino?.label ?? '',
+        a.zona ?? '',
+        a.municipio ?? '',
+        a.area_m2 ?? '',
+        a.valor_estimado ?? '',
+      ]
+        .map(esc)
+        .join(',')
+    );
+    const csv = [
+      [
+        'Nombre',
+        'Tipo',
+        'Estado',
+        'Etiqueta',
+        'Destino',
+        'Zona',
+        'Municipio',
+        'Área m²',
+        'Valor estimado',
+      ]
+        .map(esc)
+        .join(','),
+      ...filas,
+    ].join('\n');
+    // BOM para que Excel abra UTF-8 (acentos) sin pelear.
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'portafolio-dilesa.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const pdfHref = `/api/dilesa/portafolio/pdf?${new URLSearchParams({
+    ...(tipoFiltro ? { tipo: tipoFiltro } : {}),
+    ...(estadoFiltro ? { estado: estadoFiltro } : {}),
+    ...(destinoFiltro ? { destino: destinoFiltro } : {}),
+    ...(municipioFiltro ? { municipio: municipioFiltro } : {}),
+    ...(zonaFiltro ? { zona: zonaFiltro } : {}),
+    ...(search.trim() ? { q: search.trim() } : {}),
+  }).toString()}`;
 
   const columns: Column<Activo>[] = [
     { key: 'nombre', label: 'Nombre', type: 'text', sticky: true, width: 'min-w-[220px]' },
@@ -342,6 +389,23 @@ export function PortafolioModule({ empresaId }: { empresaId: string }) {
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
+        </button>
+        <a
+          href={pdfHref}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          PDF
+        </a>
+        <button
+          type="button"
+          onClick={exportarCsv}
+          className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+        >
+          <Download className="h-3.5 w-3.5" />
+          CSV
         </button>
         {puedeAdmin ? (
           <div className="ml-auto flex items-center gap-2">
