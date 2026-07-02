@@ -214,6 +214,16 @@ db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
   migraciones son la fuente de verdad del schema; el `schema:check` viejo contra
   prod se retiró del job `quality`.)
 
+### Migración primero, UI después (previews funcionales)
+
+El Vercel Preview apunta a la base de **prod** y las migraciones se aplican **al
+mergear** → un preview cuya UI depende de schema nuevo nunca funciona antes del
+merge. Norma (2026-07-01): si la feature de UI depende de una migración,
+**separar en dos PRs** — primero el PR de la migración (mergea y aplica el schema
+a prod; DDL aditivo sin UI no rompe nada), después el PR de UI, cuyo preview ya
+corre contra el schema real. No aplica si la UI no necesita el schema nuevo para
+renderear. Detalle en `supabase/GOVERNANCE.md` §4.
+
 ### Aplicar migración por MCP → registrar de una vez (anti-drift del ledger)
 
 > Norma 2026-06-17 (Beto): cortar de raíz el drift del historial de migraciones.
@@ -221,9 +231,11 @@ db:regen` (regenera `SCHEMA_REF.md` + `types/supabase.ts` desde las migraciones;
 > **⚠️ MODELO CAMBIADO (`derivados-sin-drift` S3).** El flujo normal ya **no** es
 > aplicar-por-MCP-y-reconciliar. Las migraciones se aplican a prod **al mergear**,
 > automáticamente, vía `db-push-on-merge.yml` (`supabase db push`) — **nunca por
-> MCP ni antes de mergear** (ver `supabase/GOVERNANCE.md` §4 + gate financiero D5:
-> en financieras CC avisa a Beto en el chat con resumen+riesgos y, tras su **"dale"**,
-> CC pone el label `finanzas-ok` y mergea — nunca sin ese OK). En operación
+> MCP ni antes de mergear** (ver `supabase/GOVERNANCE.md` §4 + gate financiero D5,
+> dos niveles desde 2026-07-01: financiera **aditiva** = auto-merge con aviso en el
+> chat; financiera **de riesgo** — DML/backfill de montos/destructivo/permisos — =
+> CC avisa con resumen+riesgos y, tras el **"dale"** de Beto, pone el label
+> `finanzas-ok` y mergea — nunca sin ese OK). En operación
 > normal **no toques el ledger**: `db push` lo registra con el timestamp del
 > archivo. Lo de abajo aplica SOLO al **hotfix de emergencia por `psql` directo**
 > (raro) — ahí sí reconciliá el ledger en la misma sesión.

@@ -109,19 +109,46 @@ el timestamp del archivo; muere el baile de `migration repair`).
 
 ### Gate financiero (D5) — confirmación explícita de Dirección en el chat
 
+Dos niveles (recalibración 2026-07-01 — antes todo lo financiero bloqueaba y el
+volumen de aprobaciones triviales convertía el gate en teatro; el universo de
+"espera OK" se recortó a lo que genuinamente puede costar dinero o abrir permisos):
+
 - **No-financieras** → auto-merge → al mergear, `db-push-on-merge.yml` las aplica.
   CC hace todo de punta a punta; Beto no interviene ni tiene que acordarse de nada.
-- **Financieras** (mueven dinero o permisos) → el check `financial-migration-guard`
-  las detecta y **bloquea el auto-merge**. Flujo (norma Beto 2026-06-27):
-  1. CC corre el clasificador al crear la migración; si es financiera, **avisa a Beto
-     en el chat** con el resumen + riesgos (no espera a que él se acuerde).
+- **Financieras ADITIVAS (`notify`)** — superficie financiera pero solo DDL aditivo
+  (CREATE TABLE, ADD COLUMN, índices, funciones **nuevas** con `CREATE FUNCTION`
+  sin OR REPLACE) → **auto-merge**. CC **avisa a Beto en el chat** con el resumen,
+  sin esperar OK. Reversible y no mueve dinero.
+- **Financieras de RIESGO (`block`)** — DML sobre tablas financieras, backfills de
+  columnas de montos, DROP/TRUNCATE/ALTER destructivo sobre superficie financiera,
+  `CREATE OR REPLACE`/`DROP` de RPCs financieras existentes, GRANT/REVOKE fuera
+  del boilerplate (el hardening `REVOKE … FROM PUBLIC/anon` no cuenta), RLS
+  deshabilitado o policies mutadas/expuestas a anon → el check
+  `financial-migration-guard` **bloquea el auto-merge**. Flujo (norma Beto
+  2026-06-27):
+  1. CC corre el clasificador al crear la migración; si es de riesgo, **avisa a
+     Beto en el chat** con el resumen + riesgos (no espera a que él se acuerde).
   2. Beto da el **OK verbal explícito** para ESA migración ("dale").
   3. Recién entonces CC pone el label `finanzas-ok` y mergea (lo que la aplica a prod).
 
   **CC NUNCA pone `finanzas-ok` sin el "dale" de Beto para esa migración específica.**
   El "dale" en el chat es la confirmación explícita que exige el control financiero; el
   bloqueo técnico (sin label no hay auto-merge) es la red de seguridad que evita que una
-  financiera se cuele a prod sin pasar por ese OK.
+  financiera de riesgo se cuele a prod sin pasar por ese OK.
+
+  Convención derivada: una RPC financiera **nueva** se escribe con `CREATE FUNCTION`
+  (sin `OR REPLACE`) para clasificar como aditiva; `CREATE OR REPLACE` sobre una fn
+  financiera se lee como redefinición de algo vivo y bloquea.
+
+### Migración primero, UI después (previews funcionales)
+
+El Vercel Preview apunta a la base de **prod**, y las migraciones se aplican **al
+mergear** — un preview cuya UI depende de schema nuevo NUNCA funciona antes del
+merge, con o sin gate. La norma (2026-07-01): cuando una feature de UI depende de
+una migración, **separar en dos PRs** — el PR de la migración mergea primero
+(schema aplicado a prod en ~2 min; para DDL aditivo es seguro: schema nuevo sin UI
+no rompe nada), y el PR de UI se abre después con su preview funcionando contra el
+schema real. No aplica cuando la UI no necesita el schema nuevo para renderear.
 
 ### Procedimiento normal
 
