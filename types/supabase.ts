@@ -2319,6 +2319,7 @@ export type Database = {
           tipo: string
           updated_at: string
           valor_estimado: number | null
+          zona: string | null
         }
         Insert: {
           activo_padre_id?: string | null
@@ -2345,6 +2346,7 @@ export type Database = {
           tipo: string
           updated_at?: string
           valor_estimado?: number | null
+          zona?: string | null
         }
         Update: {
           activo_padre_id?: string | null
@@ -2371,6 +2373,7 @@ export type Database = {
           tipo?: string
           updated_at?: string
           valor_estimado?: number | null
+          zona?: string | null
         }
         Relationships: [
           {
@@ -2860,6 +2863,59 @@ export type Database = {
             columns: ["proyecto_id"]
             isOneToOne: false
             referencedRelation: "v_ruv_proyectos_disponibles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cuentas_prediales: {
+        Row: {
+          activo_id: string | null
+          clave_catastral: string
+          created_at: string
+          deleted_at: string | null
+          empresa_id: string
+          estatus: string
+          folio: string | null
+          id: string
+          municipio: string | null
+          notas: string | null
+          superficie_fiscal_m2: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo_id?: string | null
+          clave_catastral: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id: string
+          estatus?: string
+          folio?: string | null
+          id?: string
+          municipio?: string | null
+          notas?: string | null
+          superficie_fiscal_m2?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo_id?: string | null
+          clave_catastral?: string
+          created_at?: string
+          deleted_at?: string | null
+          empresa_id?: string
+          estatus?: string
+          folio?: string | null
+          id?: string
+          municipio?: string | null
+          notas?: string | null
+          superficie_fiscal_m2?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuentas_prediales_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
             referencedColumns: ["id"]
           },
         ]
@@ -3753,6 +3809,126 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      prediales_convenios: {
+        Row: {
+          contraprestacion: string | null
+          created_at: string
+          descuento_pct: number
+          ejercicio_desde: number
+          ejercicio_hasta: number
+          empresa_id: string
+          estado: string
+          id: string
+          nombre: string
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          contraprestacion?: string | null
+          created_at?: string
+          descuento_pct?: number
+          ejercicio_desde: number
+          ejercicio_hasta: number
+          empresa_id: string
+          estado?: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contraprestacion?: string | null
+          created_at?: string
+          descuento_pct?: number
+          ejercicio_desde?: number
+          ejercicio_hasta?: number
+          empresa_id?: string
+          estado?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      prediales_ejercicios: {
+        Row: {
+          aseo: number | null
+          bomberos: number | null
+          convenio_id: string | null
+          created_at: string
+          cuenta_id: string
+          ejercicio: number
+          empresa_id: string
+          estado: string
+          fecha_pago: string | null
+          id: string
+          monto_pagado: number | null
+          notas: string | null
+          pagado_por: string | null
+          predial: number | null
+          recargos: number | null
+          recargos_aseo: number | null
+          recargos_bomberos: number | null
+          updated_at: string
+        }
+        Insert: {
+          aseo?: number | null
+          bomberos?: number | null
+          convenio_id?: string | null
+          created_at?: string
+          cuenta_id: string
+          ejercicio: number
+          empresa_id: string
+          estado?: string
+          fecha_pago?: string | null
+          id?: string
+          monto_pagado?: number | null
+          notas?: string | null
+          pagado_por?: string | null
+          predial?: number | null
+          recargos?: number | null
+          recargos_aseo?: number | null
+          recargos_bomberos?: number | null
+          updated_at?: string
+        }
+        Update: {
+          aseo?: number | null
+          bomberos?: number | null
+          convenio_id?: string | null
+          created_at?: string
+          cuenta_id?: string
+          ejercicio?: number
+          empresa_id?: string
+          estado?: string
+          fecha_pago?: string | null
+          id?: string
+          monto_pagado?: number | null
+          notas?: string | null
+          pagado_por?: string | null
+          predial?: number | null
+          recargos?: number | null
+          recargos_aseo?: number | null
+          recargos_bomberos?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediales_ejercicios_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "prediales_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prediales_ejercicios_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_prediales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       productos: {
         Row: {
@@ -7093,6 +7269,10 @@ export type Database = {
       }
       fn_regresar_unidad_proyecto: {
         Args: { p_unidad_id: string }
+        Returns: undefined
+      }
+      fn_sync_detonacion_desde_cxc: {
+        Args: { p_venta_id: string }
         Returns: undefined
       }
       fn_tarea_terminada_esta_pagada: {
