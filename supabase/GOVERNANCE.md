@@ -101,11 +101,30 @@ necesitás Docker** — en el modelo nuevo ya no hay atajo contra prod.
 
 **Regla dura (modelo `derivados-sin-drift` S3):** las migraciones se aplican a
 prod **al mergear el PR a `main`**, automáticamente, vía el workflow
-`db-push-on-merge.yml` (`supabase db push`). **No** se aplican antes de mergear,
-**ni** por `mcp__supabase__apply_migration`, **ni** con `psql`/`db push` manual a
-prod. Una sola vía. Así prod nunca se adelanta a `main` (muere el drift de
-SCHEMA_REF que rompía PRs ajenos) y el ledger no deriva (`db push` registra con
-el timestamp del archivo; muere el baile de `migration repair`).
+`db-push-on-merge.yml` (`supabase db push --include-all`). **No** se aplican
+antes de mergear, **ni** por `mcp__supabase__apply_migration`, **ni** con
+`psql`/`db push` manual a prod. Una sola vía. Así prod nunca se adelanta a
+`main` (muere el drift de SCHEMA_REF que rompía PRs ajenos) y el ledger no
+deriva (`db push` registra con el timestamp del archivo; muere el baile de
+`migration repair`).
+
+### Out-of-order: `--include-all` (norma 2026-07-02)
+
+Un PR con migración puede quedar detenido (típicamente esperando el label
+`finanzas-ok` del gate D5) mientras otros PRs con timestamps **posteriores**
+mergean y se aplican. Al mergear el detenido, su migración queda out-of-order
+(timestamp < último aplicado en prod) y `supabase db push` a secas la rechaza:
+`Found local migration files to be inserted before the last migration on
+remote database` (caso real: PR #1177, migración `20260702033009`, 2026-07-02).
+
+Por eso el workflow corre **siempre** con `--include-all`. Es seguro en este
+modelo porque el invariante es que **todo** archivo en `supabase/migrations/`
+de `main` termina aplicado (ledger 1:1, sin "archivos viejos intencionalmente
+sin aplicar") y ya pasó el schema-check en shadow. Matiz asumido: la migración
+rezagada se ejecuta en prod **después** de las de timestamp posterior (orden
+distinto al de la shadow, que aplica por timestamp). Riesgo bajo — las que
+mergearon antes no pueden depender de la detenida — y si conflictúa, `db push`
+falla ruidoso igual que cualquier SQL inválido.
 
 ### Gate financiero (D5) — confirmación explícita de Dirección en el chat
 

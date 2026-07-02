@@ -10,8 +10,19 @@ name: DB Push on Merge
 #     aplican solas aquí); financieras las mergea Dirección a mano tras el
 #     `financial-migration-guard` (el merge es la confirmación explícita).
 #
-# Si `db push` falla (out-of-order, SQL inválido que el schema-check no atrapó),
-# main quedó mergeado pero prod atrás → falla ruidoso para re-correr/arreglar.
+# `db push` corre con `--include-all`: un PR detenido (p.ej. esperando el label
+# `finanzas-ok`) mientras mergean otros con timestamps posteriores deja su
+# migración out-of-order al mergear — sin el flag, `db push` la rechaza ("Found
+# local migration files to be inserted before the last migration on remote
+# database"; caso real: PR #1177). El riesgo es bajo: todo archivo en
+# `supabase/migrations/` de `main` DEBE terminar aplicado (invariante 1:1 del
+# ledger) y ya pasó CI en shadow. Matiz: la migración rezagada se ejecuta en
+# prod DESPUÉS de las de timestamp posterior (orden ≠ shadow); si conflictúa,
+# falla ruidoso igual. Ver GOVERNANCE.md §4.
+#
+# Si `db push` falla (SQL inválido que el schema-check no atrapó, drift de
+# ledger), main quedó mergeado pero prod atrás → falla ruidoso para
+# re-correr/arreglar.
 
 on:
   push:
@@ -49,12 +60,13 @@ jobs:
           fi
           echo "Migraciones pendientes según el ledger de prod:"
           supabase migration list --db-url "$SUPABASE_DB_URL" 2>&1 | tail -20 || true
-          echo "── db push ──"
-          if supabase db push --db-url "$SUPABASE_DB_URL"; then
+          echo "── db push (--include-all: aplica también migraciones out-of-order de PRs detenidos, ver header) ──"
+          if supabase db push --include-all --db-url "$SUPABASE_DB_URL"; then
             echo "✓ Migraciones aplicadas a prod. Ledger registrado con el timestamp del archivo."
           else
             echo "::error::supabase db push FALLÓ. Prod puede haber quedado atrás de main."
-            echo "Revisar el log (out-of-order / SQL / drift de ledger) y re-correr este workflow"
-            echo "(workflow_dispatch) o aplicar manualmente. NO uses MCP (genera huérfanas)."
+            echo "Causas probables: SQL inválido que el schema-check no atrapó, o drift de ledger"
+            echo "(comparar 'supabase migration list' arriba). Arreglar y re-correr este workflow"
+            echo "(workflow_dispatch). NO apliques por MCP (genera huérfanas en el ledger)."
             exit 1
           fi
