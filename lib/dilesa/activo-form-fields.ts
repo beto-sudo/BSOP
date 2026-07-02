@@ -56,6 +56,13 @@ export const MASTER_FIELDS: readonly ActivoFieldDef[] = [
   },
   { key: 'clave_interna', label: 'Clave interna', type: 'text', section: 'Identificación' },
   {
+    key: 'etiqueta',
+    label: 'Etiqueta / identificador',
+    type: 'text',
+    placeholder: 'p.ej. Demo Prototipo A, Renta COINS',
+    section: 'Identificación',
+  },
+  {
     key: 'zona',
     label: 'Zona / fraccionamiento',
     type: 'text',
