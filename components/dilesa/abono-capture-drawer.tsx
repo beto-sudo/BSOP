@@ -21,7 +21,12 @@
  * fallback a nombre). Desde 2026-07-01 (decisión de Beto) el XML y el
  * comprobante del depósito son OBLIGATORIOS: ningún abono queda en blanco —
  * sin comprobante no hay nada que copiar al expediente al detonar (caso
- * Salas), y la fecha del abono gobierna la fecha de detonación/comisiones. Mismatch de receptor exige confirmación explícita
+ * Salas), y la fecha del abono gobierna la fecha de detonación/comisiones.
+ * Excepción declarada (2026-07-02, operación real de Michelle): el pago que
+ * SALDA la deuda no lleva recibo de caja propio — el CFDI se emite con la
+ * factura de la escrituración (fase 13). Una casilla lo declara, desbloquea
+ * el registro sin XML y deja constancia en las notas del abono. El
+ * comprobante del depósito NO tiene excepción. Mismatch de receptor exige confirmación explícita
  * (con coacreditados el recibo puede venir a nombre del cónyuge). El folio
  * fiscal va a `cxc_pagos.uuid_sat` (unique parcial: un recibo = un abono).
  *
@@ -132,6 +137,9 @@ export function AbonoCaptureDrawer({
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [recibo, setRecibo] = useState<File | null>(null);
   const [reciboXml, setReciboXml] = useState<File | null>(null);
+  // El pago que salda la deuda no lleva recibo de caja propio (el CFDI sale
+  // con la factura de la escrituración) — la casilla lo declara y se audita.
+  const [sinReciboCfdi, setSinReciboCfdi] = useState(false);
   const [parsed, setParsed] = useState<ReciboPagoParsed | null>(null);
   const [verif, setVerif] = useState<VerificacionRecibo | null>(null);
   const [confirmaOtroReceptor, setConfirmaOtroReceptor] = useState(false);
@@ -267,6 +275,7 @@ export function AbonoCaptureDrawer({
     setVerif(null);
     setConfirmaOtroReceptor(false);
     setEditManual(false);
+    setSinReciboCfdi(false);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -330,12 +339,15 @@ export function AbonoCaptureDrawer({
     }
     // XML + comprobante obligatorios (2026-07-01): la fecha del abono gobierna
     // la detonación/comisiones y el comprobante viaja al expediente — ninguno
-    // puede quedar en blanco.
-    if (!reciboXml || !parsed) {
+    // puede quedar en blanco. Excepción declarada (2026-07-02, caso Michelle):
+    // el pago que SALDA la deuda ya no lleva recibo de caja propio — el CFDI
+    // se emite con la factura de la escrituración (fase 13). Ese caso se marca
+    // con la casilla y queda auditado en las notas del abono.
+    if (!reciboXml && !sinReciboCfdi) {
       toast.add({
         title: 'Falta el XML del recibo de caja',
         description:
-          'Sube el CFDI del recibo de caja (XML) — es la fuente de fecha, monto y referencia del abono.',
+          'Sube el CFDI del recibo (fuente de fecha, monto y referencia) — o marca la casilla si este pago no lleva recibo porque el CFDI se emite con la factura de la escrituración.',
         type: 'error',
       });
       return;
@@ -364,6 +376,9 @@ export function AbonoCaptureDrawer({
       values.notas || '',
       parsed && verif && !verif.receptorCoincide
         ? `[Recibo a nombre de ${parsed.receptorNombre ?? parsed.receptorRfc} (${parsed.receptorRfc}) — receptor distinto confirmado por quien captura]`
+        : '',
+      !reciboXml && sinReciboCfdi
+        ? '[Sin recibo de caja CFDI al registrar — el CFDI se emite con la factura de la escrituración; declarado por quien captura]'
         : '',
     ]
       .filter(Boolean)
@@ -553,6 +568,18 @@ export function AbonoCaptureDrawer({
               onChange={(f) => void handleXmlChange(f)}
               accept=".xml,text/xml,application/xml"
             />
+            {!reciboXml ? (
+              <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-[var(--text)]/70">
+                <input
+                  type="checkbox"
+                  checked={sinReciboCfdi}
+                  onChange={(e) => setSinReciboCfdi(e.target.checked)}
+                  className="mt-0.5"
+                />
+                Este pago no lleva recibo de caja: es el pago que salda la deuda y el CFDI se emite
+                con la factura de la escrituración. (Queda registrado en las notas del abono.)
+              </label>
+            ) : null}
             {parsed && verif ? (
               <div
                 className={`mt-2 rounded-lg border p-3 text-xs ${
