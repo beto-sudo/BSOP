@@ -68,15 +68,7 @@ const ESTADO_LABEL: Record<string, string> = {
   desincorporado: 'Desincorporado',
 };
 
-export function PortafolioModule({
-  empresaId,
-  vista = 'inventario',
-}: {
-  empresaId: string;
-  /** 'evaluacion' filtra a activos en evaluación de compra (estado prospecto). */
-  vista?: 'inventario' | 'evaluacion';
-}) {
-  const esEvaluacion = vista === 'evaluacion';
+export function PortafolioModule({ empresaId }: { empresaId: string }) {
   const router = useRouter();
   const [activos, setActivos] = useState<Activo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +97,10 @@ export function PortafolioModule({
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null)
+        // Inventario = patrimonio: los prospectos/descartados viven en el tab
+        // Evaluación, y las caras de espectacular en el expediente del padre.
+        .not('estado', 'in', '(prospecto,descartado)')
+        .neq('tipo', 'cara')
         .order('nombre'),
     [empresaId]
   );
@@ -144,7 +140,6 @@ export function PortafolioModule({
   const filtrados = useMemo(() => {
     const q = search.trim().toLowerCase();
     return activos.filter((a) => {
-      if (esEvaluacion && a.estado !== 'prospecto') return false;
       if (tipoFiltro && a.tipo !== tipoFiltro) return false;
       if (estadoFiltro && a.estado !== estadoFiltro) return false;
       if (destinoFiltro && (a.destino?.label ?? '') !== destinoFiltro) return false;
@@ -159,26 +154,21 @@ export function PortafolioModule({
       }
       return true;
     });
-  }, [
-    activos,
-    search,
-    tipoFiltro,
-    estadoFiltro,
-    destinoFiltro,
-    municipioFiltro,
-    zonaFiltro,
-    esEvaluacion,
-  ]);
+  }, [activos, search, tipoFiltro, estadoFiltro, destinoFiltro, municipioFiltro, zonaFiltro]);
 
   // KPIs sobre el conjunto filtrado (la foto de lo que se está viendo).
   const kpis = useMemo<ModuleKpi[]>(() => {
     const valor = filtrados.reduce((acc, a) => acc + (a.valor_estimado ?? 0), 0);
-    const enEval = filtrados.filter((a) => a.estado === 'prospecto').length;
     const operando = filtrados.filter((a) => a.estado === 'operando').length;
+    const superficie = filtrados.reduce((acc, a) => acc + (a.area_m2 ?? 0), 0);
     return [
       { key: 'valor', label: 'Valor estimado', value: formatCurrency(valor) },
       { key: 'total', label: 'Activos', value: String(filtrados.length) },
-      { key: 'evaluacion', label: 'En evaluación', value: String(enEval) },
+      {
+        key: 'superficie',
+        label: 'Superficie',
+        value: `${Math.round(superficie).toLocaleString('es-MX')} m²`,
+      },
       { key: 'operando', label: 'Operando', value: String(operando) },
     ];
   }, [filtrados]);
@@ -259,13 +249,10 @@ export function PortafolioModule({
           <Building2 className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-            {esEvaluacion ? 'Evaluación de compra' : 'Portafolio'}
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Portafolio</h1>
           <p className="text-sm text-[var(--text)]/60">
-            {esEvaluacion
-              ? 'Terrenos y activos en evaluación de compra (pipeline de adquisición).'
-              : 'Activos de DILESA — terrenos, lotes, locales, plazas, espectaculares y demás.'}
+            Patrimonio de DILESA — terrenos, lotes, casas, locales y espectaculares. Los prospectos
+            en evaluación viven en su propio tab hasta ser adquiridos.
           </p>
         </div>
       </header>
