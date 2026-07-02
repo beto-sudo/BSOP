@@ -112,6 +112,18 @@ export const AI_USOS = {
     descripcion: 'Extrae la carátula del estado de cuenta para la conciliación bancaria.',
     archivo: 'lib/dilesa/estados-cuenta/extraer.ts',
   },
+  'dilesa-matching-escrituras': {
+    label: 'Matching de escrituras del archivo legal a predios del portafolio',
+    empresa: 'dilesa',
+    proveedor: 'anthropic',
+    modalidad: 'generacion-texto',
+    modeloDefault: DEFAULT_CLAUDE_MODEL,
+    envVar: 'ANTHROPIC_API_KEY',
+    criticidad: 'baja',
+    descripcion:
+      'Propone qué escritura de erp.documentos ampara qué activo del portafolio (S8 dilesa-portafolio-predios); el operador confirma cada liga.',
+    archivo: 'lib/dilesa/matching-escrituras.ts',
+  },
   'dilesa-notarial-venta': {
     label: 'Extracción de documento notarial de venta (Fase 8)',
     empresa: 'dilesa',

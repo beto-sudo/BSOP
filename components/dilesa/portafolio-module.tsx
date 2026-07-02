@@ -16,10 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import type { BadgeTone } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
-import { Building2, Plus, RefreshCw, Search, Tags } from 'lucide-react';
+import { Building2, Plus, RefreshCw, Search, Sparkles, Tags } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
 import { DestinosCatalogoDialog } from '@/components/dilesa/destinos-catalogo-dialog';
+import { EscriturasMatchingDialog } from '@/components/dilesa/escrituras-matching-dialog';
 import { useEffectiveUser } from '@/components/providers';
 
 type Activo = {
@@ -87,6 +88,7 @@ export function PortafolioModule({
   const [municipioFiltro, setMunicipioFiltro] = useState<string>('');
   const [zonaFiltro, setZonaFiltro] = useState<string>('');
   const [destinosOpen, setDestinosOpen] = useState(false);
+  const [matchingOpen, setMatchingOpen] = useState(false);
   // false = cerrado · null = alta · string = edición de ese activo.
   const [captura, setCaptura] = useState<string | null | false>(false);
   const { data: effectiveUser } = useEffectiveUser();
@@ -372,6 +374,14 @@ export function PortafolioModule({
               <Tags className="h-3.5 w-3.5" />
               Destinos
             </button>
+            <button
+              type="button"
+              onClick={() => setMatchingOpen(true)}
+              className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/70 hover:text-[var(--text)]"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Ligar escrituras
+            </button>
           </div>
         ) : null}
       </div>
@@ -407,6 +417,7 @@ export function PortafolioModule({
             open={destinosOpen}
             onOpenChange={setDestinosOpen}
           />
+          <EscriturasMatchingDialog open={matchingOpen} onOpenChange={setMatchingOpen} />
         </>
       ) : null}
     </div>

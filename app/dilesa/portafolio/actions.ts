@@ -25,6 +25,10 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { cargarFichaActivo } from '@/lib/dilesa/ficha-activo-data';
 import { FichaActivoPDF } from '@/lib/dilesa/pdf/ficha-activo';
 import { sendFichaComercialEmail } from '@/lib/dilesa/ficha-email';
+import {
+  sugerirLigadoEscrituras,
+  type SugerenciaEscritura,
+} from '@/lib/dilesa/matching-escrituras';
 import type { Database } from '@/types/supabase';
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -521,4 +525,20 @@ export async function enviarFichaComercial(input: {
   });
   if (!res.ok) return { ok: false, error: res.error ?? 'No se pudo enviar el correo.' };
   return { ok: true, sentTo: res.sentTo };
+}
+
+/**
+ * Calcula sugerencias de ligado escritura → predio (S8). Solo propone —
+ * el operador confirma cada liga en el dialog con `ligarDocumentoActivo`.
+ */
+export async function sugerirEscrituras(): Promise<
+  { ok: true; sugerencias: SugerenciaEscritura[]; sinMatch: number } | { ok: false; error: string }
+> {
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede ligar escrituras.' };
+  }
+  const r = await sugerirLigadoEscrituras(supabase);
+  if ('error' in r) return { ok: false, error: r.error };
+  return { ok: true, sugerencias: r.sugerencias, sinMatch: r.sinMatch };
 }

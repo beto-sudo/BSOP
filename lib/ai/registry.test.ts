@@ -17,6 +17,7 @@ const USOS_ESPERADOS = [
   'csf-extraccion',
   'dilesa-plano',
   'dilesa-estado-cuenta',
+  'dilesa-matching-escrituras',
   'dilesa-notarial-venta',
   'dilesa-pld-informe',
   'dilesa-pld-acuse',
