@@ -43,8 +43,10 @@ export default defineConfig({
       // `test:run` desde la raíz escanea sus `*.test.ts` y produce fallos
       // espurios (módulos ausentes en el checkout actual). CI no se afecta
       // (corre en checkout limpio sin `.claude/`). Ver
-      // reference_vitest_worktrees_scan.
+      // reference_vitest_worktrees_scan. `.Codex/` es el equivalente para
+      // worktrees de Codex CLI — mismo problema, misma exclusión.
       '**/.claude/**',
+      '**/.Codex/**',
       'tests/e2e/**',
       'tests/integration/**',
       '**/*.integration.test.ts',
@@ -57,6 +59,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.d.ts',
         '**/.claude/**',
+        '**/.Codex/**',
         // Helpers internos que solo sirven a tests.
         'app/api/**/_test-helpers.ts',
       ],

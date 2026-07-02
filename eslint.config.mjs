@@ -13,7 +13,9 @@ const eslintConfig = [
       '**/.next/**',
       'node_modules/**',
       // Git worktrees created by agents — never lint checked-out copies of the repo.
+      // (.claude/ = Claude Code, .Codex/ = Codex CLI.)
       '.claude/worktrees/**',
+      '.Codex/worktrees/**',
       // Untracked ad-hoc scratch folder. Already .gitignore'd; mirror here so
       // local lint matches CI.
       'tmp/**',
