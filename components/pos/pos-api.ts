@@ -105,7 +105,12 @@ export async function fetchCatalogo(): Promise<ProductoVenta[]> {
   const precioByProducto = new Map<string, number>();
   for (const p of precios.data ?? []) {
     // Vienen ordenados por fecha_inicio DESC: el primero por producto gana.
-    if (p.precio_venta != null && !precioByProducto.has(p.producto_id)) {
+    // Sin precio real (> 0) el producto NO es vendible — no aparece en captura.
+    if (
+      p.precio_venta != null &&
+      Number(p.precio_venta) > 0 &&
+      !precioByProducto.has(p.producto_id)
+    ) {
       precioByProducto.set(p.producto_id, Number(p.precio_venta));
     }
   }
@@ -272,6 +277,21 @@ export async function rpcCancelarCuenta(args: {
       p_client_action_id: args.clientActionId,
       p_pin_autorizador: args.pinAutorizador ?? undefined,
     });
+  if (error) throw error;
+}
+
+export async function rpcMoverCuenta(args: {
+  cuentaId: string;
+  pin: string;
+  ubicacion: string;
+  clientActionId: string;
+}): Promise<void> {
+  const { error } = await supabase().schema('rdb').rpc('fn_pos_mover_cuenta', {
+    p_cuenta_id: args.cuentaId,
+    p_pin: args.pin,
+    p_ubicacion: args.ubicacion,
+    p_client_action_id: args.clientActionId,
+  });
   if (error) throw error;
 }
 

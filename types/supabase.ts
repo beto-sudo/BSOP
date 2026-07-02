@@ -17086,6 +17086,15 @@ export type Database = {
         }
         Returns: string
       }
+      fn_pos_mover_cuenta: {
+        Args: {
+          p_client_action_id: string
+          p_cuenta_id: string
+          p_pin: string
+          p_ubicacion: string
+        }
+        Returns: undefined
+      }
       fn_pos_recalcular_cuenta: {
         Args: { p_cuenta_id: string }
         Returns: undefined
