@@ -112,6 +112,20 @@ hacer.
   bloqueador de cutover.
 - **2026-07-02 — El POS no toca PAN** de tarjetas: terminal standalone,
   voucher fotografiado + OCR, como hoy.
+- **2026-07-02 — Backfill de precios desde Waitry** (Beto): los precios de
+  venta RDB nunca vivieron en BSOP (237 vigentes en $0 de 447 productos).
+  Criterio aprobado: último `unit_price` cobrado en venta Waitry pagada no
+  fantasma; solo pisa precios en $0/null. Los restantes se curan a mano en
+  `/rdb/productos`. La captura oculta productos sin precio real.
+- **2026-07-02 — Ubicación de cuenta es móvil**: la gente se mueve por el
+  club; `fn_pos_mover_cuenta` reubica con auditoría. La ubicación es
+  referencial, no amarra la cuenta.
+- **2026-07-02 — GPS/localización del cliente → candidata v2** (idea de
+  Beto, post-cutover): GPS puro es impreciso en el club (5-15 m); la versión
+  viable es un QR por cuenta que el cliente abre en su cel (mini-página "mi
+  cuenta") y comparte ubicación del navegador o marca zona en croquis al
+  pedir entrega. Fuera de v1 por la regla brutal; se evalúa con el piloto
+  estable.
 
 ## Plan de sprints
 
@@ -161,6 +175,14 @@ hacer.
 
 ## Bitácora
 
+- **2026-07-02** — **S2.5 (pulido post-prueba de Beto)**: backfill de
+  precios desde Waitry (migración `20260702211303`, criterio aprobado) +
+  RPC `fn_pos_mover_cuenta`; UI: buscador de productos, tablero de cuentas
+  abiertas (tarjetas con total y minutos + switcher), carrito persistente en
+  el dispositivo (sobrevive cierre de navegador), botón Mover, y productos
+  sin precio real ocultos de captura. Feedback origen: precios en $0 (dato,
+  no bug — nunca existieron en BSOP), dudas de multi-cuenta y de cierre de
+  navegador, ubicación cambiante, idea GPS (→ decisión candidata v2).
 - **2026-07-02** — **S2 mergeado y aplicado a prod** (#1199, gate financiero
   con `finanzas-ok` de Beto). Verificado por introspección: 4 módulos
   `rdb.pos*`, backfill 21 permisos (7 roles × 3 slugs), 2 RPCs admin, ledger

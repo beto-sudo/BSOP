@@ -31,10 +31,19 @@ import {
   rpcCancelarCuenta,
   rpcCobrar,
   rpcEnviarCocina,
+  rpcMoverCuenta,
   rpcVoidItem,
 } from './pos-api';
 
 const ESTACION_KEY = 'bsop-pos-estacion';
+const CART_KEY = 'bsop-pos-cart';
+
+type PersistedCart = { productoId: string; cantidad: number; descuentoPct: number }[];
+
+/** Minutos desde un timestamp, para el tablero de cuentas. */
+function minutosDesde(iso: string): number {
+  return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+}
 
 /**
  * Captura del POS (rdb.pos.captura — ADR-056). Táctil, sin modales para
@@ -53,6 +62,7 @@ export function PosCapturaModule() {
   const [items, setItems] = useState<ItemCuenta[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [ubicacion, setUbicacion] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Acción pendiente que espera PIN. El client_action_id se genera al abrir
@@ -96,10 +106,41 @@ export function PosCapturaModule() {
       .then(setEstaciones)
       .catch((e) => setError(getSupabaseErrorMessage(e, 'Error al cargar estaciones')));
     fetchCatalogo()
-      .then(setCatalogo)
+      .then((cat) => {
+        setCatalogo(cat);
+        // Restaurar el carrito local si el navegador se cerró a media captura.
+        try {
+          const raw = localStorage.getItem(CART_KEY);
+          if (raw) {
+            const persisted = JSON.parse(raw) as PersistedCart;
+            const byId = new Map(cat.map((p) => [p.id, p]));
+            const restored: CartLine[] = persisted
+              .filter((l) => byId.has(l.productoId))
+              .map((l) => ({
+                producto: byId.get(l.productoId)!,
+                cantidad: l.cantidad,
+                descuentoPct: l.descuentoPct,
+              }));
+            if (restored.length > 0) setCart(restored);
+          }
+        } catch {
+          // carrito persistido corrupto: se ignora
+        }
+      })
       .catch((e) => setError(getSupabaseErrorMessage(e, 'Error al cargar catálogo')));
     void refreshCuentas();
   }, [refreshCuentas]);
+
+  // Persistir el carrito en el dispositivo (sobrevive cierre de navegador).
+  useEffect(() => {
+    const persisted: PersistedCart = cart.map((l) => ({
+      productoId: l.producto.id,
+      cantidad: l.cantidad,
+      descuentoPct: l.descuentoPct,
+    }));
+    if (persisted.length > 0) localStorage.setItem(CART_KEY, JSON.stringify(persisted));
+    else localStorage.removeItem(CART_KEY);
+  }, [cart]);
 
   useEffect(() => {
     void refreshItems(cuentaId);
@@ -120,10 +161,14 @@ export function PosCapturaModule() {
     return [...set.keys()];
   }, [catalogo]);
 
-  const productosVisibles = useMemo(
-    () => catalogo.filter((p) => !categoria || p.categoriaNombre === categoria),
-    [catalogo, categoria]
-  );
+  const productosVisibles = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return catalogo.filter(
+      (p) =>
+        (!categoria || p.categoriaNombre === categoria) &&
+        (!q || p.nombre.toLowerCase().includes(q))
+    );
+  }, [catalogo, categoria, busqueda]);
 
   const cartTotal = useMemo(
     () =>
@@ -222,6 +267,23 @@ export function PosCapturaModule() {
     });
   }
 
+  function moverCuenta() {
+    if (!cuenta) return;
+    const action = crypto.randomUUID();
+    const nueva = window.prompt('¿A dónde se mueve la cuenta?', cuenta.ubicacion ?? '');
+    if (!nueva?.trim()) return;
+    pedirPin(`Mover cuenta a ${nueva.trim()}`, async (pin) => {
+      await rpcMoverCuenta({
+        cuentaId: cuenta.id,
+        pin,
+        ubicacion: nueva.trim(),
+        clientActionId: action,
+      });
+      await refreshCuentas();
+      toast.add({ title: `Cuenta movida a ${nueva.trim()}` });
+    });
+  }
+
   function cancelarCuenta() {
     if (!cuenta) return;
     const action = crypto.randomUUID();
@@ -290,6 +352,12 @@ export function PosCapturaModule() {
 
       {/* ── Catálogo táctil ──────────────────────────────────────────────── */}
       <div className="space-y-3">
+        <Input
+          placeholder="Buscar producto…"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="h-11 text-base"
+        />
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -341,32 +409,65 @@ export function PosCapturaModule() {
             )}
           </div>
           {!cuenta ? (
-            <div className="space-y-2">
-              <Input
-                placeholder="Ubicación (Tiendita, Pádel 3…)"
-                value={ubicacion}
-                onChange={(e) => setUbicacion(e.target.value)}
-              />
+            <div className="space-y-3">
               {cuentas.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">o retoma una abierta:</p>
+                <div className="grid grid-cols-2 gap-2">
                   {cuentas.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => setCuentaId(c.id)}
-                      className="flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-sm hover:border-primary/50"
+                      className="rounded-lg border p-3 text-left shadow-sm transition hover:border-primary/60 active:scale-[0.98]"
                     >
-                      <span>{c.ubicacion ?? 'Sin ubicación'}</span>
-                      <span className="font-mono">{formatCurrency(c.total)}</span>
+                      <div className="truncate text-sm font-medium">
+                        {c.ubicacion ?? 'Sin ubicación'}
+                      </div>
+                      <div className="mt-1 font-mono text-base">{formatCurrency(c.total)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {minutosDesde(c.abierta_at)} min abierta
+                      </div>
                     </button>
                   ))}
                 </div>
               )}
+              <div className="space-y-1 border-t pt-2">
+                <p className="text-xs text-muted-foreground">Nueva cuenta:</p>
+                <Input
+                  placeholder="Ubicación (Tiendita, Pádel 3…)"
+                  value={ubicacion}
+                  onChange={(e) => setUbicacion(e.target.value)}
+                />
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
+              {cuentas.length > 1 && (
+                <div className="flex flex-wrap gap-1 border-b pb-2">
+                  {cuentas
+                    .filter((c) => c.id !== cuenta.id)
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setCuentaId(c.id)}
+                        className="rounded-full border px-2 py-0.5 text-xs hover:border-primary/60"
+                        title={`${formatCurrency(c.total)} · ${minutosDesde(c.abierta_at)} min`}
+                      >
+                        {c.ubicacion ?? 's/u'}
+                      </button>
+                    ))}
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
-                <span>{cuenta.ubicacion ?? 'Sin ubicación'}</span>
+                <span className="flex items-center gap-1">
+                  {cuenta.ubicacion ?? 'Sin ubicación'}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={moverCuenta}
+                    title="Mover de ubicación"
+                  >
+                    ⇄
+                  </Button>
+                </span>
                 <Badge variant="secondary">{cuenta.estado}</Badge>
               </div>
               <ul className="divide-y text-sm">
