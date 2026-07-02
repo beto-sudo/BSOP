@@ -4,10 +4,10 @@
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (nuevas `pos_cuentas`, `pos_rondas`, `pos_items`, `pos_pagos`, `pos_estaciones`, `pos_eventos`; vista canónica `v_ventas_canonicas`; sub-slugs RBAC `rdb.pos.*` en `core.modulos`/`core.permisos_rol`). `erp` (escritura en `movimientos_inventario` vía trigger espejo; lectura/escritura `cortes_caja`/`cortes_vouchers`). Post-cutover: `rdb.waitry_*` queda histórico read-only y el edge function `waitry-webhook` (incl. espejo a Coda) se apaga.
 **Estado:** in_progress
-**Próximo hito:** Beto revisa el preview de S2 (captura + KDS + admin) y mergea; luego alta de estaciones/PINs y práctica con la hostess (S3)
+**Próximo hito:** S3 — alta de estaciones/PINs reales, flags "va a cocina" en categorías, práctica sin impacto con la hostess y arranque del piloto de Tiendita
 **Dueño:** Beto
 **Creada:** 2026-07-02
-**Última actualización:** 2026-07-02 (S2 en PR: módulo /rdb/pos — captura, KDS, admin)
+**Última actualización:** 2026-07-02 (S2 en prod: módulo /rdb/pos completo, PR #1199)
 
 > **Sucede a** la saga Waitry: [`rdb-waitry-ingesta-dedup`](rdb-waitry-ingesta-dedup.md),
 > [`rdb-waitry-deduplicacion`](rdb-waitry-deduplicacion.md),
@@ -161,7 +161,13 @@ hacer.
 
 ## Bitácora
 
-- **2026-07-02** — **S2** (PR abierto, UI sin auto-merge): módulo `/rdb/pos`
+- **2026-07-02** — **S2 mergeado y aplicado a prod** (#1199, gate financiero
+  con `finanzas-ok` de Beto). Verificado por introspección: 4 módulos
+  `rdb.pos*`, backfill 21 permisos (7 roles × 3 slugs), 2 RPCs admin, ledger
+  limpio. Nota de proceso: el preview no pudo ejercitar las funciones de
+  Admin porque nacen con la migración del mismo PR (tensión conocida
+  ADR-014 vs preview→prod); Beto validó lo visual y probamos en prod.
+- **2026-07-02** — **S2** (contenido): módulo `/rdb/pos`
   con routed tabs — Captura (catálogo táctil por categoría, carrito, cuentas
   abiertas, PIN por acción, cobro efectivo/tarjeta/mixto con propina y
   cambio, void/merma), Cocina (KDS realtime + polling fallback 5 s + alerta
