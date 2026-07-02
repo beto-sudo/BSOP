@@ -12,6 +12,7 @@ import { TZ } from './utils';
 import { CategoriaBadge } from './categoria-badge';
 import type { CategoriaFilter } from './types';
 import { prorratearLineas, ventaCobrada } from './venta-cobrada';
+import { fetchPagosPorPedido, matchTipoPago } from './tipo-pago';
 
 type ProductoAgg = {
   product_id: string;
@@ -41,6 +42,7 @@ export type VentasPorProductoProps = {
   dateFrom: string;
   dateTo: string;
   corteFilter: string;
+  pagoFilter: string;
   search: string;
   onSearchChange: (value: string) => void;
   categoriaFilter: CategoriaFilter | null;
@@ -51,6 +53,7 @@ export function VentasPorProducto({
   dateFrom,
   dateTo,
   corteFilter,
+  pagoFilter,
   search,
   onSearchChange,
   categoriaFilter,
@@ -85,9 +88,23 @@ export function VentasPorProducto({
       const { data: pedidos, error: pedidosErr } = await pedidosQuery;
       if (pedidosErr) throw pedidosErr;
 
-      const validPedidos = (pedidos ?? []).filter(
+      let validPedidos = (pedidos ?? []).filter(
         (p) => !!p.order_id && !(p.status ?? '').toLowerCase().includes('cancel')
       );
+
+      // Filtro por tipo de pago — mismo criterio que el tab Pedidos: el
+      // pedido matchea si alguno de sus pagos usa ese tipo, y se reporta
+      // completo (no se parte el monto por método).
+      if (pagoFilter !== 'all') {
+        const pagosPorPedido = await fetchPagosPorPedido(
+          supabase,
+          validPedidos.map((p) => p.order_id as string)
+        );
+        validPedidos = validPedidos.filter((p) =>
+          matchTipoPago(pagosPorPedido.get(p.order_id as string)?.tipos, pagoFilter)
+        );
+      }
+
       const validOrderIds = validPedidos.map((p) => p.order_id as string);
 
       if (validOrderIds.length === 0) {
@@ -180,7 +197,7 @@ export function VentasPorProducto({
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, corteFilter]);
+  }, [dateFrom, dateTo, corteFilter, pagoFilter]);
 
   useEffect(() => {
     void fetchData();

@@ -1,3 +1,5 @@
+import type { TipoPago } from './tipo-pago';
+
 export type CorteOption = {
   id: string;
   corte_nombre: string | null;
@@ -49,6 +51,11 @@ export type Pedido = {
   // canónica `rdb.v_waitry_pedidos` siempre devuelve `es_fantasma=false`.
   superseded_by_order_id?: string | null;
   es_fantasma?: boolean | null;
+  // Enriquecido client-side desde rdb.waitry_pagos (VentasView): tipos de
+  // pago del pedido (columna "Pago" + filtro) y monto por tipo (KPIs del
+  // summary). undefined mientras carga o si el pedido no tiene pagos.
+  tipos_pago?: TipoPago[];
+  montos_pago?: Partial<Record<TipoPago, number>>;
   // lazy-loaded
   pagos?: Pago[];
   items?: PedidoItem[];

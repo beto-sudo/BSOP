@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from '@/lib/format';
 import type { Pedido } from './types';
 import { statusVariant } from './utils';
 import { ventaCobrada } from './venta-cobrada';
+import { TIPO_PAGO_LABELS } from './tipo-pago';
 
 const columns: Column<Pedido>[] = [
   {
@@ -76,6 +77,25 @@ const columns: Column<Pedido>[] = [
         formatCurrency(cobrado)
       );
     },
+  },
+  {
+    // Enriquecido client-side desde rdb.waitry_pagos (VentasView). '—'
+    // mientras carga o si el pedido no tiene pagos registrados.
+    key: 'tipos_pago',
+    label: 'Pago',
+    accessor: (p) => (p.tipos_pago ?? []).map((t) => TIPO_PAGO_LABELS[t]).join(', '),
+    render: (p) =>
+      p.tipos_pago?.length ? (
+        <span className="inline-flex flex-wrap gap-1">
+          {p.tipos_pago.map((t) => (
+            <Badge key={t} variant="outline" className="px-1.5 py-0 text-[11px] font-normal">
+              {TIPO_PAGO_LABELS[t]}
+            </Badge>
+          ))}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
   },
   {
     key: 'status',
