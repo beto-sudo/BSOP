@@ -55,13 +55,6 @@ export const MASTER_FIELDS: readonly ActivoFieldDef[] = [
     section: 'Identificación',
   },
   { key: 'clave_interna', label: 'Clave interna', type: 'text', section: 'Identificación' },
-  {
-    key: 'zona',
-    label: 'Zona / fraccionamiento',
-    type: 'text',
-    placeholder: 'p.ej. Lomas del Sol',
-    section: 'Ubicación',
-  },
   { key: 'municipio', label: 'Municipio', type: 'text', section: 'Ubicación' },
   { key: 'estado_geo', label: 'Estado', type: 'text', section: 'Ubicación' },
   {
