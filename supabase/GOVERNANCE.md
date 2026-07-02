@@ -73,26 +73,35 @@ sólo entornos nuevos (Preview, DR, local).
 
 ## §3 — Regenerar y validar el schema (desde la shadow, no prod)
 
-Las migraciones son la fuente de verdad. `SCHEMA_REF.md` y `types/supabase.ts`
-se regeneran desde una **shadow DB** construida con las migraciones del repo —
-**no desde prod** (iniciativa `derivados-sin-drift`). Así el schema es función
-pura de la rama: determinista, sin secret de prod, sin flakes, y que prod esté
-adelantado/atrasado deja de importar.
+Las migraciones son la fuente de verdad. `SCHEMA_REF.md`, `FUNCTIONS_REF.md` y
+`types/supabase.ts` se regeneran desde una **shadow DB** construida con las
+migraciones del repo — **no desde prod** (iniciativa `derivados-sin-drift`).
+Así el schema es función pura de la rama: determinista, sin secret de prod, sin
+flakes, y que prod esté adelantado/atrasado deja de importar.
 
 Tras tocar `supabase/migrations/`, regenerá los derivados (requiere Docker):
 
 ```sh
 supabase start        # levanta la shadow y aplica todas las migraciones
-npm run db:regen      # SCHEMA_REF.md + types/supabase.ts desde la shadow local
+npm run db:regen      # SCHEMA_REF.md + FUNCTIONS_REF.md + types/supabase.ts
 supabase stop         # opcional
 ```
 
-Commiteá `SCHEMA_REF.md` + `types/supabase.ts` junto con la migración.
+Commiteá los tres derivados junto con la migración.
 
 **CI lo valida** con el workflow `schema-check.yml`: levanta la shadow, regenera
-`SCHEMA_REF` y falla si no coincide con el commiteado (solo corre el trabajo
+los derivados y falla si no coinciden con lo commiteado (solo corre el trabajo
 pesado en PRs que tocan DB). Si `supabase start` falla ahí, alguna migración no
 reproduce desde cero → aplicá §1.
+
+**`FUNCTIONS_REF.md` es además la fuente canónica de los cuerpos de funciones**
+(iniciativa `blindaje-financiero` S1). Regla dura: **toda migración que
+redefina una función (`CREATE OR REPLACE`) parte del cuerpo que aparece en
+`FUNCTIONS_REF.md`** — nunca de la migración anterior. Partir de una versión
+vieja del cuerpo es la clase de error del incidente FIFO de CxC (regresión
+financiera de 11 días). El drift-guard de CI detecta el snapshot desactualizado,
+y el diff del PR sobre `FUNCTIONS_REF.md` muestra exactamente qué cambió en la
+función — revisalo como parte del review.
 
 Sin Docker local podés dejar que CI valide, pero **para regenerar los derivados
 necesitás Docker** — en el modelo nuevo ya no hay atajo contra prod.

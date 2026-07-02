@@ -3,11 +3,11 @@
 **Slug:** `blindaje-financiero`
 **Empresas:** todas (el modelo financiero vive en `erp.*` compartido)
 **Schemas afectados:** `erp` (RPCs financieras, `audit_log`, grants), `dilesa` (gate de fase/PLD, `venta_fases`), `core` (identidad `usuarios`↔`auth.users`), Supabase Storage (bucket `adjuntos`)
-**Estado:** proposed
-**Próximo hito:** Beto aprueba alcance v1 → arrancar Sprint 1 (gen-functions-ref: snapshot versionado de las ~20 funciones financieras + drift-guard en CI)
+**Estado:** in_progress
+**Próximo hito:** mergear S1 (gen-functions-ref + drift-guard en schema-check.yml) → arrancar Sprint 2 (suite de integración SQL de las RPCs de dinero contra la shadow)
 **Dueño:** Beto
 **Creada:** 2026-06-12
-**Última actualización:** 2026-06-12 (promovida desde la revisión general 2026-06-12; Sprint 0 de perímetro ya aplicado a prod — ver [reporte](../strategy/REVISION-GENERAL-BSOP-2026-06-12.md))
+**Última actualización:** 2026-07-02 (Beto aprobó alcance v1; arranca Sprint 1)
 
 ## Problema
 
@@ -32,7 +32,7 @@ El Sprint 0 (ya aplicado a prod) cerró el perímetro `anon` (RPCs financieras +
 
 ## Alcance v1 (sprints propuestos — pendientes de aprobación)
 
-- [ ] **Sprint 1 — Fuente canónica de funciones + drift-guard (ataca la clase FIFO).** Generador `gen-functions-ref` (hermano de `schema:ref`): dump versionado de `pg_get_functiondef` de las ~20 funciones financieras + lista de triggers/CHECKs. Sección nueva en `drift-check.sql` (o check en CI) que alerta si la definición viva difiere del snapshot. Convención: toda redefinición parte de ese archivo, nunca de la migración anterior.
+- [x] **Sprint 1 — Fuente canónica de funciones + drift-guard (ataca la clase FIFO).** Generador `gen-functions-ref` (hermano de `schema:ref`): dump versionado de `pg_get_functiondef` de todas las funciones de negocio (182) + triggers/CHECKs. Drift-guard en `schema-check.yml` (shadow) que falla el PR si la definición que producen las migraciones difiere del snapshot. Convención: toda redefinición parte de ese archivo, nunca de la migración anterior.
 - [ ] **Sprint 2 — Suite de integración SQL.** `vitest.integration.config.ts` contra `supabase start` que ejercita las ~10 RPCs de dinero (cxc/cxp/presupuesto) assertando saldos + un **caso anon-negativo** (anon-key directo → 42501). Corre en CI en PRs que tocan `supabase/migrations/**` (trigger ya existe en `drift-check.yml`).
 - [ ] **Sprint 3 — Cierre de fase como RPC transaccional.** `fn_cerrar_fase` (`SECURITY DEFINER`) que valida permiso de módulo + gate PLD en DB y commitea `adjuntos`+`ventas`+`venta_fases` juntos (absorbe `marcarFase`). Restringe INSERT directo a `venta_fases` / UPDATE de `fase_actual` a esa RPC.
 - [ ] **Sprint 4 — Gate interno + revoke amplio de anon (defensa en profundidad).** `IF NOT fn_is_admin() AND NOT fn_has_empresa(...) THEN RAISE 42501` al inicio de cada RPC mutadora (partiendo de `pg_get_functiondef`, con el snapshot de S1 y el test de S2 como red). Revoke de `anon` de todas las funciones/tablas/defaults de negocio, no solo las 30 del Sprint 0.
@@ -55,8 +55,10 @@ El Sprint 0 (ya aplicado a prod) cerró el perímetro `anon` (RPCs financieras +
 
 ## Decisiones registradas
 
-- _(pendiente — se registran al ejecutar)_
+- **2026-07-02 — S1 cubre TODAS las funciones de negocio, no solo las ~20 financieras.** El costo marginal de dumpear todo `pg_proc` propio (182 funciones, excluyendo miembros de extensiones vía `pg_depend`) es cero y la clase FIFO aplica a cualquier función redefinida desde una versión vieja. Se incluyen triggers y CHECK constraints por tabla (el reporte los pedía como "lista"). Alcance = mismos schemas que `SCHEMA_REF.md`.
+- **2026-07-02 — El drift-guard vive en `schema-check.yml`, no en `drift-check.sql`.** El planning original (12-jun) proponía extender `drift-check.sql`; con el modelo `derivados-sin-drift` (S2, posterior) el lugar correcto es el workflow de shadow: `FUNCTIONS_REF.md` es un derivado más de las migraciones, regenerado por `db:regen` y comparado en CI. Gratis: el diff del PR muestra el cuerpo exacto que cambia en cada redefinición.
 
 ## Bitácora
 
+- **2026-07-02** — Beto aprobó alcance v1 (`proposed → in_progress`). **Sprint 1 ejecutado**: `scripts/gen-functions-ref.ts` (hermano de `gen-schema-ref.ts`, formatter puro + tests de determinismo/orden/render) genera `supabase/FUNCTIONS_REF.md` (182 funciones + 166 triggers + 226 CHECKs de 11 schemas, desde la shadow); `npm run functions:ref`/`functions:check`; `db:regen` lo incluye; `schema-check.yml` lo valida (regen + artifact + diff). Convención documentada en `GOVERNANCE.md` §3 y `CLAUDE.md` (Reglas DB): toda redefinición parte de `FUNCTIONS_REF.md`. Helper `.env.local` extraído a `scripts/lib/env-local.ts` (compartido con `gen-schema-ref.ts`).
 - **2026-06-12** — Promovida desde la revisión general 2026-06-12 (auditoría ultracode). El Sprint 0 de perímetro (REVOKE anon en 30 RPCs + `v_partida_control` con `security_invoker` + expediente PLD a RESTRICT) ya está aplicado y verificado en prod (PR [#877](https://github.com/beto-sudo/BSOP/pull/877)). Esta iniciativa recoge el resto de la dimensión db-seguridad + testing-calidad del reporte.
