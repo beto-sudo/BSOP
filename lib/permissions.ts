@@ -41,6 +41,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   // Portafolio es un hub con 2 tabs (Inventario / Evaluación) — ADR-030.
   '/dilesa/portafolio': 'dilesa.portafolio.inventario',
   '/dilesa/portafolio/evaluacion': 'dilesa.portafolio.evaluacion',
+  '/dilesa/portafolio/prediales': 'dilesa.portafolio.prediales',
   // Expediente full-page del activo (dilesa-portafolio-predios S2): drill-down
   // de la lista, comparte el sub-slug del tab Inventario.
   '/dilesa/portafolio/activo/[id]': 'dilesa.portafolio.inventario',

@@ -50,7 +50,8 @@ export type AdjuntoEntidad =
   | 'estados_cuenta'
   | 'recepcion_obra'
   | 'recepcion_visita'
-  | 'recibos';
+  | 'recibos'
+  | 'prediales_ejercicios';
 
 export type BuildAdjuntoPathOpts = {
   empresa: EmpresaSlug;

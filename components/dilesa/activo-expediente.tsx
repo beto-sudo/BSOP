@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,12 @@ import {
   MapPin,
   Paperclip,
 } from 'lucide-react';
+
+// leaflet toca `window` al importarse → solo cliente, sin SSR.
+const ActivoMapa = dynamic(() => import('@/components/dilesa/activo-mapa'), {
+  ssr: false,
+  loading: () => <div className="h-72 animate-pulse rounded-lg bg-[var(--border)]/40" />,
+});
 
 const ACTIVO_DOC_ROLES = [
   { id: 'plano', label: 'Plano', icon: <MapIcon className="h-3 w-3" /> },
@@ -677,6 +684,15 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
         </div>
 
         <div className="space-y-6">
+          <Section title="Mapa">
+            <ActivoMapa
+              activoId={activo.id}
+              latitud={activo.latitud}
+              longitud={activo.longitud}
+              nombre={activo.nombre}
+            />
+          </Section>
+
           <ActivoPrediales activoId={activo.id} empresaId={DILESA_EMPRESA_ID} />
 
           <Section title="Documentos">
