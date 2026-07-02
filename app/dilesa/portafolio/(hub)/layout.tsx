@@ -23,6 +23,11 @@ const TABS = [
     href: '/dilesa/portafolio/evaluacion',
     module: 'dilesa.portafolio.evaluacion',
   },
+  {
+    label: 'Prediales',
+    href: '/dilesa/portafolio/prediales',
+    module: 'dilesa.portafolio.prediales',
+  },
 ] as const;
 
 export default function PortafolioLayout({ children }: { children: ReactNode }) {
