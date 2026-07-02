@@ -27,6 +27,7 @@ type Activo = {
   tipo: string;
   nombre: string;
   estado: string;
+  etiqueta: string | null;
   zona: string | null;
   municipio: string | null;
   area_m2: number | null;
@@ -98,7 +99,7 @@ export function PortafolioModule({
         .schema('dilesa')
         .from('activos')
         .select(
-          'id, tipo, nombre, estado, zona, municipio, area_m2, valor_estimado, activo_padre_id, destino_id, destino:portafolio_destinos(label)'
+          'id, tipo, nombre, estado, etiqueta, zona, municipio, area_m2, valor_estimado, activo_padre_id, destino_id, destino:portafolio_destinos(label)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null)
@@ -147,7 +148,13 @@ export function PortafolioModule({
       if (destinoFiltro && (a.destino?.label ?? '') !== destinoFiltro) return false;
       if (municipioFiltro && (a.municipio ?? '') !== municipioFiltro) return false;
       if (zonaFiltro && (a.zona ?? '') !== zonaFiltro) return false;
-      if (q && !a.nombre.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !a.nombre.toLowerCase().includes(q) &&
+        !(a.etiqueta ?? '').toLowerCase().includes(q)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [
@@ -217,6 +224,17 @@ export function PortafolioModule({
       render: (a) =>
         a.destino ? (
           <Badge tone="accent">{a.destino.label}</Badge>
+        ) : (
+          <span className="text-[var(--text)]/40">—</span>
+        ),
+    },
+    {
+      key: 'etiqueta',
+      label: 'Etiqueta',
+      type: 'custom',
+      render: (a) =>
+        a.etiqueta ? (
+          <span className="block max-w-[180px] truncate text-[var(--text)]/80">{a.etiqueta}</span>
         ) : (
           <span className="text-[var(--text)]/40">—</span>
         ),

@@ -1608,45 +1608,57 @@ export type Database = {
           activo_id: string
           ano_construccion: number | null
           banos: number | null
+          calle: string | null
           cochera_autos: number | null
           created_at: string
           empresa_id: string
+          es_esquina: boolean | null
           estado_conservacion: string | null
           m2_construccion: number | null
           m2_terreno: number | null
           niveles: number | null
           notas: string | null
+          numero_oficial: string | null
           recamaras: number | null
+          tiene_frente_verde: boolean | null
           updated_at: string
         }
         Insert: {
           activo_id: string
           ano_construccion?: number | null
           banos?: number | null
+          calle?: string | null
           cochera_autos?: number | null
           created_at?: string
           empresa_id: string
+          es_esquina?: boolean | null
           estado_conservacion?: string | null
           m2_construccion?: number | null
           m2_terreno?: number | null
           niveles?: number | null
           notas?: string | null
+          numero_oficial?: string | null
           recamaras?: number | null
+          tiene_frente_verde?: boolean | null
           updated_at?: string
         }
         Update: {
           activo_id?: string
           ano_construccion?: number | null
           banos?: number | null
+          calle?: string | null
           cochera_autos?: number | null
           created_at?: string
           empresa_id?: string
+          es_esquina?: boolean | null
           estado_conservacion?: string | null
           m2_construccion?: number | null
           m2_terreno?: number | null
           niveles?: number | null
           notas?: string | null
+          numero_oficial?: string | null
           recamaras?: number | null
+          tiene_frente_verde?: boolean | null
           updated_at?: string
         }
         Relationships: [
@@ -1977,38 +1989,50 @@ export type Database = {
       activo_lote: {
         Row: {
           activo_id: string
+          calle: string | null
           condicion: string | null
           created_at: string
           empresa_id: string
+          es_esquina: boolean | null
           fondo_m: number | null
           frente_m: number | null
           manzana: string | null
           notas: string | null
           numero_lote: string | null
+          numero_oficial: string | null
+          tiene_frente_verde: boolean | null
           updated_at: string
         }
         Insert: {
           activo_id: string
+          calle?: string | null
           condicion?: string | null
           created_at?: string
           empresa_id: string
+          es_esquina?: boolean | null
           fondo_m?: number | null
           frente_m?: number | null
           manzana?: string | null
           notas?: string | null
           numero_lote?: string | null
+          numero_oficial?: string | null
+          tiene_frente_verde?: boolean | null
           updated_at?: string
         }
         Update: {
           activo_id?: string
+          calle?: string | null
           condicion?: string | null
           created_at?: string
           empresa_id?: string
+          es_esquina?: boolean | null
           fondo_m?: number | null
           frente_m?: number | null
           manzana?: string | null
           notas?: string | null
           numero_lote?: string | null
+          numero_oficial?: string | null
+          tiene_frente_verde?: boolean | null
           updated_at?: string
         }
         Relationships: [
@@ -2307,6 +2331,7 @@ export type Database = {
           empresa_id: string
           estado: string
           estado_geo: string | null
+          etiqueta: string | null
           id: string
           latitud: number | null
           longitud: number | null
@@ -2334,6 +2359,7 @@ export type Database = {
           empresa_id: string
           estado?: string
           estado_geo?: string | null
+          etiqueta?: string | null
           id?: string
           latitud?: number | null
           longitud?: number | null
@@ -2361,6 +2387,7 @@ export type Database = {
           empresa_id?: string
           estado?: string
           estado_geo?: string | null
+          etiqueta?: string | null
           id?: string
           latitud?: number | null
           longitud?: number | null
