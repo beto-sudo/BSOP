@@ -12,7 +12,7 @@ import { TZ } from './utils';
 import { CategoriaBadge } from './categoria-badge';
 import type { CategoriaFilter } from './types';
 import { prorratearLineas, ventaCobrada } from './venta-cobrada';
-import { fetchTiposPagoPorPedido, matchTipoPago } from './tipo-pago';
+import { fetchPagosPorPedido, matchTipoPago } from './tipo-pago';
 
 type ProductoAgg = {
   product_id: string;
@@ -96,12 +96,12 @@ export function VentasPorProducto({
       // pedido matchea si alguno de sus pagos usa ese tipo, y se reporta
       // completo (no se parte el monto por método).
       if (pagoFilter !== 'all') {
-        const tiposPago = await fetchTiposPagoPorPedido(
+        const pagosPorPedido = await fetchPagosPorPedido(
           supabase,
           validPedidos.map((p) => p.order_id as string)
         );
         validPedidos = validPedidos.filter((p) =>
-          matchTipoPago(tiposPago.get(p.order_id as string), pagoFilter)
+          matchTipoPago(pagosPorPedido.get(p.order_id as string)?.tipos, pagoFilter)
         );
       }
 

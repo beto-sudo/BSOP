@@ -30,7 +30,7 @@ import { VentasPorCategoria } from './ventas-por-categoria';
 import { VentasComparativo } from './ventas-comparativo';
 import type { CategoriaFilter, CorteOption, Pedido } from './types';
 import { TZ, rangeForPreset, todayRange } from './utils';
-import { fetchTiposPagoPorPedido, matchTipoPago, type TipoPago } from './tipo-pago';
+import { fetchPagosPorPedido, type PagosPedido } from './tipo-pago';
 
 type VentasTab = 'pedidos' | 'por-producto' | 'por-categoria' | 'comparativo';
 
@@ -44,10 +44,10 @@ export function VentasView() {
   const [categoriaSearch, setCategoriaSearch] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState<CategoriaFilter | null>(null);
   const [cortes, setCortes] = useState<CorteOption[]>([]);
-  // Tipos de pago por pedido (rdb.waitry_pagos) — se carga lazy, solo cuando
-  // el filtro "Tipo de pago" está activo, para no duplicar requests en el
-  // caso común (filtro en "Todos los pagos").
-  const [tiposPago, setTiposPago] = useState<Map<string, Set<TipoPago>> | null>(null);
+  // Pagos por pedido (rdb.waitry_pagos) — alimenta la columna "Pago", los
+  // KPIs por método del summary y el filtro de tipo de pago. Se carga tras
+  // cada fetch de pedidos.
+  const [pagosPorPedido, setPagosPorPedido] = useState<Map<string, PagosPedido> | null>(null);
   const [loadingPagos, setLoadingPagos] = useState(false);
 
   // URL-synced filter defaults are captured once at mount (today's date range).
@@ -177,25 +177,25 @@ export function VentasView() {
     void fetchPedidos();
   }, [fetchPedidos]);
 
-  // Con el filtro de tipo de pago activo, resolver los métodos de pago de los
-  // pedidos cargados. Se refresca cuando cambia el conjunto de pedidos.
+  // Resolver los pagos de los pedidos cargados. Se refresca cuando cambia el
+  // conjunto de pedidos.
   useEffect(() => {
-    if (pagoFilter === 'all') return;
     const orderIds = pedidos.map((p) => p.order_id).filter((id): id is string => !!id);
     if (orderIds.length === 0) {
-      setTiposPago(new Map());
+      setPagosPorPedido(new Map());
       return;
     }
     let cancelled = false;
     setLoadingPagos(true);
-    fetchTiposPagoPorPedido(createSupabaseBrowserClient(), orderIds)
+    fetchPagosPorPedido(createSupabaseBrowserClient(), orderIds)
       .then((map) => {
-        if (!cancelled) setTiposPago(map);
+        if (!cancelled) setPagosPorPedido(map);
       })
       .catch(() => {
-        // non-fatal: sin el mapa, el filtro no matchea nada y la tabla queda
-        // vacía; el usuario puede reintentar con "Actualizar".
-        if (!cancelled) setTiposPago(new Map());
+        // non-fatal: sin el mapa, la columna "Pago" y los KPIs por método
+        // quedan vacíos y el filtro específico no matchea nada; el usuario
+        // puede reintentar con "Actualizar".
+        if (!cancelled) setPagosPorPedido(new Map());
       })
       .finally(() => {
         if (!cancelled) setLoadingPagos(false);
@@ -203,7 +203,7 @@ export function VentasView() {
     return () => {
       cancelled = true;
     };
-  }, [pagoFilter, pedidos]);
+  }, [pedidos]);
 
   const openDetail = async (pedido: Pedido) => {
     setSelected(pedido);
@@ -239,12 +239,21 @@ export function VentasView() {
     }
   };
 
-  const filtered = pedidos.filter((p) => {
+  // Pedidos enriquecidos con sus tipos/montos de pago — la columna "Pago" de
+  // la tabla y los KPIs del summary leen estos campos.
+  const pedidosConPagos = useMemo(
+    () =>
+      pedidos.map((p) => {
+        const pagosPedido = p.order_id ? pagosPorPedido?.get(p.order_id) : undefined;
+        if (!pagosPedido) return p;
+        return { ...p, tipos_pago: [...pagosPedido.tipos], montos_pago: pagosPedido.montoPorTipo };
+      }),
+    [pedidos, pagosPorPedido]
+  );
+
+  const filtered = pedidosConPagos.filter((p) => {
     if (statusFilter !== 'all' && p.status?.toLowerCase() !== statusFilter) return false;
-    if (
-      pagoFilter !== 'all' &&
-      !matchTipoPago(p.order_id ? tiposPago?.get(p.order_id) : undefined, pagoFilter)
-    )
+    if (pagoFilter !== 'all' && !(p.tipos_pago as string[] | undefined)?.includes(pagoFilter))
       return false;
     if (!search) return true;
     const q = search.toLowerCase();

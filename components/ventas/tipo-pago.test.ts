@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { clasificarMetodoPago, matchTipoPago, type TipoPago } from './tipo-pago';
+import {
+  clasificarMetodoPago,
+  matchTipoPago,
+  sumarMontosPorTipo,
+  type TipoPago,
+} from './tipo-pago';
 
 describe('clasificarMetodoPago', () => {
   it('cash → efectivo', () => {
@@ -48,5 +53,21 @@ describe('matchTipoPago', () => {
   it('pedido sin pagos registrados no matchea filtros específicos', () => {
     expect(matchTipoPago(undefined, 'efectivo')).toBe(false);
     expect(matchTipoPago(new Set(), 'efectivo')).toBe(false);
+  });
+});
+
+describe('sumarMontosPorTipo', () => {
+  it('acumula por bucket a través de pedidos, ignorando undefined', () => {
+    const res = sumarMontosPorTipo([
+      { efectivo: 100, tarjeta: 250 }, // pago dividido: cada monto a su bucket
+      { efectivo: 50 },
+      undefined, // pedido sin pagos registrados
+      { stripe: 300 },
+    ]);
+    expect(res).toEqual({ efectivo: 150, tarjeta: 250, stripe: 300, otro: 0 });
+  });
+
+  it('sin pedidos devuelve ceros', () => {
+    expect(sumarMontosPorTipo([])).toEqual({ efectivo: 0, tarjeta: 0, stripe: 0, otro: 0 });
   });
 });
