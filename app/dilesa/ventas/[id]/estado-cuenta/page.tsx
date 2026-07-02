@@ -28,6 +28,7 @@ import {
   fuenteTone,
   estadoTone,
 } from '@/components/dilesa/venta-detalle/types';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export default function VentaEstadoCuentaPage() {
   return (
@@ -376,7 +377,7 @@ function EstadoCuentaBody() {
               saldo: saldoPendiente,
               saldoFavor,
             }}
-            fechaCorteISO={new Date().toISOString().slice(0, 10)}
+            fechaCorteISO={hoyISOMatamoros()}
           />
         </DetailDrawerContent>
       </DetailDrawer>

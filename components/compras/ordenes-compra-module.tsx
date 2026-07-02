@@ -79,6 +79,7 @@ import {
   type DateRange,
 } from '@/components/filters/date-range-filter';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const SIN = '__sin__';
 /** Valor del selector para ver/crear órdenes de gasto suelto (sin proyecto/partida). */
@@ -773,7 +774,7 @@ export function OrdenesCompraModule({ empresaId }: { empresaId: string }) {
       ocTotal(r),
       r.fecha ?? '',
     ]);
-    downloadCsv(`ordenes-compra-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+    downloadCsv(`ordenes-compra-${hoyISOMatamoros()}`, toCsv(headers, filas));
   }, [filtrados]);
 
   const columns: Column<OcRow>[] = [

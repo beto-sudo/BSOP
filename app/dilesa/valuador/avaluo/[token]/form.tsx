@@ -13,6 +13,7 @@
 
 import { CheckCircle2, Loader2, Save, Upload, XCircle } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 interface Props {
   token: string;
@@ -20,7 +21,7 @@ interface Props {
 
 export function AvaluoUploadForm({ token }: Props) {
   const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(hoyISOMatamoros());
   const [comentarios, setComentarios] = useState('');
   const [archivo, setArchivo] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);

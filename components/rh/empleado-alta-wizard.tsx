@@ -62,6 +62,7 @@ import { useToast } from '@/components/ui/toast';
 import { composeFullName, titleCase } from '@/lib/name-case';
 import { createSupabaseERPClient } from '@/lib/supabase-browser';
 import { buildAdjuntoPath, slugifyFilename, type EmpresaSlug } from '@/lib/storage';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Departamento = { id: string; nombre: string };
 type Puesto = { id: string; nombre: string };
@@ -258,7 +259,7 @@ const DEFAULT_VALUES: WizardValues = {
   departamento_id: '',
   puesto_id: '',
   numero_empleado: '',
-  fecha_ingreso: new Date().toISOString().slice(0, 10),
+  fecha_ingreso: hoyISOMatamoros(),
   tipo_contrato: 'prueba',
   periodo_prueba_dias: '30',
   periodo_prueba_numero: '1',
@@ -472,7 +473,7 @@ export function EmpleadoAltaWizard({
             sueldo_mensual: Number(values.sueldo_mensual),
             sueldo_diario: values.sueldo_diario ? Number(values.sueldo_diario) : null,
             sdi: values.sdi ? Number(values.sdi) : null,
-            fecha_inicio: values.fecha_ingreso || new Date().toISOString().slice(0, 10),
+            fecha_inicio: values.fecha_ingreso || hoyISOMatamoros(),
             vigente: true,
             frecuencia_pago: 'quincenal',
           });

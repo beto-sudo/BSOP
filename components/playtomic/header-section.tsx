@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { CalendarRange, RefreshCw } from 'lucide-react';
 import type { BookingFilters, RangeKey, SportFilter } from './types';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const RANGE_OPTIONS = [
   ['7d', '7 días'],
@@ -44,7 +45,7 @@ export function HeaderSection({
   onRefresh: () => void;
 }) {
   const showCustom = range === 'custom';
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = hoyISOMatamoros();
 
   return (
     <section className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-6">

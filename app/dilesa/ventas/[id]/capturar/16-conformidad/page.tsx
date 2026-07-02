@@ -30,6 +30,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type VentaCtx = {
   id: string;
@@ -225,7 +226,7 @@ function CapturarFase16Body() {
             .insert({
               empresa_id: DILESA_EMPRESA_ID,
               venta_id: venta.id,
-              programada_para: new Date().toISOString().slice(0, 10),
+              programada_para: hoyISOMatamoros(),
               ...respuestas,
             });
       if (encErr) {
@@ -279,15 +280,12 @@ function CapturarFase16Body() {
         .update({ estado: 'sin_respuesta' })
         .eq('id', encuesta.id);
     } else {
-      await sb
-        .schema('dilesa')
-        .from('venta_encuestas')
-        .insert({
-          empresa_id: DILESA_EMPRESA_ID,
-          venta_id: venta.id,
-          programada_para: new Date().toISOString().slice(0, 10),
-          estado: 'sin_respuesta',
-        });
+      await sb.schema('dilesa').from('venta_encuestas').insert({
+        empresa_id: DILESA_EMPRESA_ID,
+        venta_id: venta.id,
+        programada_para: hoyISOMatamoros(),
+        estado: 'sin_respuesta',
+      });
     }
     const result = await marcarFase(sb, {
       ventaId: venta.id,

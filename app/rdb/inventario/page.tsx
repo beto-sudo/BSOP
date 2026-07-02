@@ -37,6 +37,7 @@ import { type StockItem } from '@/components/inventario/types';
 import { computeStockStats } from '@/components/inventario/utils';
 import { formatCurrency } from '@/lib/format';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const FILTER_DEFAULTS = {
   search: '',
@@ -389,7 +390,7 @@ function InventarioStockBody() {
             <input
               type="date"
               aria-label="Fecha de corte del inventario"
-              max={new Date().toISOString().split('T')[0]}
+              max={hoyISOMatamoros()}
               value={fechaCorte}
               onChange={(e) => setFilter('fechaCorte', e.target.value)}
               className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

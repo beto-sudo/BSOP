@@ -46,6 +46,7 @@ import {
   type ZonaSalarioMinimo,
 } from '@/lib/hr/salario-minimo-zona';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const FORMA_PAGO_LABELS: Record<FormaPagoFiniquito, string> = {
   efectivo: 'Efectivo',
@@ -169,7 +170,7 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
     setFechaIngreso(fi ?? '');
     setFechaBajaGuardada(fb);
     setMotivoBajaGuardado((emp as any).motivo_baja ?? null);
-    setFechaBaja(fb ?? new Date().toISOString().split('T')[0]);
+    setFechaBaja(fb ?? hoyISOMatamoros());
 
     const sueldoD =
       (comp as any)?.sueldo_diario ??
@@ -226,7 +227,7 @@ function Inner({ empresaSlug }: EmpleadoFiniquitoModuleProps) {
         empleado_id: id,
         empresa_id: empresaId,
         fecha_baja: calculo.fechaBaja,
-        fecha_convenio: new Date().toISOString().split('T')[0],
+        fecha_convenio: hoyISOMatamoros(),
         causa: calculo.causa,
         motivo_detalle: motivoDetalle || motivoBajaGuardado || null,
         fecha_ingreso: calculo.fechaIngreso,

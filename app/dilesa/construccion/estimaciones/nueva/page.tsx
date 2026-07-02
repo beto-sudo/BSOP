@@ -40,6 +40,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type ContratistaOpt = {
   id: string;
@@ -85,9 +86,7 @@ function NuevaEstimacionForm() {
 
   // ── Form ────────────────────────────────────────────────────────────
   const [contratistaId, setContratistaId] = useState<string>('');
-  const [fechaCierre, setFechaCierre] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaCierre, setFechaCierre] = useState<string>(() => hoyISOMatamoros());
   const [retencionPct, setRetencionPct] = useState<string>('5');
 
   // ── Preview ─────────────────────────────────────────────────────────

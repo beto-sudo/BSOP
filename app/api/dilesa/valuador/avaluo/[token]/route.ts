@@ -32,6 +32,7 @@ import { verifyAvaluoToken } from '@/lib/dilesa/avaluo-token';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { nombreFase } from '@/lib/dilesa/fases';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -223,7 +224,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
       venta_id: ventaId,
       fase: nombreFase(5),
       posicion: 5,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: hoyISOMatamoros(),
       registrado_por: null,
       notas,
     });

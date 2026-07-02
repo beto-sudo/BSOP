@@ -45,6 +45,7 @@ import {
   type DateRange,
 } from '@/components/filters/date-range-filter';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const ESTADO_TONE: Record<string, BadgeTone> = { enviada: 'info', parcial: 'warning' };
 const ESTADO_LABEL: Record<string, string> = { enviada: 'Enviada', parcial: 'Parcial' };
@@ -361,10 +362,7 @@ export function RecepcionesModule({ empresaId }: { empresaId: string }) {
       r.lineas.filter((l) => lineaPendiente(l) > 0).length,
       r.fecha ?? '',
     ]);
-    downloadCsv(
-      `recepciones-pendientes-${new Date().toISOString().slice(0, 10)}`,
-      toCsv(headers, filas)
-    );
+    downloadCsv(`recepciones-pendientes-${hoyISOMatamoros()}`, toCsv(headers, filas));
   }, [filtrados]);
 
   const columns: Column<OcRow>[] = [

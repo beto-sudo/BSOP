@@ -17,7 +17,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KpisDelDia } from './resumen-consejo-kpis';
-import { fechaISOMatamoros, inicioMesMatamoros } from '@/lib/fecha-mx';
+import { fechaISOMatamoros, inicioMesMatamoros, restarMesesISO } from '@/lib/fecha-mx';
 
 // ── Tipos por sección ───────────────────────────────────────────────────────
 
@@ -891,12 +891,8 @@ export async function fetchResumenConsejoData(
   // `venta_fases.fecha` es un `date` local, así que comparamos fecha local.
   const inicioMes = inicioMesMatamoros(now);
   const hoyISO = fechaISOMatamoros(now);
-  // Ventana de absorción: 3 meses móviles hasta hoy (aritmética de calendario
-  // sobre los componentes de la fecha local; Date.UTC solo resuelve el rollover).
-  const [hoyY, hoyM, hoyD] = hoyISO.split('-').map(Number);
-  const inicio3m = new Date(Date.UTC(hoyY, hoyM - 1 - ABSORCION_VENTANA_MESES, hoyD))
-    .toISOString()
-    .slice(0, 10);
+  // Ventana de absorción: 3 meses móviles hasta hoy (sobre la fecha local).
+  const inicio3m = restarMesesISO(hoyISO, ABSORCION_VENTANA_MESES);
 
   const [
     proyectosRes,

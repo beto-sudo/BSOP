@@ -50,6 +50,7 @@ import {
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
 import { requiereSeguroCalidad } from '@/lib/dilesa/captura/fase-roles';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type VentaCtx = {
   id: string;
@@ -119,11 +120,11 @@ function CapturarFase5Body() {
   }, [venta?.tipo_credito]);
   const docsFase = useDocsFaseColaborativos(ventaId, slotsF5);
   const [montoAvaluo, setMontoAvaluo] = useState<string>('');
-  const [fechaAvaluo, setFechaAvaluo] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fechaAvaluo, setFechaAvaluo] = useState<string>(hoyISOMatamoros());
   // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
   const [guardado, setGuardado] = useState<{ monto: string; fecha: string }>({
     monto: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyISOMatamoros(),
   });
 
   const [loading, setLoading] = useState(true);
@@ -165,7 +166,7 @@ function CapturarFase5Body() {
       // En corrección (fase ya cerrada) mostramos la fecha real del cierre, no hoy.
       const fechaCargada = v.fecha_avaluo_cerrado
         ? v.fecha_avaluo_cerrado.slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
+        : hoyISOMatamoros();
       if (v.monto_avaluo != null) setMontoAvaluo(montoCargado);
       if (v.fecha_avaluo_cerrado) setFechaAvaluo(fechaCargada);
       setGuardado({ monto: montoCargado, fecha: fechaCargada });

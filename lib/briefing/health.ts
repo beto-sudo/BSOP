@@ -14,6 +14,7 @@
 
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import type { HealthMetricRow } from '@/lib/health';
+import { fechaISOMatamoros } from '@/lib/fecha-mx';
 import {
   groupDailyAverage,
   groupDailySleep,
@@ -69,7 +70,7 @@ function latestDate(rows: HealthMetricRow[]): string | null {
 }
 
 function isoNDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return fechaISOMatamoros(new Date(Date.now() - days * 86_400_000));
 }
 
 /**

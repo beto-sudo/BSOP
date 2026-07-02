@@ -14,6 +14,7 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { signEncuestaToken } from '@/lib/dilesa/encuesta-token';
 import { sendEncuestaEmail } from '@/lib/dilesa/encuesta-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -109,18 +110,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
         .eq('id', enc.id);
     } else {
-      await admin
-        .schema('dilesa')
-        .from('venta_encuestas')
-        .insert({
-          empresa_id: venta.empresa_id,
-          venta_id: id,
-          programada_para: new Date().toISOString().slice(0, 10),
-          estado: 'enviada',
-          canal: 'email',
-          intentos: 1,
-          ultimo_envio_at: new Date().toISOString(),
-        });
+      await admin.schema('dilesa').from('venta_encuestas').insert({
+        empresa_id: venta.empresa_id,
+        venta_id: id,
+        programada_para: hoyISOMatamoros(),
+        estado: 'enviada',
+        canal: 'email',
+        intentos: 1,
+        ultimo_envio_at: new Date().toISOString(),
+      });
     }
   }
 

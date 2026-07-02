@@ -77,6 +77,7 @@ import {
   type DateRange,
 } from '@/components/filters/date-range-filter';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const ESTADO_TONE: Record<CotizacionEstado, BadgeTone> = {
   abierta: 'info',
@@ -561,7 +562,7 @@ export function CotizacionesModule({ empresaId }: { empresaId: string }) {
       `${r.proveedores.filter((p) => p.estado !== 'invitado').length}/${r.proveedores.length}`,
       r.fechaLimite ?? '',
     ]);
-    downloadCsv(`cotizaciones-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+    downloadCsv(`cotizaciones-${hoyISOMatamoros()}`, toCsv(headers, filas));
   }, [filtrados]);
 
   const columns: Column<CotizacionRow>[] = [

@@ -32,6 +32,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 import { buildAdjuntoPath, type AdjuntoEntidad } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type EstadoRecepcion = 'programada' | 'con_observaciones' | 'recibida' | 'rechazada';
 
@@ -55,7 +56,7 @@ export type RecepcionObraDrawerProps = {
 };
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return hoyISOMatamoros();
 }
 
 /** Sube un archivo a Storage + registra el adjunto en erp.adjuntos. */

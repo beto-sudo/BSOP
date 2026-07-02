@@ -48,6 +48,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type VentaCtx = {
   id: string;
@@ -98,9 +99,7 @@ function CapturarFase6Body() {
   // Número de crédito + institución (lo trae la constancia del banco).
   const [creditoTitularRef, setCreditoTitularRef] = useState<string>('');
   const [creditoCotitularRef, setCreditoCotitularRef] = useState<string>('');
-  const [fechaInscripcion, setFechaInscripcion] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaInscripcion, setFechaInscripcion] = useState<string>(hoyISOMatamoros());
   // Autoguardado (ADR-051): firma de los campos de crédito persistidos (arranca =
   // lo cargado). La fecha de inscripción NO autoguarda (va a venta_fases.notas).
   const [guardado, setGuardado] = useState({ montoTit: '', montoCo: '', refTit: '', refCo: '' });
@@ -286,7 +285,7 @@ function CapturarFase6Body() {
           credito_cotitular_ref: creditoCotitularRef.trim() || null,
         },
         notas:
-          fechaInscripcion !== new Date().toISOString().slice(0, 10)
+          fechaInscripcion !== hoyISOMatamoros()
             ? `Fecha de inscripción: ${fechaInscripcion}`
             : null,
         registradoPor: userId,

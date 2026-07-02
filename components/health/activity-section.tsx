@@ -9,6 +9,7 @@ import { buildDeltaHelper, filterRecentRows, groupDailySum } from './helpers';
 import { TONES } from './tones';
 import { TrendCard } from './trend-card';
 import type { ChartConfig, ToneKey } from './types';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Subkey =
   | 'steps'
@@ -121,7 +122,7 @@ export function ActivitySection({
 
   // Rings are pinned to "today" so they represent the live close-your-rings
   // state. The rest of the section shows aggregates for the selected range.
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = hoyISOMatamoros();
   const todayFrom = (series: { date: string; value: number }[]) =>
     series.find((point) => point.date === todayKey)?.value ?? 0;
   const todayActiveEnergy = todayFrom(activeEnergySeries);

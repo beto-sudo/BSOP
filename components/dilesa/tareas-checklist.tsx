@@ -34,6 +34,7 @@ import {
   sumMontosPasos,
 } from './tarea-pasos';
 import type { EmpresaSlug } from '@/lib/storage';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -299,7 +300,7 @@ function TareaRowCompact({
       const prev = tarea.estado;
       onPatch(tarea.id, {
         estado: next,
-        fecha_completada: next === 'completada' ? new Date().toISOString().slice(0, 10) : null,
+        fecha_completada: next === 'completada' ? hoyISOMatamoros() : null,
       });
       startTransition(async () => {
         const r = await updateTareaEstado(tarea.id, next);

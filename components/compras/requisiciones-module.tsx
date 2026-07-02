@@ -72,6 +72,7 @@ import {
   type DateRange,
 } from '@/components/filters/date-range-filter';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const SIN = '__sin__';
 /** Valor del selector para capturar una requisición libre (gasto suelto sin proyecto). */
@@ -739,7 +740,7 @@ export function RequisicionesModule({ empresaId }: { empresaId: string }) {
       reqTotal(r),
       r.fecha ?? '',
     ]);
-    downloadCsv(`requisiciones-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, filas));
+    downloadCsv(`requisiciones-${hoyISOMatamoros()}`, toCsv(headers, filas));
   }, [filtrados]);
 
   const columns: Column<ReqRow>[] = [
