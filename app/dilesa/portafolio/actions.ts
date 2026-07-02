@@ -382,3 +382,81 @@ export async function ejecutarMovimientoActivos(input: {
   const res = (data as { resultantes?: string[] } | null)?.resultantes ?? [];
   return { ok: true, resultantes: res };
 }
+
+/** Campos del embudo/due-diligence de terreno editables con quick-actions. */
+const TERRENO_QUICK_FIELDS = new Set([
+  'etapa',
+  'prioridad',
+  'responsable',
+  'siguiente_accion',
+  'decision_actual',
+  'factibilidad_agua',
+  'factibilidad_drenaje',
+  'factibilidad_electricidad',
+  'factibilidad_vialidad',
+]);
+
+/**
+ * Actualiza campos puntuales del embudo de compra / due diligence de un
+ * terreno (S6 Evaluación 2.0) sin re-crear el satélite completo. Todo
+ * cambio marca fecha_ultima_revision = hoy; los cambios de etapa/decisión
+ * quedan en la bitácora vía trigger.
+ */
+export async function actualizarEmbudoTerreno(input: {
+  activoId: string;
+  campos: Record<string, string | boolean | null>;
+  fechaRevision: string; // YYYY-MM-DD local del operador
+}): Promise<Result> {
+  const keys = Object.keys(input.campos);
+  if (keys.some((k) => !TERRENO_QUICK_FIELDS.has(k))) {
+    return { ok: false, error: 'Campo no permitido en la actualización rápida.' };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fechaRevision)) {
+    return { ok: false, error: 'La fecha de revisión no es válida.' };
+  }
+
+  const supabase = await getActionClient();
+  if (!(await puedeAdministrar(supabase))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede actualizar el embudo.' };
+  }
+
+  const { error } = await supabase
+    .schema('dilesa')
+    .from('activo_terreno')
+    .update({ ...input.campos, fecha_ultima_revision: input.fechaRevision })
+    .eq('activo_id', input.activoId)
+    .eq('empresa_id', DILESA_EMPRESA_ID);
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo actualizar el embudo.') };
+  }
+
+  revalidatePath('/dilesa/portafolio');
+  return { ok: true };
+}
+
+/** Agrega una nota a la bitácora append-only del activo (S6). */
+export async function agregarBitacoraActivo(input: {
+  activoId: string;
+  texto: string;
+}): Promise<Result> {
+  const texto = input.texto.trim();
+  if (!texto) return { ok: false, error: 'La nota no puede ir vacía.' };
+
+  const supabase = await getActionClient();
+  const eu = await getEffectiveUser(supabase);
+  if (!eu || !(eu.isAdmin === true || (eu.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede agregar notas.' };
+  }
+
+  const { error } = await supabase.schema('dilesa').from('activo_bitacora').insert({
+    empresa_id: DILESA_EMPRESA_ID,
+    activo_id: input.activoId,
+    tipo: 'nota',
+    texto,
+    creado_por: eu.id,
+  });
+  if (error) {
+    return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo guardar la nota.') };
+  }
+  return { ok: true };
+}
