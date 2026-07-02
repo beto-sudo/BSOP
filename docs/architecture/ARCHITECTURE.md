@@ -359,6 +359,7 @@ Ver [reglas SS1-SS7 en ADR-030](../adr/030_submodule_permissions.md).
 | Manual de usuario in-app           | [ADR-043](../adr/043_manual_usuario_in_app.md)        | markdown versionado + `<HelpButton>` contextual + PDF on-demand (M1-M8)              |
 | Capa única de acceso a IA          | [ADR-046](../adr/046_capa_unica_acceso_ia.md)         | `lib/ai` único entry point + registry + drift-guard (registro-ia)                    |
 | Reportes (preset + vista + PDF)    | [ADR-047](../adr/047_reportes_preset_vista_pdf.md)    | registry + `<ReporteCatalogo>`/`<ReporteShell>` + hub-índice + PDF (dilesa-reportes) |
+| Timezone: "hoy" = Matamoros        | [ADR-054](../adr/054_timezone_convencion.md)          | `lib/fecha-mx.ts` (`hoyISOMatamoros`) + lint guard; `Etc/GMT+6` solo Playtomic/holds |
 
 ### Data / DB
 
