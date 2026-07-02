@@ -31,6 +31,7 @@ import { ActivoMovimientoDialog } from '@/components/dilesa/activo-movimiento-di
 import { ActivoMovimientos } from '@/components/dilesa/activo-movimientos';
 import { ActivoEvaluacionPanel } from '@/components/dilesa/activo-evaluacion-panel';
 import { ActivoBitacora } from '@/components/dilesa/activo-bitacora';
+import { ActivoFichaDialog } from '@/components/dilesa/activo-ficha-dialog';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
@@ -374,6 +375,7 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [regresarOpen, setRegresarOpen] = useState(false);
   const [movimientoOpen, setMovimientoOpen] = useState(false);
+  const [fichaOpen, setFichaOpen] = useState(false);
   // Incrementa para refetch tras editar (el effect depende de él).
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -483,6 +485,19 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href={`/api/dilesa/portafolio/activo/${activo.id}/ficha`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-8 items-center rounded-md border border-[var(--border)] px-3 text-sm text-[var(--text)]/80 hover:text-[var(--text)]"
+            >
+              Ficha PDF
+            </a>
+            {puedeAdmin ? (
+              <Button size="sm" variant="outline" onClick={() => setFichaOpen(true)}>
+                Enviar ficha
+              </Button>
+            ) : null}
             {puedeAdmin ? (
               <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                 Editar
@@ -768,6 +783,14 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
           open={editOpen}
           onOpenChange={setEditOpen}
           onSaved={() => setRefreshKey((k) => k + 1)}
+        />
+      ) : null}
+
+      {puedeAdmin ? (
+        <ActivoFichaDialog
+          activo={{ id: activo.id, nombre: activo.nombre }}
+          open={fichaOpen}
+          onOpenChange={setFichaOpen}
         />
       ) : null}
 
