@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (nuevas `cuentas_prediales`, `prediales_ejercicios`, `prediales_convenios`, `activo_movimientos`; INSERT masivo en `activos`; sub-slug RBAC `dilesa.portafolio.prediales` en `core.modulos`/`core.permisos_rol`). `erp` (lectura `documentos`/`adjuntos` para escrituras y KMZ). UI: retiro del drawer de detalle → página expediente `/dilesa/portafolio/activo/[id]`, tab Prediales en el hub, visor KMZ, ficha comercial PDF.
 **Estado:** in_progress
-**Próximo hito:** dale de Beto al PR #1177 (RPCs zona, falso positivo del gate) + arrancar S5 (subdivisiones/fusiones + ADR)
+**Próximo hito:** arrancar S5 (subdivisiones/fusiones + ADR; piloto = relotificación del área verde)
 **Dueño:** Beto
 **Creada:** 2026-07-01
-**Última actualización:** 2026-07-02 (S1-S4 entregados en tramo autónomo nocturno)
+**Última actualización:** 2026-07-02 (S1-S4 en prod; dale a #1177; parcelas corregidas a Nava)
 
 > **Sucede a** [`dilesa-portafolio-expediente`](dilesa-portafolio-expediente.md) (cerrada). El visor interactivo multi-capa (fraccionamientos, avances de urbanización/ventas sobre plano) sigue viviendo en la iniciativa hermana [`mapas-interactivos`](mapas-interactivos.md) — aquí solo el render del KMZ del activo.
 
@@ -86,3 +86,4 @@ El Portafolio se vuelve la fuente de verdad de **todos** los inmuebles DILESA co
   - **#1177 (BLOQUEADO por gate, espera dale de Beto)** — RPCs `fn_alta/actualizar_activo` aprenden `zona` (falso positivo del clasificador; sin esto no se edita zona desde la UI, lo demás opera).
   - **Checklist KMZ/escrituras** entregado a Beto (Excel, 118 predios, en Downloads).
   - **Excepciones de datos reportadas**: clave duplicada `0022220051` (Lomas del Sol #53/#57, se conservó una), `0301000042` (#39) sin montos ni marca PAGADO, montos idénticos sospechosos entre Deportivo RDB y Business Park #43 ($186,092.55/$273,090.82 — ¿copy-paste en el Excel?), folio 31066 repetido en 3 predios (folio de recibo, no identificador). **Pregunta abierta**: ¿el convenio 60% aplica también a las parcelas ejidales? (se cargaron sin convenio).
+- **2026-07-02 — Respuestas de Beto (mañana):** dale al #1177 (label `finanzas-ok`, mergea). Las parcelas ejidales están en el municipio de **Nava** (no Piedras Negras) — corrección de datos en migración `20260702131512` (25 activos / 27 cuentas → Nava; se asumió que los 2 ranchos del mismo Excel también son Nava — corregir si no). El convenio 60% es solo con Piedras Negras: las parcelas ya estaban sin convenio, sin cambios.
