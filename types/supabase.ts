@@ -2045,6 +2045,84 @@ export type Database = {
           },
         ]
       }
+      activo_movimiento_partes: {
+        Row: {
+          activo_id: string
+          empresa_id: string
+          id: string
+          movimiento_id: string
+          rol: string
+        }
+        Insert: {
+          activo_id: string
+          empresa_id: string
+          id?: string
+          movimiento_id: string
+          rol: string
+        }
+        Update: {
+          activo_id?: string
+          empresa_id?: string
+          id?: string
+          movimiento_id?: string
+          rol?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_movimiento_partes_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activo_movimiento_partes_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "activo_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activo_movimientos: {
+        Row: {
+          creado_por: string | null
+          created_at: string
+          documento_id: string | null
+          empresa_id: string
+          fecha: string
+          id: string
+          notas: string | null
+          superficie_origen_m2: number | null
+          superficie_resultante_m2: number | null
+          tipo: string
+        }
+        Insert: {
+          creado_por?: string | null
+          created_at?: string
+          documento_id?: string | null
+          empresa_id: string
+          fecha: string
+          id?: string
+          notas?: string | null
+          superficie_origen_m2?: number | null
+          superficie_resultante_m2?: number | null
+          tipo: string
+        }
+        Update: {
+          creado_por?: string | null
+          created_at?: string
+          documento_id?: string | null
+          empresa_id?: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          superficie_origen_m2?: number | null
+          superficie_resultante_m2?: number | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       activo_nave: {
         Row: {
           activo_id: string
@@ -7201,6 +7279,17 @@ export type Database = {
           p_monto_avaluo: number
           p_motivo?: string
           p_venta_id: string
+        }
+        Returns: Json
+      }
+      fn_ejecutar_movimiento_activos: {
+        Args: {
+          p_documento_id?: string
+          p_fecha: string
+          p_notas?: string
+          p_origen_ids: string[]
+          p_resultantes: Json
+          p_tipo: string
         }
         Returns: Json
       }
