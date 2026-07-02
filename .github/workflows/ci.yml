@@ -44,6 +44,13 @@ jobs:
       - name: Prettier — check
         run: npm run format:check
 
+      # Auditoría de consistencia UI (scripts/audit-ui.ts). Reporta cobertura
+      # de patrones por página y solo falla con issues *critical* — hoy es
+      # informativa; el reporte queda en el log del job. Revisión general
+      # 2026-06 (ux-consolidacion: "audit-ui.ts corriendo en CI").
+      - name: UI audit — consistencia de patrones
+        run: npm run audit:ui
+
       # Valida los HEADERS de docs/planning/*.md (slug == archivo, y que cada
       # iniciativa activa tenga nombre/Empresas/Schemas/Próximo hito/Última
       # actualización). NO compara la tabla `## Activas` de INITIATIVES.md: esa
@@ -59,3 +66,31 @@ jobs:
       # determinista por rama y no depende del secret SUPABASE_DB_URL ni del
       # estado de prod. Se quitó de aquí para que prod adelantado/atrasado deje
       # de romper el job `quality` de PRs ajenos.
+
+  # `next build` completo — atrapa errores que typecheck no ve (páginas que
+  # rompen al prerender, imports server-only en client components, config
+  # inválida). Hallazgo C6 de la revisión general 2026-06: CI pasaba verde
+  # con builds rotos y el error aparecía hasta el deploy de Vercel. Job
+  # paralelo a `quality` para no alargar el wall-clock del PR. No necesita
+  # secrets: el build pasa sin env vars (las páginas son dinámicas; ningún
+  # prerender toca Supabase en build time).
+  build:
+    name: Next build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Next.js — build
+        run: npm run build
