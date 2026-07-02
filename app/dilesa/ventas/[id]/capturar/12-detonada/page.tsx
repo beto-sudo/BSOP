@@ -256,9 +256,11 @@ function GuiaCobranza({ ventaId }: { ventaId: string }) {
           </p>
           <p className="text-[var(--text)]/70">
             Registra el abono de la institución en el estado de cuenta de la venta — con su
-            comprobante y el XML del recibo de caja (ambos obligatorios). Al registrarlo, esta fase
-            se cierra sola y el comprobante se copia al expediente. Con coacreditados (p. ej.
-            Infonavit Unamos), registra un abono por cada depósito, cada uno con su comprobante.
+            comprobante (siempre obligatorio) y el XML del recibo de caja; si el pago salda la deuda
+            y su CFDI se emite con la factura de la escrituración, decláralo en la captura. Al
+            registrarlo, esta fase se cierra sola y el comprobante se copia al expediente. Con
+            coacreditados (p. ej. Infonavit Unamos), registra un abono por cada depósito, cada uno
+            con su comprobante.
           </p>
         </div>
       </div>
