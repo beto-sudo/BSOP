@@ -31,6 +31,7 @@ import {
   UPDATE_TIPO_CONFIG,
 } from '@/components/tasks/tasks-shared';
 import { JUNTA_ESTADO_CONFIG as ESTADO_JUNTA } from '@/lib/status-tokens';
+import { tipoOptionsForEmpresa } from '@/lib/juntas/tipos';
 import { Badge } from '@/components/ui/badge';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -121,22 +122,6 @@ type TaskUpdate = {
     fecha_vence: string | null;
   } | null;
 };
-
-const TIPO_OPTIONS: { value: string; label: string; icon: string }[] = [
-  { value: 'Comité Ejecutivo', label: 'Comité Ejecutivo', icon: '👔' },
-  { value: 'Consejo', label: 'Consejo', icon: '🏢' },
-  { value: 'Ventas', label: 'Ventas', icon: '💰' },
-  { value: 'Atención PosVenta', label: 'Atención PosVenta', icon: '🔧' },
-  { value: 'Administración', label: 'Administración', icon: '📁' },
-  { value: 'Mercadotecnia', label: 'Mercadotecnia', icon: '📣' },
-  { value: 'Construcción', label: 'Construcción', icon: '🏗️' },
-  { value: 'Compras y Admon. Inventario', label: 'Compras y Admon. Inv.', icon: '📦' },
-  { value: 'Maquinaria', label: 'Maquinaria', icon: '🚜' },
-  { value: 'Proyectos', label: 'Proyectos', icon: '🗂️' },
-  { value: 'Rincón del Bosque', label: 'Rincón del Bosque', icon: '🌲' },
-  { value: 'Extraordinaria', label: 'Extraordinaria', icon: '🚨' },
-  { value: 'Otro', label: 'Otro', icon: '📌' },
-];
 
 function toDatetimeLocal(iso: string) {
   const d = new Date(iso);
@@ -1178,7 +1163,7 @@ export function JuntaDetailModule({ empresaSlug }: JuntaDetailModuleProps) {
             <Combobox
               value={tipo ?? ''}
               onChange={(v) => setTipo(v)}
-              options={TIPO_OPTIONS.map((t) => ({
+              options={tipoOptionsForEmpresa(empresaSlug, tipo).map((t) => ({
                 value: t.value,
                 label: `${t.icon} ${t.label}`,
               }))}
