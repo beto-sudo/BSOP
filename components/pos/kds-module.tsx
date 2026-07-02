@@ -19,6 +19,7 @@ type KdsItem = {
   enviado_cocina_at: string | null;
   created_at: string;
   ubicacion: string | null;
+  cuenta_notas: string | null;
 };
 
 /**
@@ -66,20 +67,23 @@ export function PosKdsModule() {
       if (err) throw err;
 
       const cuentaIds = [...new Set((data ?? []).map((i) => i.cuenta_id))];
-      const ubicaciones = new Map<string, string | null>();
+      const cuentasInfo = new Map<string, { ubicacion: string | null; notas: string | null }>();
       if (cuentaIds.length > 0) {
         const { data: cuentas } = await sb
           .schema('rdb')
           .from('pos_cuentas')
-          .select('id, ubicacion')
+          .select('id, ubicacion, notas')
           .in('id', cuentaIds);
-        for (const c of cuentas ?? []) ubicaciones.set(c.id, c.ubicacion);
+        for (const c of cuentas ?? []) {
+          cuentasInfo.set(c.id, { ubicacion: c.ubicacion, notas: c.notas });
+        }
       }
 
       const next: KdsItem[] = (data ?? []).map((i) => ({
         ...i,
         cantidad: Number(i.cantidad),
-        ubicacion: ubicaciones.get(i.cuenta_id) ?? null,
+        ubicacion: cuentasInfo.get(i.cuenta_id)?.ubicacion ?? null,
+        cuenta_notas: cuentasInfo.get(i.cuenta_id)?.notas ?? null,
       }));
 
       const nuevos = next.filter((i) => i.estado === 'en_cocina' && !prevIds.current.has(i.id));
@@ -210,7 +214,16 @@ function KdsCard({ item, children }: { item: KdsItem; children: React.ReactNode 
           <div className="text-sm text-muted-foreground">
             {item.ubicacion ?? 'Sin ubicación'} · {formatTime(desde)}
           </div>
-          {item.notas && <div className="mt-1 text-sm italic">“{item.notas}”</div>}
+          {item.notas && (
+            <div className="mt-1 text-sm font-medium text-amber-700 dark:text-amber-400">
+              ⚠ “{item.notas}”
+            </div>
+          )}
+          {item.cuenta_notas && (
+            <div className="mt-0.5 text-xs italic text-muted-foreground">
+              Orden: “{item.cuenta_notas}”
+            </div>
+          )}
         </div>
       </div>
       <div className="mt-2">{children}</div>
