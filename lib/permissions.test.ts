@@ -452,6 +452,7 @@ const EXPECTED_DB_MODULE_SLUGS = new Set<string>([
   // POS propio (ADR-056) — padre umbrella + sub-slugs por tab.
   'rdb.pos',
   'rdb.pos.captura',
+  'rdb.pos.pedidos',
   'rdb.pos.kds',
   'rdb.pos.admin',
   'rdb.ordenes_compra',

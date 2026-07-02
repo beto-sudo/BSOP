@@ -17,6 +17,7 @@ import {
  */
 const TABS = [
   { label: 'Captura', href: '/rdb/pos', exact: true, module: 'rdb.pos.captura' },
+  { label: 'Pedidos', href: '/rdb/pos/pedidos', module: 'rdb.pos.pedidos' },
   { label: 'Cocina', href: '/rdb/pos/kds', module: 'rdb.pos.kds' },
   { label: 'Admin', href: '/rdb/pos/admin', module: 'rdb.pos.admin' },
 ] as const;

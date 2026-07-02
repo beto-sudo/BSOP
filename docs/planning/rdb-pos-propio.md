@@ -175,6 +175,20 @@ hacer.
 
 ## Bitácora
 
+- **2026-07-02** — **S3a (hallazgos de la revisión in-situ de Waitry)**:
+  revisión del panel app.waitry.net con la sesión de Beto — hallazgos
+  priorizados: variaciones estructuradas (21 tipos en uso, → S4), zonas
+  fijas vs texto libre, historial de pedidos con folio corto y camarero,
+  roles. Entregado en `20260702224039`: catálogo `pos_zonas` (seed con las
+  14 zonas de Waitry) + selector de zona en captura y mover; folio corto
+  diario (`#N`, advisory lock) visible en tablero/cuenta; tab **Pedidos**
+  (`rdb.pos.pedidos`) con el día por zona/estado/camarero. Limpieza de
+  datos de prueba de Beto en prod (2 cuentas, 4 movimientos) con su OK.
+- **2026-07-02** — **Decisión**: variaciones/opciones de producto con
+  resolución a producto real de inventario (patrón Waitry: "Powerade" →
+  variación "Ponche" descuenta el sabor exacto) = **S4**, antes o durante
+  el piloto. Notas libres cubren el interim.
+
 - **2026-07-02** — **S2.6**: (a) todo se surte de cocina excepto servicios
   (Beto): `va_a_cocina=true` en 11 categorías; quedan fuera las 8 de
   servicio (Academias, Clínica, Propina, 4 Rentas de cancha, Torneos);

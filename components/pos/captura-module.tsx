@@ -22,10 +22,12 @@ import {
   type ItemCuenta,
   type PagoInput,
   type ProductoVenta,
+  type Zona,
   fetchCatalogo,
   fetchCuentasAbiertas,
   fetchEstaciones,
   fetchItemsCuenta,
+  fetchZonas,
   rpcAbrirCuenta,
   rpcAgregarRonda,
   rpcCancelarCuenta,
@@ -67,7 +69,8 @@ export function PosCapturaModule() {
   const [cuentaId, setCuentaId] = useState<string | null>(null);
   const [items, setItems] = useState<ItemCuenta[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [ubicacion, setUbicacion] = useState('');
+  const [zonas, setZonas] = useState<Zona[]>([]);
+  const [ubicacion, setUbicacion] = useState(''); // zona elegida para la cuenta nueva
   const [busqueda, setBusqueda] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +85,7 @@ export function PosCapturaModule() {
   const [pinError, setPinError] = useState<string | null>(null);
 
   const [cobroOpen, setCobroOpen] = useState(false);
+  const [moverOpen, setMoverOpen] = useState(false);
 
   const cuenta = useMemo(() => cuentas.find((c) => c.id === cuentaId) ?? null, [cuentas, cuentaId]);
 
@@ -111,6 +115,9 @@ export function PosCapturaModule() {
     fetchEstaciones()
       .then(setEstaciones)
       .catch((e) => setError(getSupabaseErrorMessage(e, 'Error al cargar estaciones')));
+    fetchZonas()
+      .then(setZonas)
+      .catch((e) => setError(getSupabaseErrorMessage(e, 'Error al cargar zonas')));
     fetchCatalogo()
       .then((cat) => {
         setCatalogo(cat);
@@ -221,6 +228,10 @@ export function PosCapturaModule() {
 
   function confirmarRonda() {
     if (!estacionId || cart.length === 0) return;
+    if (!cuenta && !ubicacion) {
+      toast.add({ title: 'Elige la zona del cliente antes de abrir la cuenta', type: 'error' });
+      return;
+    }
     const actionAbrir = crypto.randomUUID();
     const actionRonda = crypto.randomUUID();
     const actionCocina = crypto.randomUUID();
@@ -297,20 +308,14 @@ export function PosCapturaModule() {
     });
   }
 
-  function moverCuenta() {
+  function moverCuentaA(zona: string) {
     if (!cuenta) return;
     const action = crypto.randomUUID();
-    const nueva = window.prompt('¿A dónde se mueve la cuenta?', cuenta.ubicacion ?? '');
-    if (!nueva?.trim()) return;
-    pedirPin(`Mover cuenta a ${nueva.trim()}`, async (pin) => {
-      await rpcMoverCuenta({
-        cuentaId: cuenta.id,
-        pin,
-        ubicacion: nueva.trim(),
-        clientActionId: action,
-      });
+    setMoverOpen(false);
+    pedirPin(`Mover cuenta a ${zona}`, async (pin) => {
+      await rpcMoverCuenta({ cuentaId: cuenta.id, pin, ubicacion: zona, clientActionId: action });
       await refreshCuentas();
-      toast.add({ title: `Cuenta movida a ${nueva.trim()}` });
+      toast.add({ title: `Cuenta movida a ${zona}` });
     });
   }
 
@@ -449,6 +454,9 @@ export function PosCapturaModule() {
                       className="rounded-lg border p-3 text-left shadow-sm transition hover:border-primary/60 active:scale-[0.98]"
                     >
                       <div className="truncate text-sm font-medium">
+                        {c.folio != null && (
+                          <span className="text-muted-foreground">#{c.folio} · </span>
+                        )}
                         {c.ubicacion ?? 'Sin ubicación'}
                       </div>
                       <div className="mt-1 font-mono text-base">{formatCurrency(c.total)}</div>
@@ -460,12 +468,24 @@ export function PosCapturaModule() {
                 </div>
               )}
               <div className="space-y-1 border-t pt-2">
-                <p className="text-xs text-muted-foreground">Nueva cuenta:</p>
-                <Input
-                  placeholder="Ubicación (Tiendita, Pádel 3…)"
-                  value={ubicacion}
-                  onChange={(e) => setUbicacion(e.target.value)}
-                />
+                <p className="text-xs text-muted-foreground">
+                  Nueva cuenta — ¿dónde está el cliente?
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {zonas.map((z) => (
+                    <button
+                      key={z.id}
+                      onClick={() => setUbicacion(z.nombre)}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                        ubicacion === z.nombre
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'hover:border-primary/60'
+                      }`}
+                    >
+                      {z.nombre}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -488,11 +508,14 @@ export function PosCapturaModule() {
               )}
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1">
+                  {cuenta.folio != null && (
+                    <span className="font-mono text-muted-foreground">#{cuenta.folio}</span>
+                  )}
                   {cuenta.ubicacion ?? 'Sin ubicación'}
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={moverCuenta}
+                    onClick={() => setMoverOpen(true)}
                     title="Mover de ubicación"
                   >
                     ⇄
@@ -624,6 +647,23 @@ export function PosCapturaModule() {
           )}
         </div>
       </div>
+
+      <Dialog open={moverOpen} onOpenChange={(o) => !o && setMoverOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿A dónde se mueve la cuenta?</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            {zonas
+              .filter((z) => z.nombre !== cuenta?.ubicacion)
+              .map((z) => (
+                <Button key={z.id} variant="outline" onClick={() => moverCuentaA(z.nombre)}>
+                  {z.nombre}
+                </Button>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PinDialog
         open={pinAccion !== null}

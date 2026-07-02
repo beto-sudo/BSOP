@@ -164,6 +164,7 @@ export const ROUTE_TO_MODULE: Record<string, string> = {
   '/rdb/cortes': 'rdb.cortes',
   // POS propio (ADR-056): padre umbrella `rdb.pos` + sub-slug por tab.
   '/rdb/pos': 'rdb.pos.captura',
+  '/rdb/pos/pedidos': 'rdb.pos.pedidos',
   '/rdb/pos/kds': 'rdb.pos.kds',
   '/rdb/pos/admin': 'rdb.pos.admin',
   // Productos: padre `rdb.productos` + 5 sub-slugs por tab (sub-slug pattern,
