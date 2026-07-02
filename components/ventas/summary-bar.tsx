@@ -3,9 +3,10 @@
 import { ShoppingBag, Receipt } from 'lucide-react';
 import type { Pedido } from './types';
 import { formatCurrency } from './utils';
+import { ventaCobrada } from './venta-cobrada';
 
 export function SummaryBar({ pedidos }: { pedidos: Pedido[] }) {
-  const total = pedidos.reduce((acc, p) => acc + (p.total_amount ?? 0), 0);
+  const total = pedidos.reduce((acc, p) => acc + ventaCobrada(p), 0);
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
       <div className="rounded-xl border bg-card px-4 py-3">

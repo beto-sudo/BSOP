@@ -19,6 +19,7 @@ import { ErrorBanner } from '@/components/module-page';
 import { Download } from 'lucide-react';
 import { CategoriaBadge } from './categoria-badge';
 import { TZ } from './utils';
+import { prorratearLineas, ventaCobrada } from './venta-cobrada';
 import {
   etiquetaCorta,
   etiquetaMes,
@@ -97,13 +98,16 @@ export function VentasComparativo() {
       const { data: pedidos, error: pedErr } = await supabase
         .schema('rdb')
         .from('v_waitry_pedidos')
-        .select('order_id, status, timestamp')
+        .select('order_id, status, timestamp, total_amount, total_discount')
         .gte('timestamp', rangoUtc.start)
         .lte('timestamp', rangoUtc.end)
         .limit(20000);
       if (pedErr) throw pedErr;
 
       const meta = new Map<string, PedidoMeta>();
+      // Venta cobrada por pedido — las líneas se prorratean a esta cifra,
+      // mismo criterio que los tabs Por producto / Por categoría.
+      const cobradoPorPedido = new Map<string, number>();
       for (const p of pedidos ?? []) {
         if (!p.order_id || !p.timestamp) continue;
         if ((p.status ?? '').toLowerCase().includes('cancel')) continue;
@@ -111,6 +115,7 @@ export function VentasComparativo() {
         const weekIdx = indiceSemana(fecha, semanas);
         if (weekIdx < 0) continue;
         meta.set(p.order_id, { weekIdx, inMonth: fecha >= mesInicio });
+        cobradoPorPedido.set(p.order_id, ventaCobrada(p));
       }
 
       const orderIds = [...meta.keys()];
@@ -137,8 +142,9 @@ export function VentasComparativo() {
 
       // 3) Pivote categoría × semana, acumulando importe y unidades en paralelo
       //    para que el toggle de métrica no dispare otra query.
+      const lineasCobradas = prorratearLineas(lineas, cobradoPorPedido);
       const map = new Map<string, AggRow>();
-      for (const ln of lineas) {
+      for (const ln of lineasCobradas) {
         const m = meta.get(ln.order_id);
         if (!m) continue;
         const key = ln.categoria_id ?? SIN_CATEGORIA_KEY;

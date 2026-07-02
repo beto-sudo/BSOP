@@ -11,6 +11,7 @@ import { Download, Search, Tags } from 'lucide-react';
 import { TZ } from './utils';
 import { CategoriaBadge } from './categoria-badge';
 import type { CategoriaFilter } from './types';
+import { prorratearLineas, ventaCobrada } from './venta-cobrada';
 
 // Las líneas de venta cuyo producto no resuelve a una categoría del
 // catálogo (product_id sin match en erp.productos.codigo, o producto sin
@@ -71,7 +72,7 @@ export function VentasPorCategoria({
       let pedidosQuery = supabase
         .schema('rdb')
         .from('v_waitry_pedidos')
-        .select('order_id, status')
+        .select('order_id, status, total_amount, total_discount')
         .limit(10000);
 
       if (corteFilter !== 'all') {
@@ -86,15 +87,22 @@ export function VentasPorCategoria({
       const { data: pedidos, error: pedidosErr } = await pedidosQuery;
       if (pedidosErr) throw pedidosErr;
 
-      const validOrderIds = (pedidos ?? [])
-        .filter((p) => !(p.status ?? '').toLowerCase().includes('cancel'))
-        .map((p) => p.order_id)
-        .filter((id): id is string => !!id);
+      const validPedidos = (pedidos ?? []).filter(
+        (p) => !!p.order_id && !(p.status ?? '').toLowerCase().includes('cancel')
+      );
+      const validOrderIds = validPedidos.map((p) => p.order_id as string);
 
       if (validOrderIds.length === 0) {
         setRows([]);
         return;
       }
+
+      // Venta cobrada por pedido — las líneas se prorratean a esta cifra para
+      // que el importe total cuadre con el tab Pedidos (descuentos de
+      // cabecera y líneas incompletas del POS incluidos).
+      const cobradoPorPedido = new Map(
+        validPedidos.map((p) => [p.order_id as string, ventaCobrada(p)])
+      );
 
       const CHUNK = 500;
       const allItems: CategoriaItemRow[] = [];
@@ -111,6 +119,8 @@ export function VentasPorCategoria({
         allItems.push(...((items ?? []) as CategoriaItemRow[]));
       }
 
+      const lineasCobradas = prorratearLineas(allItems, cobradoPorPedido);
+
       const agg = new Map<
         string,
         {
@@ -123,7 +133,7 @@ export function VentasPorCategoria({
         }
       >();
 
-      for (const it of allItems) {
+      for (const it of lineasCobradas) {
         const key = it.categoria_id ?? SIN_CATEGORIA_KEY;
         const prev = agg.get(key);
         const unidades = Number(it.quantity ?? 0);
