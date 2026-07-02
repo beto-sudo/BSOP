@@ -1550,6 +1550,44 @@ export type Database = {
   }
   dilesa: {
     Tables: {
+      activo_bitacora: {
+        Row: {
+          activo_id: string
+          creado_por: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          texto: string
+          tipo: string
+        }
+        Insert: {
+          activo_id: string
+          creado_por?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          texto: string
+          tipo?: string
+        }
+        Update: {
+          activo_id?: string
+          creado_por?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          texto?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activo_bitacora_activo_id_fkey"
+            columns: ["activo_id"]
+            isOneToOne: false
+            referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activo_cara: {
         Row: {
           activo_id: string

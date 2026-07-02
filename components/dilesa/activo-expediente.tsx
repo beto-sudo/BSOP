@@ -29,6 +29,8 @@ import { ActivoPrediales } from '@/components/dilesa/activo-prediales';
 import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
 import { ActivoMovimientoDialog } from '@/components/dilesa/activo-movimiento-dialog';
 import { ActivoMovimientos } from '@/components/dilesa/activo-movimientos';
+import { ActivoEvaluacionPanel } from '@/components/dilesa/activo-evaluacion-panel';
+import { ActivoBitacora } from '@/components/dilesa/activo-bitacora';
 import { regresarUnidadAlProyecto } from '@/app/dilesa/proyectos/actions';
 import { ACTIVO_TIPO_LABEL, computeTerrenoSnapshot } from '@/lib/dilesa/portafolio';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
@@ -81,6 +83,7 @@ type ActivoFull = {
   numero_escritura: string | null;
   clave_catastral: string | null;
   notas: string | null;
+  created_at: string;
 };
 
 type ActivoMini = {
@@ -248,7 +251,7 @@ async function fetchExpediente(
     .schema('dilesa')
     .from('activos')
     .select(
-      'id, tipo, nombre, estado, destino:portafolio_destinos(label), activo_padre_id, etiqueta, zona, clave_interna, municipio, estado_geo, direccion_referencia, latitud, longitud, area_m2, valor_estimado, situacion_legal, numero_escritura, clave_catastral, notas'
+      'id, tipo, nombre, estado, destino:portafolio_destinos(label), activo_padre_id, etiqueta, zona, clave_interna, municipio, estado_geo, direccion_referencia, latitud, longitud, area_m2, valor_estimado, situacion_legal, numero_escritura, clave_catastral, notas, created_at'
     )
     .eq('id', activoId)
     .is('deleted_at', null)
@@ -543,6 +546,18 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
             <Field label="Clave catastral" value={activo.clave_catastral} />
           </Section>
 
+          {activo.estado === 'prospecto' && activo.tipo === 'terreno' && satelite ? (
+            <ActivoEvaluacionPanel
+              activoId={activo.id}
+              empresaId={DILESA_EMPRESA_ID}
+              zona={activo.zona}
+              createdAt={activo.created_at}
+              satelite={satelite}
+              puedeAdmin={puedeAdmin}
+              onChanged={() => setRefreshKey((k) => k + 1)}
+            />
+          ) : null}
+
           {compra ? (
             <Section title="Análisis de compra">
               <Field
@@ -713,6 +728,12 @@ export function ActivoExpediente({ activoId }: { activoId: string }) {
           </Section>
 
           <ActivoPrediales activoId={activo.id} empresaId={DILESA_EMPRESA_ID} />
+
+          <ActivoBitacora
+            activoId={activo.id}
+            empresaId={DILESA_EMPRESA_ID}
+            puedeAdmin={puedeAdmin}
+          />
 
           <Section title="Documentos">
             <FileAttachments
