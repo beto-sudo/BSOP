@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { DataTable, ModuleKpiStrip, type Column, type ModuleKpi } from '@/components/module-page';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,6 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
 import { Building2, Plus, RefreshCw, Search, Tags } from 'lucide-react';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
-import { ActivoDetailDrawer } from '@/components/dilesa/activo-detail-drawer';
 import { ActivoCaptureDrawer } from '@/components/dilesa/activo-capture-drawer';
 import { DestinosCatalogoDialog } from '@/components/dilesa/destinos-catalogo-dialog';
 import { useEffectiveUser } from '@/components/providers';
@@ -27,6 +27,7 @@ type Activo = {
   tipo: string;
   nombre: string;
   estado: string;
+  zona: string | null;
   municipio: string | null;
   area_m2: number | null;
   valor_estimado: number | null;
@@ -74,6 +75,7 @@ export function PortafolioModule({
   vista?: 'inventario' | 'evaluacion';
 }) {
   const esEvaluacion = vista === 'evaluacion';
+  const router = useRouter();
   const [activos, setActivos] = useState<Activo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export function PortafolioModule({
   const [estadoFiltro, setEstadoFiltro] = useState<string>('');
   const [destinoFiltro, setDestinoFiltro] = useState<string>('');
   const [municipioFiltro, setMunicipioFiltro] = useState<string>('');
-  const [detalle, setDetalle] = useState<{ id: string; tipo: string } | null>(null);
+  const [zonaFiltro, setZonaFiltro] = useState<string>('');
   const [destinosOpen, setDestinosOpen] = useState(false);
   // false = cerrado · null = alta · string = edición de ese activo.
   const [captura, setCaptura] = useState<string | null | false>(false);
@@ -96,7 +98,7 @@ export function PortafolioModule({
         .schema('dilesa')
         .from('activos')
         .select(
-          'id, tipo, nombre, estado, municipio, area_m2, valor_estimado, activo_padre_id, destino_id, destino:portafolio_destinos(label)'
+          'id, tipo, nombre, estado, zona, municipio, area_m2, valor_estimado, activo_padre_id, destino_id, destino:portafolio_destinos(label)'
         )
         .eq('empresa_id', empresaId)
         .is('deleted_at', null)
@@ -144,10 +146,20 @@ export function PortafolioModule({
       if (estadoFiltro && a.estado !== estadoFiltro) return false;
       if (destinoFiltro && (a.destino?.label ?? '') !== destinoFiltro) return false;
       if (municipioFiltro && (a.municipio ?? '') !== municipioFiltro) return false;
+      if (zonaFiltro && (a.zona ?? '') !== zonaFiltro) return false;
       if (q && !a.nombre.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [activos, search, tipoFiltro, estadoFiltro, destinoFiltro, municipioFiltro, esEvaluacion]);
+  }, [
+    activos,
+    search,
+    tipoFiltro,
+    estadoFiltro,
+    destinoFiltro,
+    municipioFiltro,
+    zonaFiltro,
+    esEvaluacion,
+  ]);
 
   // KPIs sobre el conjunto filtrado (la foto de lo que se está viendo).
   const kpis = useMemo<ModuleKpi[]>(() => {
@@ -169,6 +181,10 @@ export function PortafolioModule({
   );
   const municipiosPresentes = useMemo(
     () => Array.from(new Set(activos.map((a) => a.municipio).filter(Boolean) as string[])).sort(),
+    [activos]
+  );
+  const zonasPresentes = useMemo(
+    () => Array.from(new Set(activos.map((a) => a.zona).filter(Boolean) as string[])).sort(),
     [activos]
   );
   const estadosPresentes = useMemo(
@@ -205,6 +221,7 @@ export function PortafolioModule({
           <span className="text-[var(--text)]/40">—</span>
         ),
     },
+    { key: 'zona', label: 'Zona', type: 'text' },
     { key: 'municipio', label: 'Municipio', type: 'text' },
     { key: 'area_m2', label: 'Área (m²)', type: 'number' },
     { key: 'valor_estimado', label: 'Valor estimado', type: 'currency' },
@@ -297,6 +314,20 @@ export function PortafolioModule({
             ))}
           </select>
         ) : null}
+        {zonasPresentes.length > 0 ? (
+          <select
+            value={zonaFiltro}
+            onChange={(e) => setZonaFiltro(e.target.value)}
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 text-sm text-[var(--text)]"
+          >
+            <option value="">Todas las zonas</option>
+            {zonasPresentes.map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <button
           type="button"
           onClick={() => void cargar()}
@@ -334,29 +365,11 @@ export function PortafolioModule({
         loading={loading}
         error={error}
         onRetry={() => void cargar()}
-        onRowClick={(a) => setDetalle({ id: a.id, tipo: a.tipo })}
+        onRowClick={(a) => router.push(`/dilesa/portafolio/activo/${a.id}`)}
         initialSort={{ key: 'nombre', dir: 'asc' }}
         emptyTitle="Sin activos"
         emptyDescription="Aún no hay activos en el portafolio. Se llenará al importar los datos de Coda."
         emptyIcon={<Building2 className="h-6 w-6" />}
-      />
-
-      <ActivoDetailDrawer
-        activoId={detalle?.id ?? null}
-        activoTipo={detalle?.tipo ?? null}
-        open={detalle != null}
-        onOpenChange={(o) => {
-          if (!o) setDetalle(null);
-        }}
-        onChanged={() => void cargar()}
-        onEdit={
-          puedeAdmin
-            ? (id) => {
-                setDetalle(null);
-                setCaptura(id);
-              }
-            : undefined
-        }
       />
 
       {puedeAdmin ? (
