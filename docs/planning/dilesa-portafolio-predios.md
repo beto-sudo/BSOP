@@ -4,10 +4,10 @@
 **Empresas:** DILESA
 **Schemas afectados:** `dilesa` (nuevas `cuentas_prediales`, `prediales_ejercicios`, `prediales_convenios`, `activo_movimientos`; INSERT masivo en `activos`; sub-slug RBAC `dilesa.portafolio.prediales` en `core.modulos`/`core.permisos_rol`). `erp` (lectura `documentos`/`adjuntos` para escrituras y KMZ). UI: retiro del drawer de detalle → página expediente `/dilesa/portafolio/activo/[id]`, tab Prediales en el hub, visor KMZ, ficha comercial PDF.
 **Estado:** in_progress
-**Próximo hito:** S1 en prod (schema prediales + carga de los ~121 predios de los 2 Excel)
+**Próximo hito:** dale de Beto al PR #1177 (RPCs zona, falso positivo del gate) + arrancar S5 (subdivisiones/fusiones + ADR)
 **Dueño:** Beto
 **Creada:** 2026-07-01
-**Última actualización:** 2026-07-01 (promovida; arranca tramo autónomo nocturno S1→S4)
+**Última actualización:** 2026-07-02 (S1-S4 entregados en tramo autónomo nocturno)
 
 > **Sucede a** [`dilesa-portafolio-expediente`](dilesa-portafolio-expediente.md) (cerrada). El visor interactivo multi-capa (fraccionamientos, avances de urbanización/ventas sobre plano) sigue viviendo en la iniciativa hermana [`mapas-interactivos`](mapas-interactivos.md) — aquí solo el render del KMZ del activo.
 
@@ -71,6 +71,18 @@ El Portafolio se vuelve la fuente de verdad de **todos** los inmuebles DILESA co
 - **2026-07-01 — Full page > drawer** (Beto): el detalle de activo migra a página completa; preferencia general contra side drawers para expedientes ricos.
 - **2026-07-01 — Convenio 60%**: se modela como `prediales_convenios` referenciado por los ejercicios 2026 urbanos; el descuento se aplica al calcular adeudo neto, no reescribiendo montos capturados.
 
+## Decisiones registradas (cont.)
+
+- **2026-07-02 — `zona` como columna, no pseudo-activos padre**: el fraccionamiento vendido no es un activo de DILESA; `activo_padre_id` queda reservado para linaje real (plaza→local, subdivisiones). Los ranchos (Santa Mónica, San Marcos) sí agrupan 2 cuentas prediales en 1 activo.
+- **2026-07-02 — Redefinir RPCs no financieras dispara el gate**: `fn_actualizar_activo` contiene `UPDATE … SET valor_estimado` → el clasificador lo marca block (falso positivo, fail-closed). La migración viaja en PR propio (#1177) para no encadenar la UI al dale.
+
 ## Bitácora
 
 - **2026-07-01** — Promovida tras sesión de diseño con Beto sobre los 2 Excel de prediales (27 parcelas ejido + 94 urbanos). Se estresaron 7 decisiones (ver arriba). Arranca tramo autónomo nocturno: S1→S4 + checklist KMZ; S5-S8 en tramos siguientes.
+- **2026-07-02 — Tramo autónomo nocturno (S1-S4):**
+  - **#1175 (S1, mergeado)** — schema prediales (`cuentas_prediales` / `prediales_ejercicios` / `prediales_convenios` + `activos.zona`) y carga de los 2 Excel: 118 activos (23 parcelas + 2 ranchos con 2 cuentas c/u + 93 urbanos en 13 zonas), 120 cuentas, 186 ejercicios, convenio 60% 2026-2027. Checksums 8/8 vs Excel; **verificado en prod** (predial 2026 = $1,821,825.22; 71 ejercicios en convenio).
+  - **#1176 (S2, mergeado)** — expediente full-page `/dilesa/portafolio/activo/[id]` (retira `ActivoDetailDrawer`); hub a route group `(hub)`; columna+filtro Zona; `lib/dilesa/prediales.ts` con tests.
+  - **#1178 (S3+S4, auto-merge en curso)** — tab Prediales (matriz cuenta × ejercicio, KPIs, registrar pago con comprobante, RBAC 5 lugares `dilesa.portafolio.prediales`) + visor KMZ (react-leaflet + jszip + togeojson, base para `mapas-interactivos`).
+  - **#1177 (BLOQUEADO por gate, espera dale de Beto)** — RPCs `fn_alta/actualizar_activo` aprenden `zona` (falso positivo del clasificador; sin esto no se edita zona desde la UI, lo demás opera).
+  - **Checklist KMZ/escrituras** entregado a Beto (Excel, 118 predios, en Downloads).
+  - **Excepciones de datos reportadas**: clave duplicada `0022220051` (Lomas del Sol #53/#57, se conservó una), `0301000042` (#39) sin montos ni marca PAGADO, montos idénticos sospechosos entre Deportivo RDB y Business Park #43 ($186,092.55/$273,090.82 — ¿copy-paste en el Excel?), folio 31066 repetido en 3 predios (folio de recibo, no identificador). **Pregunta abierta**: ¿el convenio 60% aplica también a las parcelas ejidales? (se cargaron sin convenio).
