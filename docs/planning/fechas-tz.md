@@ -2,9 +2,9 @@
 
 **Slug:** `fechas-tz`
 **Empresas:** Todas (DILESA, ANSA, COAGAN, RDB, SANREN)
-**Schemas afectados:** Sin migración de schema en S0. El barrido (S1-S3) toca código TS en `app/**` y `lib/**` (61 archivos con `new Date().toISOString().slice(0, 10)`); S3 audita datos en `dilesa.venta_fases.fecha`, `dilesa.ruv (fecha_carga)`, `dilesa.anteproyectos (fecha_completada)` y defaults `CURRENT_DATE` en funciones de `erp` (CxP `p_fecha_emision`).
+**Schemas afectados:** Sin migración de schema en S0-S2. El barrido S1 tocó código TS en `app/**`, `lib/**` y `components/**` (61 ocurrencias en 39 archivos con `new Date().toISOString().slice(0, 10)`); S3 audita datos en `dilesa.venta_fases.fecha`, `dilesa.ruv (fecha_carga)`, `dilesa.anteproyectos (fecha_completada)` y defaults `CURRENT_DATE` en funciones de `erp` (CxP `p_fecha_emision`, `inventario_levantamientos.fecha_programada`).
 **Estado:** in_progress
-**Próximo hito:** S1 — migrar server actions y formularios de captura a `fechaISOMatamoros()`
+**Próximo hito:** S3 — auditoría read-only de fechas +1 en datos históricos (correcciones solo con OK de Beto)
 **Dueño:** Beto
 **Creada:** 2026-07-01
 **Última actualización:** 2026-07-01
@@ -103,10 +103,38 @@ documenta en S4, no se reescribe.
 
 ## Bitácora
 
+- **2026-07-01 — Análisis de impacto en flujos externos (pedido de Beto antes
+  de S1): Waitry/Playtomic NO se tocan.** (a) El webhook de Waitry
+  (`supabase/functions/waitry-webhook`) y el trigger
+  `rdb.process_waitry_inbound` convierten los timestamps del payload (vienen
+  con `{date, timezone: America/Argentina/Buenos_Aires}`) a `timestamptz` UTC
+  correctamente — fix de abril 2026 (`20260410000000_rdb_fix_timestamp_timezone`).
+  Almacenan instantes, no fechas calendario. (b) Los pedidos se asignan al
+  **corte abierto** (`corte_id` por estado, no por fecha) y `fecha_operativa`
+  viene del corte — el día operativo de RDB no depende de matemática de fechas.
+  (c) Playtomic: el CSV se interpreta deliberadamente en UTC-6 fijo
+  (`parsePlaytomicDate`, así exporta Playtomic Manager) y el edge function
+  `playtomic-sync` compensa el DST del API — ambos documentados y correctos.
+  (d) Las 31 conversiones `AT TIME ZONE` en vistas SQL usan
+  `America/Matamoros`. Residual para S4: tensión teórica de 1 hora (23:00-24:00
+  locales en verano) entre cortes Matamoros-DST y datos Playtomic UTC-6 fijo —
+  documentar, no corregir. Ninguna de las 61 ocurrencias de S1 está en rutas de
+  ingesta externa.
+- **2026-07-01 — S1+S2.** Las 61 ocurrencias de
+  `new Date().toISOString().slice(0, 10)` (39 archivos) migradas a
+  `hoyISOMatamoros()` (helper nuevo en `lib/fecha-mx.ts`). Incluye los
+  server-side críticos: `lib/dilesa/captura/marcar-fase.ts` (escribe
+  `venta_fases.fecha`), `ruv/actions.ts` (`fecha_carga`),
+  `anteproyectos/actions.ts` (`fecha_completada`), `cerrar-fase13`, encuestas
+  (`programada_para`). Los timestamps UTC legítimos (`updated_at`,
+  `synced_at`, ventanas de sync) quedaron intactos. Guard de lint
+  `no-restricted-syntax` en `eslint.config.mjs` contra
+  `new Date().toISOString().slice(...)/.split('T')` en `app/**`, `lib/**`,
+  `components/**` (tests excluidos); smoke-test verificado.
 - **2026-07-01 — Análisis profundo + S0.** Barrido exhaustivo del repo
   (helpers, 61 archivos con "hoy UTC", crons, SQL, inconsistencia
   DST-real/offset-fijo). Causa raíz del acumulado en cero confirmada en
   `resumen-consejo-email.ts:901` (mes UTC). Hotfix aplicado: `inicioMes` →
   `inicioMesMatamoros()`, `inicio3m` sobre fecha local, `fechaTituloCST` con
   TZ real. Tests de regresión con el instante del incidente
-  (2026-07-01T01:00:00Z). PR pendiente de número al abrir.
+  (2026-07-01T01:00:00Z). PR [#1165](https://github.com/beto-sudo/BSOP/pull/1165), mergeado 2026-07-01.

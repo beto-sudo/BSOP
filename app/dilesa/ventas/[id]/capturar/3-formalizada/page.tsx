@@ -38,6 +38,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   {
@@ -87,7 +88,7 @@ function CapturarFase3Body() {
   // Solo el descuento autoguarda — la fecha del contrato va a venta_fases.notas al
   // avanzar (sin columna en dilesa.ventas), así que no tiene destino directo.
   const [descuentoGuardado, setDescuentoGuardado] = useState<string>('');
-  const [fechaContrato, setFechaContrato] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fechaContrato, setFechaContrato] = useState<string>(hoyISOMatamoros());
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [loading, setLoading] = useState(true);
@@ -243,10 +244,7 @@ function CapturarFase3Body() {
           // descuento_total se persiste por la RPC auditada (arriba), no aquí.
           // fecha del contrato — se guarda en venta_fases.fecha vía el override más abajo
         },
-        notas:
-          fechaContrato !== new Date().toISOString().slice(0, 10)
-            ? `Fecha del contrato: ${fechaContrato}`
-            : null,
+        notas: fechaContrato !== hoyISOMatamoros() ? `Fecha del contrato: ${fechaContrato}` : null,
         registradoPor: userId,
       });
 

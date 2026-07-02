@@ -38,6 +38,7 @@ import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
 import { leerCfdiMetadata } from '@/lib/dilesa/captura/cfdi-validacion';
 import { cargarCuadraturaVenta } from '@/lib/dilesa/cuadratura-server';
 import { requiereNotaCredito } from '@/lib/dilesa/captura/pld-revision';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -306,7 +307,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       venta_id: ventaId,
       fase: nombreFase(FASE),
       posicion: FASE,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: hoyISOMatamoros(),
       registrado_por: user.id,
       notas: cierreConOverride ? `Cierre autorizado por Dirección: ${motivoOverride}` : null,
     })

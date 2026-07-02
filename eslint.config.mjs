@@ -39,6 +39,31 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypeScript,
   prettier,
+  {
+    // Guard fechas-tz: "hoy" NUNCA se deriva de toISOString() — es UTC (también
+    // en el navegador) y a partir de las 18:00/19:00 de Matamoros ya es "mañana".
+    // Usar hoyISOMatamoros()/fechaISOMatamoros()/inicioMesMatamoros() de
+    // lib/fecha-mx.ts. Los tests quedan fuera (usan instantes fijos a propósito).
+    files: ['app/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='slice'][callee.object.callee.property.name='toISOString'][callee.object.callee.object.type='NewExpression'][callee.object.callee.object.callee.name='Date']",
+          message:
+            'new Date().toISOString().slice(...) recorta el calendario UTC ("hoy" se vuelve "mañana" después de las ~18:00 locales). Usa hoyISOMatamoros()/fechaISOMatamoros()/inicioMesMatamoros() de @/lib/fecha-mx.',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='split'][callee.object.callee.property.name='toISOString'][callee.object.callee.object.type='NewExpression'][callee.object.callee.object.callee.name='Date']",
+          message:
+            "new Date().toISOString().split('T')[0] es el día UTC, no el local. Usa hoyISOMatamoros() de @/lib/fecha-mx.",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

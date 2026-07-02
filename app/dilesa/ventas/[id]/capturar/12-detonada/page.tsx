@@ -46,6 +46,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   { rol: 'imagen_detonacion', label: 'Comprobante de transferencia/depósito', requerido: true },
@@ -93,13 +94,11 @@ function CapturarFase12Body() {
   const [fase11Cerrada, setFase11Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [fechaDetonacion, setFechaDetonacion] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaDetonacion, setFechaDetonacion] = useState<string>(hoyISOMatamoros());
   const [montoDetonado, setMontoDetonado] = useState<string>('');
   // Autoguardado (ADR-051): firma de lo persistido (arranca = lo cargado).
   const [guardado, setGuardado] = useState<{ fecha: string; monto: string }>({
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyISOMatamoros(),
     monto: '',
   });
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
@@ -140,7 +139,7 @@ function CapturarFase12Body() {
       if (v.fecha_detonacion) setFechaDetonacion(v.fecha_detonacion);
       if (v.monto_detonado != null) setMontoDetonado(String(v.monto_detonado));
       setGuardado({
-        fecha: v.fecha_detonacion ?? new Date().toISOString().slice(0, 10),
+        fecha: v.fecha_detonacion ?? hoyISOMatamoros(),
         monto: v.monto_detonado != null ? String(v.monto_detonado) : '',
       });
 

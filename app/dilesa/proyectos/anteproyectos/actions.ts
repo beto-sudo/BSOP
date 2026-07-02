@@ -45,6 +45,7 @@ import {
 } from '@/components/dilesa/analisis-financiero-types';
 import { checkDireccionEmpresa } from '@/lib/auth/direccion-gate';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Result = { ok: true; tareasCreadas: number } | { ok: false; error: string };
 
@@ -170,7 +171,7 @@ export async function updateTareaEstado(
   const supabase = await makeServerClient();
   const patch: { estado: TareaEstado; fecha_completada?: string | null } = { estado };
   if (estado === 'completada') {
-    patch.fecha_completada = new Date().toISOString().slice(0, 10);
+    patch.fecha_completada = hoyISOMatamoros();
   } else {
     // Si el operador desmarca, limpia la fecha (consistente con `vendida`/
     // `entregada` de unidades — el ciclo puede revertir).
@@ -207,7 +208,7 @@ export async function marcarTareasHistorico(proyectoId: string): Promise<SimpleR
   const { error } = await supabase
     .schema('dilesa')
     .from('proyecto_tareas')
-    .update({ estado: 'completada', fecha_completada: new Date().toISOString().slice(0, 10) })
+    .update({ estado: 'completada', fecha_completada: hoyISOMatamoros() })
     .eq('proyecto_id', proyectoId)
     .is('deleted_at', null)
     .in('estado', ['pendiente', 'en_curso', 'bloqueada']);

@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { desglosarPagare } from '@/lib/dilesa/pagare-interes';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export type PlanPagoJson = { num?: number; fecha?: string; monto?: number };
 type PlanRow = { fecha: string; monto: string };
@@ -48,7 +49,7 @@ const moneyFmt = new Intl.NumberFormat('es-MX', {
 });
 const money = (n: number | null | undefined): string =>
   n == null ? '—' : moneyFmt.format(Number(n));
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyISOMatamoros();
 
 export function CreditoDirectoCaptura({
   ventaId,

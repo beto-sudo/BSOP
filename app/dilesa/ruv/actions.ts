@@ -16,6 +16,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { assertNotInPreview } from '@/lib/auth/preview-guard';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -184,7 +185,7 @@ export async function marcarDocumento(input: MarcarDocumentoInput): Promise<Acti
     updated_at: new Date().toISOString(),
   };
   if (input.estado === 'cargado') {
-    patch.fecha_carga = dateOrNull(input.fechaCarga) ?? new Date().toISOString().slice(0, 10);
+    patch.fecha_carga = dateOrNull(input.fechaCarga) ?? hoyISOMatamoros();
     if (input.archivoUrl !== undefined) patch.archivo_url = input.archivoUrl;
   } else {
     // Volver a pendiente limpia la fecha (el archivo se conserva por si fue error).

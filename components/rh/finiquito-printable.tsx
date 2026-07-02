@@ -20,6 +20,7 @@ import {
   type FiniquitoCalculado,
 } from '@/lib/hr/calcular-finiquito';
 import type { ContratoPatron } from './contrato-printable';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export interface FiniquitoEmpleadoData {
   nombre: string;
@@ -68,7 +69,7 @@ export function FiniquitoPrintable({
   /** Nº de cheque o referencia de transferencia. NULL si forma=efectivo o no se capturó. */
   referenciaPago?: string | null;
 }) {
-  const fechaHoy = fechaConvenio ?? new Date().toISOString().split('T')[0];
+  const fechaHoy = fechaConvenio ?? hoyISOMatamoros();
   const nombreCompleto = composeFullName(
     empleado.nombre,
     empleado.apellido_paterno,

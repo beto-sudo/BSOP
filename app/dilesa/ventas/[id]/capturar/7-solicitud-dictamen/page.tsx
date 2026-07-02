@@ -37,6 +37,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type VentaCtx = {
   id: string;
@@ -68,13 +69,11 @@ function CapturarFase7Body() {
 
   const [notarios, setNotarios] = useState<Notaria[]>([]);
   const [notarioId, setNotarioId] = useState<string>('');
-  const [fechaSolicitud, setFechaSolicitud] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaSolicitud, setFechaSolicitud] = useState<string>(hoyISOMatamoros());
   // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
   const [guardado, setGuardado] = useState<{ notarioId: string; fecha: string }>({
     notarioId: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyISOMatamoros(),
   });
 
   const [loading, setLoading] = useState(true);
@@ -114,7 +113,7 @@ function CapturarFase7Body() {
       if (v.fecha_solicitud_dictamen) setFechaSolicitud(v.fecha_solicitud_dictamen);
       setGuardado({
         notarioId: v.notario_id ?? '',
-        fecha: v.fecha_solicitud_dictamen ?? new Date().toISOString().slice(0, 10),
+        fecha: v.fecha_solicitud_dictamen ?? hoyISOMatamoros(),
       });
 
       const [fRes, notarias] = await Promise.all([

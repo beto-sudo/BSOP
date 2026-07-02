@@ -35,6 +35,7 @@ import {
 } from '@/app/dilesa/proyectos/anteproyectos/actions';
 import { TareasChecklist, type PasoRow } from './tareas-checklist';
 import type { EmpresaSlug } from '@/lib/storage';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export type ProyectoTarea = {
   id: string;
@@ -260,7 +261,7 @@ export function ProyectoChecklist({
 
   const handlePopulate = useCallback(() => {
     setPopulateError(null);
-    const fecha = fechaArranque ?? new Date().toISOString().slice(0, 10);
+    const fecha = fechaArranque ?? hoyISOMatamoros();
     startTransition(async () => {
       const r = await populatePlantilla(proyectoId, fecha);
       if (!r.ok) {

@@ -16,6 +16,8 @@
  * devuelve null — el caller debe usar un placeholder y refinar después.
  */
 
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
+
 const TIPO_TO_SHORT: Record<string, string> = {
   Escritura: 'Escritura',
   Contrato: 'Contrato',
@@ -97,7 +99,7 @@ export function buildStandardFilename(titulo: string, ext = 'pdf'): string {
  */
 export function placeholderTitulo(empresaSlug: string | null | undefined): string {
   const slug = (empresaSlug ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const date = new Date().toISOString().slice(0, 10);
+  const date = hoyISOMatamoros();
   return slug ? `${slug}-${date}-Documento por procesar` : `Documento por procesar — ${date}`;
 }
 

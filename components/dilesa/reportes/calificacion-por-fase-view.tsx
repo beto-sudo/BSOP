@@ -34,6 +34,7 @@ import {
   type FaseCalificacionRaw,
 } from '@/lib/dilesa/reportes/calificacion-por-fase';
 import { ReporteShell } from './reporte-shell';
+import { fechaISOMatamoros } from '@/lib/fecha-mx';
 
 const REPORTE = getReporte('calificacion-por-fase')!;
 const VOLVER_HREF = '/dilesa/ventas/reportes';
@@ -53,7 +54,7 @@ const DEFAULT_FILTERS = { periodo: 'trimestre' };
 const RESPONSABLE_LABEL = { interna: 'interna', tercero: 'tercero', mixta: 'mixta' } as const;
 
 function fechaISO(msEpoch: number): string {
-  return new Date(msEpoch).toISOString().slice(0, 10);
+  return fechaISOMatamoros(new Date(msEpoch));
 }
 
 export function CalificacionPorFaseView() {

@@ -41,6 +41,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const SLOTS_FASE: SlotColaborativo[] = [
   {
@@ -76,12 +77,10 @@ function CapturarFase9Body() {
   const [fase8Cerrada, setFase8Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [fechaValidacion, setFechaValidacion] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaValidacion, setFechaValidacion] = useState<string>(hoyISOMatamoros());
   // Autoguardado (ADR-051): firma de lo último persistido. Arranca = lo cargado, así
   // que no autoguarda hasta que el usuario cambie la fecha (ni el default "hoy").
-  const [fechaGuardada, setFechaGuardada] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fechaGuardada, setFechaGuardada] = useState<string>(hoyISOMatamoros());
   const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
 
   const [loading, setLoading] = useState(true);

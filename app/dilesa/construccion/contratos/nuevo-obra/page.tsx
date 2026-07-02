@@ -38,6 +38,7 @@ import {
 } from '@/lib/dilesa/proyectos-selector';
 import { buildPartidaIndex, type PartidaGrupo } from '@/lib/compras/partidas';
 import { OBJETOS_COMUNES } from '@/lib/dilesa/objetos-obra';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Contratista = {
   id: string;
@@ -89,7 +90,7 @@ function NuevoContratoObraBody() {
   const [proyectoId, setProyectoId] = useState('');
   const [partidaId, setPartidaId] = useState('');
   const [tipo, setTipo] = useState<string>('urbanizacion');
-  const [fechaContrato, setFechaContrato] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaContrato, setFechaContrato] = useState(hoyISOMatamoros());
   const [valorTotal, setValorTotal] = useState('');
   // Defaults: anticipo y fianza en 0 (los locales no llevan; se capturan si aplican),
   // retención en 5 (el fondo de garantía estándar — la garantía real cuando no hay fianza).
@@ -281,7 +282,7 @@ function NuevoContratoObraBody() {
 
   const codigoSugerido = useMemo(() => {
     if (!contratistaSel) return '';
-    const year = (fechaContrato || new Date().toISOString().slice(0, 10)).slice(0, 4);
+    const year = (fechaContrato || hoyISOMatamoros()).slice(0, 4);
     const abrev = contratistaSel.abreviacion ?? 'CONTR';
     const seq = (seqByContratista.get(contratistaId) ?? 0) + 1;
     return `${year}/${seq}-DIE-${abrev}-${TIPO_ABREV[tipo] ?? 'OBRA'}#${seq}`;

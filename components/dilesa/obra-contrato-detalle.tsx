@@ -51,6 +51,7 @@ import {
   type FacturaCuenta,
   type ObraEstimacionEstado,
 } from '@/lib/dilesa/contratos-estado-cuenta';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export type ObraEstimacion = {
   id: string;
@@ -141,7 +142,7 @@ export function ObraContratoDetalle({
   // form inline
   const [open, setOpen] = useState(false);
   const [etiqueta, setEtiqueta] = useState('');
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(hoyISOMatamoros());
   const [factura, setFactura] = useState('');
   const [monto, setMonto] = useState('');
   const [esAnticipo, setEsAnticipo] = useState(false);
@@ -386,7 +387,7 @@ export function ObraContratoDetalle({
 
   function resetForm() {
     setEtiqueta('');
-    setFecha(new Date().toISOString().slice(0, 10));
+    setFecha(hoyISOMatamoros());
     setFactura('');
     setMonto('');
     setEsAnticipo(false);
@@ -958,7 +959,7 @@ function FacturaDelContrato({
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState('');
-  const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaEmision, setFechaEmision] = useState(hoyISOMatamoros());
   const [facturaRef, setFacturaRef] = useState('');
   const [condicionesDias, setCondicionesDias] = useState('');
   const [submitting, setSubmitting] = useState(false);

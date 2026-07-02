@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fechaISOMatamoros, inicioMesMatamoros } from './fecha-mx';
+import {
+  fechaISOMatamoros,
+  hoyISOMatamoros,
+  inicioMesMatamoros,
+  restarMesesISO,
+  sumarDiasISO,
+} from './fecha-mx';
 
 describe('fechaISOMatamoros', () => {
   it('invierno (CST, UTC-6): a las 20:00 locales el día UTC ya avanzó, pero la fecha local es la de hoy', () => {
@@ -37,5 +43,35 @@ describe('inicioMesMatamoros', () => {
 
   it('media tarde a mitad de mes → primer día del mes local', () => {
     expect(inicioMesMatamoros(new Date('2026-06-15T18:00:00Z'))).toBe('2026-06-01');
+  });
+});
+
+describe('hoyISOMatamoros', () => {
+  it('coincide con fechaISOMatamoros(ahora)', () => {
+    expect(hoyISOMatamoros()).toBe(fechaISOMatamoros(new Date()));
+  });
+});
+
+describe('sumarDiasISO', () => {
+  it('suma días con rollover de mes y año', () => {
+    expect(sumarDiasISO('2026-06-15', 30)).toBe('2026-07-15');
+    expect(sumarDiasISO('2026-12-20', 15)).toBe('2027-01-04');
+    expect(sumarDiasISO('2026-02-28', 1)).toBe('2026-03-01');
+  });
+
+  it('es aritmética pura: no depende de TZ ni de la hora', () => {
+    expect(sumarDiasISO('2026-07-01', 0)).toBe('2026-07-01');
+  });
+});
+
+describe('restarMesesISO', () => {
+  it('resta meses con rollover de año', () => {
+    expect(restarMesesISO('2026-06-30', 3)).toBe('2026-03-30');
+    expect(restarMesesISO('2026-01-15', 3)).toBe('2025-10-15');
+  });
+
+  it('día 31 hacia mes corto rueda al mes siguiente (comportamiento Date.UTC)', () => {
+    // 31 de mayo − 1 mes → "31 de abril" no existe → 1 de mayo.
+    expect(restarMesesISO('2026-05-31', 1)).toBe('2026-05-01');
   });
 });

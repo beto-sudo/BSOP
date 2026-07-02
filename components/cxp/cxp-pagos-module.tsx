@@ -67,6 +67,7 @@ import { FileAttachments, useAdjuntos } from '@/components/file-attachments';
 import type { EmpresaSlug } from '@/lib/empresa-branding';
 import { HiloGastoSection } from '@/components/gasto/hilo-gasto-stepper';
 import { useFocusDrilldown } from '@/hooks/use-focus-drilldown';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const TZ = 'America/Matamoros';
 
@@ -1206,7 +1207,7 @@ function AutorizarYPagarDialog({
   onDone: () => void;
 }) {
   const feedback = useActionFeedback();
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => hoyISOMatamoros());
   const [referencia, setReferencia] = useState(pago.referencia ?? '');
   const [submitting, setSubmitting] = useState(false);
 

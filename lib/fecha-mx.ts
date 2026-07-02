@@ -31,3 +31,39 @@ export function fechaISOMatamoros(d: Date): string {
 export function inicioMesMatamoros(d: Date = new Date()): string {
   return `${fechaISOMatamoros(d).slice(0, 7)}-01`;
 }
+
+/**
+ * "Hoy" (`YYYY-MM-DD`) en horario de Matamoros. Reemplazo directo del
+ * antipatrón `new Date().toISOString().slice(0, 10)` — que devuelve el día
+ * UTC (también en el navegador) y a partir de las 18:00/19:00 locales ya es
+ * "mañana". Default canónico para capturas de fecha y nombres de archivo.
+ * Guard de lint: `no-restricted-syntax` en `eslint.config.mjs` (iniciativa
+ * fechas-tz).
+ */
+export function hoyISOMatamoros(): string {
+  return fechaISOMatamoros(new Date());
+}
+
+/** Formatea componentes UTC de un Date como `YYYY-MM-DD` (sin toISOString). */
+function isoDeUTC(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/**
+ * Suma días de calendario a una fecha `YYYY-MM-DD` (aritmética pura, sin TZ:
+ * el string se interpreta y se re-formatea en UTC, así que no hay corrimiento).
+ */
+export function sumarDiasISO(fechaISO: string, dias: number): string {
+  const [y, m, d] = fechaISO.split('-').map(Number);
+  return isoDeUTC(new Date(Date.UTC(y, m - 1, d + dias)));
+}
+
+/**
+ * Resta meses de calendario a una fecha `YYYY-MM-DD` (aritmética pura, sin
+ * TZ). `Date.UTC` resuelve el rollover (ej. 2026-01-15 − 3m → 2025-10-15).
+ */
+export function restarMesesISO(fechaISO: string, meses: number): string {
+  const [y, m, d] = fechaISO.split('-').map(Number);
+  return isoDeUTC(new Date(Date.UTC(y, m - 1 - meses, d)));
+}

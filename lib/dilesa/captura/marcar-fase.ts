@@ -25,6 +25,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildAdjuntoPath } from '@/lib/storage/path';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { FASES_VENTA, nombreFase, type FaseSlug } from '@/lib/dilesa/fases';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export type DocCaptura = {
   /** Rol del adjunto (ej. 'contrato_promesa', 'aviso_pld', 'factura'). */
@@ -168,7 +169,7 @@ export async function marcarFase(
       venta_id: ventaId,
       fase: nombreFase(faseposicion),
       posicion: faseposicion,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: hoyISOMatamoros(),
       registrado_por: registradoPor,
       notas: notas ?? null,
     })

@@ -47,6 +47,7 @@ import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { RecepcionObraDrawer } from '@/components/dilesa/recepcion-obra-drawer';
 import { HITO_RECEPCION_LABEL } from '@/lib/dilesa/recepcion-checklist';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Construccion = {
   id: string;
@@ -514,7 +515,7 @@ function DetailInner() {
     if (!obra || !currentUser || palomeoInFlight) return;
     setPalomeoInFlight(plantillaId);
     const sb = createSupabaseBrowserClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hoyISOMatamoros();
     const { data: insRow, error } = await sb
       .schema('dilesa')
       .from('construccion_tareas_terminadas')
@@ -973,7 +974,7 @@ function DetailInner() {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  setFechaProgInput(new Date().toISOString().slice(0, 10));
+                  setFechaProgInput(hoyISOMatamoros());
                   setProgramarOpen(true);
                 }}
               >

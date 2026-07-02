@@ -25,6 +25,7 @@
 
 import { composeFullName } from '@/lib/name-case';
 import { formatMoneda } from '@/lib/hr/calcular-finiquito';
+import { hoyISOMatamoros, sumarDiasISO } from '@/lib/fecha-mx';
 
 export interface ContratoEmpleado {
   // Persona
@@ -134,7 +135,7 @@ export function ContratoPrintable({
   /** Fecha de fin (para contratos por tiempo determinado; default = 30 días después del inicio). */
   vigenciaFin?: string;
 }) {
-  const fechaHoy = fechaContrato ?? new Date().toISOString().split('T')[0];
+  const fechaHoy = fechaContrato ?? hoyISOMatamoros();
   const nombreCompleto = composeFullName(
     empleado.nombre,
     empleado.apellido_paterno,
@@ -148,13 +149,7 @@ export function ContratoPrintable({
 
   const inicio = vigenciaInicio ?? empleado.fecha_ingreso ?? fechaHoy;
   // Por default, contratos de DILESA son de 1 mes (30 días).
-  const fin =
-    vigenciaFin ??
-    (() => {
-      const d = new Date(inicio);
-      d.setDate(d.getDate() + 30);
-      return d.toISOString().split('T')[0];
-    })();
+  const fin = vigenciaFin ?? sumarDiasISO(inicio, 30);
 
   const sueldoDiarioTexto =
     empleado.sueldo_diario != null

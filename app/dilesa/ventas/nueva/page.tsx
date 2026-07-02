@@ -46,6 +46,7 @@ import {
   buildPersonaKycPayload,
   type PersonaKycSnapshot,
 } from '@/lib/dilesa/kyc-persona';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type UnidadDisponible = {
   id: string;
@@ -925,7 +926,7 @@ function NuevaSolicitudForm() {
           posicion: 1,
           // fecha (date) = hoy; created_at (timestamptz) = now() vía default.
           // Para FIFO en Fase 2 se ordena por created_at, que conserva la hora.
-          fecha: new Date().toISOString().slice(0, 10),
+          fecha: hoyISOMatamoros(),
           registrado_por: user?.id ?? null,
         });
       if (fErr) {

@@ -51,6 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Contratista = {
   id: string;
@@ -129,7 +130,7 @@ function NuevoContratoForm() {
   const [contratistaId, setContratistaId] = useState<string>('');
   const [proyectoId, setProyectoId] = useState<string>('');
   const [precioMoM2, setPrecioMoM2] = useState<string>('');
-  const [fechaContrato, setFechaContrato] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fechaContrato, setFechaContrato] = useState<string>(hoyISOMatamoros());
   const [fianzasUrl, setFianzasUrl] = useState<string>('');
   const [codigoOverride, setCodigoOverride] = useState<string>('');
   const [notas, setNotas] = useState<string>('');
@@ -140,7 +141,7 @@ function NuevoContratoForm() {
       key: makeRowKey(),
       unidadId: '',
       productoId: '',
-      fechaArranque: new Date().toISOString().slice(0, 10),
+      fechaArranque: hoyISOMatamoros(),
     },
   ]);
 
@@ -368,7 +369,7 @@ function NuevoContratoForm() {
 
   const codigoSugerido = useMemo(() => {
     if (!contratistaSel) return '';
-    const year = (fechaContrato || new Date().toISOString().slice(0, 10)).slice(0, 4);
+    const year = (fechaContrato || hoyISOMatamoros()).slice(0, 4);
     const abrev = contratistaSel.abreviacion ?? 'CONTR';
     const seq = (seqByContratista.get(contratistaId) ?? 0) + 1;
     return `${year}/${seq}-DIE-${abrev}-CONTRATO#${seq}`;
@@ -416,7 +417,7 @@ function NuevoContratoForm() {
         key: makeRowKey(),
         unidadId: '',
         productoId: '',
-        fechaArranque: fechaContrato || new Date().toISOString().slice(0, 10),
+        fechaArranque: fechaContrato || hoyISOMatamoros(),
       },
     ]);
   }

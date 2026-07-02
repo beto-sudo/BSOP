@@ -56,6 +56,7 @@ import {
   FileSignature,
   Send,
 } from 'lucide-react';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type Persona = {
   id: string;
@@ -532,7 +533,7 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
 
   const [showBajaDialog, setShowBajaDialog] = useState(false);
   const [motivoBaja, setMotivoBaja] = useState('');
-  const [fechaBaja, setFechaBaja] = useState(new Date().toISOString().split('T')[0]);
+  const [fechaBaja, setFechaBaja] = useState(hoyISOMatamoros());
   const [givingBaja, setGivingBaja] = useState(false);
   const [testingAviso, setTestingAviso] = useState(false);
 
@@ -770,7 +771,7 @@ function EmpleadoDetailInner({ empresaSlug }: EmpleadoDetailModuleProps) {
       .from('empleados')
       .update({
         activo: false,
-        fecha_baja: fechaBaja || new Date().toISOString().split('T')[0],
+        fecha_baja: fechaBaja || hoyISOMatamoros(),
         motivo_baja: motivoBaja.trim() || null,
       })
       .eq('id', empleado.id);

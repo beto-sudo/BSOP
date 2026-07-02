@@ -35,6 +35,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 type VentaCtx = {
   id: string;
@@ -74,13 +75,11 @@ function CapturarFase4Body() {
 
   const [valuadores, setValuadores] = useState<Valuador[]>([]);
   const [valuadorId, setValuadorId] = useState<string>('');
-  const [fechaSolicitud, setFechaSolicitud] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [fechaSolicitud, setFechaSolicitud] = useState<string>(hoyISOMatamoros());
   // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
   const [guardado, setGuardado] = useState<{ valuadorId: string; fecha: string }>({
     valuadorId: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: hoyISOMatamoros(),
   });
 
   const [loading, setLoading] = useState(true);
@@ -121,7 +120,7 @@ function CapturarFase4Body() {
       // Firma persistida inicial = lo cargado (no autoguarda hasta que el usuario cambie).
       setGuardado({
         valuadorId: v.valuador_id ?? '',
-        fecha: v.fecha_solicitud_avaluo ?? new Date().toISOString().slice(0, 10),
+        fecha: v.fecha_solicitud_avaluo ?? hoyISOMatamoros(),
       });
 
       // Fases cerradas y catálogo de valuadores en paralelo.

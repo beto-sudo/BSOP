@@ -47,6 +47,7 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { formatMontoEnLetras } from '@/lib/format/numero-a-letras';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
 import { getNotaria } from '@/lib/dilesa/notarios';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const TIPOS = [
   'solicitud-asignacion',
@@ -590,7 +591,7 @@ export async function GET(
         : ordinarioSnapshot > 0
           ? Math.round(ordinarioSnapshot * 3 * 100) / 100
           : null;
-    const fechaSuscripcion = cd.cd_fecha_suscripcion ?? new Date().toISOString().slice(0, 10);
+    const fechaSuscripcion = cd.cd_fecha_suscripcion ?? hoyISOMatamoros();
 
     // Desglose de interés ordinario por parcialidad (mismo motor que la
     // preview de la fase 10 — lib/dilesa/pagare-interes.ts).

@@ -78,6 +78,7 @@ import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
 } from '@/components/dilesa/captura/autoguardado-campos';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 // Pagaré firmado (decisión Beto 2026-06-24): el documento se recaba en la
 // dictaminación (no en la firma). Mismo adjunto (rol `pagare`) que reconoce la
@@ -265,7 +266,7 @@ function CapturarFase8Body() {
   const [fase7Cerrada, setFase7Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
 
-  const [fechaDictamen, setFechaDictamen] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [fechaDictamen, setFechaDictamen] = useState<string>(hoyISOMatamoros());
   // Confirmar/editar (acarrean de Fase 6) + capturar gastos de escrituración.
   const [montoTitular, setMontoTitular] = useState<string>('');
   const [montoCotitular, setMontoCotitular] = useState<string>('');

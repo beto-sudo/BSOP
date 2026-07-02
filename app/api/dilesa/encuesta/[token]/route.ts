@@ -15,6 +15,7 @@ import { verifyEncuestaToken } from '@/lib/dilesa/encuesta-token';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { nombreFase } from '@/lib/dilesa/fases';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 const FASE_POSICION = 16;
 const FASE_NOMBRE = nombreFase(FASE_POSICION);
@@ -94,7 +95,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       .insert({
         empresa_id: DILESA_EMPRESA_ID,
         venta_id: ventaId,
-        programada_para: new Date().toISOString().slice(0, 10),
+        programada_para: hoyISOMatamoros(),
         ...respuestas,
       });
     if (insErr) {
@@ -113,18 +114,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .maybeSingle();
 
   if (!fase16) {
-    await admin
-      .schema('dilesa')
-      .from('venta_fases')
-      .insert({
-        empresa_id: DILESA_EMPRESA_ID,
-        venta_id: ventaId,
-        fase: FASE_NOMBRE,
-        posicion: FASE_POSICION,
-        fecha: new Date().toISOString().slice(0, 10),
-        registrado_por: null,
-        notas: 'Encuesta respondida por el cliente (magic link).',
-      });
+    await admin.schema('dilesa').from('venta_fases').insert({
+      empresa_id: DILESA_EMPRESA_ID,
+      venta_id: ventaId,
+      fase: FASE_NOMBRE,
+      posicion: FASE_POSICION,
+      fecha: hoyISOMatamoros(),
+      registrado_por: null,
+      notas: 'Encuesta respondida por el cliente (magic link).',
+    });
 
     // Sync del caché fase_actual/posicion — solo avanza, nunca retrocede.
     const { data: venta } = await admin
