@@ -3,11 +3,11 @@
 **Slug:** `fechas-tz`
 **Empresas:** Todas (DILESA, ANSA, COAGAN, RDB, SANREN)
 **Schemas afectados:** Sin migración de schema en S0-S2. El barrido S1 tocó código TS en `app/**`, `lib/**` y `components/**` (61 ocurrencias en 39 archivos con `new Date().toISOString().slice(0, 10)`); S3 audita datos en `dilesa.venta_fases.fecha`, `dilesa.ruv (fecha_carga)`, `dilesa.anteproyectos (fecha_completada)` y defaults `CURRENT_DATE` en funciones de `erp` (CxP `p_fecha_emision`, `inventario_levantamientos.fecha_programada`).
-**Estado:** in_progress
-**Próximo hito:** OK de Beto para (a) UPDATE de las 11 fechas +1 en `venta_fases` y (b) migración S4b de defaults `CURRENT_DATE` (gate finanzas-ok)
+**Estado:** done
+**Próximo hito:** —
 **Dueño:** Beto
 **Creada:** 2026-07-01
-**Última actualización:** 2026-07-01
+**Última actualización:** 2026-07-01 (CERRADA — S0-S4 completos el mismo día del detonante. Verificación pasiva restante: el resumen al consejo del 31-jul-2026 debe mostrar el acumulado del mes correcto.)
 
 > Detonante: el 30-jun-2026 a las 20:00 (CDT) el resumen diario al consejo de
 > DILESA llegó con las ventas acumuladas del mes en **cero**. A esa hora el
@@ -103,6 +103,16 @@ documenta en S4, no se reescribe.
 
 ## Bitácora
 
+- **2026-07-01 — S3 corrección + S4b + CIERRE (OK de Beto: "dale a las 2").**
+  (a) UPDATE aplicado en prod a las 11 filas de `venta_fases` (condición
+  defensiva `fecha = día UTC del created_at`; 11/11 RETURNING verificado;
+  detector post-corrección: 0 filas fuera del sellado Coda). El Avalúo
+  Cerrado del 30-jun regresó a junio. (b) Migración
+  `20260702002130_fechas_tz_defaults_fecha_local`: 17 defaults
+  `CURRENT_DATE` → `(now() AT TIME ZONE 'America/Matamoros')::date`
+  (introspección de prod, no la lista estimada del barrido) — via
+  db-push-on-merge con label finanzas-ok. Derivados regenerados desde shadow
+  (`db:regen`). Barrido de Reminders: lista limpia. Iniciativa **done**.
 - **2026-07-01 — S3 (auditoría read-only, prod).** Detector: `fecha = día UTC
 del created_at` donde `día UTC ≠ día local de Matamoros`. Resultados:
   - `dilesa.venta_fases`: **1,104 filas**, de las cuales **1,093 son el sellado
