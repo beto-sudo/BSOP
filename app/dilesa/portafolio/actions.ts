@@ -12,14 +12,19 @@
  * los controles a esos roles.
  */
 
+import { createElement } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { renderToBuffer } from '@react-pdf/renderer';
 import { revalidatePath } from 'next/cache';
 
 import { getEffectiveUser } from '@/lib/auth/effective-user';
 import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { slugifyDestino } from '@/lib/dilesa/portafolio';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
+import { cargarFichaActivo } from '@/lib/dilesa/ficha-activo-data';
+import { FichaActivoPDF } from '@/lib/dilesa/pdf/ficha-activo';
+import { sendFichaComercialEmail } from '@/lib/dilesa/ficha-email';
 import type { Database } from '@/types/supabase';
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -459,4 +464,61 @@ export async function agregarBitacoraActivo(input: {
     return { ok: false, error: getSupabaseErrorMessage(error, 'No se pudo guardar la nota.') };
   }
   return { ok: true };
+}
+
+/**
+ * Envía la ficha comercial (PDF adjunto) de un activo a un prospecto de
+ * venta/renta (S7). Confirmación explícita del operador en el dialog —
+ * nunca automático. Pasa por el catálogo `dilesa_ficha_comercial`.
+ */
+export async function enviarFichaComercial(input: {
+  activoId: string;
+  para: string[];
+  asunto: string;
+  mensaje: string;
+}): Promise<{ ok: true; sentTo: string[] } | { ok: false; error: string }> {
+  const para = input.para.map((e) => e.trim()).filter(Boolean);
+  if (para.length === 0) return { ok: false, error: 'Captura al menos un destinatario.' };
+  if (para.some((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) {
+    return { ok: false, error: 'Hay un correo destinatario con formato inválido.' };
+  }
+  if (!input.asunto.trim()) return { ok: false, error: 'El asunto es obligatorio.' };
+  if (!input.mensaje.trim()) return { ok: false, error: 'El mensaje es obligatorio.' };
+
+  const supabase = await getActionClient();
+  const eu = await getEffectiveUser(supabase);
+  if (!eu || !(eu.isAdmin === true || (eu.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID))) {
+    return { ok: false, error: 'Solo Dirección o un administrador puede enviar fichas.' };
+  }
+
+  const r = await cargarFichaActivo(supabase, input.activoId);
+  if ('error' in r) return { ok: false, error: r.error };
+
+  const fechaTexto = new Date().toLocaleDateString('es-MX', {
+    timeZone: 'America/Matamoros',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const pdf = await renderToBuffer(
+    createElement(FichaActivoPDF, {
+      ficha: r.ficha,
+      fechaTexto,
+    }) as Parameters<typeof renderToBuffer>[0]
+  );
+
+  const res = await sendFichaComercialEmail({
+    empresaId: DILESA_EMPRESA_ID,
+    activoId: input.activoId,
+    activoNombre: r.ficha.nombre,
+    to: para,
+    subject: input.asunto.trim(),
+    mensaje: input.mensaje,
+    pdf: Buffer.from(pdf),
+    pdfFilename: 'ficha-comercial.pdf',
+    operadorNombre: eu.firstName ?? null,
+    operadorEmail: eu.email ?? null,
+  });
+  if (!res.ok) return { ok: false, error: res.error ?? 'No se pudo enviar el correo.' };
+  return { ok: true, sentTo: res.sentTo };
 }
