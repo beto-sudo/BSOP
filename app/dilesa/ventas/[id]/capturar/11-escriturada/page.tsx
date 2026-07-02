@@ -5,10 +5,11 @@
  *
  * Tras la firma en notaría, las escrituras llegan a Dirección (Beto, o quien
  * de Dirección esté) para firmar. Se registra:
- *   - `fecha_escritura` → fecha de la escritura
+ *   - `fecha_escritura` → fecha de la escritura (nunca futura; también sella
+ *     `venta_fases.fecha` de la posición 11 — captura y corrección)
  *   - `numero_escritura` → número de instrumento público del NOTARIO
  *     (no el folio interno — la revisión PLD de F13 lo cruza contra el
- *     aviso). Corrige post-cierre sin tocar venta_fases.
+ *     aviso). Corrige post-cierre.
  *   - `numero_cheque_notaria` → número del cheque enviado a la notaría
  *   - `monto_cheque_notaria` → monto del cheque (parte de la cuadratura)
  *
@@ -31,6 +32,7 @@ import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
 import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 import {
   IndicadorAutoguardado,
   useAutoguardadoCampos,
@@ -75,8 +77,11 @@ function CapturarFase11Body() {
 
   const [numeroEscritura, setNumeroEscritura] = useState<string>('');
   // En blanco a propósito: la fecha de escritura debe seleccionarse a mano
-  // (no asumir "hoy") para que sea la fecha real del instrumento.
+  // (no asumir "hoy") para que sea la fecha real del instrumento. Y nunca
+  // futura (`max` + validación): la escritura ya se firmó cuando se captura —
+  // una fecha adelante casi siempre es un error de mes en el date picker.
   const [fechaEscritura, setFechaEscritura] = useState<string>('');
+  const hoy = hoyISOMatamoros();
   const [numeroCheque, setNumeroCheque] = useState<string>('');
   const [montoCheque, setMontoCheque] = useState<string>('');
   // Autoguardado (ADR-051): firma de lo último persistido (arranca = lo cargado).
@@ -163,6 +168,9 @@ function CapturarFase11Body() {
     claveGuardada: JSON.stringify(guardado),
     habilitado: !!venta && !yaCerrada,
     guardar: async () => {
+      if (fechaEscritura && fechaEscritura > hoy) {
+        return { ok: false, error: 'La fecha de escritura no puede ser futura.' };
+      }
       const { error: upErr } = await sb
         .schema('dilesa')
         .from('ventas')
@@ -188,6 +196,14 @@ function CapturarFase11Body() {
         toast.add({
           title: 'Falta la fecha de escritura',
           description: 'Captura la fecha de la escritura.',
+          type: 'error',
+        });
+        return;
+      }
+      if (fechaEscritura > hoy) {
+        toast.add({
+          title: 'La fecha de escritura no puede ser futura',
+          description: 'Revisa el mes y el año seleccionados en el calendario.',
           type: 'error',
         });
         return;
@@ -234,6 +250,9 @@ function CapturarFase11Body() {
         },
         notas: null,
         registradoPor: userId,
+        // La fase se sella con la fecha REAL de la escritura, no con la fecha
+        // de captura: el reporte "Ventas por fase" cuenta por venta_fases.fecha.
+        fecha: fechaEscritura,
       });
 
       setSubmitting(false);
@@ -262,12 +281,15 @@ function CapturarFase11Body() {
 
       router.push(`/dilesa/ventas/${venta.id}`);
     },
-    [fechaEscritura, montoCheque, numeroCheque, numeroEscritura, router, sb, toast, venta]
+    [fechaEscritura, hoy, montoCheque, numeroCheque, numeroEscritura, router, sb, toast, venta]
   );
 
-  // ── Corrección post-cierre (no toca venta_fases — patrón F8) ─────
+  // ── Corrección post-cierre (patrón F8) ───────────────────────────
   // Las ventas migradas traen folio interno en numero_escritura; la
-  // revisión PLD de F13 exige el instrumento real del notario.
+  // revisión PLD de F13 exige el instrumento real del notario. La fecha SÍ
+  // sincroniza venta_fases (posición 11): esa fila se sella con la fecha de
+  // la escritura y el reporte "Ventas por fase" cuenta por ella — si solo
+  // corrigiéramos ventas.fecha_escritura quedarían en meses distintos.
   const onActualizarEscritura = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -275,6 +297,14 @@ function CapturarFase11Body() {
       if (!fechaEscritura) {
         toast.add({
           title: 'Falta la fecha de escritura',
+          type: 'error',
+        });
+        return;
+      }
+      if (fechaEscritura > hoy) {
+        toast.add({
+          title: 'La fecha de escritura no puede ser futura',
+          description: 'Revisa el mes y el año seleccionados en el calendario.',
           type: 'error',
         });
         return;
@@ -295,11 +325,30 @@ function CapturarFase11Body() {
           numero_escritura: numeroEscritura.trim(),
         })
         .eq('id', venta.id);
-      setSubmitting(false);
       if (upErr) {
+        setSubmitting(false);
         toast.add({
           title: 'No se pudieron actualizar los datos',
           description: getSupabaseErrorMessage(upErr, 'Reintenta.'),
+          type: 'error',
+        });
+        return;
+      }
+      const { error: faseErr } = await sb
+        .schema('dilesa')
+        .from('venta_fases')
+        .update({ fecha: fechaEscritura })
+        .eq('venta_id', venta.id)
+        .eq('posicion', 11)
+        .is('deleted_at', null);
+      setSubmitting(false);
+      if (faseErr) {
+        toast.add({
+          title: 'Venta actualizada, pero la fase no',
+          description: getSupabaseErrorMessage(
+            faseErr,
+            'La fecha de la fase Escriturada no se sincronizó; reintenta.'
+          ),
           type: 'error',
         });
         return;
@@ -310,7 +359,7 @@ function CapturarFase11Body() {
         type: 'success',
       });
     },
-    [venta, fechaEscritura, numeroEscritura, sb, toast]
+    [venta, fechaEscritura, hoy, numeroEscritura, sb, toast]
   );
 
   // ── Render ───────────────────────────────────────────────────────
@@ -358,6 +407,7 @@ function CapturarFase11Body() {
                     value={fechaEscritura}
                     onChange={(e) => setFechaEscritura(e.target.value)}
                     required
+                    max={hoy}
                   />
                 </Field>
                 <Field label="Número de instrumento público (escritura) *">
@@ -419,6 +469,7 @@ function CapturarFase11Body() {
                   value={fechaEscritura}
                   onChange={(e) => setFechaEscritura(e.target.value)}
                   required
+                  max={hoy}
                 />
               </Field>
               <Field label="Número de instrumento público (escritura) *">

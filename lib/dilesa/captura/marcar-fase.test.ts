@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { marcarFase, FASES_PIPELINE } from './marcar-fase';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 function mockClient(opts?: {
@@ -14,7 +15,10 @@ function mockClient(opts?: {
   /** fase_posicion actual de la venta (default 2: previa de la fase 3 base). */
   fasePosicionActual?: number;
   /** captura los campos que recibe el UPDATE de ventas (undefined si no se llamó). */
-  capture?: { ventaUpdateCampos?: Record<string, unknown> };
+  capture?: {
+    ventaUpdateCampos?: Record<string, unknown>;
+    faseInsertCampos?: Record<string, unknown>;
+  };
 }): SupabaseClient {
   const storageOk = !opts?.storageUploadError;
   const adjuntoOk = !opts?.adjuntoInsertError;
@@ -64,15 +68,18 @@ function mockClient(opts?: {
       }
       if (s === 'dilesa' && table === 'venta_fases') {
         return {
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn(async () =>
-                faseOk
-                  ? { data: { id: 'fase-id-123' }, error: null }
-                  : { data: null, error: { message: opts!.faseInsertError } }
-              ),
-            })),
-          })),
+          insert: vi.fn((campos: Record<string, unknown>) => {
+            if (opts?.capture) opts.capture.faseInsertCampos = campos;
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () =>
+                  faseOk
+                    ? { data: { id: 'fase-id-123' }, error: null }
+                    : { data: null, error: { message: opts!.faseInsertError } }
+                ),
+              })),
+            };
+          }),
         };
       }
       return {};
@@ -182,6 +189,22 @@ describe('marcarFase', () => {
     });
     expect(r.ok).toBe(true);
     expect(capture.ventaUpdateCampos).not.toHaveProperty('fase_posicion');
+  });
+
+  it('sin `fecha`, la fase se sella con hoy (fecha de captura)', async () => {
+    const capture: { faseInsertCampos?: Record<string, unknown> } = {};
+    const sb = mockClient({ capture });
+    const r = await marcarFase(sb, baseInput);
+    expect(r.ok).toBe(true);
+    expect(capture.faseInsertCampos).toMatchObject({ fecha: hoyISOMatamoros() });
+  });
+
+  it('con `fecha` (ej. Fase 11: fecha real de la escritura), la fase se sella con ella', async () => {
+    const capture: { faseInsertCampos?: Record<string, unknown> } = {};
+    const sb = mockClient({ capture });
+    const r = await marcarFase(sb, { ...baseInput, fecha: '2026-06-25' });
+    expect(r.ok).toBe(true);
+    expect(capture.faseInsertCampos).toMatchObject({ fecha: '2026-06-25' });
   });
 
   it('múltiples docs se suben en orden', async () => {
