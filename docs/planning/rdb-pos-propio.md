@@ -4,10 +4,10 @@
 **Empresas:** RDB
 **Schemas afectados:** `rdb` (nuevas `pos_cuentas`, `pos_rondas`, `pos_items`, `pos_pagos`, `pos_estaciones`, `pos_eventos`; vista canónica `v_ventas_canonicas`; sub-slugs RBAC `rdb.pos.*` en `core.modulos`/`core.permisos_rol`). `erp` (escritura en `movimientos_inventario` vía trigger espejo; lectura/escritura `cortes_caja`/`cortes_vouchers`). Post-cutover: `rdb.waitry_*` queda histórico read-only y el edge function `waitry-webhook` (incl. espejo a Coda) se apaga.
 **Estado:** in_progress
-**Próximo hito:** cerrar S0 (spec operativa + ADR + slugs RBAC) y abrir el PR de schema (S1)
+**Próximo hito:** S1 — migración del schema POS + RPCs + vista canónica + tests (PR propio)
 **Dueño:** Beto
 **Creada:** 2026-07-02
-**Última actualización:** 2026-07-02 (promoción)
+**Última actualización:** 2026-07-02 (S0 cerrado: ADR-056 + slugs RBAC)
 
 > **Sucede a** la saga Waitry: [`rdb-waitry-ingesta-dedup`](rdb-waitry-ingesta-dedup.md),
 > [`rdb-waitry-deduplicacion`](rdb-waitry-deduplicacion.md),
@@ -161,7 +161,12 @@ hacer.
 
 ## Bitácora
 
-- **2026-07-02** — Promoción. Evaluación pre-promoción con 6 revisores
+- **2026-07-02** — **S0 cerrado**: [ADR-056](../adr/056_rdb_pos_modelo.md)
+  fija el modelo técnico (tablas `pos_*`, máquinas de estados, RPCs con
+  `client_action_id`, identidad dispositivo+PIN, inventario por evento de
+  línea, vista canónica, RLS/RBAC con slugs `rdb.pos`/`.captura`/`.kds`/`.admin`).
+  Índice de ARCHITECTURE.md §5 actualizado. Próximo: S1 (migración).
+- **2026-07-02** — Promoción (PR #1189). Evaluación pre-promoción con 6 revisores
   independientes (5 agentes: arquitectura de datos, UX operativa,
   seguridad/anti-fraude, rollout/piloto, completitud; + codex/gpt-5.5 como
   arquitecto externo). Consenso: build correcto con alcance brutal; KDS se
