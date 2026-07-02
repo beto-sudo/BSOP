@@ -9,6 +9,7 @@ import { ActiveFiltersChip } from '@/components/module-page';
 import type { CorteOption } from './types';
 import { STATUS_OPTIONS } from './types';
 import { formatDate } from './utils';
+import { TIPO_PAGO_OPTIONS } from './tipo-pago';
 
 export type VentasFiltersProps = {
   search: string;
@@ -18,6 +19,8 @@ export type VentasFiltersProps = {
   corteFilter: string;
   onCorteFilterChange: (value: string) => void;
   cortes: CorteOption[];
+  pagoFilter: string;
+  onPagoFilterChange: (value: string) => void;
   dateFrom: string;
   dateTo: string;
   onDateFromChange: (value: string) => void;
@@ -42,6 +45,8 @@ export function VentasFilters({
   corteFilter,
   onCorteFilterChange,
   cortes,
+  pagoFilter,
+  onPagoFilterChange,
   dateFrom,
   dateTo,
   onDateFromChange,
@@ -90,6 +95,16 @@ export function VentasFilters({
         searchPlaceholder="Buscar corte..."
         clearLabel="Todos los cortes"
         className="w-52"
+      />
+
+      {/* Tipo de pago — buckets espejo de rdb.v_cortes_totales (efectivo /
+          tarjeta / stripe / otro). Un pedido con pago dividido matchea por
+          cualquiera de sus métodos. */}
+      <Combobox
+        value={pagoFilter}
+        onChange={(v) => onPagoFilterChange(v || 'all')}
+        options={TIPO_PAGO_OPTIONS}
+        className="w-44"
       />
 
       <div className="flex items-center gap-2">

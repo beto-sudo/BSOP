@@ -8222,6 +8222,7 @@ export type Database = {
           nombre: string
           orden: number
           updated_at: string
+          va_a_cocina: boolean
         }
         Insert: {
           activo?: boolean
@@ -8232,6 +8233,7 @@ export type Database = {
           nombre: string
           orden?: number
           updated_at?: string
+          va_a_cocina?: boolean
         }
         Update: {
           activo?: boolean
@@ -8242,6 +8244,7 @@ export type Database = {
           nombre?: string
           orden?: number
           updated_at?: string
+          va_a_cocina?: boolean
         }
         Relationships: []
       }
@@ -12469,6 +12472,7 @@ export type Database = {
           unidad: string
           unidad_base: string | null
           updated_at: string | null
+          va_a_cocina: boolean | null
         }
         Insert: {
           activo?: boolean
@@ -12491,6 +12495,7 @@ export type Database = {
           unidad?: string
           unidad_base?: string | null
           updated_at?: string | null
+          va_a_cocina?: boolean | null
         }
         Update: {
           activo?: boolean
@@ -12513,6 +12518,7 @@ export type Database = {
           unidad?: string
           unidad_base?: string | null
           updated_at?: string | null
+          va_a_cocina?: boolean | null
         }
         Relationships: [
           {
@@ -15590,6 +15596,509 @@ export type Database = {
   }
   rdb: {
     Tables: {
+      pos_cuentas: {
+        Row: {
+          abierta_at: string
+          abierta_por: string
+          cancel_razon: string | null
+          cerrada_at: string | null
+          client_action_id: string
+          cliente_nombre: string | null
+          created_at: string
+          cuenta_origen_id: string | null
+          descuento_total: number
+          empresa_id: string
+          estacion_id: string
+          estado: string
+          id: string
+          playtomic_folio: string | null
+          subtotal: number
+          tipo_venta: string
+          total: number
+          ubicacion: string | null
+          updated_at: string
+        }
+        Insert: {
+          abierta_at?: string
+          abierta_por: string
+          cancel_razon?: string | null
+          cerrada_at?: string | null
+          client_action_id: string
+          cliente_nombre?: string | null
+          created_at?: string
+          cuenta_origen_id?: string | null
+          descuento_total?: number
+          empresa_id: string
+          estacion_id: string
+          estado?: string
+          id?: string
+          playtomic_folio?: string | null
+          subtotal?: number
+          tipo_venta?: string
+          total?: number
+          ubicacion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abierta_at?: string
+          abierta_por?: string
+          cancel_razon?: string | null
+          cerrada_at?: string | null
+          client_action_id?: string
+          cliente_nombre?: string | null
+          created_at?: string
+          cuenta_origen_id?: string | null
+          descuento_total?: number
+          empresa_id?: string
+          estacion_id?: string
+          estado?: string
+          id?: string
+          playtomic_folio?: string | null
+          subtotal?: number
+          tipo_venta?: string
+          total?: number
+          ubicacion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_cuentas_cuenta_origen_id_fkey"
+            columns: ["cuenta_origen_id"]
+            isOneToOne: false
+            referencedRelation: "pos_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_cuentas_estacion_id_fkey"
+            columns: ["estacion_id"]
+            isOneToOne: false
+            referencedRelation: "pos_estaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_estaciones: {
+        Row: {
+          activa: boolean
+          auth_user_id: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          nombre: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pos_eventos: {
+        Row: {
+          actor_auth_uid: string | null
+          actor_empleado_id: string | null
+          actor_empleado_nombre: string | null
+          autorizado_por: string | null
+          client_action_id: string | null
+          created_at: string
+          cuenta_id: string | null
+          datos_antes: Json | null
+          datos_despues: Json | null
+          empresa_id: string
+          estacion_id: string | null
+          evento: string
+          id: string
+          item_id: string | null
+          pago_id: string | null
+          razon: string | null
+        }
+        Insert: {
+          actor_auth_uid?: string | null
+          actor_empleado_id?: string | null
+          actor_empleado_nombre?: string | null
+          autorizado_por?: string | null
+          client_action_id?: string | null
+          created_at?: string
+          cuenta_id?: string | null
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          empresa_id: string
+          estacion_id?: string | null
+          evento: string
+          id?: string
+          item_id?: string | null
+          pago_id?: string | null
+          razon?: string | null
+        }
+        Update: {
+          actor_auth_uid?: string | null
+          actor_empleado_id?: string | null
+          actor_empleado_nombre?: string | null
+          autorizado_por?: string | null
+          client_action_id?: string | null
+          created_at?: string
+          cuenta_id?: string | null
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          empresa_id?: string
+          estacion_id?: string | null
+          evento?: string
+          id?: string
+          item_id?: string | null
+          pago_id?: string | null
+          razon?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_eventos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "pos_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_eventos_estacion_id_fkey"
+            columns: ["estacion_id"]
+            isOneToOne: false
+            referencedRelation: "pos_estaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_eventos_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "pos_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_eventos_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pos_pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_items: {
+        Row: {
+          cantidad: number
+          categoria_id: string | null
+          categoria_nombre: string | null
+          created_at: string
+          cuenta_id: string
+          descuento_autorizado_por: string | null
+          descuento_pct: number
+          descuento_razon: string | null
+          empresa_id: string
+          entregado_at: string | null
+          enviado_cocina_at: string | null
+          estado: string
+          id: string
+          listo_at: string | null
+          notas: string | null
+          precio_unitario: number
+          producto_id: string
+          producto_nombre: string
+          ronda_id: string
+          updated_at: string
+          va_a_cocina: boolean
+          void_por: string | null
+          void_razon: string | null
+        }
+        Insert: {
+          cantidad: number
+          categoria_id?: string | null
+          categoria_nombre?: string | null
+          created_at?: string
+          cuenta_id: string
+          descuento_autorizado_por?: string | null
+          descuento_pct?: number
+          descuento_razon?: string | null
+          empresa_id: string
+          entregado_at?: string | null
+          enviado_cocina_at?: string | null
+          estado?: string
+          id?: string
+          listo_at?: string | null
+          notas?: string | null
+          precio_unitario: number
+          producto_id: string
+          producto_nombre: string
+          ronda_id: string
+          updated_at?: string
+          va_a_cocina?: boolean
+          void_por?: string | null
+          void_razon?: string | null
+        }
+        Update: {
+          cantidad?: number
+          categoria_id?: string | null
+          categoria_nombre?: string | null
+          created_at?: string
+          cuenta_id?: string
+          descuento_autorizado_por?: string | null
+          descuento_pct?: number
+          descuento_razon?: string | null
+          empresa_id?: string
+          entregado_at?: string | null
+          enviado_cocina_at?: string | null
+          estado?: string
+          id?: string
+          listo_at?: string | null
+          notas?: string | null
+          precio_unitario?: number
+          producto_id?: string
+          producto_nombre?: string
+          ronda_id?: string
+          updated_at?: string
+          va_a_cocina?: boolean
+          void_por?: string | null
+          void_razon?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_items_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "pos_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventario_stock"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_producto_metricas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_producto_tendencia_semanal"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_producto_ultima_venta"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_productos_grupo"
+            referencedColumns: ["padre_id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_productos_tabla"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "v_waitry_productos_categoria"
+            referencedColumns: ["producto_catalogo_id"]
+          },
+          {
+            foreignKeyName: "pos_items_ronda_id_fkey"
+            columns: ["ronda_id"]
+            isOneToOne: false
+            referencedRelation: "pos_rondas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_operadores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          empleado_id: string
+          empresa_id: string
+          id: string
+          pin_hash: string
+          puede_autorizar: boolean
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          empleado_id: string
+          empresa_id: string
+          id?: string
+          pin_hash: string
+          puede_autorizar?: boolean
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          empleado_id?: string
+          empresa_id?: string
+          id?: string
+          pin_hash?: string
+          puede_autorizar?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pos_pagos: {
+        Row: {
+          cambio: number | null
+          client_action_id: string
+          corte_id: string
+          created_at: string
+          cuenta_id: string
+          empresa_id: string
+          id: string
+          metodo: string
+          monto: number
+          propina: number
+          recibido: number | null
+          referencia: string | null
+          registrado_por: string
+          reversa_de: string | null
+        }
+        Insert: {
+          cambio?: number | null
+          client_action_id: string
+          corte_id: string
+          created_at?: string
+          cuenta_id: string
+          empresa_id: string
+          id?: string
+          metodo: string
+          monto: number
+          propina?: number
+          recibido?: number | null
+          referencia?: string | null
+          registrado_por: string
+          reversa_de?: string | null
+        }
+        Update: {
+          cambio?: number | null
+          client_action_id?: string
+          corte_id?: string
+          created_at?: string
+          cuenta_id?: string
+          empresa_id?: string
+          id?: string
+          metodo?: string
+          monto?: number
+          propina?: number
+          recibido?: number | null
+          referencia?: string | null
+          registrado_por?: string
+          reversa_de?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_pagos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_pagos_corte_id_fkey"
+            columns: ["corte_id"]
+            isOneToOne: false
+            referencedRelation: "v_cortes_totales"
+            referencedColumns: ["corte_id"]
+          },
+          {
+            foreignKeyName: "pos_pagos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "pos_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_pagos_reversa_de_fkey"
+            columns: ["reversa_de"]
+            isOneToOne: false
+            referencedRelation: "pos_pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_rondas: {
+        Row: {
+          capturada_por: string
+          client_action_id: string
+          created_at: string
+          cuenta_id: string
+          empresa_id: string
+          estacion_id: string
+          id: string
+          numero: number
+        }
+        Insert: {
+          capturada_por: string
+          client_action_id: string
+          created_at?: string
+          cuenta_id: string
+          empresa_id: string
+          estacion_id: string
+          id?: string
+          numero: number
+        }
+        Update: {
+          capturada_por?: string
+          client_action_id?: string
+          created_at?: string
+          cuenta_id?: string
+          empresa_id?: string
+          estacion_id?: string
+          id?: string
+          numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_rondas_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "pos_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_rondas_estacion_id_fkey"
+            columns: ["estacion_id"]
+            isOneToOne: false
+            referencedRelation: "pos_estaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos_waitry_map: {
         Row: {
           created_at: string | null
@@ -16158,6 +16667,19 @@ export type Database = {
         }
         Relationships: []
       }
+      v_ventas_canonicas: {
+        Row: {
+          corte_id: string | null
+          estado: string | null
+          fecha: string | null
+          propina: number | null
+          source: string | null
+          total: number | null
+          ubicacion: string | null
+          venta_ref: string | null
+        }
+        Relationships: []
+      }
       v_waitry_pedidos: {
         Row: {
           content_hash: string | null
@@ -16470,6 +16992,102 @@ export type Database = {
           unidad: string
           valor_inventario: number
         }[]
+      }
+      fn_pos_abrir_cuenta: {
+        Args: {
+          p_client_action_id: string
+          p_cliente_nombre?: string
+          p_estacion_id: string
+          p_pin: string
+          p_playtomic_folio?: string
+          p_tipo_venta?: string
+          p_ubicacion?: string
+        }
+        Returns: string
+      }
+      fn_pos_accion_ya_procesada: {
+        Args: { p_client_action_id: string }
+        Returns: boolean
+      }
+      fn_pos_agregar_ronda: {
+        Args: {
+          p_client_action_id: string
+          p_cuenta_id: string
+          p_items: Json
+          p_pin: string
+          p_pin_autorizador?: string
+        }
+        Returns: string
+      }
+      fn_pos_cancelar_cuenta: {
+        Args: {
+          p_client_action_id: string
+          p_cuenta_id: string
+          p_pin: string
+          p_pin_autorizador?: string
+          p_razon: string
+        }
+        Returns: undefined
+      }
+      fn_pos_cobrar: {
+        Args: {
+          p_client_action_id: string
+          p_cuenta_id: string
+          p_pagos: Json
+          p_pin: string
+        }
+        Returns: undefined
+      }
+      fn_pos_enviar_cocina: {
+        Args: { p_client_action_id: string; p_cuenta_id: string; p_pin: string }
+        Returns: number
+      }
+      fn_pos_kds_marcar: {
+        Args: {
+          p_client_action_id: string
+          p_item_id: string
+          p_nuevo_estado: string
+        }
+        Returns: undefined
+      }
+      fn_pos_log_evento: {
+        Args: {
+          p_actor: string
+          p_antes?: Json
+          p_autorizado_por?: string
+          p_client_action_id?: string
+          p_cuenta?: string
+          p_despues?: Json
+          p_empresa_id: string
+          p_estacion: string
+          p_evento: string
+          p_item?: string
+          p_pago?: string
+          p_razon?: string
+        }
+        Returns: string
+      }
+      fn_pos_recalcular_cuenta: {
+        Args: { p_cuenta_id: string }
+        Returns: undefined
+      }
+      fn_pos_resolver_autorizador: {
+        Args: { p_empresa_id: string; p_pin: string }
+        Returns: string
+      }
+      fn_pos_resolver_operador: {
+        Args: { p_empresa_id: string; p_pin: string }
+        Returns: string
+      }
+      fn_pos_void_item: {
+        Args: {
+          p_client_action_id: string
+          p_item_id: string
+          p_pin: string
+          p_pin_autorizador?: string
+          p_razon: string
+        }
+        Returns: undefined
       }
       parse_waitry_timestamptz: {
         Args: { p_fallback_tz?: string; p_value: Json }

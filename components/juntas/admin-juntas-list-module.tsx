@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { FieldLabel } from '@/components/ui/field-label';
 import { Plus, Search, RefreshCw, Loader2, CalendarDays, Play } from 'lucide-react';
 import { JUNTA_ESTADO_CONFIG as ESTADO_CONFIG, type JuntaEstado } from '@/lib/status-tokens';
+import { TIPO_CONFIG, tipoOptionsForEmpresa } from '@/lib/juntas/tipos';
 
 type Junta = {
   id: string;
@@ -56,34 +57,6 @@ type Junta = {
   created_at: string;
   updated_at: string | null;
 };
-
-const TIPO_OPTIONS: { value: string; label: string; icon: string }[] = [
-  { value: 'Comité Ejecutivo', label: 'Comité Ejecutivo', icon: '👔' },
-  { value: 'Consejo', label: 'Consejo', icon: '🏢' },
-  { value: 'Ventas', label: 'Ventas', icon: '💰' },
-  { value: 'Atención PosVenta', label: 'Atención PosVenta', icon: '🔧' },
-  { value: 'Administración', label: 'Administración', icon: '📁' },
-  { value: 'Mercadotecnia', label: 'Mercadotecnia', icon: '📣' },
-  { value: 'Construcción', label: 'Construcción', icon: '🏗️' },
-  { value: 'Compras y Admon. Inventario', label: 'Compras y Admon. Inv.', icon: '📦' },
-  { value: 'Maquinaria', label: 'Maquinaria', icon: '🚜' },
-  { value: 'Proyectos', label: 'Proyectos', icon: '🗂️' },
-  { value: 'Rincón del Bosque', label: 'Rincón del Bosque', icon: '🌲' },
-  { value: 'Extraordinaria', label: 'Extraordinaria', icon: '🚨' },
-  { value: 'Otro', label: 'Otro', icon: '📌' },
-];
-
-const TIPO_CONFIG: Record<string, { label: string; icon: string }> = Object.fromEntries([
-  ...TIPO_OPTIONS.map((t) => [t.value, { label: t.label, icon: t.icon }]),
-  // Legacy aliases from Coda import (DILESA migración).
-  ['Comite Ejecutivo', { label: 'Comité Ejecutivo', icon: '👔' }],
-  ['Junta Operativa', { label: 'Comité Ejecutivo', icon: '👔' }],
-  ['Junta de Área', { label: 'Junta de Área', icon: '📋' }],
-  ['operativa', { label: 'Operativa', icon: '⚙️' }],
-  ['directiva', { label: 'Directiva', icon: '🏛️' }],
-  ['seguimiento', { label: 'Seguimiento', icon: '📊' }],
-  ['emergencia', { label: 'Emergencia', icon: '🚨' }],
-]);
 
 function formatDateTime(dt: string) {
   return new Date(dt).toLocaleString('es-MX', {
@@ -189,6 +162,8 @@ export function AdminJuntasListModule({
 }: AdminJuntasListModuleProps) {
   const router = useRouter();
   const supabase = createSupabaseERPClient();
+
+  const tipoOptions = useMemo(() => tipoOptionsForEmpresa(empresaSlug), [empresaSlug]);
 
   const [juntas, setJuntas] = useState<Junta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -551,7 +526,7 @@ export function AdminJuntasListModule({
           <FilterCombobox
             value={filterTipo}
             onChange={setFilterTipo}
-            options={TIPO_OPTIONS.map((t) => ({
+            options={tipoOptions.map((t) => ({
               id: t.value,
               label: `${t.icon} ${t.label}`,
             }))}
@@ -632,7 +607,7 @@ export function AdminJuntasListModule({
               <Combobox
                 value={createTipo}
                 onChange={setCreateTipo}
-                options={TIPO_OPTIONS.map((t) => ({
+                options={tipoOptions.map((t) => ({
                   value: t.value,
                   label: `${t.icon} ${t.label}`,
                 }))}
