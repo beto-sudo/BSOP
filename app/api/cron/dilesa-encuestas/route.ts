@@ -27,6 +27,7 @@ import {
 } from '@/lib/dilesa/encuesta-emails';
 import { loadEmpresaBranding } from '@/lib/dilesa/email-branding';
 import { loadGerenteVentas } from '@/lib/dilesa/gerente-ventas';
+import { hoyISOMatamoros } from '@/lib/fecha-mx';
 
 export const maxDuration = 120;
 
@@ -48,13 +49,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'admin client no disponible' }, { status: 500 });
   }
 
-  // Hoy en hora de Piedras Negras (CST fijo) — el ciclo es por días locales.
-  const hoy = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Etc/GMT+6',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+  // Hoy en hora local (America/Matamoros, DST real — ADR-054). El cron corre a
+  // las 16:00 UTC (~10:00 locales), lejos de medianoche, así que el cambio de
+  // Etc/GMT+6 fijo a TZ real no altera ningún ciclo; es consistencia de convención.
+  const hoy = hoyISOMatamoros();
 
   const { data: pendientes, error: qErr } = await admin
     .schema('dilesa')

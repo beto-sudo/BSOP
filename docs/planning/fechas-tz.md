@@ -4,7 +4,7 @@
 **Empresas:** Todas (DILESA, ANSA, COAGAN, RDB, SANREN)
 **Schemas afectados:** Sin migración de schema en S0-S2. El barrido S1 tocó código TS en `app/**`, `lib/**` y `components/**` (61 ocurrencias en 39 archivos con `new Date().toISOString().slice(0, 10)`); S3 audita datos en `dilesa.venta_fases.fecha`, `dilesa.ruv (fecha_carga)`, `dilesa.anteproyectos (fecha_completada)` y defaults `CURRENT_DATE` en funciones de `erp` (CxP `p_fecha_emision`, `inventario_levantamientos.fecha_programada`).
 **Estado:** in_progress
-**Próximo hito:** S3 — auditoría read-only de fechas +1 en datos históricos (correcciones solo con OK de Beto)
+**Próximo hito:** OK de Beto para (a) UPDATE de las 11 fechas +1 en `venta_fases` y (b) migración S4b de defaults `CURRENT_DATE` (gate finanzas-ok)
 **Dueño:** Beto
 **Creada:** 2026-07-01
 **Última actualización:** 2026-07-01
@@ -102,6 +102,30 @@ documenta en S4, no se reescribe.
   exportado para no tocar el cron en el hotfix.
 
 ## Bitácora
+
+- **2026-07-01 — S3 (auditoría read-only, prod).** Detector: `fecha = día UTC
+del created_at` donde `día UTC ≠ día local de Matamoros`. Resultados:
+  - `dilesa.venta_fases`: **1,104 filas**, de las cuales **1,093 son el sellado
+    masivo del cutover Coda** (11-jun, fase 17, un minuto, `registrado_por`
+    null — fecha sintética de sellado grabada 06-12 en vez de 06-11; NO
+    contaminan el resumen al consejo, que filtra `posicion in (2, 11)`) y
+    **11 son capturas reales nocturnas** con fecha +1 (fases 1/5/9/10/16,
+    19-jun a 30-jun), incluida una fase 5 del 30-jun grabada **2026-07-01**
+    (cruza el corte de mes). IDs y detalle en la sesión; corrección propuesta:
+    `UPDATE ... SET fecha = (created_at AT TIME ZONE 'America/Matamoros')::date`
+    sobre los IDs listados — **pendiente OK de Beto**.
+  - `dilesa.ruv_frente_documentos` y `dilesa.proyecto_tareas`: 0 filas.
+  - `dilesa.venta_encuestas`: 8 filas con `programada_para` +1 (11-jun, mismo
+    bulk); ciclo ya consumido → sin acción.
+- **2026-07-01 — S4a.** ADR-054 (convención: fecha de negocio =
+  `America/Matamoros`; instantes = timestamptz UTC; `Etc/GMT+6` solo
+  Playtomic/hold-cola documentados; crons = dos-horas-UTC + guard). Cron
+  `dilesa-encuestas` migrado de `Etc/GMT+6` a `hoyISOMatamoros()` (corre
+  ~10:00 locales — cero cambio de comportamiento, consistencia). Índice en
+  ARCHITECTURE.md §5. S4b (defaults `CURRENT_DATE` → fecha local en ~13
+  columnas `date` de `erp`/`dilesa.construccion`) queda propuesto —
+  migración toca tablas financieras, gate finanzas-ok, **pendiente OK de
+  Beto**.
 
 - **2026-07-01 — Análisis de impacto en flujos externos (pedido de Beto antes
   de S1): Waitry/Playtomic NO se tocan.** (a) El webhook de Waitry
