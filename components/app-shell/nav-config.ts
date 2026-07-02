@@ -171,6 +171,7 @@ export const NAV_ITEMS: NavItem[] = [
       {
         label: 'Operaciones',
         children: [
+          { label: 'Punto de Venta', href: '/rdb/pos' },
           { label: 'Ventas', href: '/rdb/ventas' },
           { label: 'Cortes', href: '/rdb/cortes' },
           { label: 'Playtomic', href: '/rdb/playtomic' },
