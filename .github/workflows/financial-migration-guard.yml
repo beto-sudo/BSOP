@@ -2,15 +2,22 @@ name: Financial Migration Guard
 
 # Gate D5 de la iniciativa `derivados-sin-drift` (Sprint 3). Con el modelo nuevo
 # las migraciones se aplican a prod AL MERGEAR (db-push-on-merge.yml). El control
-# financiero de Beto exige que nada que mueva dinero/permisos se aplique sin su
-# confirmación → las migraciones FINANCIERAS no se auto-mergean: las revisa y
-# mergea Dirección a mano (el merge ES la confirmación).
+# financiero de Beto exige que nada que MUEVA dinero o ABRA permisos se aplique
+# sin su confirmación → esas migraciones (nivel block) no se auto-mergean: espera
+# el "dale" de Beto + label `finanzas-ok`. El DDL aditivo sobre superficie
+# financiera (nivel notify) auto-mergea con aviso en el chat.
 #
 # Este check clasifica las migraciones nuevas del PR y publica el commit-status
-# `finanzas-gate` (required en branch protection):
+# `finanzas-gate` (required en branch protection). DOS NIVELES (2026-07-01 —
+# antes todo lo financiero bloqueaba y el volumen de aprobaciones triviales
+# convertía el gate en teatro):
 #   - PR sin migración financiera ............... success (no bloquea)
-#   - financiera CON label `finanzas-ok` ........ success (Dirección aprobó)
-#   - financiera SIN label ...................... pending (bloquea el auto-merge)
+#   - financiera ADITIVA (notify: DDL nuevo) .... success (auto-merge; CC avisa
+#                                                  en el chat, sin esperar OK)
+#   - financiera de RIESGO (block: DML/backfill
+#     de montos/destructivo/permisos) CON label
+#     `finanzas-ok` ............................. success (Dirección aprobó)
+#   - de RIESGO SIN label ....................... pending (bloquea el auto-merge)
 #
 # BLOQUEO SILENCIOSO (norma 2026-06-27): el job SIEMPRE termina en success, así
 # que GitHub no manda el correo "workflow run failed". El freno del auto-merge lo
@@ -77,16 +84,22 @@ jobs:
         if: steps.detect.outputs.has == 'true'
         run: npm ci --prefer-offline --no-audit
 
+      # Exit codes del clasificador: 0=none, 2=notify (aditiva), 3=block.
+      # Cualquier otro código (crash, tsx roto) se mapea a block — fail-closed.
       - name: Clasificar migraciones nuevas
         id: classify
         if: steps.detect.outputs.has == 'true'
         run: |
           NEW=$(cat /tmp/new_migrations.txt)
-          if npx tsx scripts/classify-financial-migration.ts $NEW; then
-            echo "financial=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "financial=true" >> "$GITHUB_OUTPUT"
-          fi
+          set +e
+          npx tsx scripts/classify-financial-migration.ts $NEW
+          RC=$?
+          set -e
+          case "$RC" in
+            0) echo "level=none"   >> "$GITHUB_OUTPUT" ;;
+            2) echo "level=notify" >> "$GITHUB_OUTPUT" ;;
+            *) echo "level=block"  >> "$GITHUB_OUTPUT" ;;
+          esac
 
       # Publica el status `finanzas-gate`. Siempre corre (incluso si un paso
       # previo falló) para no dejar el required check colgado, y el job no falla:
@@ -97,20 +110,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
           HAS: ${{ steps.detect.outputs.has }}
-          FINANCIAL: ${{ steps.classify.outputs.financial }}
+          LEVEL: ${{ steps.classify.outputs.level }}
           LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'finanzas-ok') }}
         run: |
           STATE=success
           DESC="Sin migración financiera — OK"
-          # Fail-closed: financiera (true) O clasificación incompleta (vacío) con
+          # Fail-closed: nivel block O clasificación incompleta (vacío) con
           # migraciones presentes ⇒ exigir aprobación.
-          if [ "$HAS" = "true" ] && [ "$FINANCIAL" != "false" ]; then
-            if [ "$LABELED" = "true" ]; then
-              STATE=success
-              DESC="Migración financiera aprobada por Dirección (finanzas-ok)"
+          if [ "$HAS" = "true" ] && [ "$LEVEL" != "none" ]; then
+            if [ "$LEVEL" = "notify" ]; then
+              DESC="Financiera aditiva — auto-merge con aviso en chat (sin bloqueo)"
+            elif [ "$LABELED" = "true" ]; then
+              DESC="Migración financiera de riesgo aprobada por Dirección (finanzas-ok)"
             else
               STATE=pending
-              DESC="Migración financiera: espera label finanzas-ok de Dirección"
+              DESC="Financiera de riesgo (DML/destructivo/permisos): espera finanzas-ok"
             fi
           fi
           echo "finanzas-gate → $STATE — $DESC"

@@ -7,7 +7,7 @@
 **Próximo hito:** — (iniciativa cerrada 2026-06-27)
 **Dueño:** Beto
 **Creada:** 2026-06-26
-**Última actualización:** 2026-06-27 (CERRADA — modelo completo en main: schema desde shadow + INITIATIVES fuera del PR + db push al merge con gate financiero D5; los 3 checks required en `main`; gate operativo con label `finanzas-ok`)
+**Última actualización:** 2026-07-01 (post-cierre: gate D5 recalibrado a dos niveles — aditiva auto-mergea con aviso, riesgo espera `finanzas-ok`; norma "migración primero, UI después" para previews)
 
 ## Problema
 
@@ -92,6 +92,24 @@ imposible** mientras se respete el apply-post-merge.
 - **D6 — El nuevo `schema-check` corre con paths-filter `supabase/migrations/**`**
 (gratis para PRs de UI), como `drift-check.yml`. No carga el job `quality` de cada
   PR con el boot de Docker.
+- **D5-bis (2026-07-01) — El gate financiero pasa a DOS NIVELES.** El clasificador
+  amplio original bloqueaba todo lo financiero; el volumen de aprobaciones triviales
+  hizo que Beto aprobara sin leer (gate = teatro). Recalibración: financiera
+  **aditiva** (`notify` — CREATE TABLE/ADD COLUMN/índices/funciones nuevas) auto-mergea
+  con aviso en el chat; financiera **de riesgo** (`block` — DML sobre tablas
+  financieras, backfills de montos, DROP/TRUNCATE/ALTER destructivo, `CREATE OR
+REPLACE`/`DROP` de RPCs financieras, GRANT/REVOKE fuera del boilerplate, RLS off,
+  policies mutadas o expuestas a anon) sigue exigiendo "dale" + label `finanzas-ok`.
+  Extras: comentarios SQL ya no clasifican (falso positivo documentado) y `REVOKE …
+FROM PUBLIC/anon` cuenta como endurecimiento, no bloquea. Convención derivada: RPC
+  financiera nueva = `CREATE FUNCTION` (sin OR REPLACE). Calibrado contra las últimas
+  25 migraciones reales: 15 bloqueos con la regla vieja → 6 con la nueva, y los 6 son
+  genuinamente de riesgo. **Decidida con Beto en chat (2026-07-01).**
+- **D7 (2026-07-01) — Norma "migración primero, UI después".** El Vercel Preview
+  apunta a prod y las migraciones se aplican al merge → un preview cuya UI depende de
+  schema nuevo nunca funciona antes del merge (con o sin gate). Cuando la UI dependa
+  de una migración, se separa en dos PRs: migración primero (auto-merge, schema en
+  prod en ~2 min), UI después con preview funcional. Sin cambio de tooling.
 
 ## Riesgos
 
@@ -223,3 +241,15 @@ NOT EXISTS ... REFERENCES/DEFAULT` (no reproducible). `SCHEMA_REF`/`types`
   local con `npm run initiatives:gen` cuando haga falta; el camino del PAT queda
   documentado en `initiatives-regen.yml`. Memorias de migración actualizadas al modelo
   nuevo.
+- **2026-07-01 — Recalibración post-cierre del gate D5 (D5-bis) + norma D7.** Beto
+  reportó que aprobaba `finanzas-ok` sin leer (demasiadas aprobaciones triviales) y
+  que los previews de features con migración nueva no funcionan. Cambios: (1)
+  `classify-financial-migration.ts` reescrito a dos niveles (`notify` aditiva
+  auto-mergea con aviso / `block` DML-destructivo-permisos espera "dale"), con strip
+  de comentarios SQL y `REVOKE FROM PUBLIC/anon` exento como endurecimiento; exit
+  codes 0/2/3, fail-closed en el workflow. (2) `financial-migration-guard.yml`
+  publica `pending` solo en nivel `block`. (3) Test unitario nuevo
+  (`classify-financial-migration.test.ts`, 20 casos) lockea la frontera notify/block.
+  (4) Norma "migración primero, UI después" documentada en `GOVERNANCE.md` §4 y
+  `CLAUDE.md`. Calibración contra las 25 migraciones más recientes: 15 bloqueos
+  (regla vieja) → 6 (nueva), todos de riesgo genuino.
