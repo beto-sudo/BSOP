@@ -136,6 +136,18 @@ function PipelineBody() {
                         ) : null}
                       </div>
 
+                      {/* Fase 12 se cierra sola por CxC — sin captura manual
+                          (decisión Beto 2026-07-01); la fecha es la base de
+                          comisiones, por eso la nota vive también aquí. */}
+                      {r.pos === 12 ? (
+                        <p className="ml-11 mt-0.5 text-[10px] text-[var(--text)]/45">
+                          Se cierra sola al registrar el abono de la institución en el estado de
+                          cuenta (con comprobante y XML del recibo). La fecha de la fase = fecha del
+                          último abono de institución en Cobranza — base del cálculo de comisiones;
+                          para corregirla, corrige el abono en CxC.
+                        </p>
+                      ) : null}
+
                       {/* Qué se capturó en esta fase (expandible) */}
                       {capturados.length > 0 ? (
                         <details className="ml-11 mt-0.5">

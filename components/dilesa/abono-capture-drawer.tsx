@@ -18,7 +18,10 @@
  * CONTPAQi por cada pago se sube aquí y es la FUENTE de los datos — fecha,
  * monto, forma de pago y referencia se extraen del XML (no se capturan a
  * mano) y el receptor se verifica contra el cliente de la venta (RFC, con
- * fallback a nombre). Mismatch de receptor exige confirmación explícita
+ * fallback a nombre). Desde 2026-07-01 (decisión de Beto) el XML y el
+ * comprobante del depósito son OBLIGATORIOS: ningún abono queda en blanco —
+ * sin comprobante no hay nada que copiar al expediente al detonar (caso
+ * Salas), y la fecha del abono gobierna la fecha de detonación/comisiones. Mismatch de receptor exige confirmación explícita
  * (con coacreditados el recibo puede venir a nombre del cónyuge). El folio
  * fiscal va a `cxc_pagos.uuid_sat` (unique parcial: un recibo = un abono).
  *
@@ -325,6 +328,27 @@ export function AbonoCaptureDrawer({
       });
       return;
     }
+    // XML + comprobante obligatorios (2026-07-01): la fecha del abono gobierna
+    // la detonación/comisiones y el comprobante viaja al expediente — ninguno
+    // puede quedar en blanco.
+    if (!reciboXml || !parsed) {
+      toast.add({
+        title: 'Falta el XML del recibo de caja',
+        description:
+          'Sube el CFDI del recibo de caja (XML) — es la fuente de fecha, monto y referencia del abono.',
+        type: 'error',
+      });
+      return;
+    }
+    if (!comprobante) {
+      toast.add({
+        title: 'Falta el comprobante del depósito',
+        description:
+          'Sube el comprobante de la transferencia/depósito. En abonos de institución se copia solo al expediente de la venta.',
+        type: 'error',
+      });
+      return;
+    }
     if (parsed && verif && !verif.receptorCoincide && !confirmaOtroReceptor) {
       toast.add({
         title: 'El recibo es de otro receptor',
@@ -520,11 +544,11 @@ export function AbonoCaptureDrawer({
 
           <div>
             <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
-              Recibo de caja (CFDI)
+              Recibo de caja (CFDI) *
             </span>
             <WizardFileSlot
               role="recibo_caja_xml"
-              label="XML del recibo — llena los datos solo"
+              label="XML del recibo (obligatorio) — llena los datos solo"
               file={reciboXml}
               onChange={(f) => void handleXmlChange(f)}
               accept=".xml,text/xml,application/xml"
@@ -694,10 +718,12 @@ export function AbonoCaptureDrawer({
           </FormField>
 
           <div>
-            <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">Comprobante</span>
+            <span className="mb-1.5 block text-xs font-medium text-[var(--text)]">
+              Comprobante *
+            </span>
             <WizardFileSlot
               role="comprobante_deposito"
-              label="Comprobante del depósito"
+              label="Comprobante del depósito (obligatorio)"
               file={comprobante}
               onChange={setComprobante}
               accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"

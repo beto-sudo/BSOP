@@ -1,56 +1,36 @@
 'use client';
 
 /**
- * Fase 12 — Detonada. GUÍA a Cobranza + cierre manual SOLO Dirección.
+ * Fase 12 — Detonada. Pantalla informativa: la fase se cierra SOLO por CxC.
  *
  * "Detonar" el crédito = la institución libera el recurso y DILESA recibe el
- * depósito. El camino ÚNICO normal (2026-06-11) es: Contabilidad registra el
- * abono de la institución en el estado de cuenta de la venta y el trigger
- * `dilesa.fn_detonar_venta_desde_cxc` cierra esta fase solo — un registro,
- * un lugar, el dinero en CxC y el comprobante copiado al expediente.
+ * depósito. El camino ÚNICO (2026-07-01, decisión de Beto) es: Contabilidad
+ * registra el abono de la institución en el estado de cuenta de la venta y el
+ * trigger `dilesa.fn_detonar_venta_desde_cxc` cierra esta fase solo — un
+ * registro, un lugar, el dinero en CxC y el comprobante copiado al expediente.
  *
- * Esta pantalla ya NO captura para el equipo (2026-06-12, caso Ahumada
- * Castillo: el cierre manual con imagen hacía creer que el depósito quedaba
- * registrado, y el estado de cuenta quedaba en ceros). Para no-Dirección es
- * una guía con botón directo a "Registrar abono". El form manual queda como
- * cierre de emergencia exclusivo de Dirección/admin, con advertencia de que
- * NO registra el dinero en Cobranza.
+ * La captura manual de emergencia (solo Dirección) se retiró en la misma
+ * decisión: dejaba la fecha/monto desincronizados de Cobranza y el estado de
+ * cuenta en ceros (caso Ahumada Castillo 2026-06-12; drift de fechas
+ * 2026-06-10/11). La fecha de detonación es la del ÚLTIMO abono de institución
+ * — con cuantos recibos sean, el último salda y marca fecha — y es la base del
+ * cálculo de comisiones (#1171). `trg_resync_detonacion_por_pago` la mantiene
+ * sincronizada ante correcciones en CxC.
  *
- * Enforcement: Fase 11 (Escriturada) debe estar cerrada.
- * Acceso: `dilesa.ventas.fase12_detonada` (Contabilidad + Gerencia Ventas +
- * Dirección); el form de emergencia además exige Dirección
- * (`EffectiveUser.direccionEmpresaIds` o admin global).
+ * Enforcement: Fase 11 (Escriturada) debe estar cerrada (el trigger no detona
+ * antes). Acceso: `dilesa.ventas.fase12_detonada`.
  */
 
-import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Banknote, Loader2, Save, ShieldAlert } from 'lucide-react';
+import { Banknote, CheckCircle2, ExternalLink, Info } from 'lucide-react';
 import { RequireAccess } from '@/components/require-access';
-import { useEffectiveUser } from '@/components/providers';
-import { DILESA_EMPRESA_ID } from '@/lib/empresa-constants';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast';
 import { getSupabaseErrorMessage } from '@/lib/supabase-error';
 import { CapturarFaseHeader } from '@/components/dilesa/capturar-fase-header';
-import { marcarFase } from '@/lib/dilesa/captura/marcar-fase';
-import {
-  DocsFaseSection,
-  useDocsFaseColaborativos,
-  type SlotColaborativo,
-} from '@/components/dilesa/captura/docs-fase-colaborativos';
-import {
-  IndicadorAutoguardado,
-  useAutoguardadoCampos,
-} from '@/components/dilesa/captura/autoguardado-campos';
-import { hoyISOMatamoros } from '@/lib/fecha-mx';
-
-const SLOTS_FASE: SlotColaborativo[] = [
-  { rol: 'imagen_detonacion', label: 'Comprobante de transferencia/depósito', requerido: true },
-];
+import { getAdjuntoProxyUrl } from '@/lib/adjuntos';
 
 type VentaCtx = {
   id: string;
@@ -58,6 +38,20 @@ type VentaCtx = {
   unidad_id: string | null;
   fecha_detonacion: string | null;
   monto_detonado: number | null;
+  monto_credito_titular: number | null;
+  monto_credito_cotitular: number | null;
+};
+
+/** Abono `fuente='institucion'` del estado de cuenta (erp.cxc_pagos). */
+type AbonoInstitucion = {
+  id: string;
+  fecha: string | null;
+  monto_total: number;
+  forma_pago: string | null;
+  referencia: string | null;
+  comprobante_adjunto_id: string | null;
+  /** Path en Storage del comprobante (erp.adjuntos.url), null = sin comprobante. */
+  comprobantePath: string | null;
 };
 
 const moneyFmt = new Intl.NumberFormat('es-MX', {
@@ -78,34 +72,16 @@ export default function CapturarFase12Page() {
 
 function CapturarFase12Body() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const toast = useToast();
   const sb = useMemo(() => createSupabaseBrowserClient(), []);
   const ventaId = params.id;
-
-  // Cierre manual = SOLO Dirección (admin global o rol Dirección en DILESA).
-  // El resto del equipo ve la guía hacia el estado de cuenta.
-  const { data: effectiveUser, loading: userLoading } = useEffectiveUser();
-  const esDireccion =
-    !!effectiveUser?.isAdmin ||
-    (effectiveUser?.direccionEmpresaIds ?? []).includes(DILESA_EMPRESA_ID);
 
   const [venta, setVenta] = useState<VentaCtx | null>(null);
   const [fase11Cerrada, setFase11Cerrada] = useState<boolean | null>(null);
   const [yaCerrada, setYaCerrada] = useState<boolean>(false);
-
-  const [fechaDetonacion, setFechaDetonacion] = useState<string>(hoyISOMatamoros());
-  const [montoDetonado, setMontoDetonado] = useState<string>('');
-  // Autoguardado (ADR-051): firma de lo persistido (arranca = lo cargado).
-  const [guardado, setGuardado] = useState<{ fecha: string; monto: string }>({
-    fecha: hoyISOMatamoros(),
-    monto: '',
-  });
-  const docsFase = useDocsFaseColaborativos(ventaId, SLOTS_FASE);
+  const [abonos, setAbonos] = useState<AbonoInstitucion[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   // ── Cargar contexto ──────────────────────────────────────────────
   useEffect(() => {
@@ -119,7 +95,9 @@ function CapturarFase12Body() {
       const { data: vRow, error: vErr } = await sb
         .schema('dilesa')
         .from('ventas')
-        .select('id, persona_id, unidad_id, fecha_detonacion, monto_detonado')
+        .select(
+          'id, persona_id, unidad_id, fecha_detonacion, monto_detonado, monto_credito_titular, monto_credito_cotitular'
+        )
         .eq('id', ventaId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -136,12 +114,6 @@ function CapturarFase12Body() {
       }
       const v = vRow as unknown as VentaCtx;
       setVenta(v);
-      if (v.fecha_detonacion) setFechaDetonacion(v.fecha_detonacion);
-      if (v.monto_detonado != null) setMontoDetonado(String(v.monto_detonado));
-      setGuardado({
-        fecha: v.fecha_detonacion ?? hoyISOMatamoros(),
-        monto: v.monto_detonado != null ? String(v.monto_detonado) : '',
-      });
 
       const { data: fRows } = await sb
         .schema('dilesa')
@@ -155,6 +127,42 @@ function CapturarFase12Body() {
       setFase11Cerrada(posiciones.includes(11));
       setYaCerrada(posiciones.includes(12));
 
+      // Abonos de institución en Cobranza (mismo amarre origen_id que la
+      // cuadratura). La fecha de detonación es la del último de estos abonos.
+      const { data: pagosRows } = await sb
+        .schema('erp')
+        .from('cxc_pagos')
+        .select('id, fecha, monto_total, forma_pago, referencia, comprobante_adjunto_id')
+        .eq('origen_tipo', 'venta_dilesa')
+        .eq('origen_id', v.id)
+        .eq('fuente', 'institucion')
+        .is('deleted_at', null)
+        .order('fecha', { ascending: true });
+      if (!activo) return;
+
+      const pagos = (pagosRows ?? []) as unknown as Omit<AbonoInstitucion, 'comprobantePath'>[];
+      const adjuntoIds = pagos.map((p) => p.comprobante_adjunto_id).filter(Boolean) as string[];
+      let pathPorAdjunto = new Map<string, string>();
+      if (adjuntoIds.length > 0) {
+        const { data: adjRows } = await sb
+          .schema('erp')
+          .from('adjuntos')
+          .select('id, url')
+          .in('id', adjuntoIds);
+        if (!activo) return;
+        pathPorAdjunto = new Map(
+          ((adjRows ?? []) as { id: string; url: string | null }[]).map((a) => [a.id, a.url ?? ''])
+        );
+      }
+      setAbonos(
+        pagos.map((p) => ({
+          ...p,
+          comprobantePath: p.comprobante_adjunto_id
+            ? (pathPorAdjunto.get(p.comprobante_adjunto_id) ?? null)
+            : null,
+        }))
+      );
+
       setLoading(false);
     })();
 
@@ -162,95 +170,6 @@ function CapturarFase12Body() {
       activo = false;
     };
   }, [ventaId, sb]);
-
-  // ── Autoguardado (ADR-051) ──────────────────────────────────────
-  // Fecha + monto de detonación persisten al cambiarlos. SOLO Dirección (el form
-  // de captura manual solo se le muestra a Dirección; el resto ve la guía de cobranza).
-  const auto = useAutoguardadoCampos({
-    clave: JSON.stringify({ fecha: fechaDetonacion, monto: montoDetonado }),
-    claveGuardada: JSON.stringify(guardado),
-    habilitado: !!venta && !yaCerrada && esDireccion,
-    guardar: async () => {
-      if (!venta) return { ok: false };
-      const { error: upErr } = await sb
-        .schema('dilesa')
-        .from('ventas')
-        .update({
-          fecha_detonacion: fechaDetonacion || null,
-          monto_detonado: montoDetonado.trim() ? Number(montoDetonado) : null,
-        })
-        .eq('id', venta.id);
-      if (upErr) return { ok: false, error: getSupabaseErrorMessage(upErr, 'No se pudo guardar.') };
-      setGuardado({ fecha: fechaDetonacion, monto: montoDetonado });
-      return { ok: true };
-    },
-  });
-
-  // ── Submit ───────────────────────────────────────────────────────
-  const onSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!venta) return;
-      if (docsFase.faltantes.length > 0) {
-        toast.add({
-          title: 'Falta el comprobante del depósito',
-          description: 'Sube el comprobante de transferencia/depósito de la detonación.',
-          type: 'error',
-        });
-        return;
-      }
-      if (!fechaDetonacion) {
-        toast.add({
-          title: 'Falta la fecha de detonación',
-          description: 'Captura la fecha en que se recibió el depósito.',
-          type: 'error',
-        });
-        return;
-      }
-      const monto = montoDetonado === '' ? null : Number(montoDetonado);
-      if (monto != null && (!Number.isFinite(monto) || monto < 0)) {
-        toast.add({
-          title: 'Monto detonado inválido',
-          description: 'Captura un monto válido o déjalo vacío.',
-          type: 'error',
-        });
-        return;
-      }
-
-      setSubmitting(true);
-      const { data: userRes } = await sb.auth.getUser();
-      const userId = userRes?.user?.id ?? null;
-
-      const result = await marcarFase(sb, {
-        ventaId: venta.id,
-        faseposicion: 12,
-        docs: [], // el comprobante ya vive en el expediente (subida incremental)
-        camposVenta: {
-          fecha_detonacion: fechaDetonacion,
-          monto_detonado: monto,
-        },
-        notas: null,
-        registradoPor: userId,
-      });
-
-      setSubmitting(false);
-      if (!result.ok) {
-        toast.add({
-          title: 'Error al cerrar Fase 12',
-          description: result.error ?? 'Error desconocido.',
-          type: 'error',
-        });
-        return;
-      }
-      toast.add({
-        title: 'Fase 12 cerrada',
-        description: 'Detonación registrada. Continúa con la siguiente fase desde el detalle.',
-        type: 'success',
-      });
-      router.push(`/dilesa/ventas/${venta.id}`);
-    },
-    [docsFase.faltantes, fechaDetonacion, montoDetonado, router, sb, toast, venta]
-  );
 
   // ── Render ───────────────────────────────────────────────────────
   if (loading) {
@@ -278,7 +197,7 @@ function CapturarFase12Body() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <CapturarFaseHeader
         faseposicion={12}
-        descripcion="Registra la detonación del crédito (el depósito recibido) y sube el comprobante."
+        descripcion="La detonación se registra en Cobranza; esta fase se cierra sola."
       />
 
       {yaCerrada ? (
@@ -306,85 +225,21 @@ function CapturarFase12Body() {
             </Link>
           }
         />
-      ) : userLoading ? (
-        <Skeleton className="h-48 w-full rounded-lg" />
-      ) : !esDireccion ? (
-        <GuiaCobranza ventaId={venta.id} />
       ) : (
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="rounded-lg border border-amber-400/50 bg-amber-50 p-4 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-            <div className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">Cierre manual de emergencia (solo Dirección)</p>
-                <p>
-                  Esta pantalla NO registra el depósito en Cobranza: el estado de cuenta de la venta
-                  quedará sin el abono. El camino normal es registrar el abono de la institución en
-                  el estado de cuenta — la fase se cierra sola y el comprobante se copia al
-                  expediente. Si cierras por aquí, registra el abono en Cobranza después.
-                </p>
-                <Link
-                  href={`/dilesa/ventas/${venta.id}?abono=1`}
-                  className="inline-block font-medium underline"
-                >
-                  Mejor registrar el abono ahora →
-                </Link>
-              </div>
-            </div>
-          </div>
+        <GuiaCobranza ventaId={venta.id} />
+      )}
 
-          <DocsFaseSection state={docsFase} titulo="Comprobante del depósito" />
+      <NotaCierreAutomatico />
 
-          <Section
-            title="Datos de la detonación"
-            accion={<IndicadorAutoguardado estado={auto.estado} error={auto.error} />}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Fecha de detonación *">
-                <Input
-                  type="date"
-                  value={fechaDetonacion}
-                  onChange={(e) => setFechaDetonacion(e.target.value)}
-                  required
-                />
-              </Field>
-              <Field label="Monto detonado (opcional)">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={montoDetonado}
-                  onChange={(e) => setMontoDetonado(e.target.value)}
-                />
-                <Hint>
-                  {montoDetonado === ''
-                    ? 'Monto del depósito recibido'
-                    : money(Number(montoDetonado) || 0)}
-                </Hint>
-              </Field>
-            </div>
-          </Section>
-
-          <div className="flex items-center justify-end gap-3">
-            <Link
-              href={`/dilesa/ventas/${venta.id}`}
-              className="text-sm text-muted-foreground hover:text-[var(--text)]"
-            >
-              Cancelar
-            </Link>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" /> Guardando…
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 size-4" /> Guardar fase
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
+      {(fase11Cerrada !== false || abonos.length > 0) && (
+        <AbonosInstitucionSection
+          abonos={abonos}
+          creditoEsperado={
+            (Number(venta.monto_credito_titular) || 0) +
+            (Number(venta.monto_credito_cotitular) || 0)
+          }
+          fechaDetonacion={venta.fecha_detonacion}
+        />
       )}
     </div>
   );
@@ -401,9 +256,9 @@ function GuiaCobranza({ ventaId }: { ventaId: string }) {
           </p>
           <p className="text-[var(--text)]/70">
             Registra el abono de la institución en el estado de cuenta de la venta — con su
-            comprobante y el XML del recibo de caja. Al registrarlo, esta fase se cierra sola y el
-            comprobante se copia al expediente. Con coacreditados (p. ej. Infonavit Unamos),
-            registra un abono por cada depósito, cada uno con su comprobante.
+            comprobante y el XML del recibo de caja (ambos obligatorios). Al registrarlo, esta fase
+            se cierra sola y el comprobante se copia al expediente. Con coacreditados (p. ej.
+            Infonavit Unamos), registra un abono por cada depósito, cada uno con su comprobante.
           </p>
         </div>
       </div>
@@ -414,6 +269,148 @@ function GuiaCobranza({ ventaId }: { ventaId: string }) {
         <Banknote className="h-4 w-4" /> Registrar abono en el estado de cuenta
       </Link>
     </div>
+  );
+}
+
+/**
+ * Cómo, cuándo y con qué fecha se cierra la fase 12 — visible siempre
+ * (decisión Beto 2026-07-01: sin captura manual; todo por CxC).
+ */
+function NotaCierreAutomatico() {
+  return (
+    <div className="rounded-lg border border-sky-400/40 bg-sky-50 p-4 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100">
+      <div className="flex items-start gap-2">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="space-y-1">
+          <p className="font-medium">¿Cómo se cierra esta fase?</p>
+          <ul className="list-disc space-y-1 pl-4">
+            <li>
+              <strong>Cómo:</strong> registrando el abono de la institución (fuente «Institución»)
+              en el estado de cuenta de la venta, con su comprobante de depósito y el XML del recibo
+              de caja. No hay captura manual.
+            </li>
+            <li>
+              <strong>Cuándo:</strong> al registrar el primer abono de institución con la venta
+              escriturada (Fase 11 cerrada). Depósitos anteriores no la avanzan.
+            </li>
+            <li>
+              <strong>Con qué fecha:</strong> la fecha del <strong>último</strong> abono de
+              institución — con cuantos depósitos sean (coacreditados), el último salda y marca la
+              fecha. Esa fecha es la base del cálculo y pago de comisiones. Si Cobranza corrige o
+              elimina un abono, la fecha se recalcula sola.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function fmtFecha(d: string | null): string {
+  if (!d) return '—';
+  // Fechas YYYY-MM-DD (date): parsear sin TZ para no correr el día.
+  const [y, m, day] = d.slice(0, 10).split('-');
+  return `${day}/${m}/${y}`;
+}
+
+/**
+ * Los abonos de institución registrados en Cobranza — la fuente de verdad de
+ * la detonación. La fecha de la fase 12 es la del ÚLTIMO de estos abonos (con
+ * cuantos recibos sean, el último salda y marca fecha); el trigger
+ * `fn_detonar_venta_desde_cxc` + `trg_resync_detonacion_por_pago` la mantienen
+ * sincronizada sola.
+ */
+function AbonosInstitucionSection({
+  abonos,
+  creditoEsperado,
+  fechaDetonacion,
+}: {
+  abonos: AbonoInstitucion[];
+  creditoEsperado: number;
+  fechaDetonacion: string | null;
+}) {
+  const total = abonos.reduce((s, a) => s + (Number(a.monto_total) || 0), 0);
+  const saldado = creditoEsperado > 0 && total >= creditoEsperado;
+  const faltante = creditoEsperado > 0 ? Math.max(0, creditoEsperado - total) : 0;
+
+  return (
+    <Section title="Abonos de institución en Cobranza">
+      {abonos.length === 0 ? (
+        <p className="text-sm text-[var(--text)]/60">
+          Sin abonos de institución registrados en el estado de cuenta. La fecha de detonación se
+          fija sola con el último abono que se registre en Cobranza.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wide text-[var(--text)]/50">
+                <th className="py-1.5 pr-3 font-medium">Fecha</th>
+                <th className="py-1.5 pr-3 text-right font-medium">Monto</th>
+                <th className="py-1.5 pr-3 font-medium">Forma de pago</th>
+                <th className="py-1.5 pr-3 font-medium">Referencia</th>
+                <th className="py-1.5 font-medium">Comprobante</th>
+              </tr>
+            </thead>
+            <tbody>
+              {abonos.map((a) => (
+                <tr key={a.id} className="border-b border-[var(--border)]/60 last:border-0">
+                  <td className="py-2 pr-3 whitespace-nowrap">{fmtFecha(a.fecha)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{money(a.monto_total)}</td>
+                  <td className="py-2 pr-3 capitalize">{a.forma_pago ?? '—'}</td>
+                  <td className="py-2 pr-3">{a.referencia ?? '—'}</td>
+                  <td className="py-2">
+                    {a.comprobantePath ? (
+                      <a
+                        href={getAdjuntoProxyUrl(a.comprobantePath)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-[var(--accent)] underline"
+                      >
+                        Ver <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                        Sin comprobante — adjúntalo al abono en Cobranza
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-[var(--muted)]/40 px-3 py-2 text-sm">
+            <span>
+              Detonado <span className="font-medium tabular-nums">{money(total)}</span>
+              {creditoEsperado > 0 && (
+                <span className="text-[var(--text)]/60">
+                  {' '}
+                  · crédito esperado {money(creditoEsperado)}
+                </span>
+              )}
+            </span>
+            {creditoEsperado > 0 &&
+              (saldado ? (
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" /> Crédito saldado
+                </span>
+              ) : (
+                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  Detonación parcial — faltan {money(faltante)}
+                </span>
+              ))}
+          </div>
+
+          {fechaDetonacion && (
+            <Hint>
+              Fecha de detonación: {fmtFecha(fechaDetonacion)} — el último abono de institución
+              marca la fecha (base del cálculo de comisiones).
+            </Hint>
+          )}
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -436,17 +433,6 @@ function Section({
       </div>
       {children}
     </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-[var(--text)]/50">
-        {label}
-      </span>
-      {children}
-    </label>
   );
 }
 
